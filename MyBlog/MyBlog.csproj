@@ -11,4 +11,10 @@
       <None Include="wwwroot\Posts\Intro_To_Design_Patterns_In_C#.html" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Update="wwwroot\**\*">
+            <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        </Content>
+    </ItemGroup>
+
 </Project>
