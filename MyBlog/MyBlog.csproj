@@ -10,6 +10,9 @@
     <ItemGroup>
       <None Include="wwwroot\Posts\Design_Patterns_In_C#_Part_2.html" />
       <None Include="wwwroot\Posts\Intro_To_Design_Patterns_In_C#.html" />
+      <None Update="render.yaml">
+        <DependentUpon>.dockerignore</DependentUpon>
+      </None>
     </ItemGroup>
 
     <ItemGroup>
