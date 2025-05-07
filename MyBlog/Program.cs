@@ -17,7 +17,8 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Blog}/{action=Index}/{id?}");
+    name: "blogPost",
+    pattern: "blog/{slug}",
+    defaults: new { controller = "Blog", action = "Post" });
 
 app.Run("http://0.0.0.0:80");
