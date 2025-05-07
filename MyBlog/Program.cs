@@ -1,30 +1,23 @@
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<BlogService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // Serve wwwroot content
 app.UseRouting();
-
 app.UseAuthorization();
 
-app.MapStaticAssets();
-app.UseStaticFiles(); // Needed to serve css/js/images
-
 app.MapControllerRoute(
-        name: "default",
-        pattern: "{controller=Blog}/{action=Index}/{id?}")
-    .WithStaticAssets();
+    name: "default",
+    pattern: "{controller=Blog}/{action=Index}/{id?}");
 
 app.Run("http://0.0.0.0:80");
