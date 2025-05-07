@@ -3,5 +3,5 @@
 <h1>@Model.Title</h1>
 <p>@Model.DatePosted.ToString("MMMM dd, yyyy")</p>
 <div>
-    @Model.Content
+    @Html.Raw(Model.Content) <!-- This ensures the Content is rendered as HTML -->
 </div>
