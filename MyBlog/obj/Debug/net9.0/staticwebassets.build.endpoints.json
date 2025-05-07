@@ -301,174 +301,13 @@
       ]
     },
     {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.f13gq2cqct.html",
-      "AssetFile": "Posts/Design_Patterns_In_C#_Part_2.html.gz",
-      "Selectors": [
-        {
-          "Name": "Content-Encoding",
-          "Value": "gzip",
-          "Quality": "0.000794281176"
-        }
-      ],
-      "ResponseHeaders": [
-        {
-          "Name": "Accept-Ranges",
-          "Value": "bytes"
-        },
-        {
-          "Name": "Cache-Control",
-          "Value": "max-age=31536000, immutable"
-        },
-        {
-          "Name": "Content-Encoding",
-          "Value": "gzip"
-        },
-        {
-          "Name": "Content-Length",
-          "Value": "1258"
-        },
-        {
-          "Name": "Content-Type",
-          "Value": "text/html"
-        },
-        {
-          "Name": "ETag",
-          "Value": "\"oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=\""
-        },
-        {
-          "Name": "ETag",
-          "Value": "W/\"Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=\""
-        },
-        {
-          "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
-        },
-        {
-          "Name": "Vary",
-          "Value": "Content-Encoding"
-        }
-      ],
-      "EndpointProperties": [
-        {
-          "Name": "fingerprint",
-          "Value": "f13gq2cqct"
-        },
-        {
-          "Name": "integrity",
-          "Value": "sha256-Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI="
-        },
-        {
-          "Name": "label",
-          "Value": "Posts/Design_Patterns_In_C#_Part_2.html"
-        }
-      ]
-    },
-    {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.f13gq2cqct.html",
-      "AssetFile": "Posts/Design_Patterns_In_C#_Part_2.html",
-      "Selectors": [],
-      "ResponseHeaders": [
-        {
-          "Name": "Accept-Ranges",
-          "Value": "bytes"
-        },
-        {
-          "Name": "Cache-Control",
-          "Value": "max-age=31536000, immutable"
-        },
-        {
-          "Name": "Content-Length",
-          "Value": "2653"
-        },
-        {
-          "Name": "Content-Type",
-          "Value": "text/html"
-        },
-        {
-          "Name": "ETag",
-          "Value": "\"Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=\""
-        },
-        {
-          "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
-        }
-      ],
-      "EndpointProperties": [
-        {
-          "Name": "fingerprint",
-          "Value": "f13gq2cqct"
-        },
-        {
-          "Name": "integrity",
-          "Value": "sha256-Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI="
-        },
-        {
-          "Name": "label",
-          "Value": "Posts/Design_Patterns_In_C#_Part_2.html"
-        }
-      ]
-    },
-    {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.f13gq2cqct.html.gz",
-      "AssetFile": "Posts/Design_Patterns_In_C#_Part_2.html.gz",
-      "Selectors": [],
-      "ResponseHeaders": [
-        {
-          "Name": "Accept-Ranges",
-          "Value": "bytes"
-        },
-        {
-          "Name": "Cache-Control",
-          "Value": "max-age=31536000, immutable"
-        },
-        {
-          "Name": "Content-Encoding",
-          "Value": "gzip"
-        },
-        {
-          "Name": "Content-Length",
-          "Value": "1258"
-        },
-        {
-          "Name": "Content-Type",
-          "Value": "text/html"
-        },
-        {
-          "Name": "ETag",
-          "Value": "\"oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=\""
-        },
-        {
-          "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
-        },
-        {
-          "Name": "Vary",
-          "Value": "Content-Encoding"
-        }
-      ],
-      "EndpointProperties": [
-        {
-          "Name": "fingerprint",
-          "Value": "f13gq2cqct"
-        },
-        {
-          "Name": "integrity",
-          "Value": "sha256-oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs="
-        },
-        {
-          "Name": "label",
-          "Value": "Posts/Design_Patterns_In_C#_Part_2.html.gz"
-        }
-      ]
-    },
-    {
       "Route": "Posts/Design_Patterns_In_C#_Part_2.html",
       "AssetFile": "Posts/Design_Patterns_In_C#_Part_2.html.gz",
       "Selectors": [
         {
           "Name": "Content-Encoding",
           "Value": "gzip",
-          "Quality": "0.000794281176"
+          "Quality": "0.000858369099"
         }
       ],
       "ResponseHeaders": [
@@ -486,7 +325,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "1258"
+          "Value": "1164"
         },
         {
           "Name": "Content-Type",
@@ -494,15 +333,15 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=\""
+          "Value": "\"duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=\""
         },
         {
           "Name": "ETag",
-          "Value": "W/\"Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=\""
+          "Value": "W/\"TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
         },
         {
           "Name": "Vary",
@@ -512,7 +351,7 @@
       "EndpointProperties": [
         {
           "Name": "integrity",
-          "Value": "sha256-Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI="
+          "Value": "sha256-TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g="
         }
       ]
     },
@@ -531,7 +370,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "2653"
+          "Value": "2550"
         },
         {
           "Name": "Content-Type",
@@ -539,17 +378,17 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=\""
+          "Value": "\"TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
         }
       ],
       "EndpointProperties": [
         {
           "Name": "integrity",
-          "Value": "sha256-Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI="
+          "Value": "sha256-TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g="
         }
       ]
     },
@@ -572,7 +411,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "1258"
+          "Value": "1164"
         },
         {
           "Name": "Content-Type",
@@ -580,11 +419,11 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=\""
+          "Value": "\"duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
         },
         {
           "Name": "Vary",
@@ -594,7 +433,168 @@
       "EndpointProperties": [
         {
           "Name": "integrity",
-          "Value": "sha256-oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs="
+          "Value": "sha256-duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.jwu92xgsqk.html",
+      "AssetFile": "Posts/Design_Patterns_In_C#_Part_2.html.gz",
+      "Selectors": [
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip",
+          "Quality": "0.000858369099"
+        }
+      ],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1164"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=\""
+        },
+        {
+          "Name": "ETag",
+          "Value": "W/\"TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "jwu92xgsqk"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g="
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/Design_Patterns_In_C#_Part_2.html"
+        }
+      ]
+    },
+    {
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.jwu92xgsqk.html",
+      "AssetFile": "Posts/Design_Patterns_In_C#_Part_2.html",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "2550"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "jwu92xgsqk"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g="
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/Design_Patterns_In_C#_Part_2.html"
+        }
+      ]
+    },
+    {
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.jwu92xgsqk.html.gz",
+      "AssetFile": "Posts/Design_Patterns_In_C#_Part_2.html.gz",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1164"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "jwu92xgsqk"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI="
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/Design_Patterns_In_C#_Part_2.html.gz"
         }
       ]
     },
@@ -893,6 +893,304 @@
         {
           "Name": "integrity",
           "Value": "sha256-oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.500wjmm519.html",
+      "AssetFile": "Posts/SOLID_Principles_And_More_OOP_Terms.html.gz",
+      "Selectors": [
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip",
+          "Quality": "0.000582750583"
+        }
+      ],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1715"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=\""
+        },
+        {
+          "Name": "ETag",
+          "Value": "W/\"+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "500wjmm519"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4="
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/SOLID_Principles_And_More_OOP_Terms.html"
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.500wjmm519.html",
+      "AssetFile": "Posts/SOLID_Principles_And_More_OOP_Terms.html",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "4154"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "500wjmm519"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4="
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/SOLID_Principles_And_More_OOP_Terms.html"
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.500wjmm519.html.gz",
+      "AssetFile": "Posts/SOLID_Principles_And_More_OOP_Terms.html.gz",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1715"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "500wjmm519"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM="
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/SOLID_Principles_And_More_OOP_Terms.html.gz"
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.html",
+      "AssetFile": "Posts/SOLID_Principles_And_More_OOP_Terms.html.gz",
+      "Selectors": [
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip",
+          "Quality": "0.000582750583"
+        }
+      ],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1715"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=\""
+        },
+        {
+          "Name": "ETag",
+          "Value": "W/\"+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.html",
+      "AssetFile": "Posts/SOLID_Principles_And_More_OOP_Terms.html",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "4154"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.html.gz",
+      "AssetFile": "Posts/SOLID_Principles_And_More_OOP_Terms.html.gz",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1715"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM="
         }
       ]
     },

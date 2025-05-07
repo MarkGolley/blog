@@ -1,54 +1,39 @@
-@model BlogPost
-<h1 class="mb-4">Intro to Design Patterns in C#</h1>
+<h2 class="mb-3">Design Patterns Part 2</h2>
 
-<p>Straight away I didn’t know design patterns are actually grouped into three categories:</p>
-
-<ul>
-    <li><strong>Creational</strong> – Creating objects (e.g. Singleton, Factory)</li>
-    <li><strong>Structural</strong> – Composing objects and classes (e.g. Adapter, Decorator)</li>
-    <li><strong>Behavioural</strong> – Managing object interaction and communication (e.g. Observer)</li>
-</ul>
-
-<h2 class="mt-4">🧱 Creational Patterns</h2>
-
-<h4>Singleton</h4>
+<h4>Repository</h4>
 <p>
-    Ensures a class has only one instance and provides global access to it. Often used for logging, config, or data connections.
-    You make the constructor private so new instances can't be created directly. Instead, a property manages the instance creation,
-    checking if one already exists. To make it thread-safe, use a <code>readonly</code> lock object and wrap access in a <code>lock</code> block.
-</p>
-<p>
-    <em>(@patches – does the Warp Engine use this for DataServices? Sounds like a Singleton under the hood, and maybe a Factory to wrap it?)</em>
+    This was interesting as I can see that you can create the repository you need to interact with and then put in place an interface
+    to require the repository and methods to interact with it, such as adding or finding. You can then create a concrete class which
+    implements all of this and, using dependency injection, instantiate the class. Now the service can interact with the data with the
+    details abstracted away — and I think that means you can have different implementations for different databases?
 </p>
 
-<h4>Factory</h4>
+<h4>Strategy</h4>
 <p>
-    Hides the creation logic of objects. You create multiple implementations of an interface, then use a Factory to return the right one
-    depending on conditions (like a <code>switch</code>). This means consumers don’t need to worry about how the object is created.
-</p>
-<p>
-    I saw Carl do this with an Entities Factory that returns impersonated or non-impersonated clients. Very cool — keeps consuming code clean.
-</p>
-
-<h2 class="mt-4">🏗️ Structural Patterns</h2>
-
-<h4>Adapter</h4>
-<p>
-    Lets you adapt an existing class to a new interface — perfect when you have legacy code (e.g. old logger) that doesn’t match your
-    current system's expected interface. The Adapter class bridges that gap.
+    This was really interesting — it’s a pattern where you provide behavior by injecting the class with the desired behavior.
+    The example I saw was where a payment service needs to handle different payment types. They created an interface that simply
+    defines a method like <code>Pay()</code>, then created several implementations (e.g. PayPal, Apple Pay, etc.).
+    When constructing the service, you pass in the strategy class you want, so when the service calls <code>Pay()</code>, it uses
+    the correct implementation. It seemed cool for cases where the same action occurs in different ways — you just swap in the strategy.
+    It suggested that if you find yourself writing a lot of <code>if</code> statements to vary behavior, maybe a strategy pattern
+    would be better.
 </p>
 
-<h4>Decorator</h4>
+<h3 class="mt-4">KATA Learnings</h3>
+
+<h4>StringBuilder</h4>
 <p>
-    Adds new behaviour to an object without changing its core logic. You use an abstract decorator class that implements the same interface
-    as the object, pass the original object into it, and then override methods to enhance or change behaviour — like adding extra text to a log.
+    This is a faster way to build strings, since concatenation creates a new string each time.
+    I’ve seen <code>StringBuilder</code> before but hadn’t looked into it. I liked how you can use <code>Append()</code>
+    to add more text (there are other methods too like <code>Clear()</code> and <code>Replace()</code>).
+    It feels nicer than using <code>+=</code>. I also read that in short or simple cases, regular concatenation
+    is fine — but for more complex string operations, <code>StringBuilder</code> is more performant.
 </p>
 
-<h2 class="mt-4">🧠 Behavioural Patterns</h2>
-
-<h4>Observer</h4>
+<h4>Char vs String</h4>
 <p>
-    Automatically reacts to changes in another object. The pattern uses a <strong>Subject</strong> that holds a list of <strong>Observers</strong>.
-    Observers can be added/removed, and when the subject's state changes, it notifies all observers to react. This reminded me of delegates —
-    that automatic action triggering was very cool.
+    I never knew that <code>'A'</code> is a <strong>char</strong> and <code>"A"</code> is a <strong>string</strong>.
+    So if you use <code>"A"</code>, that’s already a string — not a character. I think I didn’t know this
+    because in Python and JavaScript (where I started), there’s no difference between <code>"</code> and <code>'</code> — they’re both strings.
+    I’ll definitely be more mindful of that distinction in C# now.
 </p>

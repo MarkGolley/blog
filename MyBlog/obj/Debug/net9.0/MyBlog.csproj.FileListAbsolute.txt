@@ -96,5 +96,7 @@ C:\Users\markg\RiderProjects\MyBlog\MyBlog\obj\Debug\net9.0\MyBlog.pdb
 C:\Users\markg\RiderProjects\MyBlog\MyBlog\obj\Debug\net9.0\MyBlog.genruntimeconfig.cache
 C:\Users\markg\RiderProjects\MyBlog\MyBlog\obj\Debug\net9.0\ref\MyBlog.dll
 C:\Users\markg\RiderProjects\MyBlog\MyBlog\obj\Debug\net9.0\compressed\82r7s7nl6g-f13gq2cqct.gz
-C:\Users\markg\RiderProjects\MyBlog\MyBlog\obj\Debug\net9.0\compressed\jxaea5g300-f13gq2cqct.gz
 C:\Users\markg\RiderProjects\MyBlog\MyBlog\obj\Debug\net9.0\MyBlog.sourcelink.json
+C:\Users\markg\RiderProjects\MyBlog\MyBlog\bin\Debug\net9.0\global.json
+C:\Users\markg\RiderProjects\MyBlog\MyBlog\obj\Debug\net9.0\compressed\jxaea5g300-jwu92xgsqk.gz
+C:\Users\markg\RiderProjects\MyBlog\MyBlog\obj\Debug\net9.0\compressed\a7j8oulber-500wjmm519.gz

@@ -1164,8 +1164,8 @@
       <RelatedAsset></RelatedAsset>
       <AssetTraitName></AssetTraitName>
       <AssetTraitValue></AssetTraitValue>
-      <Fingerprint>f13gq2cqct</Fingerprint>
-      <Integrity>Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=</Integrity>
+      <Fingerprint>jwu92xgsqk</Fingerprint>
+      <Integrity>TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=</Integrity>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <OriginalItemSpec>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\Posts\Design_Patterns_In_C#_Part_2.html'))</OriginalItemSpec>
@@ -1187,6 +1187,24 @@
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <OriginalItemSpec>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\Posts\Intro_To_Design_Patterns_In_C#.html'))</OriginalItemSpec>
+    </StaticWebAsset>
+    <StaticWebAsset Include="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\Posts\SOLID_Principles_And_More_OOP_Terms.html'))">
+      <SourceType>Package</SourceType>
+      <SourceId>MyBlog</SourceId>
+      <ContentRoot>$(MSBuildThisFileDirectory)..\staticwebassets\</ContentRoot>
+      <BasePath>_content/MyBlog</BasePath>
+      <RelativePath>Posts/SOLID_Principles_And_More_OOP_Terms.html</RelativePath>
+      <AssetKind>All</AssetKind>
+      <AssetMode>All</AssetMode>
+      <AssetRole>Primary</AssetRole>
+      <RelatedAsset></RelatedAsset>
+      <AssetTraitName></AssetTraitName>
+      <AssetTraitValue></AssetTraitValue>
+      <Fingerprint>500wjmm519</Fingerprint>
+      <Integrity>+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=</Integrity>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <OriginalItemSpec>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\staticwebassets\Posts\SOLID_Principles_And_More_OOP_Terms.html'))</OriginalItemSpec>
     </StaticWebAsset>
   </ItemGroup>
 </Project>

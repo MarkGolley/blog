@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "MYNEkW7kJfyVWxauoNzWEaNp9EwDjNypQPJL7vt4HCI=",
+  "Hash": "vftCdgnnoHRB5jw+sgXKKFBthRsrN3IQ3ag5THoNbz8=",
   "Source": "MyBlog",
   "BasePath": "_content/MyBlog",
   "Mode": "Default",
@@ -458,6 +458,27 @@
       "OriginalItemSpec": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\lib\\bootstrap\\dist\\css\\bootstrap-utilities.rtl.css.map"
     },
     {
+      "Identity": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\a7j8oulber-500wjmm519.gz",
+      "SourceId": "MyBlog",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\",
+      "BasePath": "_content/MyBlog",
+      "RelativePath": "Posts/SOLID_Principles_And_More_OOP_Terms#[.{fingerprint=500wjmm519}]?.html.gz",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Alternative",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\SOLID_Principles_And_More_OOP_Terms.html",
+      "AssetTraitName": "Content-Encoding",
+      "AssetTraitValue": "gzip",
+      "Fingerprint": "djuk7iuojl",
+      "Integrity": "maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\SOLID_Principles_And_More_OOP_Terms.html"
+    },
+    {
       "Identity": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\akpk1enydf-4d85u1mtcx.gz",
       "SourceId": "MyBlog",
       "SourceType": "Discovered",
@@ -731,12 +752,12 @@
       "OriginalItemSpec": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\lib\\bootstrap\\dist\\js\\bootstrap.esm.min.js"
     },
     {
-      "Identity": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-f13gq2cqct.gz",
+      "Identity": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-jwu92xgsqk.gz",
       "SourceId": "MyBlog",
       "SourceType": "Discovered",
       "ContentRoot": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\",
       "BasePath": "_content/MyBlog",
-      "RelativePath": "Posts/Design_Patterns_In_C#_Part_2#[.{fingerprint=f13gq2cqct}]?.html.gz",
+      "RelativePath": "Posts/Design_Patterns_In_C#_Part_2#[.{fingerprint=jwu92xgsqk}]?.html.gz",
       "AssetKind": "All",
       "AssetMode": "All",
       "AssetRole": "Alternative",
@@ -745,8 +766,8 @@
       "RelatedAsset": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\Design_Patterns_In_C#_Part_2.html",
       "AssetTraitName": "Content-Encoding",
       "AssetTraitValue": "gzip",
-      "Fingerprint": "xgk4xz85o0",
-      "Integrity": "oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=",
+      "Fingerprint": "az8kbb8o2i",
+      "Integrity": "duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\Design_Patterns_In_C#_Part_2.html"
@@ -2782,8 +2803,8 @@
       "RelatedAsset": "",
       "AssetTraitName": "",
       "AssetTraitValue": "",
-      "Fingerprint": "f13gq2cqct",
-      "Integrity": "Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=",
+      "Fingerprint": "jwu92xgsqk",
+      "Integrity": "TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\Posts\\Design_Patterns_In_C#_Part_2.html"
@@ -2808,6 +2829,27 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\Posts\\Intro_To_Design_Patterns_In_C#.html"
+    },
+    {
+      "Identity": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\SOLID_Principles_And_More_OOP_Terms.html",
+      "SourceId": "MyBlog",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\",
+      "BasePath": "_content/MyBlog",
+      "RelativePath": "Posts/SOLID_Principles_And_More_OOP_Terms#[.{fingerprint}]?.html",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "500wjmm519",
+      "Integrity": "+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\Posts\\SOLID_Principles_And_More_OOP_Terms.html"
     }
   ],
   "Endpoints": [
@@ -21966,13 +22008,13 @@
       ]
     },
     {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.f13gq2cqct.html",
-      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-f13gq2cqct.gz",
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.html",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-jwu92xgsqk.gz",
       "Selectors": [
         {
           "Name": "Content-Encoding",
           "Value": "gzip",
-          "Quality": "0.000794281176"
+          "Quality": "0.000858369099"
         }
       ],
       "ResponseHeaders": [
@@ -21982,19 +22024,19 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "1258"
+          "Value": "1164"
         },
         {
           "Name": "ETag",
-          "Value": "\"oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=\""
+          "Value": "\"duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
         },
         {
           "Name": "Cache-Control",
-          "Value": "max-age=31536000, immutable"
+          "Value": "no-cache"
         },
         {
           "Name": "Content-Encoding",
@@ -22010,26 +22052,18 @@
         },
         {
           "Name": "ETag",
-          "Value": "W/\"Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=\""
+          "Value": "W/\"TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=\""
         }
       ],
       "EndpointProperties": [
         {
-          "Name": "fingerprint",
-          "Value": "f13gq2cqct"
-        },
-        {
-          "Name": "label",
-          "Value": "Posts/Design_Patterns_In_C#_Part_2.html"
-        },
-        {
           "Name": "integrity",
-          "Value": "sha256-Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI="
+          "Value": "sha256-TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g="
         }
       ]
     },
     {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.f13gq2cqct.html",
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.html",
       "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\Design_Patterns_In_C#_Part_2.html",
       "Selectors": [],
       "ResponseHeaders": [
@@ -22039,7 +22073,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "2653"
+          "Value": "2550"
         },
         {
           "Name": "Content-Type",
@@ -22047,11 +22081,156 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=\""
+          "Value": "\"TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.html.gz",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-jwu92xgsqk.gz",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1164"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.jwu92xgsqk.html",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-jwu92xgsqk.gz",
+      "Selectors": [
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip",
+          "Quality": "0.000858369099"
+        }
+      ],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1164"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "W/\"TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=\""
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "jwu92xgsqk"
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/Design_Patterns_In_C#_Part_2.html"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.jwu92xgsqk.html",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\Design_Patterns_In_C#_Part_2.html",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "2550"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -22061,7 +22240,7 @@
       "EndpointProperties": [
         {
           "Name": "fingerprint",
-          "Value": "f13gq2cqct"
+          "Value": "jwu92xgsqk"
         },
         {
           "Name": "label",
@@ -22069,13 +22248,13 @@
         },
         {
           "Name": "integrity",
-          "Value": "sha256-Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI="
+          "Value": "sha256-TZWMQy3UZqXtv1L3cXxbzvM3S/5EmIXtqHdvU85ZR+g="
         }
       ]
     },
     {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.f13gq2cqct.html.gz",
-      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-f13gq2cqct.gz",
+      "Route": "Posts/Design_Patterns_In_C#_Part_2.jwu92xgsqk.html.gz",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-jwu92xgsqk.gz",
       "Selectors": [],
       "ResponseHeaders": [
         {
@@ -22084,7 +22263,7 @@
         },
         {
           "Name": "Content-Length",
-          "Value": "1258"
+          "Value": "1164"
         },
         {
           "Name": "Content-Type",
@@ -22092,11 +22271,11 @@
         },
         {
           "Name": "ETag",
-          "Value": "\"oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=\""
+          "Value": "\"duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI=\""
         },
         {
           "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
+          "Value": "Wed, 07 May 2025 07:54:19 GMT"
         },
         {
           "Name": "Cache-Control",
@@ -22114,7 +22293,7 @@
       "EndpointProperties": [
         {
           "Name": "fingerprint",
-          "Value": "f13gq2cqct"
+          "Value": "jwu92xgsqk"
         },
         {
           "Name": "label",
@@ -22122,144 +22301,7 @@
         },
         {
           "Name": "integrity",
-          "Value": "sha256-oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs="
-        }
-      ]
-    },
-    {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.html",
-      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-f13gq2cqct.gz",
-      "Selectors": [
-        {
-          "Name": "Content-Encoding",
-          "Value": "gzip",
-          "Quality": "0.000794281176"
-        }
-      ],
-      "ResponseHeaders": [
-        {
-          "Name": "Accept-Ranges",
-          "Value": "bytes"
-        },
-        {
-          "Name": "Content-Length",
-          "Value": "1258"
-        },
-        {
-          "Name": "ETag",
-          "Value": "\"oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=\""
-        },
-        {
-          "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
-        },
-        {
-          "Name": "Cache-Control",
-          "Value": "no-cache"
-        },
-        {
-          "Name": "Content-Encoding",
-          "Value": "gzip"
-        },
-        {
-          "Name": "Vary",
-          "Value": "Content-Encoding"
-        },
-        {
-          "Name": "Content-Type",
-          "Value": "text/html"
-        },
-        {
-          "Name": "ETag",
-          "Value": "W/\"Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=\""
-        }
-      ],
-      "EndpointProperties": [
-        {
-          "Name": "integrity",
-          "Value": "sha256-Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI="
-        }
-      ]
-    },
-    {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.html",
-      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\Design_Patterns_In_C#_Part_2.html",
-      "Selectors": [],
-      "ResponseHeaders": [
-        {
-          "Name": "Accept-Ranges",
-          "Value": "bytes"
-        },
-        {
-          "Name": "Content-Length",
-          "Value": "2653"
-        },
-        {
-          "Name": "Content-Type",
-          "Value": "text/html"
-        },
-        {
-          "Name": "ETag",
-          "Value": "\"Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI=\""
-        },
-        {
-          "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
-        },
-        {
-          "Name": "Cache-Control",
-          "Value": "no-cache"
-        }
-      ],
-      "EndpointProperties": [
-        {
-          "Name": "integrity",
-          "Value": "sha256-Y1USMVgkKMgSA4Z9ZLro8iX8xSLzMOutw59nLj9IyCI="
-        }
-      ]
-    },
-    {
-      "Route": "Posts/Design_Patterns_In_C#_Part_2.html.gz",
-      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\jxaea5g300-f13gq2cqct.gz",
-      "Selectors": [],
-      "ResponseHeaders": [
-        {
-          "Name": "Accept-Ranges",
-          "Value": "bytes"
-        },
-        {
-          "Name": "Content-Length",
-          "Value": "1258"
-        },
-        {
-          "Name": "Content-Type",
-          "Value": "text/html"
-        },
-        {
-          "Name": "ETag",
-          "Value": "\"oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs=\""
-        },
-        {
-          "Name": "Last-Modified",
-          "Value": "Tue, 06 May 2025 17:15:18 GMT"
-        },
-        {
-          "Name": "Cache-Control",
-          "Value": "no-cache"
-        },
-        {
-          "Name": "Content-Encoding",
-          "Value": "gzip"
-        },
-        {
-          "Name": "Vary",
-          "Value": "Content-Encoding"
-        }
-      ],
-      "EndpointProperties": [
-        {
-          "Name": "integrity",
-          "Value": "sha256-oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs="
+          "Value": "sha256-duE1HDNFhpkrXYE+iuYgQdtmUPY+q8ZcwNh1c5luRlI="
         }
       ]
     },
@@ -22558,6 +22600,304 @@
         {
           "Name": "integrity",
           "Value": "sha256-oS2NOdnYdF99P3fGqc2Pdf39cDCtOUGZHZLBtvo7KRs="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.500wjmm519.html",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\a7j8oulber-500wjmm519.gz",
+      "Selectors": [
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip",
+          "Quality": "0.000582750583"
+        }
+      ],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1715"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "W/\"+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=\""
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "500wjmm519"
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/SOLID_Principles_And_More_OOP_Terms.html"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.500wjmm519.html",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\SOLID_Principles_And_More_OOP_Terms.html",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "4154"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "500wjmm519"
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/SOLID_Principles_And_More_OOP_Terms.html"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.500wjmm519.html.gz",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\a7j8oulber-500wjmm519.gz",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1715"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "500wjmm519"
+        },
+        {
+          "Name": "label",
+          "Value": "Posts/SOLID_Principles_And_More_OOP_Terms.html.gz"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.html",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\a7j8oulber-500wjmm519.gz",
+      "Selectors": [
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip",
+          "Quality": "0.000582750583"
+        }
+      ],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1715"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "W/\"+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=\""
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.html",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\wwwroot\\Posts\\SOLID_Principles_And_More_OOP_Terms.html",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "4154"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-+4zw3MKvLaHxLmEEvPypz41HqU+ZUJlb3hD1DRBxtJ4="
+        }
+      ]
+    },
+    {
+      "Route": "Posts/SOLID_Principles_And_More_OOP_Terms.html.gz",
+      "AssetFile": "C:\\Users\\markg\\RiderProjects\\MyBlog\\MyBlog\\obj\\Debug\\net9.0\\compressed\\a7j8oulber-500wjmm519.gz",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1715"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "text/html"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Wed, 07 May 2025 07:55:07 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        },
+        {
+          "Name": "Content-Encoding",
+          "Value": "gzip"
+        },
+        {
+          "Name": "Vary",
+          "Value": "Content-Encoding"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-maYy22PqjOoFW/lA7xxYaqa++HmmxU99607NnwClnDM="
         }
       ]
     }

@@ -20,6 +20,7 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+app.UseStaticFiles(); // Needed to serve css/js/images
 
 app.MapControllerRoute(
         name: "default",

@@ -1,0 +1,83 @@
+<h2 class="mb-3">SOLID Principles</h2>
+<p>
+    These are principles that encourage more readable, maintainable, and scalable object-oriented code.
+</p>
+
+<ul>
+    <li>
+        <strong>S - Single Responsibility:</strong> Each class should be responsible for one thing.
+        For example, one class to generate a file, another to save it — not just separate methods in a larger class.
+    </li>
+    <li>
+        <strong>O - Open/Closed:</strong> Classes should be open for extension but closed for modification.
+        I saw an example where logic handled different shapes — rather than constantly updating the same method,
+        you can define an interface and implement new shape classes without touching the original code.
+    </li>
+    <li>
+        <strong>L - Liskov Substitution:</strong> (I’m sorry who/what/where?)
+        This is about ensuring derived classes don't break or change the base class's behaviour.
+        The recommendation was to prefer interfaces over inheritance when types vary in behaviour.
+        If you swap a derived class for its base class, it should still work as expected.
+    </li>
+    <li>
+        <strong>I - Interface Segregation:</strong> It’s better to have lots of small, focused interfaces than
+        one big one that forces implementation of unused methods (you know, when you see <code>throw new NotImplementedException()</code>).
+        I think I've seen that in the Warp Engine — something to revisit.
+    </li>
+    <li>
+        <strong>D - Dependency Inversion:</strong> Avoid relying on low-level components directly inside high-level classes.
+        Instead of newing up a <code>FileLogger</code> inside an ordering service, inject an <code>ILogger</code> and provide
+        the implementation via DI. This makes your code more testable, swappable, and less tightly coupled.
+    </li>
+</ul>
+
+<h3 class="mt-4">Class Naming</h3>
+<p>
+    I picked up on some naming conventions while reading. I’ve always called a subclass a “child class,”
+    but it turns out these are the common terms:
+</p>
+<ul>
+    <li><strong>Superclass / Base Class:</strong> A class that is inherited from.</li>
+    <li><strong>Subclass / Derived Class:</strong> A class that inherits from the base.</li>
+</ul>
+
+<h3 class="mt-4">Other Terminology</h3>
+<p>
+    I came across the term <strong>destructor</strong> (as opposed to a constructor) —
+    it's used to clean up objects but not really used in C# much. That led me down a terminology rabbit hole:
+</p>
+
+<ul>
+    <li>
+        <strong>Abstract Class:</strong> Can’t be instantiated. It may contain abstract methods (which must be implemented
+        in subclasses), and shared methods too.
+    </li>
+    <li>
+        <strong>Static Class:</strong> Also can’t be instantiated. Contains only static members — typically used for utility/helper methods.
+    </li>
+    <li>
+        <strong>Sealed Class:</strong> Can’t be inherited from. Prevents further extension.
+    </li>
+    <li>
+        <strong>Polymorphism:</strong> Just like with dependency inversion — code can work with different implementations
+        of a type through an interface (e.g. <code>ILogger</code>).
+    </li>
+    <li>
+        <strong>Encapsulation:</strong> Keeping internal state private and only exposing what’s needed. Honestly,
+        I don’t think we’re great at this in the Warp Engine — something to work on.
+    </li>
+    <li>
+        <strong>Members of a Class:</strong> All the class “gubbins” — fields, properties, methods, constructors, etc.
+    </li>
+    <li>
+        <strong>Composition:</strong> When one class depends entirely on another and creates it directly —
+        tightly coupled, and both live/die together.
+    </li>
+    <li>
+        <strong>Aggregation:</strong> Like composition, but looser — the dependent class can exist or not,
+        and is often passed in (e.g. a list of objects).
+    </li>
+    <li>
+        <strong>Association:</strong> A general term for when classes are related or know about each other in some way.
+    </li>
+</ul>
