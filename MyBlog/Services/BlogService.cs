@@ -12,27 +12,37 @@ public class BlogService
 
     public IEnumerable<BlogPost> GetAllPosts()
     {
-        var postsPath = Path.Combine(_env.WebRootPath, "Posts");
+        // NOTE: Use consistent case-sensitive path
+        var postsPath = Path.Combine(_env.WebRootPath, "Posts"); 
 
+        // Retrieve all blog post files
         var posts = (from file in Directory.GetFiles(postsPath, "*.html")
             let id = Path.GetFileNameWithoutExtension(file)
             let title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(id.Replace("_", " "))
             let content = File.ReadAllText(file)
             let published = File.GetLastWriteTime(file)
-            select new BlogPost { Id = id, Title = title, Content = content, DatePosted = published }).ToList();
+            select new BlogPost
+            {
+                Id = id,
+                Title = title,
+                Content = content,
+                DatePosted = published
+            }).ToList();
 
         return posts.OrderByDescending(p => p.DatePosted);
     }
 
     public BlogPost GetPostBySlug(string id)
     {
-        var path = Path.Combine(_env.WebRootPath, "posts", id + ".html");
-        if (!System.IO.File.Exists(path)) return null;
+        // Use same directory structure and consistent casing
+        var path = Path.Combine(_env.WebRootPath, "Posts", id + ".html");
+
+        if (!File.Exists(path)) return null;
 
         return new BlogPost
         {
             Id = id,
-            Title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(id.Replace("-", " ")),
+            Title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(id.Replace("_", " ")),
             Content = File.ReadAllText(path),
             DatePosted = File.GetLastWriteTime(path)
         };

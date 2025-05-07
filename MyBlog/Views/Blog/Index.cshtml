@@ -1,10 +1,15 @@
 @model IEnumerable<BlogPost>
+
 <h1>My Blogs</h1>
-<p></p>
+
 @foreach (var post in Model)
 {
     <div class="mb-4">
-        <h3><a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">@post.Title</a></h3>
+        <h3>
+            <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">
+                @post.Title
+            </a>
+        </h3>
         <p class="text-muted">@post.DatePosted.ToString("MMMM dd, yyyy")</p>
     </div>
 }
