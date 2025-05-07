@@ -20,4 +20,9 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+app.MapControllerRoute(
+    name: "blog",
+    pattern: "Blog/Post/{slug?}",
+    defaults: new { controller = "Blog", action = "Post" });
+
 app.Run("http://0.0.0.0:80");
