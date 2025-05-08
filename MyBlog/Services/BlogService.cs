@@ -20,7 +20,7 @@ public class BlogService
             let id = Path.GetFileNameWithoutExtension(file)
             let title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(id.Replace("_", " "))
             let content = File.ReadAllText(file)
-            let published = File.GetLastWriteTime(file)
+            let published = ParsePublishedDate(content)
             select new BlogPost
             {
                 Id = id,
@@ -31,7 +31,7 @@ public class BlogService
 
         return posts.OrderByDescending(p => p.DatePosted);
     }
-
+    
     public BlogPost GetPostBySlug(string id)
     {
         // Use same directory structure and consistent casing
@@ -46,5 +46,19 @@ public class BlogService
             Content = File.ReadAllText(path),
             DatePosted = File.GetLastWriteTime(path)
         };
+    }
+    
+    private static DateTime ParsePublishedDate(string content)
+    {
+        const string keyword = "<!-- PublishedDate:";
+        var startIndex = content.IndexOf(keyword, StringComparison.Ordinal);
+        if (startIndex == -1) return DateTime.MinValue; // Default if no date is found
+
+        startIndex += keyword.Length;
+        var endIndex = content.IndexOf("-->", startIndex, StringComparison.Ordinal);
+        if (endIndex == -1) return DateTime.MinValue;
+
+        var dateString = content.Substring(startIndex, endIndex - startIndex).Trim();
+        return DateTime.TryParse(dateString, out var date) ? date : DateTime.MinValue;
     }
 }
