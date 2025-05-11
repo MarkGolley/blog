@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploying My .NET Blog to Render</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            color: #222;
+        }
+        pre {
+            background: #eee;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .tip {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+<h1>Deploying My .NET Blog to Render</h1>
+
+<p>Recently, I set out to publish my personal .NET blog using <a href="https://render.com" target="_blank" rel="noopener noreferrer">Render</a>, a platform I hadn’t used before but one that looked appealing for simple web hosting. Things didn’t go entirely smoothly. Here’s a recap of what went wrong, what I learned, and what eventually got me over the finish line.</p>
+
+<h2>My Goal</h2>
+<p>I’d built a simple ASP.NET Core MVC blog project with a controller to serve my blog posts from HTML files. All I wanted was to get it hosted somewhere easily and Render seemed like a good option. It <em>was</em>, but only after some trial and error.</p>
+
+<h2>Attempt 1: Native .NET - Static Site</h2>
+<p>Initially, I followed Render’s static Web Service guide. The default build command I was using looked like this:</p>
+<pre><code>dotnet publish MyBlog/MyBlog.csproj -c Release -o out</code></pre>
+<p>But this failed with:</p>
+<pre><code>bash: line 1: dotnet: command not found</code></pre>
+
+<h2>Attempt 2: Docker Deployment - Dynamic Site</h2>
+<p> I wrote a <code>Dockerfile</code> that used the official .NET 8 SDK image, published the app, and exposed port 80</p>
+<p>I also added a <code>render.yaml</code> file to tell Render how to build and deploy the app using Docker. Once this was in place, Render successfully built and ran the app. But.....</p>
+
+<h2>A Mysterious "Not Found"</h2>
+<p>Even though the app deployed, if i visited the URL i just got a <strong>"Not Found"</strong> page. It wasn’t a 404 page from my app — it was Render’s own page.</p>
+<p>After digging in, I realized I’d left in some non-standard code from a .NET 9 preview template I’d previously experimented with. Once I removed them and stuck with the conventional middleware setup (<code>UseStaticFiles()</code>, <code>MapControllerRoute()</code>, etc.), everything worked as expected.</p>
+
+<h2>Success!</h2>
+<p>After cleaning up the Docker file and reverting my <code>Program.cs</code> to the basic methods the site deployed correctly - I finally saw something other than “Not Found”.</p>
+
+<hr>
+
+<p><strong>TL;DR:</strong> If you're deploying a .NET app to Render, use Docker, stick with .NET 8, and use basic syntax unless you’re absolutely sure it will work!</p>
+</body>
+</html>
