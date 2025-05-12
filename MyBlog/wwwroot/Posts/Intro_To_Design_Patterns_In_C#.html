@@ -1,5 +1,47 @@
 <!-- PublishedDate: 2025-04-21 -->
-<h1 class="mb-4">Intro to Design Patterns in C#</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            color: #222;
+        }
+        pre {
+            background: #eee;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .tip {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+<h1>Intro to Design Patterns in C#</h1>
 
 <p>Straight away I didn’t know design patterns are actually grouped into three categories:</p>
 
@@ -16,9 +58,6 @@
     Ensures a class has only one instance and provides global access to it. Often used for logging, config, or data connections.
     You make the constructor private so new instances can't be created directly. Instead, a property manages the instance creation,
     checking if one already exists. To make it thread-safe, use a <code>readonly</code> lock object and wrap access in a <code>lock</code> block.
-</p>
-<p>
-    <em>(@patches – does the Warp Engine use this for DataServices? Sounds like a Singleton under the hood, and maybe a Factory to wrap it?)</em>
 </p>
 
 <h4>Factory</h4>
@@ -52,3 +91,5 @@
     Observers can be added/removed, and when the subject's state changes, it notifies all observers to react. This reminded me of delegates —
     that automatic action triggering was very cool.
 </p>
+</body>
+</html>
