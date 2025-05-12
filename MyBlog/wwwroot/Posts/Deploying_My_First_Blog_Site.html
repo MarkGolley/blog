@@ -53,9 +53,11 @@
 <pre><code>dotnet publish MyBlog/MyBlog.csproj -c Release -o out</code></pre>
 <p>But this failed with:</p>
 <pre><code>bash: line 1: dotnet: command not found</code></pre>
+<p>Basically, Render's docs suggest using their Static Site option for blogs, sounded good right? Even though Render says their Static Site is "great for blogs", it's meant only for blogs built entirely with static HTML, CSS, and JS files — no backend code like C#, no .NET, no dynamic rendering. There in lay the problem.</p>
 
 <h2>Attempt 2: Docker Deployment - Dynamic Site</h2>
-<p> I wrote a <code>Dockerfile</code> that used the official .NET 8 SDK image, published the app, and exposed port 80</p>
+<p>A dynamic site with Render fully supports server-side code and building from a dockerfile, so well suited to me c# ASP.NET core app.</p>
+<p>I wrote a <code>Dockerfile</code> that used the official .NET 8 SDK image, published the app, and exposed port 80</p>
 <p>I also added a <code>render.yaml</code> file to tell Render how to build and deploy the app using Docker. Once this was in place, Render successfully built and ran the app. But.....</p>
 
 <h2>A Mysterious "Not Found"</h2>
@@ -67,6 +69,6 @@
 
 <hr>
 
-<p><strong>TL;DR:</strong> If you're deploying a .NET app to Render, use Docker, stick with .NET 8, and use basic syntax unless you’re absolutely sure it will work!</p>
+<p><strong>TL;DR:</strong> If you're deploying a .NET app to Render, go for their 'Web Services' type of site, use Docker, stick with .NET 8, and use basic syntax unless you’re absolutely sure it will work!</p>
 </body>
 </html>
