@@ -45,7 +45,7 @@
 
 <p>Going back to the basics, a unit test is meant to verify a single bit of functionality, say a method. We want that test to be isolated, so when running the method we don't call out to the internet or make use of a database. We want unit tests to reflect the expected behavior of our solution. We want unit tests to act as a safety net - "Hey, you just broke some expected behavior!"</p>
 
-<p>Sometimes I see that we tend to focus on the happy paths in our tests, but I've always enjoyed thinking about what might go wrong, and testing we handle that correctly too, giving full coverage of the happy and unhappy paths. There are often far more unhappy paths than there are happy ones!</p>
+<p>Sometimes I see that sometime people tend to focus on the happy paths in their tests, but I've always enjoyed thinking about what might go wrong, and testing we handle that correctly too, giving full coverage of the happy and unhappy paths. There are often far more unhappy paths than there are happy ones!</p>
 
 <h2>Why xUnit?</h2>
 <p>It's the main testing tool of the platform I work on at work, so why might that have been chosen and what other options might there have been?</p>
@@ -117,6 +117,10 @@ thingIMocked.Setup(p => p.Add(It.IsAny&lt;int&gt;())).Returns(true);
 </code></pre>
 
 <p>This allows you to run a unit test to check different values and outcomes and cover vast scenarios. You can even call a Verify method to ensure that methods on mocked classes are called a certain number of times, or never - there is a lot of control available here.</p>
+
+<p>But what is mocking, using Moq, actually doing? Firstly it's useful to point out that an alternative would be to stub out a class, so literally writing out a fake class and implementing on there what you want to test, that is clearly going to be tedious and less maintainable than mocking a class using this package.</p>
+<p>So by using Mock&lt;ThingToMock&gt;() instead, Moq actually creates a fake class at runtime and then you can use the API to interact with how that will behave (the setup, returns, verify methods). To do this, Moq is using reflection and something called Dynamic Proxy to create the class and then intercept all method calls. It looks up the matching method call in the registry and then runs the matching mocked version, tracking the parameters and the count of calls.</p>
+<p>Whilst Moq is super useful, it has some limitations I have encountered, where it cannot mock static or sealed types and it cannot mock a class without a parameterless constructor, to get around that I had to mock at a different point in the class.</p>
 
 <h2>In Summary: Why I like using xUnit</h2>
 
