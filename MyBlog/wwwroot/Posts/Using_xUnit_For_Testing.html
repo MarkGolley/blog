@@ -1,0 +1,136 @@
+<!-- PublishedDate: 2025-05-11 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            color: #222;
+        }
+        pre {
+            background: #eee;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .tip {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+<h1>Using xUnit Unit Testing</h1>
+
+<p>Going back to the basics, a unit test is meant to verify a single bit of functionality, say a method. We want that test to be isolated, so when running the method we don't call out to the internet or make use of a database. We want unit tests to reflect the expected behavior of our solution. We want unit tests to act as a safety net - "Hey, you just broke some expected behavior!"</p>
+
+<p>Sometimes I see that we tend to focus on the happy paths in our tests, but I've always enjoyed thinking about what might go wrong, and testing we handle that correctly too, giving full coverage of the happy and unhappy paths. There are often far more unhappy paths than there are happy ones!</p>
+
+<h2>Why xUnit?</h2>
+<p>It's the main testing tool of the platform I work on at work, so why might that have been chosen and what other options might there have been?</p>
+
+<p>Some of the key testing packages out there are MSTest, NUnit and xUnit. I know that in xUnit we tag our tests as either [Fact] or [Theory], this denotes if the test is single and has no parameters vs if it has a package of test data that will be provided, allowing multiple iterations to execute.</p>
+
+<p>Similarly MSTest and NUnit also take tags to decorate methods.</p>
+
+<p>Also, xUnit discovers tests through 'convention-based' discovery, so it looks for those attributes I mentioned on public classes containing the tests and where the test files are in a test project usually ending in '.Tests'. One negative to this though that I have seen is the discovery doesn't always work. I've not had trouble but I have seen some of the QA team members try and run the tests at work and the IDE just will not discover the tests.</p>
+
+<p>Next, the way that xUnit sets up and tears down tests is different, as the class constructor sets up what you need and then there is a Dispose method to place clean up inside of. For NUnit/MSTest you do similar with decorators of [SetUp] and [TearDown] to identify which methods offer that functionality. xUnit's approach feels more familiar as a class.</p>
+
+<p>So next interesting difference is that xUnit actually news up a new instance of the object you are testing per test vs NUnit and MSTest sharing the test class by default, of course that can be overridden. This can be important to have new instances between tests as otherwise you might find side effects of one test can impact the next test and you end up trying to figure out what the heck is going on!</p>
+
+<p>I've also read that a big difference is how good xUnit is for DI (dependency injection). This is because the constructor can new up what you need so you can replace your service to test with mocked instances (I'll get onto that later) where as MSTest and NUnit work better with factory methods to pass dependencies in. I can appreciate that with xUnit when newing up your test class you're constructing it in a similar way to production code and just replacing the parameters with the isolating version (as mentioned before to keep the code from actually calling out etc).</p>
+
+<p>A nice bonus for xUnit is that by default, test collections run in parallel (but the tests on each class are sequential). There do seem to be a lot of nice default behaviors with xUnit.</p>
+
+<p>They also provide a nice shared setup for occasions where a resource in the tests might be expensive, I think I have seen this in the Entities API at work in place of the database. To use this you have to inherit from IClassFixture and provide the parameter in your constructor and it will ensure the class is created once per test class. This is only meant to be used sparingly though.</p>
+
+<p>Something else I make use of in xUnit is the Theory decorator which allows you to run a test multiple times with different data, so instead of a single test run like this:</p>
+
+<pre><code class="language-csharp">[Fact]
+public void Testy_Mc_Test_Face()
+</code></pre>
+
+<p>You can do:</p>
+
+<pre><code class="language-csharp">[Theory]
+[InlineData(1, 2, 3)]
+public void Testy_Mc_Test_Face(int foo, int fee, int faa)
+</code></pre>
+
+<p>Or:</p>
+
+<pre><code class="language-csharp">public static IEnumerable&lt;object[]&gt; AddTestData => new List&lt;object[]&gt;
+{
+    new object[] { 0, 1, 1 },
+    new object[] { 1, 2, 3 },
+    new object[] { -1, 1, 0 }
+};
+
+[Theory]
+[MemberData(nameof(AddTestData))]
+public void Addition_Works(int a, int b, int expected)
+{
+    // Test logic here
+}
+</code></pre>
+
+<h2>What is the right naming convention?</h2>
+<p>This is something I often don't get right, but convention tells us to name our tests 'MethodName_WhenCondition_ExpectedOutcome'.</p>
+
+<h2>So what the hell is Mocking really?</h2>
+<p>So we're all probably familiar with the concept of mocking, it's where we want to swap out dependencies and services of a class we want to test so we isolate our unit test. This means we can take control of these services and set the return values to provide when our tested method makes a call to a database, and this allows us to greatly increase the coverage of tests. I actually love mocking but it can get tricky sometimes, not everything can be mocked, or certainly not easily.</p>
+
+<p>The mocking package I use at work is called Moq and after installing it <code>dotnet add package Moq</code> you can make a mocked service or class by typing:</p>
+
+<pre><code class="language-csharp">var thingIMocked = new Mock&lt;IThingIWantToMock&gt;();
+</code></pre>
+
+<p>You then have a variable that you can control the call of methods on, so say for example that thing I just mocked had a method called Add, we can now control the return value when that method is called with either specific or any argument:</p>
+
+<pre><code class="language-csharp">// For cases where you care about the specific value provided as the argument
+thingIMocked.Setup(p => p.Add(100)).Returns(true);
+
+// For cases where you don't care about the argument provided
+thingIMocked.Setup(p => p.Add(It.IsAny&lt;int&gt;())).Returns(true);
+</code></pre>
+
+<p>This allows you to run a unit test to check different values and outcomes and cover vast scenarios. You can even call a Verify method to ensure that methods on mocked classes are called a certain number of times, or never - there is a lot of control available here.</p>
+
+<h2>In Summary: Why I like using xUnit</h2>
+
+<ul>
+    <li>Fresh test class instances for each test (no more mysterious test interactions!)</li>
+    <li>The constructor/Dispose pattern feels more like regular C# code</li>
+    <li>Great support for dependency injection and mocking - a big win</li>
+    <li>Parallel test execution by default</li>
+    <li>Theory type tests allow you to run the same test multiple times with different data</li>
+</ul>
+
+<p>Pick the testing tool that works for you. I like xUnit because I'm familiar with it and it makes sense to me (most of the time!).</p>
+<p>What's my take away today? Name your tests clearly - You'll thank yourself later (as will your team) when you're trying to figure out what they do!</p>
+
+<p>Happy testing!</p>
+</body>
+</html>

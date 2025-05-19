@@ -1,0 +1,65 @@
+Going back to the basics, a unit test is meant to verify a single bit of functionality, say a method. We want that test to be isolated, so when running the method we dont call out to the internet or make use of a databsse. We want unit tests to refeclet the expected beahiour of our soltuion. We want unti tets to act as a safety net @hey you usst broke some expected behaior@/
+
+Sometimes i see that we tend to focus on the happy paths in our tests, but i've always enjoyed thinking about what might go wrong, and testing we handle that correctly too, giving full coverage of the happy and unhappy paths. There are often far more unhappy paths than there are happy ones! 
+
+Why xUnit?
+
+Its the main testing tool of the platform i work on at work, so why might that have been chosen and what other options might there have been?
+
+Some of the key testing packages out there are MSTest, NUnit and xUnit. I know that in xUnit we tag our tests as either [Fact] or [Theory], this denoted if the test is singlue and has no parameters vs if it has a package of test data that will be provided, allowing multiple iterations to execute. 
+Similarly MSTest and Nuit also take tags to decorate methods. 
+Also, xUnit discovers test through 'convention-based' discovery, so it looks for those attributes i mentiond on public classes containing the tests and where the test files are in a test project usually ending in '.Tests'. One negative to this though that i have seen is the discovery doesnt always work, i've not had trouble bit i have some of the QA team members try and run the tests at work and the IDE just will not discover the tests.
+
+Next, the way that xUnit sets up and tears down tests is different, as the class constructor sets up what you need and then there is a Dispose method to place clean up inside of. For NUnit/MSTest you do similar with again use decoratos of [SetUp] and [TearDown] to identify which methods offer that functionality. 
+XUnits approach feels more familiar as a class. 
+
+So next interesting difference is that xUnit actually news up a new instance of the object you are testing per test vs NUnit and MSTest sharing the test class by default, of course that can be overriden. This can be important to have new instances between tests as otherwise you might find side effects of one test can impact the next test and you end up trying to figure out what the heck is going on!
+
+I've also read that a big difference is how good xUnit is for DI (dependency injection). This is becuase the constructor can new up what you need so you can replace your service to test with mocked instances (i'll get onto that later) where as MSTest and NUnit work better with factory methods to pass dependencies in. I can aprpeciate that with xUnit when newing up your test class youre constructing it in a imialr way to production code and just repalcing the parameters with the isolating version (as mentioned before to keep the code from actually calling out etc).
+
+A nice bonus for xUnit is that by default, test collections run in parallel (but the tests on each class are sequential). There do seem to be a lot of nice default behaviours with xUnit. 
+ 
+They also provide a nice shared setup for occasions where a resource in the tests might be expensive, i think i have seen this in the Entities Api at work in place of the database. To use this you have to inherit from IClassFixture<the class you want to be shared> and provide the parameter in your constructor and it will ensure the class is created once per text class. This is only meant to be used sparingly though. 
+
+Something else i make use of in xUnit is the Theory decorator which allows you to run a test multiple times with different data, so instead of a single test run like this:
+
+[Fact]
+public void Testy_Mc_Test_Face()
+
+You can do:
+
+[Theory]
+[InlineData(1, 2, 3)]
+public void Testy_Mc_Test_Face(int foo, int fee, int faa)
+
+Or:
+
+public static IEnumerable<object[]> AddTestData => new List<object[]>
+{
+    new object[] { 0, 0, 0 },
+    new object[] { 10, 20, 30 }
+};
+
+[Theory]
+[MemberData(nameof(AddTestData))]
+public void Testy_Mc_Test_Face(int foo, int fee, int faa)
+
+So there is a great deal of choice to set up your tests with, it also keeps the number of tests that you have to write lower, with a bit of imagination in how to construct the tetss sometimes! 
+
+What is the right naming convention? 
+This is something i often don't get write but convention tell us to name our tests 'MethodName_WhenCondition_ExpectedOutcome'
+
+So what the hell is Mocking really?
+So we're all probably familiar with the concept of mocking, its where we want to swap out dependencies and services of a class we want to test so we isolate out unit test.
+This means we can take control of these services and set the retrun values to provide when our tested method makes a call to a database and this allows us to greatly increase the coverage of tests. I actually love mokcing but it can get tricky sometimes, not everything cna be mocked, or certainly not easily. 
+
+The mocking package i use at work is called Moq and after installing it 'dotnet add package Moq' you can make a mocked service or class by typing:
+
+var thingIMocked = new Mock<IThingIWantToMock>();
+
+You then have a varaible that you can control the call of methods on, so say for example that thing i just mocked had a method on called Add, we can now control the return value when that method is called with either specific or any argument:
+
+thingIMocked.Setup(p => p.Add(100)).Returns(true); - for cases where you care about the specific value provided as the argument. 
+thingIMocked.Setup(p => p.Add(It.IsAny<int>)).Returns true; - for cases where you dont care about the argument provided. 
+
+This allows you to run a unit test to check different values and outcomes and cover vast outcomes. You can even call a Verify method to ensure that methods on mocked classes are called a certain number of times, or never, there is a lot of control avialable here. 
