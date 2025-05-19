@@ -45,33 +45,40 @@
 
 <p>Going back to the basics, a unit test is meant to verify a single bit of functionality, say a method. We want that test to be isolated, so when running the method we don't call out to the internet or make use of a database. We want unit tests to reflect the expected behavior of our solution. We want unit tests to act as a safety net - "Hey, you just broke some expected behavior!"</p>
 
-<p>Sometimes I see that sometime people tend to focus on the happy paths in their tests, but I've always enjoyed thinking about what might go wrong, and testing we handle that correctly too, giving full coverage of the happy and unhappy paths. There are often far more unhappy paths than there are happy ones!</p>
+<p>Sometimes I see that people tend to focus on the happy paths in their tests, but I've always enjoyed thinking about what might go wrong, and testing we handle that correctly too, giving full coverage of the happy and unhappy paths. There are often far more 😢 paths than there are 😊 ones!</p>
 
 <h2>Why xUnit?</h2>
 <p>It's the main testing tool of the platform I work on at work, so why might that have been chosen and what other options might there have been?</p>
 
-<p>Some of the key testing packages out there are MSTest, NUnit and xUnit. I know that in xUnit we tag our tests as either [Fact] or [Theory], this denotes if the test is single and has no parameters vs if it has a package of test data that will be provided, allowing multiple iterations to execute.</p>
+<h3>Test Attributes and Organization</h3>
+<p>Some of the key testing packages out there are MSTest, NUnit and xUnit. I know that in xUnit we tag our tests as either [Fact] or [Theory], this denotes if the test is single and has no parameters vs if it has a package of test data that will be provided, allowing multiple iterations to execute. Similarly, MSTest and NUnit also take tags to decorate methods.</p>
 
-<p>Similarly MSTest and NUnit also take tags to decorate methods.</p>
+<h3>Test Discovery</h3>
+<p>Also, xUnit discovers tests through 'convention-based' discovery, so it looks for those attributes I mentioned on public classes containing the tests and where the test files are in a test project usually ending in '.Tests'. One negative to this though that I have seen is the discovery doesn't always work. I've not had trouble but I have seen some of the QA team members try and run the tests at work and the IDE just will not discover the tests 😞</p>
 
-<p>Also, xUnit discovers tests through 'convention-based' discovery, so it looks for those attributes I mentioned on public classes containing the tests and where the test files are in a test project usually ending in '.Tests'. One negative to this though that I have seen is the discovery doesn't always work. I've not had trouble but I have seen some of the QA team members try and run the tests at work and the IDE just will not discover the tests.</p>
-
+<h3>Setup and Teardown</h3>
 <p>Next, the way that xUnit sets up and tears down tests is different, as the class constructor sets up what you need and then there is a Dispose method to place clean up inside of. For NUnit/MSTest you do similar with decorators of [SetUp] and [TearDown] to identify which methods offer that functionality. xUnit's approach feels more familiar as a class.</p>
 
+<h3>Test Isolation</h3>
 <p>So next interesting difference is that xUnit actually news up a new instance of the object you are testing per test vs NUnit and MSTest sharing the test class by default, of course that can be overridden. This can be important to have new instances between tests as otherwise you might find side effects of one test can impact the next test and you end up trying to figure out what the heck is going on!</p>
 
-<p>I've also read that a big difference is how good xUnit is for DI (dependency injection). This is because the constructor can new up what you need so you can replace your service to test with mocked instances (I'll get onto that later) where as MSTest and NUnit work better with factory methods to pass dependencies in. I can appreciate that with xUnit when newing up your test class you're constructing it in a similar way to production code and just replacing the parameters with the isolating version (as mentioned before to keep the code from actually calling out etc).</p>
+<h3>Dependency Injection Support</h3>
+<p>I've also read that a big difference is how good xUnit is for DI (dependency injection). This is because the constructor can new up what you need so you can replace your service to test with mocked instances (I'll get onto that later) where as MSTest and NUnit work better with factory methods to pass dependencies in. I can appreciate that with xUnit when newing up your test class you're constructing it in a similar way to production code and just replacing the parameters with the isolating versions.</p>
 
+<h3>Parallel Test Execution</h3>
 <p>A nice bonus for xUnit is that by default, test collections run in parallel (but the tests on each class are sequential). There do seem to be a lot of nice default behaviors with xUnit.</p>
 
+<h3>Shared Test Context</h3>
 <p>They also provide a nice shared setup for occasions where a resource in the tests might be expensive, I think I have seen this in the Entities API at work in place of the database. To use this you have to inherit from IClassFixture and provide the parameter in your constructor and it will ensure the class is created once per test class. This is only meant to be used sparingly though.</p>
 
+<h3>Data-Driven Tests with Theory</h3>
 <p>Something else I make use of in xUnit is the Theory decorator which allows you to run a test multiple times with different data, so instead of a single test run like this:</p>
 
 <pre><code class="language-csharp">[Fact]
 public void Testy_Mc_Test_Face()
 </code></pre>
 
+<h4>Using InlineData</h4>
 <p>You can do:</p>
 
 <pre><code class="language-csharp">[Theory]
@@ -79,6 +86,7 @@ public void Testy_Mc_Test_Face()
 public void Testy_Mc_Test_Face(int foo, int fee, int faa)
 </code></pre>
 
+<h4>Using MemberData</h4>
 <p>Or:</p>
 
 <pre><code class="language-csharp">public static IEnumerable&lt;object[]&gt; AddTestData => new List&lt;object[]&gt;
@@ -95,6 +103,7 @@ public void Addition_Works(int a, int b, int expected)
     // Test logic here
 }
 </code></pre>
+
 
 <h2>What is the right naming convention?</h2>
 <p>This is something I often don't get right, but convention tells us to name our tests 'MethodName_WhenCondition_ExpectedOutcome'.</p>
