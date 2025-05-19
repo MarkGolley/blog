@@ -127,7 +127,7 @@ public void Addition_Works(int a, int b, int expected)
 <h2>So what the hell is Mocking really?</h2>
 <p>So we're all probably familiar with the concept of mocking, it's where we want to swap out dependencies and services of a class we want to test so we isolate our unit test. This means we can take control of these services and set the return values to provide when our tested method makes a call to a database, and this allows us to greatly increase the coverage of tests. I actually love mocking but it can get tricky sometimes, not everything can be mocked, or certainly not easily.</p>
 
-<p>The mocking package I use at work is called Moq and after installing it <code>dotnet add package Moq</code> you can make a mocked service or class by typing:</p>
+<p>The mocking package I use at work is called Moq and after installing it <code>dotnet add package Moq</code> you can make a mocked service or class by typing the following and providing the interface:</p>
 
 <pre><code class="language-csharp">var thingIMocked = new Mock&lt;IThingIWantToMock&gt;();
 </code></pre>
