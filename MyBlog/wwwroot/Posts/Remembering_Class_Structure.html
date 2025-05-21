@@ -118,10 +118,7 @@ using MyCompany.Utilities;</code></pre>
 
 <p>Define your class, including any documentation and attributes:</p>
 
-<pre><code>/// &lt;summary&gt;
-/// Handles data management operations for the application.
-/// &lt;/summary&gt;
-[Serializable]
+<pre><code>/// docs
 public class DataManager : IDataProcessor
 {
     // Class members go here
@@ -132,7 +129,7 @@ public class DataManager : IDataProcessor
 <p>Define static members, starting with constants, then fields, properties and methods:</p>
 
 <pre><code>// Constants
-public const string DefaultConnectionString = "Data Source=localhost;Initial Catalog=AppDb;";
+public const string DefaultConnectionString = "";
 
 // Static fields
 private static readonly HttpClient _httpClient = new HttpClient();
@@ -143,7 +140,7 @@ public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(30);
 // Static methods
 public static bool IsValidConfiguration(Configuration config)
 {
-    return !string.IsNullOrEmpty(config.ApiKey) && config.Endpoint != null;
+    // method logic here
 }</code></pre>
 
 <h2>F - Fields</h2>
@@ -151,7 +148,7 @@ public static bool IsValidConfiguration(Configuration config)
 <p>Define instance fields, often private or protected:</p>
 
 <pre><code>// Private fields
-private readonly ILogger _logger;
+protected readonly ILogger _logger;
 private readonly IRepository _repository;
 private bool _isInitialized;</code></pre>
 
@@ -183,11 +180,7 @@ public async Task&lt;DataResult&gt; ProcessDataAsync(DataRequest request)
 {
 // method logic here
 }
-
-private async Task ValidateRequestAsync(DataRequest request)
-{
-// method logic here
-}</code></pre>
+</code></pre>
 
 <h2>N - Nested Types</h2>
 
