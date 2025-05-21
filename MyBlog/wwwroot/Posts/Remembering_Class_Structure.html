@@ -98,11 +98,7 @@
 
 <h3>S - Statics:</h3>
 <ul>
-    <li>Constants</li>
-    <li>Static Fields</li>
-    <li>Static Properties</li>
-    <li>Static Events</li>
-    <li>Static Methods</li>
+    <li>Constants, Static Fields, Static Properties, Static Events and Static Methods</li>
 </ul>
 
 <h3>F - Fields (instance fields only)</h3>
@@ -111,9 +107,7 @@
 
 <h3>C - Class behaviors:</h3>
 <ul>
-    <li>Instance Properties</li>
-    <li>Instance Events</li>
-    <li>Instance Methods</li>
+    <li>Instance Properties, Events and Methods</li>
 </ul>
 
 <h3>N - Nested types (inner classes, structs, interfaces, enums)</h3>
@@ -206,16 +200,6 @@ public int Priority { get; set; } = 1;</code></pre>
 <pre><code>public async Task&lt;bool&gt; ProcessOrderAsync(Order order)
 {
     // Method implementation
-}
-
-protected bool ValidateOrder(Order order)
-{
-    // Method implementation
-}
-
-private string GenerateTransactionId(string orderId)
-{
-    // Method implementation
 }</code></pre>
 
 <h2>N - Nested Types</h2>
@@ -236,8 +220,19 @@ public enum OrderStatus
     Failed
 }</code></pre>
 
-<p>This organizational approach creates a natural flow from file-level elements to implementation details, making your code more readable and maintainable. Each section builds logically on what came before, making it easier for others (and your future self) to navigate and understand your code.</p>
+<h2>Access Modifier Order</h2>
 
-<p>By following this consistent pattern in all your C# files, you'll develop muscle memory that makes writing well-structured code second nature.</p>
+<p>To wrap up, its worth clarifying the order members by their access modifier from most accessible to least accessible:</p>
+
+<ol>
+    <li><code>public</code> - Accessible by any code</li>
+    <li><code>protected</code> - Accessible by the class and its subclasses</li>
+    <li><code>internal</code> - Accessible within the same assembly</li>
+    <li><code>protected internal</code> - Accessible by the assembly or derived classes</li>
+    <li><code>private protected</code> - Accessible by derived classes within the same assembly</li>
+    <li><code>private</code> - Accessible only within the declaring class</li>
+</ol>
+
+<p>Hopefully this helps make things a little clearer than before!</p>
 </body>
 </html>
