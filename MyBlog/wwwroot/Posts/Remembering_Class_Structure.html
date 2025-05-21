@@ -1,0 +1,209 @@
+<!-- PublishedDate: 2025-10-21 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            color: #222;
+        }
+        h3 {
+            font-size: 1.1rem;
+            color: #555;
+            font-weight: 600;
+            margin-top: 1.2rem;
+            margin-bottom: 0.6rem;
+        }
+        h4 {
+            font-size: 1rem;
+            color: #666;
+            font-weight: 600;
+            font-style: italic;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        pre {
+            background: #eee;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .tip {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .blueprint {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-family: monospace;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+<h1>C# Class Structure: A Developer's Memory Guide</h1>
+
+<p>As developers, we all face that nagging feeling: "I think I know how to code, but can I remember correct class structure? No i cant!" The struggle is real.</p>
+
+<p>In this post, I'll share a simple framework to help remember C# class structure.</p>
+
+<h2>Why Class Structure Matters</h2>
+<p>Before diving into the framework, let's remind ourselves why correct class structure matters:</p>
+
+<ol>
+    <li><strong>Readability</strong>: easier to read/understand</li>
+    <li><strong>Maintenance</strong>: easier to find and fix issues</li>
+    <li><strong>Professionalism</strong>: demonstrates technical proficiency</li>
+</ol>
+
+<h2>The CAMPS Framework: Remembering C# Class Structure</h2>
+
+<p>To help remember the ideal order of structure in a C# class, here is a simple memory tool called "CAMPS", starting from after the usings and namespace declaration:</p>
+
+<h3>💅</h3>
+<h3>C - Constants and statics</h3>
+<h3>A - Access modifiers (from public to private)</h3>
+<h3>M - Member fields and properties</h3>
+<h3>P - Procedures (constructors first, then methods)</h3>
+<h3>S - Special members (events, delegates, nested types)</h3>
+<h3>💅</h3>
+
+<p>Here's a breakdown:</p>
+
+<h2>C - Constants and Statics (Top of Class)</h2>
+
+<p>Constants and static members should appear at the top of your class. The order:</p>
+
+<h4>1. Constants (values that can't change)</h4>
+<pre><code>public const string OrderPrefix = "ORD";
+protected const int MaxProcessingAttempts = 3;
+private const decimal MinimumOrderAmount = 5.00m;</code></pre>
+
+<h4>2. Static fields (belong to the class, not instances)</h4>
+<pre><code>public static readonly TimeSpan ProcessingTimeout = TimeSpan.FromMinutes(5);
+private static readonly string s_processorId = Guid.NewGuid().ToString();</code></pre>
+
+<h4>3. Static properties</h4>
+<pre><code>public static bool IsServiceAvailable { get; private set; }</code></pre>
+
+<h2>A - Access Modifiers (Order from Public to Private)</h2>
+
+<p>Within each section, order members by access modifier:</p>
+<ol>
+    <li><code>public</code> (accessible by any code)</li>
+    <li><code>protected</code> (accessible by the class and its subclasses)</li>
+    <li><code>internal</code> (accessible within the same assembly)</li>
+    <li><code>protected internal</code> (accessible by the assembly or derived classes)</li>
+    <li><code>private protected</code> (accessible by derived classes within the same assembly)</li>
+    <li><code>private</code> (accessible only within the declaring class)</li>
+</ol>
+
+<h2>M - Member Fields and Properties</h2>
+
+<p>After constants and statics, list instance fields and properties:</p>
+
+<h4>1. Instance fields (belong to each object)</h4>
+<pre><code>protected readonly string _merchantId;
+private readonly IPaymentGateway _paymentGateway;
+private bool _isProcessing;</code></pre>
+
+<h4>2. Properties (methods that look like fields)</h4>
+<pre><code>public string Status { get; private set; } = "Ready";
+public int Priority { get; set; } = 1;</code></pre>
+
+<h2>P - Procedures (Constructors, then Methods)</h2>
+
+<p>Next come the procedures - constructors and methods:</p>
+
+<h4>1. Constructors (special methods that initialize objects)</h4>
+<pre><code>public OrderProcessor(IPaymentGateway paymentGateway, string merchantId)
+{
+    _paymentGateway = paymentGateway;
+    _merchantId = merchantId;
+}</code></pre>
+
+<h4>2. Methods (functions that perform operations)</h4>
+<pre><code>public async Task&lt;bool&gt; ProcessOrderAsync(Order order)
+{
+    // Method implementation
+}
+
+protected bool ValidateOrder(Order order)
+{
+    // Method implementation
+}
+
+private string GenerateTransactionId(string orderId)
+{
+    // Method implementation
+}</code></pre>
+
+<h2>S - Special Members (Events, Delegates, Nested Types)</h2>
+
+<p>Finally, include any special members:</p>
+
+<h4>1. Events (notifications to other objects)</h4>
+<pre><code>public event EventHandler&lt;OrderProcessedEventArgs&gt; OrderProcessed;</code></pre>
+
+<h4>2. Delegates (function pointers)</h4>
+<pre><code>private delegate void LoggingCallback(string message);</code></pre>
+
+<h4>3. Nested types (classes/structs defined within the class)</h4>
+<pre><code>private class TransactionResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; }
+}</code></pre>
+
+<h2>The Differences Between Fields and Properties</h2>
+
+<p>Something I really get mixed up with is when to use fields versus properties  but the key difference is to use private fields for internal state and then properties for external access. Here is a summary of the differences:</p>
+
+<h3>Fields</h3>
+<ul>
+    <li>Raw data storage</li>
+    <li>Usually private (with underscore prefix by convention: <code>_fieldName</code>)</li>
+    <li>Direct memory access, no logic</li>
+    <li>Example: <code>private int _count;</code></li>
+</ul>
+
+<h3>Properties</h3>
+<ul>
+    <li>Public access to private fields (accessors)</li>
+    <li>Can contain validation or transformation logic</li>
+    <li>Use auto-implemented properties when no additional logic needed</li>
+    <li>Example: <code>public int Count { get; private set; }</code></li>
+</ul>
+
+<h2>Conclusion</h2>
+
+<p>This 'CAMPS' framework provides a way to remember how to structure your C# classes.</p>
+
+<p>Remember: CAMPS = Constants and statics, Access modifiers, Member fields and properties, Procedures, Special members.</p>
+
+</body>
+</html>

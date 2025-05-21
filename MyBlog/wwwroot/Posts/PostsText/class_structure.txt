@@ -1,0 +1,218 @@
+<!-- PublishedDate: 2025-10-21 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            color: #222;
+        }
+        h3 {
+            font-size: 1.1rem;
+            color: #555;
+            font-weight: 600;
+            margin-top: 1.2rem;
+            margin-bottom: 0.6rem;
+        }
+        h4 {
+            font-size: 1rem;
+            color: #666;
+            font-weight: 600;
+            font-style: italic;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        pre {
+            background: #eee;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .tip {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .blueprint {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-family: monospace;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+<h1>C# Class Structure: A Developer's Memory Guide</h1>
+
+<p>As developers, we all face that nagging feeling: "I think I know how to code, but can I remember correct class structure? No I cant!" The struggle is real.</p>
+
+<p>In this post, I'll share a simple framework to help remember C# class structure.</p>
+
+<h2>Why Class Structure Matters</h2>
+<p>Before diving into the framework, let's remind ourselves why correct class structure matters:</p>
+
+<ol>
+    <li><strong>Readability</strong>: easier to read/understand</li>
+    <li><strong>Maintenance</strong>: easier to find and fix issues</li>
+    <li><strong>Professionalism</strong>: demonstrates technical proficiency</li>
+</ol>
+
+<h2>The UNCSF-ICN Framework: Remembering C# Class Structure</h2>
+
+<p>To help remember the ideal order of structure in a C# class file, here is a simple memory tool called "UNCSF-ICN":</p>
+
+<h3>U - Usings</h3>
+<h3>N - Namespace declaration</h3>
+<h3>C - Class declaration</h3>
+<h3>S - Statics (constants, fields, properties, events, and methods)</h3>
+<h3>F - Fields (instance)</h3>
+<h3>I - Initialization (constructors)</h3>
+<h3>C - Class behaviors (instance properties, events, methods)</h3>
+<h3>N - Nested types (inner classes, structs, interfaces, enums)</h3>
+
+<p>Here's a breakdown:</p>
+
+<h2>U - Usings</h2>
+
+<p>Start with all your using directives, organized from system to custom:</p>
+
+<pre><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using MyCompany.Services;
+using MyCompany.Utilities;</code></pre>
+
+<h2>N - Namespace Declaration</h2>
+
+<p>Declare your namespace to organize your types:</p>
+
+<pre><code>namespace MyCompany.Processors
+{
+    // Everything else goes inside here
+}</code></pre>
+
+<h2>C - Class Declaration</h2>
+
+<p>Define your class, including any documentation and attributes:</p>
+
+<pre><code>/// &lt;summary&gt;
+/// Processes orders through the payment gateway
+/// &lt;/summary&gt;
+[Serializable]
+public class OrderProcessor
+{
+    // Class members will go here
+}</code></pre>
+
+<h2>S - Static Items (constants, fields, properties, events, and methods)</h2>
+
+<p>Constants and static members should appear first within your class:</p>
+
+<h4>1. Constants (values that can't change)</h4>
+<pre><code>public const string OrderPrefix = "ORD";
+protected const int MaxProcessingAttempts = 3;
+private const decimal MinimumOrderAmount = 5.00m;</code></pre>
+
+<h4>2. Static fields (belong to the class, not instances)</h4>
+<pre><code>public static readonly TimeSpan ProcessingTimeout = TimeSpan.FromMinutes(5);
+private static readonly string s_processorId = Guid.NewGuid().ToString();</code></pre>
+
+<h4>3. Static properties</h4>
+<pre><code>public static bool IsServiceAvailable { get; private set; }</code></pre>
+
+<h2>F - Fields (Instance)</h2>
+
+<p>List your instance fields, maintaining the access modifier order (public to private):</p>
+
+<pre><code>protected readonly string _merchantId;
+private readonly IPaymentGateway _paymentGateway;
+private bool _isProcessing;</code></pre>
+
+<h2>I - Initialization (Constructors)</h2>
+
+<p>Group your constructors together, starting with the most general:</p>
+
+<pre><code>public OrderProcessor()
+{
+    // Default constructor
+}
+
+public OrderProcessor(IPaymentGateway paymentGateway, string merchantId)
+{
+    _paymentGateway = paymentGateway;
+    _merchantId = merchantId;
+}</code></pre>
+
+<h2>C - Class Behaviors (Instance Properties, Events, Methods)</h2>
+
+<p>Next come the properties, events, and methods that define your class's behavior:</p>
+
+<h4>1. Properties</h4>
+<pre><code>public string Status { get; private set; } = "Ready";
+public int Priority { get; set; } = 1;</code></pre>
+
+<h4>2. Events</h4>
+<pre><code>public event EventHandler&lt;OrderProcessedEventArgs&gt; OrderProcessed;</code></pre>
+
+<h4>3. Methods</h4>
+<pre><code>public async Task&lt;bool&gt; ProcessOrderAsync(Order order)
+{
+    // Method implementation
+}
+
+protected bool ValidateOrder(Order order)
+{
+    // Method implementation
+}
+
+private string GenerateTransactionId(string orderId)
+{
+    // Method implementation
+}</code></pre>
+
+<h2>N - Nested Types</h2>
+
+<p>Finally, include any nested types that belong specifically to this class:</p>
+
+<pre><code>private class OrderProcessingResult
+{
+    public bool Success { get; set; }
+    public string TransactionId { get; set; }
+}
+
+public enum OrderStatus
+{
+    Pending,
+    Processing,
+    Complete,
+    Failed
+}</code></pre>
+
+<p>This organizational approach creates a natural flow from file-level elements to implementation details, making your code more readable and maintainable. Each section builds logically on what came before, making it easier for others (and your future self) to navigate and understand your code.</p>
+
+<p>By following this consistent pattern in all your C# files, you'll develop muscle memory that makes writing well-structured code second nature.</p>
+</body>
+</html>
