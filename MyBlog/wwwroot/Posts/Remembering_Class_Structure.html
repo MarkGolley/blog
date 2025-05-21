@@ -109,7 +109,7 @@ using MyCompany.Utilities;</code></pre>
 
 <p>Declare your namespace to organize your types:</p>
 
-<pre><code>namespace MyCompany.Processors
+<pre><code>namespace MyCompany.Core
 {
     // Everything else goes inside here
 }</code></pre>
@@ -119,87 +119,97 @@ using MyCompany.Utilities;</code></pre>
 <p>Define your class, including any documentation and attributes:</p>
 
 <pre><code>/// &lt;summary&gt;
-/// Processes orders through the payment gateway
+/// Handles data management operations for the application.
 /// &lt;/summary&gt;
 [Serializable]
-public class OrderProcessor
+public class DataManager : IDataProcessor
 {
-    // Class members will go here
+    // Class members go here
 }</code></pre>
 
-<h2>S - Static Items (constants, fields, properties, events, and methods)</h2>
+<h2>S - Statics</h2>
 
-<p>Constants and static members should appear first within your class:</p>
+<p>Define static members, starting with constants, then fields, properties and methods:</p>
 
-<h4>1. Constants (values that can't change)</h4>
-<pre><code>public const string OrderPrefix = "ORD";
-protected const int MaxProcessingAttempts = 3;
-private const decimal MinimumOrderAmount = 5.00m;</code></pre>
+<pre><code>// Constants
+public const string DefaultConnectionString = "Data Source=localhost;Initial Catalog=AppDb;";
 
-<h4>2. Static fields (belong to the class, not instances)</h4>
-<pre><code>public static readonly TimeSpan ProcessingTimeout = TimeSpan.FromMinutes(5);
-private static readonly string s_processorId = Guid.NewGuid().ToString();</code></pre>
+// Static fields
+private static readonly HttpClient _httpClient = new HttpClient();
 
-<h4>3. Static properties</h4>
-<pre><code>public static bool IsServiceAvailable { get; private set; }</code></pre>
+// Static properties
+public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
-<h2>F - Fields (Instance)</h2>
-
-<p>List your instance fields, maintaining the access modifier order (public to private):</p>
-
-<pre><code>protected readonly string _merchantId;
-private readonly IPaymentGateway _paymentGateway;
-private bool _isProcessing;</code></pre>
-
-<h2>I - Initialization (Constructors)</h2>
-
-<p>Group your constructors together, starting with the most general:</p>
-
-<pre><code>public OrderProcessor()
+// Static methods
+public static bool IsValidConfiguration(Configuration config)
 {
-    // Default constructor
+    return !string.IsNullOrEmpty(config.ApiKey) && config.Endpoint != null;
+}</code></pre>
+
+<h2>F - Fields</h2>
+
+<p>Define instance fields, often private or protected:</p>
+
+<pre><code>// Private fields
+private readonly ILogger _logger;
+private readonly IRepository _repository;
+private bool _isInitialized;</code></pre>
+
+<h2>I - Initialization</h2>
+
+<p>Define constructors and any initialization logic:</p>
+
+<pre><code>// Main constructor
+public DataManager(IRepository repository, ILogger logger)
+{
+// Initialization logic here
 }
 
-public OrderProcessor(IPaymentGateway paymentGateway, string merchantId)
+// Parameterless constructor
+public DataManager() : this(new DefaultRepository(), LogManager.GetCurrentClassLogger())
 {
-    _paymentGateway = paymentGateway;
-    _merchantId = merchantId;
 }</code></pre>
 
-<h2>C - Class Behaviors (Instance Properties, Events, Methods)</h2>
+<h2>C - Class Behaviors</h2>
 
-<p>Next come the properties, events, and methods that define your class's behavior:</p>
+<p>Define instance properties, events, and methods:</p>
 
-<h4>1. Properties</h4>
-<pre><code>public string Status { get; private set; } = "Ready";
-public int Priority { get; set; } = 1;</code></pre>
+<pre><code>// Properties
+public bool IsConnected { get; private set; }
+public ConnectionStatus Status => _isInitialized ? ConnectionStatus.Ready : ConnectionStatus.Pending;
 
-<h4>2. Events</h4>
-<pre><code>public event EventHandler&lt;OrderProcessedEventArgs&gt; OrderProcessed;</code></pre>
-
-<h4>3. Methods</h4>
-<pre><code>public async Task&lt;bool&gt; ProcessOrderAsync(Order order)
+// Methods
+public async Task&lt;DataResult&gt; ProcessDataAsync(DataRequest request)
 {
-    // Method implementation
+// method logic here
+}
+
+private async Task ValidateRequestAsync(DataRequest request)
+{
+// method logic here
 }</code></pre>
 
 <h2>N - Nested Types</h2>
 
-<p>Finally, include any nested types that belong specifically to this class:</p>
+<p>Define any nested types like enums, classes, interfaces:</p>
 
-<pre><code>private class OrderProcessingResult
-{
-    public bool Success { get; set; }
-    public string TransactionId { get; set; }
-}
-
-public enum OrderStatus
+<pre><code>// Nested enum
+public enum ConnectionStatus
 {
     Pending,
-    Processing,
-    Complete,
+    Ready,
     Failed
+}
+
+// Nested class
+private class DataRequestValidator
+{
+    public bool Validate(DataRequest request)
+    {
+        // method logic here
+    }
 }</code></pre>
+
 
 <h2>Access Modifier Order</h2>
 
