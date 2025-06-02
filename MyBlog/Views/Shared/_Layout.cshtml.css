@@ -46,3 +46,20 @@ button.accept-policy {
   white-space: nowrap;
   line-height: 60px;
 }
+
+.comment-form {
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.comment-form .form-control {
+  border: 1px solid #ced4da;
+}
+
+.comment-form .btn-primary {
+  padding: 0.5rem 1.5rem;
+}
+
