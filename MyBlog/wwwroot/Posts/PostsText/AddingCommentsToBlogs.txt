@@ -1,0 +1,105 @@
+# Adding A Comments Feature with ASP.NET Core
+Since starting this blog I've had a few readers send me comments on my posts. There are many third-party comment solutions available which embed a widget (like a <script>) into your blog pages so there no backend setup required, you can use services like Disqus. I fancied building my own solution for greater learning opportunities. For now my solution is using a file system to store the comments, but i plan to extend that to utilising a database to further gain experience. 
+
+## Why Did I Build My Own Comments System?
+Building your own comment system rather than using a hosted solution like Disqus offers several advantages:
+- **Full control over data**: I own and store all comment data
+- **Customizable UI**: Design the comment section to perfectly match my blog's style
+- **No third-party dependencies**: No external scripts or services are required
+- **Learning opportunity**: Deepening my understanding of ASP.NET Core
+
+## High Level Implementation Guide
+Let's walk through how I implemented my solution.
+
+### 1. Create a Comment Model
+I defined what I wanted a comment to look like:
+``` csharp
+public class Comment
+{
+    public int Id { get; set; }
+    public string Author { get; set; }
+    public string Content { get; set; }
+    public DateTime PostedAt { get; set; }
+    public string PostId { get; set; }
+}
+```
+
+### 2. Update my ViewModel for Blog Posts with Comments
+So my blog post view can display both the post content and its comments I updated my ViewModel to combine them:
+``` csharp
+public class BlogPostViewModel
+{
+    public BlogPost Post { get; set; }
+    public List<Comment> Comments { get; set; }
+}
+```
+
+### 3. Implementing my Comment Service
+My service handles the storaging and getting of comments:
+``` csharp
+public class CommentService
+{
+    private readonly string _basePath = "App_Data/comments";
+
+    public List<Comment> GetComments(string postTitle)
+    {
+        // Retrieves comments for a post from JSON file or returns empty list if file doesn't exist
+    }
+
+    public void AddComment(Comment comment)
+    {
+        // Adds a new comment to the post's comment list with timestamp and ID, then saves all comments to JSON file
+    }
+}
+```
+
+### 4. Updated My Blog Controller
+Modified my controller to work with comments:
+``` csharp
+[Route("blog")]
+public class BlogController : Controller
+{
+    private readonly BlogService _blogService;
+    private readonly CommentService _commentService;
+
+    public BlogController(BlogService blogService, CommentService commentService)
+    {
+        _blogService = blogService;
+        _commentService = commentService;
+    }
+
+    [HttpGet("{slug}")]
+    public IActionResult Post(string slug)
+    {
+        // Retrieves a blog post and its comments by slug, then displays them using the BlogPostViewModel
+    }
+
+    [HttpPost("comment")]
+    public IActionResult PostComment(Comment comment)
+    {
+        // Handles comment submission by saving it to the comment service and redirecting back to the blog post
+    }
+}
+```
+
+### 5. Updated My Blog Post View
+Finally, I had to modify my Razor view to display and collect comments which was really just adding on top of the displaying of the blog post content to now include existing comments and a form for adding new comments.
+
+## What's next?
+Now I have a very basic system working i'm thinking about making some improvements:
+1. **Database storage**: Moving from JSON files to a database
+2. **Anti-spam measures**: Add CAPTCHA or honeypot fields (I hadn't heard of these before reading about them)
+4. **Comment moderation**: Implement an approval system for comments
+5. **Notifications**: Emailing me when new comments are posted
+
+## Where did I go wrong?
+If you try this yourself then watch out for these problems:
+- **Model type mismatches**: Ensure your Razor view's `@model` matches what your controller returns as I changed the name
+- **Port conflicts**: When trying to run locally I was using port 80 and another service was using it, so I had to switch to a higher port
+
+## Conclusions...
+Making your own comment system is handy! You get to pick how it works and you learn while building it.
+The basic setup I've made is a starting point, I'll add more features later as I need/want them.
+By keeping comments in your ASP.NET Core app my blog stays looking nice and consistent and I don't have to think about the other provider.
+
+Enjoy!

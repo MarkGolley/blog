@@ -1,6 +1,5 @@
 @model MyBlog.Models.BlogPostViewModel
 
-<h1>@Model.Post.Title</h1>
 <p>@Model.Post.DatePosted.ToString("MMMM dd, yyyy")</p>
 <div>
     @Html.Raw(Model.Post.Content)
