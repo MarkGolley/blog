@@ -1,7 +1,10 @@
+using MyBlog.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<BlogService>();
+builder.Services.AddSingleton<CommentService>();
 
 var app = builder.Build();
 
@@ -25,4 +28,4 @@ app.MapControllerRoute(
     pattern: "Blog/Post/{slug?}",
     defaults: new { controller = "Blog", action = "Post" });
 
-app.Run("http://localhost:5000");
+app.Run("http://0.0.0.0:5000");

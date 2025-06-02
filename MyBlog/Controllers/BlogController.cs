@@ -31,9 +31,10 @@ public class BlogController : Controller
     }
     
     [HttpPost("comment")]
-    public IActionResult PostComment(Comment comment)
+    public IActionResult AddComment(Comment comment)
     {
         _commentService.AddComment(comment);
-        return RedirectToAction("Post", new { slug = comment.Id });
+        var formattedPostId = comment.PostId.Replace(" ", "_");
+        return RedirectToAction("Post", new { slug = formattedPostId });
     }
 }
