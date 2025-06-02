@@ -1,7 +1,45 @@
-@model BlogPost
+@model MyBlog.Models.BlogPostViewModel
 
-<h1>@Model.Title</h1>
-<p>@Model.DatePosted.ToString("MMMM dd, yyyy")</p>
+<h1>@Model.Post.Title</h1>
+<p>@Model.Post.DatePosted.ToString("MMMM dd, yyyy")</p>
 <div>
-    @Html.Raw(Model.Content) <!-- This ensures the Content is rendered as HTML -->
+    @Html.Raw(Model.Post.Content)
 </div>
+
+<hr />
+
+<h2>Comments</h2>
+
+@if (Model.Comments != null && Model.Comments.Any())
+{
+    <ul>
+        @foreach (var comment in Model.Comments)
+        {
+            <li>
+                <strong>@comment.Author</strong> on @comment.PostedAt.ToString("g")<br />
+                @comment.Content
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <p>No comments yet.</p>
+}
+
+<hr />
+
+<h3>Add a comment</h3>
+
+<form asp-action="AddComment" method="post">
+    <input type="hidden" name="postId" value="@Model.Post.Id" />
+    <div>
+        <label for="author">Name:</label>
+        <input type="text" name="author" required />
+    </div>
+    <div>
+        <label for="content">Comment:</label>
+        <textarea name="content" rows="4" cols="50" required></textarea>
+    </div>
+    <button type="submit">Submit</button>
+</form>

@@ -25,4 +25,4 @@ app.MapControllerRoute(
     pattern: "Blog/Post/{slug?}",
     defaults: new { controller = "Blog", action = "Post" });
 
-app.Run("http://0.0.0.0:80");
+app.Run("http://localhost:5000");
