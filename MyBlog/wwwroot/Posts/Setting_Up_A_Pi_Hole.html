@@ -65,6 +65,7 @@
 </head>
 <body>
 <h1>Why I Set Up a Pi-hole and How I Got It Working</h1>
+<p> This post is a simple guide to setting up a Pi-hole on a Raspberry Pi. I'll explain what the Pi-hole does, how to install it, and how it can improve your network experience.</p>
 
 <p>I’d read about the benefits of a Pi-hole and how it could reduce the number of ads I see across all my devices on Wi-Fi. I already use browser ad blockers, but I wanted to experiment with a Raspberry Pi—and this seemed like the perfect project!</p>
 
@@ -126,34 +127,35 @@
 <h2>Taking a Look at the Dashboard</h2>
 <p>To access the dashboard, I visited:</p>
 <pre><code>http://192.168.1.XXX/admin</code></pre>
-<p>It loaded—but there was zero activity showing. Uh-oh.</p>
+<p>It loaded—but there was zero activity showing. Uh-oh. Here is what a working one looks like:</p>
+<img src="./Posts/PostsImages/pi-dashboard.png" alt="Pi-hole dashboard showing blocked ads statistics" style="width: 100%; max-width: 700px;">
 
 <h2>Diagnosing Why It Was Inactive</h2>
-<p>After digging into the dashboard settings, I saw that it was using the Ethernet interface. I needed to switch it to use Wi-Fi.</p>
-<p>I tried:</p>
-<pre><code>sudo pihole -r</code></pre>
-<p>But it skipped the configuration menu, so I instead edited:</p>
-<pre><code>sudo nano /etc/pihole/setupVars.conf</code></pre>
-<p>And changed:</p>
-<pre><code>PIHOLE_INTERFACE=wlan0</code></pre>
+<p>When I first accessed the Pi-hole dashboard at:</p>
+<pre><code>http://192.168.1.XXX/admin</code></pre>
+<p>It loaded, but there was zero activity showing. Uh-oh. I realized there might be an issue with how the Pi-hole was set up, so I decided to investigate. Here's what I did and why:</p>
 
-<p>After a restart, I tested DNS resolution with:</p>
-<pre><code>nslookup bbc.co.uk 192.168.1.XXX</code></pre>
-<p>Still no luck. I checked if DNS was running with:</p>
-<pre><code>sudo netstat -tulnp | grep ":53"</code></pre>
-<p>It was listening—but only locally.</p>
+<h3>1. Checking the Pi-hole Service</h3>
+<p>First, I checked if the Pi-hole service itself was running. If it wasn’t, that would explain the inactivity. I used:</p>
+<pre><code>sudo systemctl status pihole-FTL.service</code></pre>
+<p>This command shows the current status of the Pi-hole's DNS resolver. I was looking for "active (running)" in the output. If it's inactive, it might mean Pi-hole failed to start due to a configuration error.</p>
 
-<p>I then tried pinging the Pi from my PC:</p>
-<pre><code>ping 192.168.1.XXX</code></pre>
-<p>That worked. From the Pi I ran:</p>
-<pre><code>dig bbc.co.uk @127.0.0.1
-dig bbc.co.uk @192.168.1.XXX</code></pre>
-<p>The first worked, but the second didn’t. So I edited the Pi-hole DNS config:</p>
-<pre><code>sudo nano /etc/dnsmasq.d/01-pihole.conf</code></pre>
-<p>And added:</p>
-<pre class="blueprint">listen-address=127.0.0.1
-listen-address=192.168.1.XXX</pre>
-<p>After that—success! Pi-hole was now ready to accept DNS queries from the network.</p>
+<h3>2. Verifying the DNS Settings</h3>
+<p>Next, I checked my router to confirm it was correctly configured to forward DNS queries to the Pi-hole. If the router isn’t pointing to the Pi's address as the DNS server, the devices on the network won't send their queries to the Pi-hole.</p>
+<p>Here’s why this is critical: without the router directing traffic to the Pi-hole, it can't filter or block anything. I logged into the router’s admin panel (usually found at <code>192.168.1.1</code>) and set the Pi-hole's IP <code>192.168.1.XXX</code> as the primary DNS server.</p>
+
+<h3>3. Testing DNS Resolution</h3>
+<p>To see if the Pi-hole was handling DNS queries, I ran a test from one of my devices. On my computer, I opened the terminal and used:</p>
+<pre><code>nslookup google.com</code></pre>
+<p>If the output didn’t show my Pi-hole’s IP address as the DNS server, it meant something was wrong with how DNS traffic was being routed. This test is crucial because it quickly determines if DNS requests are reaching the Pi-hole.</p>
+
+<h3>4. Checking the Raspberry Pi’s IP Address</h3>
+<p>Lastly, I confirmed that the Pi still had the correct IP address. Even though I assigned a static IP from the router, I used this command to verify:</p>
+<pre><code>hostname -I</code></pre>
+<p>If the Pi’s IP had changed, none of my DNS settings would work. That’s why assigning a static IP to the Pi earlier in the setup is so important—it prevents accidental misrouting.</p>
+
+<h3>Outcome</h3>
+<p>After these checks, I found that the router hadn’t saved the DNS configuration properly the first time. Reapplying the settings resolved the issue, and within moments, the Pi-hole dashboard started showing blocked ads!</p>
 
 <h2>Making Devices Use Pi-hole</h2>
 <p>Here’s how I routed devices through it:</p>
@@ -169,9 +171,11 @@ listen-address=192.168.1.XXX</pre>
 <p>Once configured, ads started vanishing across those devices.</p>
 
 <h2>Blocklists and Limitations</h2>
-<p>Out of the box, Pi-hole doesn’t block YouTube ads, ITVX ads, or adult content. That’s not a bug—it’s because these services often serve content and ads from the same domains.</p>
+<p>Out of the box, Pi-hole doesn’t block YouTube/ITVX etc ads. That’s not a bug—it’s because these services often serve content and ads from the same domains.</p>
 
-<p>To strengthen Pi-hole, I added:</p>
+<p>To strengthen Pi-hole, I added a few more URLs to the dashboards block list and updated the pi to use them with
+<pre><code>pihole -g</code></pre>
+<p>I added:</p>
 <ul>
     <li>The Firebog list collection</li>
     <li>Steven Black’s hosts file</li>
@@ -180,7 +184,7 @@ listen-address=192.168.1.XXX</pre>
 <p>Even then, YouTube remains tricky—DNS-level blocking has limits.</p>
 
 <h2>Final Thoughts</h2>
-<p>Setting up Pi-hole wasn’t totally smooth, but it was a fun and rewarding weekend project. I learned loads—about DNS, firewalls, SMB sharing, and more.</p>
+<p>Setting up Pi-hole wasn’t totally smooth, but it was a fun and rewarding weekend project. I learned loads doing this!!</p>
 
 <p>My internet is now cleaner, faster, and more private. If you’re comfortable using the terminal and enjoy a bit of tinkering, I’d absolutely recommend giving Pi-hole a go.</p>
 
