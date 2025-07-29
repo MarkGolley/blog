@@ -157,10 +157,10 @@
 dig bbc.co.uk @127.0.0.1  
 dig bbc.co.uk @192.168.1.XXX
 </code></pre>
-<p>I noticed that only the first command worked. This meant the Pi-hole could resolve DNS queries locally (on itself) but wasn’t accepting requests from other devices on the network. So, it still wasn’t fully functional.</p>
+<p>I noticed that only the first command worked. So, the Pi-hole was sorting out its own DNS, but for some reason, it wasn’t letting anything from my devices through . So, it still wasn’t fully functional.</p>
 
 <h3>4. Updating the Listen Addresses</h3>
-<p>After some research, I realized the Pi-hole's configuration needed to be updated to listen for both local and network requests. I edited the DNS configuration file:</p>
+<p>After some research, I realised the Pi-hole's configuration needed to be updated to listen for both local and network requests. I edited the DNS configuration file:</p>
 <pre><code>sudo nano /etc/dnsmasq.d/01-pihole.conf</code></pre>
 <p>and added:</p>
 <pre><code>
@@ -175,7 +175,7 @@ listen-address=192.168.1.XXX
 <p>This time, it worked! The Pi-hole was now resolving DNS requests from other devices on the network.</p>
 
 <h3>Ready for Use!</h3>
-<p>Finally, I refreshed the Pi-hole dashboard and could see activity—ads were being blocked, and DNS queries from my devices were being handled. After a bit of trial and error, it was ready for use!</p>
+<p>Finally, I refreshed the Pi-hole dashboard, and—finally—there was activity!—ads were being blocked, and DNS queries from my devices were being handled. After a bit of trial and error, it was ready for use!</p>
 
 <h2>Making Devices Use Pi-hole</h2>
 <p>Here’s how I routed devices through it:</p>
