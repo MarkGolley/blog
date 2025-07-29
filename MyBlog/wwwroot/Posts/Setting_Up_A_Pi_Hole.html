@@ -131,30 +131,51 @@
 <img src="./Posts/PostsImages/pi-dashboard.png" alt="Pi-hole dashboard showing blocked ads statistics" style="width: 100%; max-width: 700px;">
 
 <h2>Diagnosing Why It Was Inactive</h2>
-<p>When I first accessed the Pi-hole dashboard at:</p>
-<pre><code>http://192.168.1.XXX/admin</code></pre>
-<p>It loaded, but there was no activity showing—no blocked queries, nothing. This didn’t seem right. I had no idea where to start, but I decided to poke around and try to figure out what was going on. Here’s what I did:</p>
+<p>When I first checked the dashboard, it wasn’t blocking anything. I decided to troubleshoot, but it wasn’t immediately clear what was wrong. Here’s what I tried (and how I eventually fixed it):</p>
 
-<h3>1. Is the Pi-hole Even Running?</h3>
-<p>The first thing that popped into my head was, "Wait, is Pi-hole even doing anything right now?" I remembered something about "services" from when I installed it, so I ran:</p>
-<pre><code>sudo systemctl status pihole-FTL.service</code></pre>
-<p>I wasn’t sure what I was looking for, to be honest—but I saw the words "active (running)" in green. That was a relief! At least Pi-hole wasn’t completely broken. But why wasn’t it blocking anything?</p>
+<h3>1. Checking the Network Interface</h3>
+<p>I noticed in the dashboard settings that it was using the Ethernet interface instead of the Wi-Fi interface. Since my Pi-hole was connected to Wi-Fi, this had to be fixed. I read that you can often use:</p>
+<pre><code>sudo pihole -r</code></pre>
+<p>to reconfigure the Pi-hole settings, but when I tried, it skipped past the part where I could select the interface. So instead, I manually edited the configuration file:</p>
+<pre><code>sudo nano /etc/pihole/setupVars.conf</code></pre>
+<p>and updated:</p>
+<pre><code>PIHOLE_INTERFACE=wlan0</code></pre>
+<p>After saving the file and rebooting the Pi-hole, I tested it using:</p>
+<pre><code>nslookup bbc.co.uk 192.168.1.XXX</code></pre>
+<p>Unfortunately, it was timing out. This meant the Pi-hole wasn’t responding to DNS requests yet.</p>
 
-<h3>2. Is the Router Playing Along?</h3>
-<p>Then I thought, "Maybe my devices aren’t even using the Pi-hole." I logged into my router (the IP address and login info were on the back of the device) and checked the DNS settings. It turns out I hadn’t actually saved the change to use the Pi-hole’s IP as the primary DNS server. Oops! I fixed that and hit save. And… still nothing. Hmm.</p>
+<h3>2. Checking for Open Ports</h3>
+<p>To check if Pi-hole was set up to accept DNS requests, I ran:</p>
+<pre><code>sudo netstat -tulnp | grep ":53"</code></pre>
+<p>Port 53 (the port DNS queries use) was open, so I knew Pi-hole was at least listening for DNS requests. That was a good sign!</p>
 
-<h3>3. Testing DNS Queries</h3>
-<p>At this point, I decided to see if the Pi-hole was getting ANY traffic at all. I ran this on my laptop:</p>
-<pre><code>nslookup google.com</code></pre>
-<p>The result was… confusing. It showed my regular router’s IP address as the DNS, not the Pi-hole’s. That was when it hit me: I hadn’t double-checked that every device on the network was actually using the Pi-hole. Ugh, rookie mistake. Before moving on, I went into one device's network settings (my laptop) and manually set the DNS server to the Pi-hole’s IP. Then I ran <code>nslookup</code> again—and finally, it showed the Pi-hole’s IP!</p>
+<h3>3. Testing Connectivity on the Network</h3>
+<p>Next, I tried testing the connection between my PC and the Pi-hole. From my PC, I ran:</p>
+<pre><code>ping 192.168.1.XXX</code></pre>
+<p>This worked! My PC could communicate with the Pi-hole. But when I went back to the Pi and tested DNS resolution using:</p>
+<pre><code>
+dig bbc.co.uk @127.0.0.1  
+dig bbc.co.uk @192.168.1.XXX
+</code></pre>
+<p>I noticed that only the first command worked. This meant the Pi-hole could resolve DNS queries locally (on itself) but wasn’t accepting requests from other devices on the network. So, it still wasn’t fully functional.</p>
 
-<h3>4. Did the Pi’s IP Change?</h3>
-<p>By now, I was grasping at straws. I thought, "What if my Pi got a new IP address somehow?" Even though I *thought* I’d assigned a static IP in the router settings, I ran:</p>
-<pre><code>hostname -I</code></pre>
-<p>Luckily, the Pi’s IP hadn’t changed. So at least that wasn’t the issue. But now I knew for sure that the DNS traffic wasn’t getting to the Pi in the first place. That narrowed my problem down to the network settings.</p>
+<h3>4. Updating the Listen Addresses</h3>
+<p>After some research, I realized the Pi-hole's configuration needed to be updated to listen for both local and network requests. I edited the DNS configuration file:</p>
+<pre><code>sudo nano /etc/dnsmasq.d/01-pihole.conf</code></pre>
+<p>and added:</p>
+<pre><code>
+listen-address=127.0.0.1  
+listen-address=192.168.1.XXX
+</code></pre>
+<p>This made sure Pi-hole was set to listen both to itself (127.0.0.1) and the broader network interface (192.168.1.XXX).</p>
 
-<h3>What Finally Worked</h3>
-<p>After fumbling through different settings and retries, I found out the router had some sneaky "backup DNS" settings that I hadn’t disabled. These let the router bypass my Pi-hole whenever it wanted! Once I disabled those and saved everything properly, things started working. I refreshed the Pi-hole dashboard and watched in amazement as blocked query numbers finally started climbing. A small victory!</p>
+<h3>5. Testing Again</h3>
+<p>After saving the file and restarting the Pi-hole, I tested it again using:</p>
+<pre><code>dig bbc.co.uk @192.168.1.XXX</code></pre>
+<p>This time, it worked! The Pi-hole was now resolving DNS requests from other devices on the network.</p>
+
+<h3>Ready for Use!</h3>
+<p>Finally, I refreshed the Pi-hole dashboard and could see activity—ads were being blocked, and DNS queries from my devices were being handled. After a bit of trial and error, it was ready for use!</p>
 
 <h2>Making Devices Use Pi-hole</h2>
 <p>Here’s how I routed devices through it:</p>
