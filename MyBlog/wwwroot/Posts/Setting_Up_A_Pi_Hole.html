@@ -1,0 +1,195 @@
+<!-- PublishedDate: 2025-07-29 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 2rem;
+            line-height: 1.6;
+            background: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            color: #222;
+        }
+        h3 {
+            font-size: 1.1rem;
+            color: #555;
+            font-weight: 600;
+            margin-top: 1.2rem;
+            margin-bottom: 0.6rem;
+        }
+        h4 {
+            font-size: 1rem;
+            color: #666;
+            font-weight: 600;
+            font-style: italic;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        pre {
+            background: #eee;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+        a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .tip {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .blueprint {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-family: monospace;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+<h1>Why I Set Up a Pi-hole and How I Got It Working</h1>
+
+<p>I’d read about the benefits of a Pi-hole and how it could reduce the number of ads I see across all my devices on Wi-Fi. I already use browser ad blockers, but I wanted to experiment with a Raspberry Pi—and this seemed like the perfect project!</p>
+
+<p>Enter Pi-hole: a powerful little tool that runs as a local DNS server, blocking ads for every device on your network.</p>
+
+<h2>Why I Got a Pi-hole</h2>
+<p>Ads had become more intrusive than ever, especially on streaming services, YouTube, and certain websites. I wanted:</p>
+<ul>
+    <li><strong>Faster browsing</strong> (if possible)</li>
+    <li><strong>Fewer distractions</strong> – yes please (haha)</li>
+    <li><strong>More privacy</strong></li>
+    <li><strong>Some nerdy fun</strong></li>
+</ul>
+<p>I had a spare Raspberry Pi 3 from a friend, so I decided to put it to work.</p>
+
+<h2>The Network Flow</h2>
+<p>Here's how network traffic flows after setting it up:</p>
+<p><code>Device → Router → Pi-hole → Internet</code></p>
+
+<h2>Initial Setup</h2>
+<p>Before I could begin, I needed a few things:</p>
+<ul>
+    <li>HDMI to Micro HDMI cable</li>
+    <li>USB-A keyboard</li>
+    <li>USB-A mouse – I didn’t have one, so it was keyboard-only!</li>
+</ul>
+
+<h3>How Does a Pi Connect?</h3>
+<p>I wasn’t even sure if my Pi supported Wi-Fi. To find out, I ran:</p>
+<pre><code>iwconfig</code></pre>
+<p>I looked for <code>wlan0</code> in the output—and it was there! So Wi-Fi was a go.</p>
+
+<h2>Installing Pi-hole</h2>
+<p>Installation was simple with a one-liner:</p>
+<pre><code>curl -sSL https://install.pi-hole.net | bash</code></pre>
+<p>I selected a few popular blocklists and configured Pi-hole to run on port 8080, since another service was already using port 80.</p>
+
+<h3>Connecting Raspberry Pi to Wi-Fi</h3>
+<p>To get Wi-Fi working, I edited the network configuration:</p>
+<pre><code>sudo nano /etc/wpa_supplicant/wpa_supplicant.conf</code></pre>
+<p>Then added:</p>
+<pre class="blueprint">network={
+    ssid="YourWiFiSSID"
+    psk="YourWiFiPassword"
+}</pre>
+<p>After a quick reboot, I got the IP address using:</p>
+<pre><code>hostname -I</code></pre>
+
+<div class="tip">
+    ✅ Tip: Assign a static IP to your Pi using your router’s admin settings.
+</div>
+
+<h3>Telling the Router to Use the Pi-hole</h3>
+<p>I logged into my router (the default IP and password were printed on the back), and changed the DNS settings from "automatic" to "manual". Then I entered the Pi’s IP address so it could handle DNS requests.</p>
+
+<h4>What is DNS Resolution?</h4>
+<p>It’s how your devices translate human-friendly domain names (like <code>bbc.co.uk</code>) into IP addresses. Pi-hole steps in here to block unwanted domains at this point in the process.</p>
+
+<h2>Taking a Look at the Dashboard</h2>
+<p>To access the dashboard, I visited:</p>
+<pre><code>http://192.168.1.XXX/admin</code></pre>
+<p>It loaded—but there was zero activity showing. Uh-oh.</p>
+
+<h2>Diagnosing Why It Was Inactive</h2>
+<p>After digging into the dashboard settings, I saw that it was using the Ethernet interface. I needed to switch it to use Wi-Fi.</p>
+<p>I tried:</p>
+<pre><code>sudo pihole -r</code></pre>
+<p>But it skipped the configuration menu, so I instead edited:</p>
+<pre><code>sudo nano /etc/pihole/setupVars.conf</code></pre>
+<p>And changed:</p>
+<pre><code>PIHOLE_INTERFACE=wlan0</code></pre>
+
+<p>After a restart, I tested DNS resolution with:</p>
+<pre><code>nslookup bbc.co.uk 192.168.1.XXX</code></pre>
+<p>Still no luck. I checked if DNS was running with:</p>
+<pre><code>sudo netstat -tulnp | grep ":53"</code></pre>
+<p>It was listening—but only locally.</p>
+
+<p>I then tried pinging the Pi from my PC:</p>
+<pre><code>ping 192.168.1.XXX</code></pre>
+<p>That worked. From the Pi I ran:</p>
+<pre><code>dig bbc.co.uk @127.0.0.1
+dig bbc.co.uk @192.168.1.XXX</code></pre>
+<p>The first worked, but the second didn’t. So I edited the Pi-hole DNS config:</p>
+<pre><code>sudo nano /etc/dnsmasq.d/01-pihole.conf</code></pre>
+<p>And added:</p>
+<pre class="blueprint">listen-address=127.0.0.1
+listen-address=192.168.1.XXX</pre>
+<p>After that—success! Pi-hole was now ready to accept DNS queries from the network.</p>
+
+<h2>Making Devices Use Pi-hole</h2>
+<p>Here’s how I routed devices through it:</p>
+<ul>
+    <li><strong>Windows PC</strong>: Updated DNS manually in Ethernet settings</li>
+    <li><strong>iPhone & Apple TV</strong>: Changed DNS under their Wi-Fi settings</li>
+</ul>
+
+<div class="tip">
+    ✅ Tip: It takes effect instantly—no need to reboot the device.
+</div>
+
+<p>Once configured, ads started vanishing across those devices.</p>
+
+<h2>Blocklists and Limitations</h2>
+<p>Out of the box, Pi-hole doesn’t block YouTube ads, ITVX ads, or adult content. That’s not a bug—it’s because these services often serve content and ads from the same domains.</p>
+
+<p>To strengthen Pi-hole, I added:</p>
+<ul>
+    <li>The Firebog list collection</li>
+    <li>Steven Black’s hosts file</li>
+</ul>
+
+<p>Even then, YouTube remains tricky—DNS-level blocking has limits.</p>
+
+<h2>Final Thoughts</h2>
+<p>Setting up Pi-hole wasn’t totally smooth, but it was a fun and rewarding weekend project. I learned loads—about DNS, firewalls, SMB sharing, and more.</p>
+
+<p>My internet is now cleaner, faster, and more private. If you’re comfortable using the terminal and enjoy a bit of tinkering, I’d absolutely recommend giving Pi-hole a go.</p>
+
+<h2>Bonus Project: Turn Pi into a Media Server</h2>
+<p>With Pi-hole sorted, I plugged in an external hard drive full of movies and photos. It auto-mounted, so I could browse the files straight away.</p>
+
+<p>I set up Samba (SMB) to access them from my Windows PC. I’m now trying to use Kodi on my Xbox to stream the content. The only snag: the “Windows network” option isn’t showing up. Still working on that!</p>
+
+<p>Let me know if you've had a similar experience—or any tips for getting Kodi working with SMB. 😄</p>
+
+</body>
+</html>

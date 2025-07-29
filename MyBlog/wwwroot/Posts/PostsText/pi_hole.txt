@@ -1,0 +1,106 @@
+Why I Set Up a Pi-hole and How I Got It Working
+
+I'd read about the benefits of a pi-hole and that it would be able to reduce the number of ads I see on my devices at home on the WiFi. I know we have ad blockers to help in browsers but I wanted to experiment with a pi and this seemed like a good idea!. Sooooo enter: Pi-hole— it's a powerful little tool that acts as a local DNS server and blocks ads for every device on your network.
+
+Why I Got a Pi-hole
+Ads had become more intrusive than ever, especially on streaming services, YouTube, and various websites. I wanted:
+
+- Faster browsing if possible
+- Fewer distractions - yes please (HAHA)
+- A little more privacy
+- Some nerdy fun
+
+I had a Raspberry Pi 3 donated by a friend so I decided to put it to work.
+
+The Network Flow
+Device -> Router -> Pi-hole -> Internet
+
+Initial Setup
+Before I could start I needed a few things:
+
+- A HDMI to HDMI Micro cable
+- A USB A Keyboard
+- A USB A Mouse - i didn't have one so it was keyboard all the way!
+
+How does a Pi Connect?
+I didn't even know when i started if the device needed to be ethernet or wifi, it took some playing around to find out if the pi-hole had WiFi, I first tried iwconfig and was looking for wlan0 to indicate there was Wifi.
+There was a Wlan0 result so i knew it had WiFi!
+
+Installed Pi-hole
+A simple curl -sSL https://install.pi-hole.net | bash got the install going.
+I selected a few popular blocklists and configured it to run on port 8080 since another service was already using port 80.
+
+Connected Raspberry Pi to Wi-Fi
+I knew once i was up and running i would want the Pi to operate on WiFi so i needed to update the Pi config with the network details by entering sudo nano /etc/wpa_supplicant/wpa_supplicant.conf and providing the network details:
+
+network={
+    ssid="YourWiFiSSID"
+    psk="YourWiFiPassword"
+}
+A quick reboot and i was able to now retrieve an IP address with hostname -I
+✅ PRO Tip: Give your Pi a static IP address via your router settings.
+
+Tell the Router to Use the Pi
+Next i needed to log into my router (instructions were on the back of my router) and find the DNS servers, i changed this from automatic to manual and provided the pi's IP address so that DNS resolution would be handled by the PI. 
+
+What is DSN resolution you ask?
+....
+
+Taking a Look At The Pi-Hole Dashboard
+I now wanted to be able to see the dashboard so on my phone or your pc you can tryp in http://192.168.1.xxx/admin and wallah up comes the dashboard. I noticed right away though that there was zero activity showing, ut oh. 
+
+Diagnosing Why Its Inactive
+To try and see what was wrong i tried a few things, i looked in the dashboards settings and noticed that it had an Ethernet Interface not a WiFi Interface, so i needed to get my pi-hole to use the wifif it was connected to.
+I read that you cna usually run sudo pihole -r and intereact with the settings but for me it skipped past any interaction so instead i ran sudo nano /etc/pihole/setupVars.conf to access the setup file and update the PIHOLE_INTERFACE=wlan0. 
+After a restart and a quick test nslookup bbc.co.uk 192.168.1.XXX i could see it was tiing out so i ran sudo netstat -tulnp | grep ":53" to see if it was set up correctly to accept DNS requests and it was. 
+
+Next i tried from my PC ping 192.168.1.XXX and that worked, so then i get back onto the pi and tried:
+
+dig bbc.co.uk @127.0.0.1
+dig bbc.co.uk @192.168.1.XXX
+
+And only the first one worked - so the pi-hole could resolve its own DNS but its not accepting requests in. I read then that i needed to amend the pis configuration sudo nano /etc/dnsmasq.d/01-pihole.conf and added:
+
+listen-address=127.0.0.1
+listen-address=192.168.1.XXX
+
+So that the device would listen to itself and the network ip. Wallah it's ready for use!
+
+Making Devices Use It
+Windows PC: I changed the DNS in my Ethernet settings manually.
+
+iPhone and Apple TV: I changed the DNS settings under their Wi-Fi configuration.
+✅ Tip: It takes effect instantly once saved—no need to reboot the device.
+
+Once Pi-hole was the DNS for these devices, ads started disappearing.
+
+Blocklists and Limitations
+Out of the box, Pi-hole doesn’t block YouTube ads, ITVX, or adult sites. That’s not a bug—many of these services use the same domains to serve both ads and content.
+
+To beef up my Pi-hole, I added more blocklists:
+
+The Firebog lists
+Steven Black’s hosts file
+
+Even then, YouTube remains a challenge—DNS-level blocking has limits.
+
+Final Thoughts
+Setting up Pi-hole wasn't 100% smooth—but it was a fun and rewarding weekend project. I learned about DNS, firewalls, SMB sharing, and more. My home internet is cleaner, faster, and more private.
+
+If you're comfortable with a terminal and enjoy tinkering, I’d absolutely recommend it.
+
+Bonus Project: Turn Pi into a Media Server
+With Pi-hole sorted, I plugged in my external hard drive full of movies and photos.
+
+It auto-mounted on the Pi, so I could browse the files straight away.
+
+I set up Samba (SMB) so I could access the files from my Windows PC.
+
+I planned to use Kodi on my Xbox to stream content—but hit a snag where “Windows network” wasn’t showing. That’s still a work-in-progress, but I'm close.
+
+
+
+
+
+
+Ask ChatGPT
