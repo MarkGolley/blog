@@ -15,7 +15,7 @@ public class BlogController : Controller
         _commentService = commentService;
     }
 
-    public IActionResult Index()
+    public IActionResult Blogs()
     {
         var posts = _blogService.GetAllPosts();
         return View(posts);

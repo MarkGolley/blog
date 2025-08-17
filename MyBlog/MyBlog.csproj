@@ -29,4 +29,8 @@
       <_ContentIncludedByDefault Remove="Views\Home\Privacy.cshtml" />
     </ItemGroup>
 
+    <ItemGroup>
+      <AdditionalFiles Include="Views\Learning\Learning.cshtml" />
+    </ItemGroup>
+    
 </Project>
