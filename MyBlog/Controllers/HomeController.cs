@@ -11,7 +11,7 @@ public class HomeController : Controller
         _logger = logger;
     }
     
-    public IActionResult About()
+    public IActionResult Home()
     {
         return View();
     }

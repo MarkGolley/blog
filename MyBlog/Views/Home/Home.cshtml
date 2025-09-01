@@ -1,0 +1,50 @@
+@{
+    ViewData["Title"] = "Home";
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="/css/about.css"> <!-- Reusing the About CSS -->
+</head>
+<body>
+
+<main>
+    <section id="home" style="padding: 2rem; background: var(--bg); border: 1px solid var(--border); border-radius: 16px;">
+        <div class="wrap">
+            <h2 style="font-size: clamp(1.6rem, 2vw + 1rem, 2rem); margin-bottom: .5rem; color: var(--text);">Welcome to My Website</h2>
+            <p class="lead" style="line-height: 1.7; margin-bottom: 1rem; color: var(--muted);">
+                Explore my journey, upcoming plans, and get to know me better. Thank you for stopping by! 😊
+            </p>
+            <div class="cta">
+                <a href="/About/About" class="btn" style="background: #0f172a; color: #fff; padding: 0.7rem 1.2rem; border-radius: 5px; text-decoration: none;">Learn More About Me</a>
+                <a href="/Contact/Contact" class="btn" style="background: #0f172a; color: #fff; padding: 0.7rem 1.2rem; border-radius: 5px; text-decoration: none;">Contact Me</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" style="margin-top: 2rem;">
+        <div class="wrap" style="display: grid; gap: var(--gap); background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 2rem;">
+            <h2 style="font-size: clamp(1.6rem, 2vw + 0.8rem, 2rem); margin-bottom: 1.5rem; color: var(--text); text-align: center;">What You’ll Find Here</h2>
+            <div class="feature-list" style="display: flex; flex-wrap: wrap; gap: 1.5rem;">
+                <div class="card" style="flex: 1; border: 1px solid var(--border); border-radius: 14px; padding: 1rem; background: #fff;">
+                    <h3 style="font-size: 1.5rem; margin-bottom: .5rem; color: var(--text);">My Journey</h3>
+                    <p style="line-height: 1.7; margin-bottom: 1rem; color: var(--muted);">Discover how I got started, what excites me, and my continuous learning process.</p>
+                </div>
+                <div class="card" style="flex: 1; border: 1px solid var(--border); border-radius: 14px; padding: 1rem; background: #fff;">
+                    <h3 style="font-size: 1.5rem; margin-bottom: .5rem; color: var(--text);">Future Plans</h3>
+                    <p style="line-height: 1.7; margin-bottom: 1rem; color: var(--muted);">Check out my learning plans and aspirations for the future.</p>
+                </div>
+                <div class="card" style="flex: 1; border: 1px solid var(--border); border-radius: 14px; padding: 1rem; background: #fff;">
+                    <h3 style="font-size: 1.5rem; margin-bottom: .5rem; color: var(--text);">Contact Me</h3>
+                    <p style="line-height: 1.7; margin-bottom: 1rem; color: var(--muted);">Feel free to reach out to me for collaboration, feedback, or just to say hi.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>
