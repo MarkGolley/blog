@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: myblog
-    env: docker
-    plan: free
-    region: oregon
-    dockerfilePath: Dockerfile
