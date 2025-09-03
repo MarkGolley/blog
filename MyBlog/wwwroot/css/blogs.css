@@ -1,56 +1,30 @@
-body {
-    font-family: system-ui, sans-serif;
-    max-width: 800px;
-    margin: auto;
-    padding: 2rem;
-    line-height: 1.6;
-    background: #f9f9f9;
-    color: #333;
+/* Default state - not hovering */
+#blogs .blog-post {
+    color: #0f172a; /* Default text color */
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    background: #fff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.3s ease;
 }
-h1, h2 {
-    color: #222;
+
+#blogs .blog-post h3,
+#blogs .blog-post h3 a,
+#blogs .blog-post .text-muted {
+    color: #0f172a; /* Default text inside */
+    transition: color 0.3s ease;
 }
-h3 {
-    font-size: 1.1rem;
-    color: #555;
-    font-weight: 600;
-    margin-top: 1.2rem;
-    margin-bottom: 0.6rem;
+
+/* Hover state */
+#blogs .blog-post:hover {
+    background: #0f172a; /* Background becomes dark */
+    color: #fff; /* All text inside changes to white */
+    transform: translateY(-5px); /* Add a lifting effect */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow effect */
 }
-h4 {
-    font-size: 1rem;
-    color: #666;
-    font-weight: 600;
-    font-style: italic;
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-}
-pre {
-    background: #eee;
-    padding: 1rem;
-    overflow-x: auto;
-}
-code {
-    font-family: monospace;
-}
-a {
-    color: #0366d6;
-    text-decoration: none;
-}
-a:hover {
-    text-decoration: underline;
-}
-.tip {
-    background: #e7f3ff;
-    border-left: 4px solid #2196f3;
-    padding: 1rem;
-    margin: 1rem 0;
-}
-.blueprint {
-    background: #f5f5f5;
-    border: 1px solid #ddd;
-    padding: 1rem;
-    margin: 1rem 0;
-    font-family: monospace;
-    white-space: pre;
+
+#blogs .blog-post:hover h3,
+#blogs .blog-post:hover h3 a,
+#blogs .blog-post:hover .text-muted {
+    color: #fff !important; /* Force text-muted to change its color */
 }

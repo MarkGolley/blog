@@ -1,0 +1,93 @@
+<!-- PublishedDate: 2025-9-2 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Deploying My .NET Blog Site to Google Cloud Run</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>Deploying My .NET Blog to Google Cloud Run: A Step-by-Step Journey</h1>
+<p>Recently I decided to move my personal blog from a slower hosting platform to Google Cloud Platform (GCP). I wanted faster load times and more experience with cloud deployment. Here’s how the process went.</p>
+
+<h2>1. Setting Up the Project on GCP</h2>
+<p>First off I created a new project in GCP and enabled the services I was going to make use of:</p>
+<ul>
+    <li><strong>Cloud Run:</strong> for hosting my containerised app.</li>
+    <li><strong>Artifact Registry:</strong> to store my Docker images.</li>
+    <li><strong>IAM roles:</strong> making sure my Google account had the right permissions to deploy containers.</li>
+</ul>
+<p>I also installed the Google Cloud SDK and verified that I could interact with GCP via the command line.</p>
+
+<h2>2. Preparing the .NET App</h2>
+<p>My blog is built with .NET C#, so the first step was to ensure it could run in a container:</p>
+<ul>
+    <li>My app was originally configured to run on port 5000 - I cant recall now why!</li>
+    <li>Cloud Run requires the app to listen on port 8080, or whatever is specified by the <code>PORT</code> environment variable.</li>
+</ul>
+<p>I needed to update the <code>Program.cs</code> file as I was getting an error regarding the improper port:</p>
+<pre><code>var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Urls.Add($"http://0.0.0.0:{port}");
+app.Run();</code></pre>
+<p>This then allowed the app to run both locally and in Cloud Run so I was in a good place! Before I moved to the next stage i checked I could run my containerised app locally so I ran:</p>
+<pre><code>docker build -t myblog-app .
+docker run -p 8080:8080 -e PORT=8080 myblog-app</code></pre>
+<p>Everything worked perfectly at <code>http://localhost:8080</code>.</p>
+
+<p>Key points:</p>
+<ul>
+    <li>Using 8080 ensures Cloud Run can check the health of the container.</li>
+    <li>The app is published in <strong>Release</strong> mode for production performance.</li>
+</ul>
+
+<h2>3. Pushing to Google Artifact Registry</h2>
+<p>I first off tried pushing to Container Registry (GCR) but ran into 403 permission errors due to OAuth and IAM configuration issues on Windows. I battled with these for quite some time and in an effort to avoid getting stuck I switched to Artifact Registry for a different approach:</p>
+<pre><code>docker tag myblog-app europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest
+docker push europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest</code></pre>
+
+<h2>4. Deploying to Cloud Run</h2>
+<p>Now my Docker image was successfully in Artifact Registry the deployment process was straightforward:</p>
+<pre><code>gcloud run deploy myblog-app \
+  --image europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest \
+  --platform managed \
+  --region europe-west2 \
+  --allow-unauthenticated \
+  --min-instances 1</code></pre>
+<p>Cloud Run automatically handles:</p>
+<ul>
+    <li><strong>Scaling</strong> the service up or down based on traffic.</li>
+    <li>Providing a public HTTPS URL for my site.</li>
+    <li>Keeping at least one instance warm to avoid slow cold starts.</li>
+</ul>
+<p>After a few minutes, my blog was live!🙌</p>
+
+<h2>5. Managing Cost on Cloud Run</h2>
+<p>I noticed my service was costing about 9p for 12 hours with a single instance always running. That’s of course tiny really but it adds up if you’re running a hobby project for months.</p>
+
+<p>To bring the cost down I looked at:</p>
+<ul>
+    <li><strong>CPU and memory size:</strong> Cloud Run lets you pick how much CPU and RAM each container gets. My app doesn’t need a full core so I reduced it to a smaller setting (<strong>0.25 vCPU down from 1</strong>, <strong>256MB down from 512MB memory</strong>). That means each instance is cheaper to run.</li>
+    <li><strong>Minimum instances:</strong> Cloud Run can scale down to zero so you pay nothing when there’s no traffic. The trade-off is a short “cold start” (a few seconds delay) the first time a request comes in after being idle. If I keep one tiny instance always on then my site loads instantly with a small baseline cost. If I set it to zero I save money but accept the slight startup lag.</li>
+</ul>
+<p>Right now I’m experimenting with the best balance 💵</p>
+
+<h2>6. Lessons Learned</h2>
+<ul>
+    <li><strong>Port configuration matters:</strong> Cloud Run always provides a <code>$PORT</code> environment variable. Binding to <code>0.0.0.0:$PORT</code> is critical.</li>
+    <li><strong>Local testing is key:</strong> Testing the container locally with Docker saved deployment headaches I reckon.</li>
+    <li><strong>Artifact Registry over Container Registry:</strong> Avoids OAuth token issues on Windows.</li>
+    <li><strong>Cloud Run is fast and scalable:</strong> Once the image works, deployment is smooth, and the site is highly responsive.</li>
+</ul>
+
+<h2>7. Next Steps</h2>
+<p>I plan to:</p>
+<ul>
+    <li>Set up a <strong>custom domain</strong> for a cleaner URL.</li>
+    <li>Optimise the Docker image size for faster cold starts.</li>
+    <li>Implement logging and monitoring for insight into traffic and performance.</li>
+</ul>
+
+<p>Deploying my .NET blog to Cloud Run was a fun and actually quite simple learning experience. Now my blog site is faster!</p>
+</body>
+</html>

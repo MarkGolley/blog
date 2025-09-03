@@ -1,15 +1,23 @@
-@model IEnumerable<BlogPost>
-
-<h1>My Blogs</h1>
-<p></p>
-@foreach (var post in Model)
-{
-    <div class="mb-4">
-        <h3>
-            <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">
-                @post.Title
-            </a>
-        </h3>
-        <p class="text-muted">@post.DatePosted.ToString("MMMM dd, yyyy")</p>
-    </div>
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Blogs</title>
+    <link rel="stylesheet" href="/css/blogs.css">
+</head>
+<body>
+<section id="blogs" aria-labelledby="blogs-title">
+    @foreach (var post in Model)
+    {
+        <div class="blog-post">
+            <h3>
+                <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">
+                    @post.Title
+                </a>
+            </h3>
+            <p class="text-muted">@post.DatePosted.ToString("MMMM dd, yyyy")</p>
+        </div>
+    }
+</section>
+</body>
+</html>

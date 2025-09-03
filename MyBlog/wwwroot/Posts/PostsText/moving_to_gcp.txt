@@ -1,0 +1,120 @@
+Deploying My .NET Blog to Google Cloud Run: A Step-by-Step Journey
+
+Recently, I decided to move my personal blog from a slower hosting platform to Google Cloud Platform (GCP). I wanted faster load times, scalability, and hands-on experience with cloud deployment — all while learning how to deploy a .NET C# application using Docker and Cloud Run. Here’s how the process went.
+
+1. Setting Up the Project on GCP
+
+First, I created a new project in GCP and enabled the required services:
+
+Cloud Run: for hosting my containerized app.
+
+Container Registry / Artifact Registry: to store my Docker images.
+
+IAM roles: made sure my Google account had the right permissions to deploy containers.
+
+I also installed the Google Cloud SDK and verified that I could interact with GCP via the command line.
+
+2. Preparing the .NET App
+
+My blog is built with .NET C#, so the first step was to ensure it could run in a container:
+
+My app was originally configured to run on port 5000.
+
+Cloud Run requires the app to listen on port 8080, or whatever is specified by the PORT environment variable.
+
+I updated the Program.cs file:
+
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Urls.Add($"http://0.0.0.0:{port}");
+app.Run();
+
+
+This allowed the app to run both locally and in Cloud Run.
+
+3. Dockerizing the App
+
+Next, I created a Dockerfile for my blog:
+
+FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS base
+WORKDIR /app
+EXPOSE 8080
+
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+WORKDIR /src
+COPY ["MyBlog.csproj", "."]
+RUN dotnet restore "MyBlog.csproj"
+COPY . .
+RUN dotnet publish "MyBlog.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "MyBlog.dll"]
+
+
+Key points:
+
+EXPOSE 8080 ensures Cloud Run can check the health of the container.
+
+The app is published in Release mode for production performance.
+
+I tested the container locally using Docker:
+
+docker build -t myblog-app .
+docker run -p 8080:8080 -e PORT=8080 myblog-app
+
+
+Everything worked perfectly at http://localhost:8080.
+
+4. Pushing to Google Artifact Registry
+
+Initially, I tried pushing to Container Registry (GCR), but ran into 403 permission errors due to OAuth and IAM configuration issues on Windows. To avoid this, I switched to Artifact Registry, which is fully supported and easier to use:
+
+docker tag myblog-app europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest
+docker push europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest
+
+5. Deploying to Cloud Run
+
+With the Docker image in Artifact Registry, deployment was straightforward:
+
+gcloud run deploy myblog-app \
+  --image europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest \
+  --platform managed \
+  --region europe-west2 \
+  --allow-unauthenticated \
+  --min-instances 1
+
+
+Cloud Run automatically handles:
+
+Scaling the service up or down based on traffic.
+
+Providing a public HTTPS URL for my site.
+
+Keeping at least one instance warm to avoid slow cold starts.
+
+After a few minutes, my blog was live at:
+
+https://myblog-app-1045907029556.europe-west2.run.app
+
+6. Lessons Learned
+
+Port configuration matters: Cloud Run always provides a $PORT environment variable. Binding to 0.0.0.0:$PORT is critical.
+
+Local testing is key: Testing the container locally with Docker saved a lot of deployment headaches.
+
+Artifact Registry over GCR on Windows: Avoids OAuth token issues.
+
+Cloud Run is fast and scalable: Once the image works, deployment is smooth and the site is highly responsive.
+
+7. Next Steps
+
+I plan to:
+
+Set up a custom domain for a cleaner URL.
+
+Optimize the Docker image size for faster cold starts.
+
+Implement logging and monitoring for better insight into traffic and performance.
+
+Deploying my .NET blog to Cloud Run was a learning experience — from Docker and environment variables to GCP permissions — but now my blog is faster, scalable, and fully cloud-ready.

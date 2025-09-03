@@ -28,4 +28,6 @@ app.MapControllerRoute(
     pattern: "Blog/Post/{slug?}",
     defaults: new { controller = "Blog", action = "Post" });
 
-app.Run("http://0.0.0.0:5000");
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Urls.Add($"http://0.0.0.0:{port}");
+app.Run();
