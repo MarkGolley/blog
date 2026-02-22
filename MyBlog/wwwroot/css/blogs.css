@@ -1,0 +1,30 @@
+/* Default state - not hovering */
+#blogs .blog-post {
+    color: #0f172a; /* Default text color */
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    background: #fff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.3s ease;
+}
+
+#blogs .blog-post h3,
+#blogs .blog-post h3 a,
+#blogs .blog-post .text-muted {
+    color: #0f172a; /* Default text inside */
+    transition: color 0.3s ease;
+}
+
+/* Hover state */
+#blogs .blog-post:hover {
+    background: #0f172a; /* Background becomes dark */
+    color: #fff; /* All text inside changes to white */
+    transform: translateY(-5px); /* Add a lifting effect */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow effect */
+}
+
+#blogs .blog-post:hover h3,
+#blogs .blog-post:hover h3 a,
+#blogs .blog-post:hover .text-muted {
+    color: #fff !important; /* Force text-muted to change its color */
+}

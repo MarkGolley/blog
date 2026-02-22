@@ -1,0 +1,123 @@
+<!-- PublishedDate: 2026-02-18 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Moving My Comments Feature to Cloud SQL (and Why It Was More Awkward Than Expected!)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+
+<h1>Moving My Comments Feature to Cloud SQL (and Why It Was More Awkward Than Expected!)</h1>
+
+<p>When I first added comments to this site, I kept it simple. Too simple. They were stored locally. It worked, technically. Until I redeployed. In the back of my mind, I of course knew that Cloud Run containers are ephemeral (if you write to local storage it's temporary - redeploy the service and it disappears).</p>
+
+<p>So the comments feature 'worked'… but comments did not persist. Which slightly defeats the point of a comment section right?</p>
+
+<h2>The obvious fix: use a real database</h2>
+
+<p>The correct solution was to move comments into Cloud SQL using PostgreSQL and Entity Framework Core, so on paper this looked straightforward:</p>
+
+<ul>
+    <li>Create a database and table</li>
+    <li>Add a migration</li>
+    <li>Update the database</li>
+    <li>Done</li>
+</ul>
+
+<p>In reality, this process forced me to understand far more about how my application is wired together.</p>
+
+<h2>Why Cloud SQL?</h2>
+
+<p>I am already running the site on Google Cloud, so Cloud SQL was the natural fit. I'd been studying storage offerings recently as part of my GCE exam anyway so I knew Cloud Sql gives me:</p>
+
+<ul>
+    <li>Managed backups - it’s like having an undo button for the entire database</li>
+    <li>Automatic patching - i can focus on building features instead of worrying about updates</li>
+    <li>High availability options - even if a server or zone fails, visitors won’t notice a thing</li>
+    <li>Integration with Cloud Run networking - no messy network configs, just a secure connection</li>
+</ul>
+
+<p>I did not want to run PostgreSQL myself on a virtual machine. That would mean handling updates, monitoring, and backups manually. If I am using managed infrastructure, I may as well lean into it properly. More importantly, it separates compute from state. The container can be destroyed and recreated at any time. The data remains. It's how it should be.</p>
+
+<p>This separation is not optional in modern cloud architecture right? It is expected.</p>
+
+<h2>Why PostgreSQL?</h2>
+
+<p>Mostly because it is dependable and widely supported. PostgreSQL is mature, well-documented, and works cleanly with .NET. For a comments table, almost any relational database would have worked. I wanted to build the feature using something simple.</p>
+
+<h2>Why Entity Framework Core?</h2>
+
+<p>I need to learn more about Entity Framework Core - i've got it on my learning plan but after looking into it briefly it seemed sensible because my application logic works with C# objects and EF Core maps those objects to relational tables. For example:</p>
+
+<pre><code>public class Comment
+{
+    public int Id { get; set; }
+    public string Author { get; set; }
+    public string Content { get; set; }
+    public DateTime PostedAt { get; set; }
+    public string PostId { get; set; }
+}</code></pre>
+
+<p>That model becomes a real table in PostgreSQL. I work in C#, and EF handles the translation so it nicely keeps the data layer aligned with the domain model instead of having SQL strings throughout my code.</p>
+
+<h2>Why I needed a migration</h2>
+
+<p>This is the part that initially felt unnecessary. I defined the <code>Comment</code> class. Surely that should be enough? <strong>It is not!</strong> The database has its own schema and it doesn't care about my C# classes so a 'migration' is simply a version-controlled description of the database schema.</p>
+
+<p>When I ran: <code>dotnet ef migrations add CreateCommentsTable</code></p>
+
+<p>EF Core generated a migration file describing how to create the <code>Comments</code> table.</p>
+
+<p>When I then ran: <code>dotnet ef database update</code></p>
+
+<p>EF connected to PostgreSQL and executed those instructions, physically creating the table. Without that step the application would compile perfectly, but PostgreSQL would have no table to insert into and I started to get errors when I deployed to test.</p>
+
+<h2>The awkward parts</h2>
+
+<p>Of course as always this process was not seamless.</p>
+
+<p>First, I ran into a dependency injection error. I had registered my <code>CommentService</code> as a singleton, which means .NET only ever creates one instance for the entire application. The problem was that it depended on a <code>DbContext</code>, which is scoped, meaning a new instance is created for each web request. .NET correctly refused to build, because a long-lived singleton cannot safely hold a short-lived scoped service. Changing the <code>CommentService</code> to scoped resolved the issue, so each request gets its own service and <code>DbContext</code>.</p>
+
+<p>Then came connection string problems. A connection string is basically a set of instructions that tells the application how to reach the database (which server, which database name, which username and password etc). My app would start fine because the runtime connection string was configured in Cloud Run, but migrations run at design time on my local machine, and they didn’t know how to connect because that connection string wasn’t set up for local use. Once I provided the correct local connection string, migrations could find the database and create the tables properly.</p>
+
+<p>Finally, secrets. Passwords and database credentials should never live in the code! Cloud Run lets you store them as environment variables or in Secret Manager and your app reads them at runtime. Managing these properly adds a bit of overhead, but it keeps credentials secure and separate from your codebase.</p>
+
+<h2>What this feature move achieved</h2>
+
+<p>Before:</p>
+
+<ul>
+    <li>Comments were fragile</li>
+    <li>Deployments meant data loss</li>
+    <li>Storage was tied to the container</li>
+</ul>
+
+<p>Now:</p>
+
+<ul>
+    <li>Comments persist across revisions</li>
+    <li>The application is stateless</li>
+    <li>The database is managed and independent</li>
+    <li>The schema is version-controlled via migrations</li>
+</ul>
+
+<h2>What I want to add next</h2>
+
+<p>The comments system works, but it is still basic. I would love to introduce:</p>
+
+<ul>
+    <li>Basic moderation or profanity filtering - fits right in with my work!</li>
+    <li>An admin-only delete comment option</li>
+    <li>Soft deletes instead of permanent removal - keeps an audit</li>
+    <li>Rate limiting to prevent spam</li>
+    <li>Eventually, authentication</li>
+</ul>
+
+<p>Each small improvement forces me to understand another layer of the stack.</p>
+
+<p>Thanks for reading and of course, please use my shiny new comments feature!!!</p>
+
+</body>
+</html>

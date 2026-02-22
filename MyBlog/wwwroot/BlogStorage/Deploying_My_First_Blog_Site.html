@@ -1,0 +1,41 @@
+﻿<!-- PublishedDate: 2025-05-11 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Deploying My .NET Blog to Render</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>Deploying My .NET Blog to Render</h1>
+
+<p>Recently, I set out to publish my personal .NET blog using <a href="https://render.com" target="_blank" rel="noopener noreferrer">Render</a>, a platform I had not used before but which seemed well suited to simple hosting. It did not go entirely to plan. Here is what went wrong, what I learned, and how I eventually got it working.</p>
+
+<h2>My Goal</h2>
+<p>I had built a simple ASP.NET Core MVC blog project with a controller that serves posts from HTML files. I just wanted it hosted somewhere quickly, and Render seemed like a sensible option. It was — after a bit of trial and error.</p>
+
+<h2>Attempt 1: Native .NET – Static Site</h2>
+<p>Initially, I followed Render’s static site guide. The default build command I used looked like this:</p>
+<pre><code>dotnet publish MyBlog/MyBlog.csproj -c Release -o out</code></pre>
+<p>But this failed with:</p>
+<pre><code>bash: line 1: dotnet: command not found</code></pre>
+<p>Render describes their Static Site option as “great for blogs”, which sounded right at first. But it only works for purely static HTML/CSS/JS with no server-side code. That was the issue.</p>
+
+<h2>Attempt 2: Docker Deployment – Web Service</h2>
+<p>A Web Service supports server-side code and building from a Dockerfile, so it was a better fit for my C# ASP.NET Core application.</p>
+<p>I wrote a <code>Dockerfile</code> using the official .NET 8 SDK image, published the app, and exposed port 80.</p>
+<p>I also added a <code>render.yaml</code> file to tell Render how to build and deploy the application using Docker. Once this was in place, Render built and ran the app. But…</p>
+
+<h2>A Mysterious “Not Found”</h2>
+<p>Although the application deployed, when I visited the URL I was met with a <strong>“Not Found”</strong> page. It was not a 404 from my application, but Render’s own page.</p>
+<p>After digging into it, I realised I had left in some non-standard code from a .NET 9 preview template I had previously experimented with. Once I removed it and returned to a straightforward middleware setup (<code>UseStaticFiles()</code>, <code>MapControllerRoute()</code>, etc.), everything worked as expected.</p>
+
+<h2>Success</h2>
+<p>After tidying up the Dockerfile and reverting my <code>Program.cs</code> to a simpler configuration, the site deployed correctly. I finally saw something other than “Not Found”.</p>
+
+<hr>
+
+<p><strong>In short:</strong> If you’re deploying a .NET application to Render, use a Web Service (not a Static Site), build with Docker, stick with .NET 8, and keep the middleware straightforward unless you’re certain you need something more involved.</p>
+</body>
+</html>

@@ -1,0 +1,78 @@
+﻿<!-- PublishedDate: 2025-9-2 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Deploying My .NET Blog Site to Google Cloud Run</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>Deploying My .NET Blog to Google Cloud Run</h1>
+<p>I moved my personal blog from a sluggish host to Google Cloud Platform because I wanted faster load times and some proper cloud deployment experience. Here is how it went, warts and all.</p>
+
+<h2>Setting up the project</h2>
+<p>I created a new project in GCP and enabled the services I needed:</p>
+<ul>
+    <li><strong>Cloud Run</strong> for hosting the container</li>
+    <li><strong>Artifact Registry</strong> to store Docker images</li>
+    <li><strong>IAM roles</strong> so my account could actually deploy</li>
+</ul>
+<p>I also installed the Google Cloud SDK and checked I could talk to GCP from the command line.</p>
+
+<h2>Getting the app ready</h2>
+<p>My blog is a .NET application, so the first step was making sure it would run inside a container. The main gotcha: Cloud Run expects your app to listen on port 8080 (or whatever is provided in the <code>PORT</code> environment variable).</p>
+<ul>
+    <li>My app was originally set to run on port 5000 for no particular reason.</li>
+</ul>
+<p>I updated <code>Program.cs</code> so it uses the provided port:</p>
+<pre><code>var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Urls.Add($"http://0.0.0.0:{port}");
+app.Run();</code></pre>
+<p>Before pushing anything, I tested the container locally:</p>
+<pre><code>docker build -t myblog-app .
+docker run -p 8080:8080 -e PORT=8080 myblog-app</code></pre>
+<p>Everything worked at <code>http://localhost:8080</code>.</p>
+
+<h2>Pushing to Artifact Registry</h2>
+<p>I originally tried pushing to Container Registry (GCR) but ran into 403 permission errors on Windows. I wrestled with OAuth and IAM for a while, then switched to Artifact Registry to get things moving:</p>
+<pre><code>docker tag myblog-app europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest
+docker push europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest</code></pre>
+
+<h2>Deploying to Cloud Run</h2>
+<p>Once the image was in Artifact Registry, deployment was fairly straightforward:</p>
+<pre><code>gcloud run deploy myblog-app \
+  --image europe-west2-docker.pkg.dev/my-blog-website-470819/myblog-app-repo/myblog-app:latest \
+  --platform managed \
+  --region europe-west2 \
+  --allow-unauthenticated \
+  --min-instances 1</code></pre>
+<p>Cloud Run handles scaling, HTTPS, and keeping instances warm if you choose to.</p>
+<p>After a few minutes, the blog was live.</p>
+
+<h2>Cost tweaks</h2>
+<p>I noticed it was costing around 9p for 12 hours with one instance always running. That is tiny, but it adds up if you leave it running for months.</p>
+<ul>
+    <li><strong>CPU and memory</strong>: I reduced the instance size from 1 vCPU / 512MB to 0.25 vCPU / 256MB. The blog is lightweight, so it did not need the larger size.</li>
+    <li><strong>Minimum instances</strong>: If I set it to zero I save money, but the first request after idle incurs a cold start. Keeping one small instance warm gives faster load times for a small baseline cost.</li>
+</ul>
+<p>At the moment I am experimenting to find the right balance.</p>
+
+<h2>What I learned</h2>
+<ul>
+    <li><strong>Port configuration matters</strong>: Cloud Run provides <code>$PORT</code> and you need to bind to it.</li>
+    <li><strong>Local testing helps</strong>: running the container locally saved me a fair bit of frustration.</li>
+    <li><strong>Artifact Registry is simpler</strong>: less OAuth hassle on Windows (at least in my case).</li>
+</ul>
+
+<h2>Next steps</h2>
+<p>I want to:</p>
+<ul>
+    <li>Set up a custom domain</li>
+    <li>Reduce the Docker image size to improve cold start times</li>
+    <li>Add logging and monitoring so I can see traffic and errors more clearly</li>
+</ul>
+
+<p>Overall this was enjoyable, and the blog is noticeably quicker now.</p>
+</body>
+</html>

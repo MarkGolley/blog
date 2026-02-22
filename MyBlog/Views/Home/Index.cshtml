@@ -1,0 +1,35 @@
+@{
+    ViewData["Title"] = "Home";
+}
+
+<section id="hero" class="hero-section">
+    <div class="container">
+        <h1>Hi, I'm Mark</h1>
+        <p>I build reliable, well-tested software in C#/.NET and Python, and I focus on clean, maintainable code.</p>
+        <div class="hero-actions">
+            <a class="btn btn-primary" asp-controller="Contact" asp-action="Index">Get in touch</a>
+            <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">See my blogs</a>
+        </div>
+    </div>
+</section>
+
+<section aria-labelledby="quick-bits-title">
+    <h2 id="quick-bits-title">Quick bits</h2>
+    <div class="credentials-grid">
+        <div class="credential-card">
+            <div class="credential-title">Stack</div>
+            <div class="credential-value">C#, .NET, xUnit, Python, GCP</div>
+            <p class="credential-copy">I focus on maintainable code, strong tests, and clean delivery.</p>
+        </div>
+        <div class="credential-card">
+            <div class="credential-title">Learning style</div>
+            <div class="credential-value">Short focused sprints</div>
+            <p class="credential-copy">Consistent, intentional learning beats marathon sessions.</p>
+        </div>
+        <div class="credential-card">
+            <div class="credential-title">Outside work</div>
+            <div class="credential-value">Climbing and long walks</div>
+            <p class="credential-copy">Usually with Ellie, my cocker spaniel.</p>
+        </div>
+    </div>
+</section>

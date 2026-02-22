@@ -1,0 +1,23 @@
+@model IEnumerable<MyBlog.Models.BlogPost>
+
+@{
+    ViewData["Title"] = "My Blogs";
+}
+
+<section id="blogs" aria-labelledby="blogs-title">
+    <h2 id="blogs-title">My Blogs</h2>
+
+    <div class="blog-list">
+        @foreach (var post in Model)
+        {
+            <article class="blog-post">
+                <h3>
+                    <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">
+                        @post.Title
+                    </a>
+                </h3>
+                <div class="post-meta">@post.DatePosted.ToString("dd MMMM yyyy")</div>
+            </article>
+        }
+    </div>
+</section>

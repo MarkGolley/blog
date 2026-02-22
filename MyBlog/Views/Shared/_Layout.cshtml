@@ -1,0 +1,38 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>@ViewData["Title"] - MyBlog</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true"/>
+    <link rel="stylesheet" href="~/MyBlog.styles.css" asp-append-version="true"/>
+</head>
+<body>
+<header class="navbar">
+    <div class="container">
+        <a class="nav-brand" asp-controller="Home" asp-action="Index">MyBlog</a>
+        <nav class="nav-links" aria-label="Primary">
+            <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
+            <a class="nav-link" asp-controller="Blog" asp-action="Index">My Blogs</a>
+            <a class="nav-link" asp-controller="Learning" asp-action="Index">Learning Plan</a>
+            <a class="nav-link" asp-controller="Contact" asp-action="Index">Contact</a>
+            <a class="nav-link" asp-controller="About" asp-action="Index">About</a>
+        </nav>
+    </div>
+</header>
+
+<main role="main" class="container">
+    @RenderBody()
+</main>
+
+<footer>
+    <div class="container">
+        &copy; 2026 - MyBlog
+    </div>
+</footer>
+
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

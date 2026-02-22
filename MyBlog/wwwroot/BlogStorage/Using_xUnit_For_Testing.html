@@ -1,0 +1,108 @@
+﻿<!-- PublishedDate: 2025-05-19 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Using xUnit Unit Testing</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>Using xUnit Unit Testing</h1>
+
+<p>Back to basics: a unit test should verify a single piece of functionality, usually a method. I like tests to be isolated, so I avoid calling the internet or a real database. Tests are my safety net for "you’ve just broken something".</p>
+
+<p>I also make a point of testing the unhappy paths. It’s easy to only test the happy path, but bugs often hide in the corners.</p>
+
+<h2>Why xUnit?</h2>
+<p>It is the main testing framework used where I work, so I wanted to understand why and what the alternatives are.</p>
+
+<h3>Test attributes and organisation</h3>
+<p>Common frameworks are MSTest, NUnit and xUnit. In xUnit, we tag tests with <code>[Fact]</code> (single test) or <code>[Theory]</code> (data-driven test). MSTest and NUnit have similar attributes.</p>
+
+<h3>Test discovery</h3>
+<p>xUnit discovers tests by convention. It looks for those attributes on public classes inside a test project (usually ending in <code>.Tests</code>). One downside: discovery can sometimes fail in IDEs. I haven’t experienced this personally, but I’ve seen it happen for QA.</p>
+
+<h3>Setup and teardown</h3>
+<p>xUnit uses the class constructor for setup and <code>Dispose</code> for teardown. NUnit/MSTest use <code>[SetUp]</code> and <code>[TearDown]</code>. The constructor approach feels more natural to me.</p>
+
+<h3>Test isolation</h3>
+<p>By default, xUnit creates a new instance of the test class for each test. NUnit and MSTest reuse the same instance unless configured otherwise. This approach prevents strange side effects between tests.</p>
+
+<h3>Dependency injection support</h3>
+<p>xUnit works well with DI because the constructor can take dependencies. You can pass in mocks and keep your tests close to how the production code is wired.</p>
+
+<h3>Parallel execution</h3>
+<p>By default, test collections run in parallel (tests within a class run sequentially). This has been a useful speed boost for me.</p>
+
+<h3>Shared test context</h3>
+<p>If you have an expensive setup, you can share it using <code>IClassFixture</code>. I’ve seen this used for database-like setup where you want to reuse a single instance.</p>
+
+<h3>Data-driven tests with Theory</h3>
+<p>I use <code>Theory</code> when I want the same test to run multiple times with different data.</p>
+
+<pre><code class="language-csharp">[Fact]
+public void Testy_Mc_Test_Face()
+</code></pre>
+
+<h4>Using InlineData</h4>
+<pre><code class="language-csharp">[Theory]
+[InlineData(1, 2, 3)]
+public void Testy_Mc_Test_Face(int foo, int fee, int faa)
+</code></pre>
+
+<h4>Using MemberData</h4>
+<pre><code class="language-csharp">public static IEnumerable&lt;object[]&gt; AddTestData => new List&lt;object[]&gt;
+{
+    new object[] { 0, 1, 1 },
+    new object[] { 1, 2, 3 },
+    new object[] { -1, 1, 0 }
+};
+
+[Theory]
+[MemberData(nameof(AddTestData))]
+public void Addition_Works(int a, int b, int expected)
+{
+    // Test logic here
+}
+</code></pre>
+
+<h2>Test naming</h2>
+<p>I still get this wrong sometimes, but the usual convention is <code>MethodName_WhenCondition_ExpectedOutcome</code>.</p>
+
+<h2>So what is mocking?</h2>
+<p>Mocking replaces dependencies so tests remain isolated. This allows control over what happens when a method calls a database or service. I actually enjoy mocking, though it can get tricky.</p>
+
+<p>The mocking library I use at work is Moq. After installing it (<code>dotnet add package Moq</code>), you can create a mock like this:</p>
+
+<pre><code class="language-csharp">var thingIMocked = new Mock&lt;IThingIWantToMock&gt;();
+</code></pre>
+
+<p>You can then control what the mock returns:</p>
+
+<pre><code class="language-csharp">// For cases where you care about the specific value provided as the argument
+thingIMocked.Setup(p => p.Add(100)).Returns(true);
+
+// For cases where you don’t care about the argument provided
+thingIMocked.Setup(p => p.Add(It.IsAny&lt;int&gt;())).Returns(true);
+</code></pre>
+
+<p>This makes it straightforward to test different outcomes. You can also verify how many times a method was called.</p>
+
+<p>Under the hood, Moq creates a fake class at runtime (using reflection and Dynamic Proxy) and intercepts method calls. It’s clever, but it has limitations: it cannot mock static or sealed types, nor can it mock a class without a parameterless constructor. I’ve hit both of those.</p>
+
+<h2>Why I like using xUnit</h2>
+<ul>
+    <li>Fresh test class instances for each test (no odd interactions)</li>
+    <li>Constructor/Dispose feels like normal C#</li>
+    <li>DI and mocking support is solid</li>
+    <li>Parallel test execution by default</li>
+    <li>Theory tests make data-driven testing easy</li>
+</ul>
+
+<p>Pick the testing framework that works for you. I like xUnit because I’m familiar with it and it usually makes sense to me.</p>
+<p>My main takeaway: name your tests clearly. You’ll thank yourself later.</p>
+
+<p>Happy testing.</p>
+</body>
+</html>

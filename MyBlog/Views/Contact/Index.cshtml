@@ -1,0 +1,42 @@
+@model ContactFormModel
+@{
+    ViewData["Title"] = "Contact";
+}
+
+<section id="contact" aria-labelledby="contact-title">
+    <h2 id="contact-title">Get in touch</h2>
+    <p class="section-intro">
+        Got a question, a project idea, or just want to say hi? Feel free to use any of the methods below.
+    </p>
+
+    <div class="contact-info">
+        <p><strong>Email:</strong> <a href="mailto:mark.golley@icloud.com">mark.golley@icloud.com</a></p>
+        <p><strong>LinkedIn:</strong> <a href="https://www.linkedin.com/in/MarkGolley" target="_blank" rel="noopener">linkedin.com/in/MarkGolley</a></p>
+        <p><strong>GitHub:</strong> <a href="https://github.com/MarkGolley" target="_blank" rel="noopener">github.com/MarkGolley</a></p>
+    </div>
+
+    @if (ViewBag.MessageSent != null && ViewBag.MessageSent == true)
+    {
+        <p class="confirmation-message">Thanks for your message! I’ll get back to you shortly.</p>
+    }
+    @if (ViewBag.Error != null)
+    {
+        <p class="error-message">@ViewBag.Error</p>
+    }
+
+
+    <form method="post" asp-action="Index" class="contact-form">
+        @Html.AntiForgeryToken()
+        
+        <label for="name">Your name</label>
+        <input type="text" id="name" name="Name" value="@Model?.Name" placeholder="Enter your name" required />
+
+        <label for="email">Your email</label>
+        <input type="email" id="email" name="Email" value="@Model?.Email" placeholder="Enter your email" required />
+
+        <label for="message">Your message</label>
+        <textarea id="message" name="Message" rows="6" placeholder="Type your message here..." required>@Model?.Message</textarea>
+
+        <button type="submit">Send message</button>
+    </form>
+</section>

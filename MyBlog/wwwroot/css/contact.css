@@ -1,0 +1,53 @@
+/* Contact Page Styles */
+
+#contact {
+    padding: 2rem;
+    background-color: #f9f9f9;
+    color: #333;
+}
+
+.contact-info p {
+    font-size: 1.1rem;
+    margin: 0.5rem 0;
+}
+
+form {
+    margin-top: 2rem;
+    max-width: 600px;
+}
+
+form label {
+    display: block;
+    margin: 0.5rem 0 0.2rem;
+    font-weight: bold;
+}
+
+form input, form textarea {
+    width: 100%;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+#contact .btn {
+    background: #0f172a;
+    color: #fff;
+    border: none;
+    padding: 0.7rem 1.2rem;
+    font-size: 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#contact .btn:hover {
+    background-color: #0056b3;
+}
+
+.note {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    font-style: italic;
+}

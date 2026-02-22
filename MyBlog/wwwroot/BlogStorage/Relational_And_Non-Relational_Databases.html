@@ -1,0 +1,69 @@
+﻿<!-- PublishedDate: 2026-01-11 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Relational vs. Non-Relational Databases</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>Relational vs. Non-Relational Databases: What’s the Difference?</h1>
+<p>I keep seeing “relational” and “non-relational” everywhere, so I wrote this down to get it straight in my head. I’m also revising for my Google Cloud Engineer exam, so the GCP examples are fresh in my mind.</p>
+
+<h2>Relational databases (SQL)</h2>
+<p>Relational databases organise data into tables with defined schemas. If you have structured data and relationships matter (customers and orders, for example), this is usually the safest default.</p>
+
+<p><strong>Things I associate with relational databases:</strong></p>
+<ul>
+    <li><strong>Schema-based</strong>: rows and columns with strict data types.</li>
+    <li><strong>Relationships</strong>: primary keys and foreign keys keep tables consistent.</li>
+    <li><strong>ACID</strong>: atomicity, consistency, isolation, durability.</li>
+</ul>
+
+<p>Google Cloud options that fit here:</p>
+<ul>
+    <li><strong>Cloud SQL</strong>: managed PostgreSQL/MySQL/SQL Server.</li>
+    <li><strong>AlloyDB</strong>: managed PostgreSQL with higher performance.</li>
+    <li><strong>Spanner</strong>: globally distributed SQL with strong consistency.</li>
+</ul>
+
+<h2>Non-relational databases (NoSQL)</h2>
+<p>NoSQL systems are generally more flexible and tend to scale horizontally. They store data as documents, key–value pairs, wide columns, and so on. Useful for messy or rapidly changing data.</p>
+
+<p><strong>Things I associate with NoSQL:</strong></p>
+<ul>
+    <li><strong>Flexible schema</strong>: you can change the structure as you go.</li>
+    <li><strong>Horizontal scaling</strong>: designed to spread across multiple servers.</li>
+    <li><strong>BASE-style behaviour</strong>: basically available, soft state, eventual consistency.</li>
+</ul>
+
+<p>Google Cloud options here:</p>
+<ul>
+    <li><strong>Bigtable</strong>: very high throughput and low latency, suited to write-heavy workloads.</li>
+    <li><strong>Firestore</strong>: serverless, well suited to web and mobile applications.</li>
+    <li><strong>Memorystore</strong>: in-memory cache (Redis/Memcached).</li>
+</ul>
+
+<h2>How I think about choosing</h2>
+<p>My rough mental checklist:</p>
+<ul>
+    <li><strong>Data shape</strong>: structured and relational? SQL. Looser and evolving? NoSQL.</li>
+    <li><strong>Consistency</strong>: need strict consistency? SQL. Can tolerate eventual consistency? NoSQL may be fine.</li>
+    <li><strong>Scale</strong>: very large scale or global distribution? Spanner or Bigtable. More modest scale? Cloud SQL is often sufficient.</li>
+    <li><strong>Cost</strong>: avoid paying for capability you do not actually need.</li>
+</ul>
+
+<h2>Quick note on AI and vector search</h2>
+<p>Generative AI use cases often involve vector embeddings (arrays of numbers representing meaning). Some relational options now support vector search, and some NoSQL options do as well. On GCP, this is why you see vector search features appearing in services such as AlloyDB and Cloud SQL, along with integrations with Vertex AI.</p>
+
+<h2>Final thoughts</h2>
+<p>There is no one-size-fits-all answer. The right database depends on your data, your consistency requirements, and how you expect the system to scale. I’m still learning, but writing this out helped me make better sense of it.</p>
+
+<footer style="margin-bottom: 50px; padding-bottom: 20px;">
+    <p>*Schemas are blueprints for structured data, where we define the columns and their types up front.</p>
+    <p>*Horizontal scaling means adding more servers to handle increased workload.</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,67 @@
+﻿<!-- PublishedDate: 2025-05-05 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>SOLID Principles</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h2 class="mb-3">SOLID Principles</h2>
+<p>
+    These are the fundamental principles that help keep object-oriented code readable, maintainable, and far less painful to change.
+</p>
+
+<ul>
+    <li>
+        <strong>S – Single Responsibility:</strong> Each class should have one responsibility.
+        For instance, one class to generate a file and another to save it, rather than stuffing everything into one large class.
+    </li>
+    <li>
+        <strong>O – Open/Closed:</strong> Classes should be open to extension but closed to modification.
+        I saw an example with shapes: instead of altering a method each time, you define an interface and add new shapes without changing existing code.
+    </li>
+    <li>
+        <strong>L – Liskov Substitution:</strong> (I still stumble over the name.)
+        Derived classes should behave in ways the base class expects. You should be able to substitute a derived class for its base without breaking anything.
+        This is one reason people favour interfaces over inheritance when behaviour varies.
+    </li>
+    <li>
+        <strong>I – Interface Segregation:</strong> It is better to have several small, focused interfaces than a single large one.
+        If you find yourself writing <code>throw new NotImplementedException()</code>, the interface is probably too broad.
+    </li>
+    <li>
+        <strong>D – Dependency Inversion:</strong> High-level classes should not depend on low-level details.
+        Inject abstractions rather than instantiating concrete types directly. This makes the code easier to test and swap later.
+    </li>
+</ul>
+
+<h3 class="mt-4">Class naming</h3>
+<p>
+    I used to call a subclass a "child class", but the more standard terms are:
+</p>
+<ul>
+    <li><strong>Superclass / Base Class:</strong> A class that is inherited from.</li>
+    <li><strong>Subclass / Derived Class:</strong> A class that inherits from the base.</li>
+</ul>
+
+<h3 class="mt-4">Other terminology</h3>
+<p>
+    I came across the term <strong>destructor</strong> (as opposed to a constructor). It exists in C#, though it is rarely used.
+    That led me down a terminology rabbit hole:
+</p>
+
+<ul>
+    <li><strong>Abstract Class:</strong> Cannot be instantiated. May contain abstract methods (which must be implemented) as well as shared methods.</li>
+    <li><strong>Static Class:</strong> Cannot be instantiated. Contains only static members, usually helpers.</li>
+    <li><strong>Sealed Class:</strong> Cannot be inherited from.</li>
+    <li><strong>Polymorphism:</strong> Code can operate with different implementations of a type via an interface (e.g. <code>ILogger</code>).</li>
+    <li><strong>Encapsulation:</strong> Keeping internal state private and only exposing what is needed. Something we could improve in the Warp Engine.</li>
+    <li><strong>Members of a Class:</strong> All the class "bits and pieces" – fields, properties, methods, constructors, etc.</li>
+    <li><strong>Composition:</strong> One class owns another and creates it directly. Tightly coupled.</li>
+    <li><strong>Aggregation:</strong> Similar to composition but looser. The dependent class can exist independently (often passed in).</li>
+    <li><strong>Association:</strong> A general term for when classes are related or aware of one another in some way.</li>
+</ul>
+</body>
+</html>

@@ -1,0 +1,49 @@
+@model MyBlog.Models.BlogPostViewModel
+
+@{
+    ViewData["Title"] = Model.Post.Title;
+}
+
+<section aria-labelledby="post-title">
+    <h2 id="post-title">@Model.Post.Title</h2>
+    <div class="post-meta">@Model.Post.DatePosted.ToString("dd MMMM yyyy")</div>
+    <div class="post-content">
+        @Html.Raw(Model.Post.Content)
+    </div>
+</section>
+
+<section aria-labelledby="comments-title">
+    <h2 id="comments-title">Comments</h2>
+
+    @if (Model.Comments != null && Model.Comments.Any())
+    {
+        <div class="comment-list">
+            @foreach (var comment in Model.Comments)
+            {
+                <div class="comment-item">
+                    <strong>@comment.Author</strong> on @comment.PostedAt.ToString("dd MMMM yyyy")<br />
+                    @comment.Content
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p>No comments yet.</p>
+    }
+</section>
+
+<section aria-labelledby="add-comment-title">
+    <h2 id="add-comment-title">Add a comment</h2>
+    <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form">
+        <input type="hidden" name="PostId" value="@Model.Post.Id" />
+
+        <label for="author">Name</label>
+        <input type="text" id="author" name="Author" placeholder="Your name" required />
+
+        <label for="content">Comment</label>
+        <textarea id="content" name="Content" rows="4" placeholder="Share your thoughts..." required></textarea>
+
+        <button type="submit">Submit comment</button>
+    </form>
+</section>

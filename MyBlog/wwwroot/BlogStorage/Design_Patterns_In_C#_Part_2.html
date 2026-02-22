@@ -1,0 +1,44 @@
+﻿<!-- PublishedDate: 2025-04-28 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Design Patterns Part 2</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>Design Patterns Part 2</h1>
+
+<h4>Repository</h4>
+<p>
+    This one properly clicked for me. You create a repository interface that defines what you need (add, find, update), then a concrete class implements it.
+    Your service takes the interface via DI so the implementation details are kept out of the way. The main benefit, as I see it, is that you can swap
+    implementations later (different databases, in-memory for tests, and so on) without rewriting the service itself.
+</p>
+
+<h4>Strategy</h4>
+<p>
+    This was an interesting one. You inject behaviour into a class instead of hard-coding it. The example I saw was a payment service that needs to handle
+    different payment types. You define an interface such as <code>Pay()</code>, then create implementations (PayPal, Apple Pay, and so on). When you construct
+    the service, you pass in the strategy you want. If you find yourself writing lots of <code>if</code> or <code>switch</code> branches to vary behaviour,
+    a strategy is often a cleaner approach.
+</p>
+
+<h3 class="mt-4">Kata Learnings</h3>
+
+<h4>StringBuilder</h4>
+<p>
+    This is a more efficient way to build strings because concatenation creates a new string each time. I had seen <code>StringBuilder</code> before but never
+    really used it. I like that you can <code>Append()</code> repeatedly (and there are other useful methods such as <code>Clear()</code> and <code>Replace()</code>).
+    For short strings I still tend to use <code>+</code>, but in loops or when building something larger this feels more appropriate.
+</p>
+
+<h4>Char vs String</h4>
+<p>
+    I had not really thought about the distinction before: <code>'A'</code> is a <strong>char</strong> and <code>"A"</code> is a <strong>string</strong>.
+    In Python and JavaScript there is no distinction between single and double quotes, so this caught me out in C#.
+    I am trying to be more deliberate about it now.
+</p>
+</body>
+</html>

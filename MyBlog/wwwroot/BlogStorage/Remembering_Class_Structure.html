@@ -1,0 +1,144 @@
+﻿<!-- PublishedDate: 2025-5-21 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>C# Class Structure: A Developer’s Memory Guide</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>C# Class Structure: A Developer’s Memory Guide</h1>
+
+<p>I always have that moment of “I think I know how to code… but do I actually remember the class structure order?” So I wrote this down for myself.</p>
+
+<p>This is the mental model I use when I want a clean, readable C# class file.</p>
+
+<h2>Why bother with order?</h2>
+<p>It helps with:</p>
+<ol>
+    <li><strong>Readability</strong>: easier to scan</li>
+    <li><strong>Maintenance</strong>: less time searching for things</li>
+    <li><strong>Professionalism</strong>: it simply looks neater</li>
+</ol>
+
+<h2>The UNC-SFICN mnemonic</h2>
+<p>To remember the order, I use “UNC-SFICN” (I say it like “Uncle Sficin” in my head):</p>
+
+<h3>U - Usings <span style="font-size: small; font-weight: normal;">- File imports/references</span></h3>
+<h3>N - Namespace declaration</h3>
+<h3>C - Class declaration <span style="font-size: small; font-weight: normal;">- Including attributes and XML documentation</span></h3>
+<h3>S - Statics <span style="font-size: small; font-weight: normal;">- Constants, Static Fields, Static Properties, Static Events and Static Methods</span></h3>
+<h3>F - Fields <span style="font-size: small; font-weight: normal;">(instance fields only)</span></h3>
+<h3>I - Initialisation <span style="font-size: small; font-weight: normal;">(constructors)</span></h3>
+<h3>C - Class behaviours <span style="font-size: small; font-weight: normal;">- Instance Properties, Events and Methods</span></h3>
+<h3>N - Nested types <span style="font-size: small; font-weight: normal;">(inner classes, structs, interfaces, enums)</span></h3>
+
+<p>Quick breakdown below.</p>
+
+<h2>U - Usings</h2>
+<p>Start with all your using directives, usually system ones first, then your own:</p>
+<pre><code>using System;
+using System.Collections.Generic;
+using System.Linq;
+using MyCompany.Services;
+using MyCompany.Utilities;</code></pre>
+
+<h2>N - Namespace Declaration</h2>
+<p>Declare your namespace to organise your types:</p>
+<pre><code>namespace MyCompany.Core
+{
+    // Everything else goes inside here
+}</code></pre>
+
+<h2>C - Class Declaration</h2>
+<p>Define your class and any documentation or attributes:</p>
+<pre><code>/// docs
+public class DataManager : IDataProcessor
+{
+    // Class members go here
+}</code></pre>
+
+<h2>S - Statics</h2>
+<p>Static members at the top (constants, fields, properties, methods):</p>
+<pre><code>// Constants
+public const string DefaultConnectionString = "";
+
+// Static fields
+private static readonly HttpClient _httpClient = new HttpClient();
+
+// Static properties
+public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+// Static methods
+public static bool IsValidConfiguration(Configuration config)
+{
+    // method logic here
+}</code></pre>
+
+<h2>F - Fields</h2>
+<p>Instance fields next:</p>
+<pre><code>// Private fields
+protected readonly ILogger _logger;
+private readonly IRepository _repository;
+private bool _isInitialized;</code></pre>
+
+<h2>I - Initialisation</h2>
+<p>Constructors and setup:</p>
+<pre><code>// Main constructor
+public DataManager(IRepository repository, ILogger logger)
+{
+    // initialisation logic here
+}
+
+// Parameterless constructor
+public DataManager() : this(new DefaultRepository(), LogManager.GetCurrentClassLogger())
+{
+}</code></pre>
+
+<h2>C - Class Behaviours</h2>
+<p>Instance properties, events, and methods:</p>
+<pre><code>// Properties
+public bool IsConnected { get; private set; }
+public ConnectionStatus Status => _isInitialized ? ConnectionStatus.Ready : ConnectionStatus.Pending;
+
+// Methods
+public async Task&lt;DataResult&gt; ProcessDataAsync(DataRequest request)
+{
+    // method logic here
+}
+</code></pre>
+
+<h2>N - Nested Types</h2>
+<p>Nested enums, classes, or interfaces at the bottom:</p>
+<pre><code>// Nested enum
+public enum ConnectionStatus
+{
+    Pending,
+    Ready,
+    Failed
+}
+
+// Nested class
+private class DataRequestValidator
+{
+    public bool Validate(DataRequest request)
+    {
+        // method logic here
+    }
+}</code></pre>
+
+<h2>Access Modifier Order</h2>
+<p>One last thing I try to keep straight: order members from most accessible to least accessible:</p>
+<ol>
+    <li><code>public</code> - Accessible by any code</li>
+    <li><code>protected</code> - Accessible by the class and its derived classes</li>
+    <li><code>internal</code> - Accessible within the same assembly</li>
+    <li><code>protected internal</code> - Accessible by the assembly or derived classes</li>
+    <li><code>private protected</code> - Accessible by derived classes within the same assembly</li>
+    <li><code>private</code> - Accessible only within the declaring class</li>
+</ol>
+
+<p>Hopefully this helps me (and you) keep things tidy.</p>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!-- PublishedDate: 2025-6-02 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Adding A Comments Feature with ASP.NET Core</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>Adding A Comments Feature with ASP.NET Core</h1>
+
+<p>Since starting this blog, I’ve had a few readers email me with comments on posts. There are plenty of third-party comment widgets you can drop in (usually just a &lt;script&gt; tag) so you don’t have to build any backend at all. I wanted to build my own, mainly for the learning. At the moment it’s just a file-based store, but I’d like to move it to a database once I’ve had a proper play around with it.</p>
+
+<h2>Why Did I Build My Own Comments System?</h2>
+<p>Building it myself rather than using a hosted solution such as Disqus gives me:</p>
+<ul>
+    <li><strong>Full control</strong>: I own and store the comments</li>
+    <li><strong>Custom UI</strong>: I can style it to match the rest of the site</li>
+    <li><strong>No external dependency</strong>: it still works if a third party goes down</li>
+    <li><strong>Learning</strong>: I improve at ASP.NET Core by actually building things</li>
+</ul>
+
+<h2>How I wired it up (high level)</h2>
+<p>This is roughly what I put together.</p>
+
+<h3>1. Create a Comment Model</h3>
+<p>I defined what I wanted a comment to look like:</p>
+<pre><code class="language-csharp">public class Comment
+{
+    public int Id { get; set; }
+    public string Author { get; set; }
+    public string Content { get; set; }
+    public DateTime PostedAt { get; set; }
+    public string PostId { get; set; }
+}</code></pre>
+
+<h3>2. Update my ViewModel for Blog Posts with Comments</h3>
+<p>So the view can render both the post and its comments, I wrapped them together in a ViewModel:</p>
+<pre><code class="language-csharp">public class BlogPostViewModel
+{
+    public BlogPost Post { get; set; }
+    public List&lt;Comment&gt; Comments { get; set; }
+}</code></pre>
+
+<h3>3. Implementing my Comment Service</h3>
+<p>This handles storing and loading comments:</p>
+<pre><code class="language-csharp">public class CommentService
+{
+    private readonly string _basePath = "App_Data/comments";
+
+    public List&lt;Comment&gt; GetComments(string postTitle)
+    {
+        // Retrieves comments for a post from a JSON file or returns an empty list if the file does not exist
+    }
+
+    public void AddComment(Comment comment)
+    {
+        // Adds a new comment to the post's comment list with timestamp and ID, then saves all comments to a JSON file
+    }
+}</code></pre>
+
+<h3>4. Updated My Blog Controller</h3>
+<p>I tweaked the controller to include comments when loading a post and to save them on submission:</p>
+<pre><code class="language-csharp">[Route("blog")]
+public class BlogController : Controller
+{
+    private readonly BlogService _blogService;
+    private readonly CommentService _commentService;
+
+    public BlogController(BlogService blogService, CommentService commentService)
+    {
+        _blogService = blogService;
+        _commentService = commentService;
+    }
+
+    [HttpGet("{slug}")]
+    public IActionResult Post(string slug)
+    {
+        // Retrieves a blog post and its comments by slug, then displays them using the BlogPostViewModel
+    }
+
+    [HttpPost("comment")]
+    public IActionResult PostComment(Comment comment)
+    {
+        // Handles comment submission by saving it via the comment service and redirecting back to the blog post
+    }
+}</code></pre>
+
+<h3>5. Updated My Blog Post View</h3>
+<p>Finally, I added a comments section beneath the post and a simple form for submitting new ones.</p>
+
+<h2>What’s next?</h2>
+<p>Now I have a basic system working, I’m considering a few improvements:</p>
+<ol>
+    <li><strong>Database storage</strong>: Move from JSON files to a proper database</li>
+    <li><strong>Anti-spam</strong>: Add a CAPTCHA or a honeypot field (both new to me)</li>
+    <li><strong>Moderation</strong>: Add an approval step before comments are published</li>
+    <li><strong>Notifications</strong>: Email me when new comments are posted</li>
+</ol>
+
+<h2>Where did I go wrong?</h2>
+<p>If you try this yourself, here are two things that caught me out:</p>
+<ul>
+    <li><strong>Model type mismatch</strong>: my Razor <code>@model</code> did not match what the controller returned after I renamed things</li>
+    <li><strong>Port conflicts</strong>: I tried to run on port 80 and something else was already using it</li>
+</ul>
+
+<h2>Conclusion</h2>
+<p>Building a comments system for my blog was easier than I expected, but still a satisfying win. The main thing I wanted was learning and control, and I got both.</p>
+
+<p>There are obviously third-party options, but if you want to learn, building a small one yourself is a good excuse.</p>
+
+<p>Let me know what you think below.</p>
+
+</body>
+</html>

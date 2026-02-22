@@ -1,0 +1,48 @@
+@{
+    ViewData["Title"] = "About";
+}
+
+<section id="about" aria-labelledby="about-title">
+    <div class="about-content">
+        <div class="about-image">
+            <img src="~/images/me.jpg" alt="Portrait of Mark" />
+        </div>
+        <div class="about-text">
+            <h2 id="about-title">Hi, I'm Mark - a C#/.NET and Python developer</h2>
+            <p class="intro">
+                I build reliable, well-tested software and keep things pragmatic, delivering value quickly while
+                keeping code readable and maintainable. I've been developing for nearly four years and I'm currently
+                sharpening my testing and architecture skills.
+            </p>
+            <p class="intro">
+                I work in JetBrains Rider and PyCharm day-to-day. I'm based in <strong>Burley In Wharfedale, UK</strong>,
+                and I balance work with climbing sessions and long walks with my cocker spaniel, Ellie.
+            </p>
+            <div class="hero-actions">
+                <a class="btn btn-primary" asp-controller="Contact" asp-action="Index">Get in touch</a>
+                <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">See my blogs</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section aria-labelledby="quick-bits-title">
+    <h2 id="quick-bits-title">Quick bits</h2>
+    <div class="credentials-grid">
+        <div class="credential-card">
+            <div class="credential-title">Stack</div>
+            <div class="credential-value">C#, .NET, xUnit, Python, GCP</div>
+            <p class="credential-copy">I focus on maintainable code, strong tests, and clean delivery.</p>
+        </div>
+        <div class="credential-card">
+            <div class="credential-title">Learning style</div>
+            <div class="credential-value">Short focused sprints</div>
+            <p class="credential-copy">Consistent, intentional learning beats marathon sessions for me.</p>
+        </div>
+        <div class="credential-card">
+            <div class="credential-title">Outside work</div>
+            <div class="credential-value">Climbing and long walks</div>
+            <p class="credential-copy">Usually with Ellie, the most food-motivated cocker spaniel.</p>
+        </div>
+    </div>
+</section>

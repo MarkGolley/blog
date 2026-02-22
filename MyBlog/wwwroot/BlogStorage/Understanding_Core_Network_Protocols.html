@@ -1,0 +1,151 @@
+<!-- PublishedDate: 2026-02-15 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Understanding Network Protocols: TCP, UDP, ICMP, IPsec and GRE</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+
+<h1>Understanding Network Protocols: TCP, UDP, ICMP, IPsec and GRE</h1>
+
+<p>I’ve been meaning to properly understand what happens when two machines “connect” over the internet. We throw around terms like TCP, UDP and VPN all the time, but I realised I didn’t fully grasp how they fit together, and that started to bother me.</p>
+
+<p>This is me writing it down so it clicks.</p>
+
+<h2>Firstly, what is a “connection”?</h2>
+
+<p>When you open a website, nothing physically connects your laptop to the server. Instead, your device breaks data into small chunks called <strong>packets</strong>, which travel across multiple networks until they reach their destination.</p>
+
+<p>A “connection” is just an exchange of those packets following agreed rules, known as <strong>protocols</strong>.</p>
+
+<p>A device on a network with an IP address is called a <strong>host</strong>. That could be your laptop, a cloud virtual machine, your router, or a server.</p>
+
+<h2>Networking layers</h2>
+
+<p>Before diving into protocols, it’s worth understanding the layers of a network. Networking is split into layers so that different problems can be handled separately. Each layer has a specific role and doesn’t need to know how the other layers work.</p>
+
+<p>The OSI model (Open Systems Interconnection) describes seven layers, but for now we can focus on the main ones:</p>
+
+<ul>
+    <li><strong>Physical layer</strong> – the actual signal (cable, fibre, Wi-Fi).</li>
+    <li><strong>Network layer (IP)</strong> – figuring out how to get a packet from one machine to another across networks.</li>
+    <li><strong>Transport layer (TCP / UDP)</strong> – deciding how two machines exchange data (reliable? fast? ordered?).</li>
+    <li><strong>Application layer</strong> – the service you actually care about (HTTP, DNS, SSH, etc.).</li>
+</ul>
+
+<p>Each layer builds on the one below. For example, when you open a website:</p>
+
+<ul>
+    <li>HTTP (application layer) sends a request</li>
+    <li>TCP (transport layer) ensures it arrives reliably</li>
+    <li>IP (network layer) routes it across the internet</li>
+    <li>The physical layer moves the bits across cables or radio waves</li>
+</ul>
+
+<h2>Transport protocols</h2>
+
+<p>This is about how machines communicate, and it’s where most developers will recognise familiar names.</p>
+
+<h3>TCP (Transmission Control Protocol)</h3>
+
+<p>TCP is reliable and connection-based. Before sending data, both machines agree to start communicating via a handshake using SYN and ACK messages. Once established, TCP:</p>
+
+<ul>
+    <li>Numbers every packet</li>
+    <li>Makes sure packets arrive in order</li>
+    <li>Resends anything that is lost</li>
+    <li>Slows down if the network looks congested</li>
+</ul>
+
+<p>TCP is slower than other options but very safe and dependable. It’s typically used for:</p>
+
+<ul>
+    <li>Websites (HTTP / HTTPS)</li>
+    <li>SSH</li>
+    <li>Databases</li>
+    <li>Email</li>
+</ul>
+
+<p>If the data <strong>must</strong> arrive correctly, TCP is usually the default choice.</p>
+
+<h3>UDP (User Datagram Protocol)</h3>
+
+<p>UDP is simpler. If TCP is like sending a book through the post and checking every page arrives in order, UDP is more like tossing pages from a moving car. It sends packets without:</p>
+
+<ul>
+    <li>Checking they arrived</li>
+    <li>Guaranteeing order</li>
+    <li>Resending missing data</li>
+</ul>
+
+<p>Because it does less work, UDP is faster and lower latency. It’s commonly used for:</p>
+
+<ul>
+    <li>Video calls</li>
+    <li>Online gaming</li>
+    <li>Streaming</li>
+    <li>DNS lookups</li>
+</ul>
+
+<p>If one video frame is lost, it’s usually not noticeable. If a bank transaction is lost, you certainly notice — that’s the trade-off.</p>
+
+<h2>Network control – how the internet manages itself</h2>
+
+<p>These protocols don’t carry user data. They help the network operate.</p>
+
+<h3>ICMP (Internet Control Message Protocol)</h3>
+
+<p>ICMP is essentially the network’s feedback system. When you run <code>ping</code>, you’re using ICMP.</p>
+
+<p>Routers use ICMP to report issues such as:</p>
+
+<ul>
+    <li>“Destination unreachable”</li>
+    <li>“Time exceeded” (used in traceroute)</li>
+</ul>
+
+<p>ICMP doesn’t deliver web pages, it reports problems. You’ll see ICMP used alongside TCP; they operate at different layers.</p>
+
+<p>ICMPv6 for IPv6 networks also helps devices find each other and auto-configure IP addresses, making it important in modern infrastructure.</p>
+
+<h2>Security at the IP layer (IPsec)</h2>
+
+<p>IPsec protects traffic before it leaves the device.</p>
+
+<h3>AH (Authentication Header)</h3>
+
+<p>AH ensures integrity and authentication, confirming a packet hasn’t been altered. It does <strong>not</strong> encrypt the contents. It’s not widely used these days, as other protocols provide similar protection.</p>
+
+<h3>ESP (Encapsulating Security Payload)</h3>
+
+<p>ESP provides encryption, integrity checking, and authentication. In traditional site-to-site VPNs, it is usually the mechanism providing encryption underneath.</p>
+
+<h2>Tunnelling</h2>
+
+<h3>GRE (Generic Routing Encapsulation)</h3>
+
+<p>GRE encapsulates one packet inside another. It doesn’t encrypt data; it simply wraps traffic so it can travel across networks that wouldn’t normally support it.</p>
+
+<p>GRE is often combined with IPsec to get routing flexibility from GRE with encryption from IPsec.</p>
+
+<h2>Where do HTTP, DNS and SSH fit?</h2>
+
+<p>These are application-layer protocols that sit on top of transport protocols:</p>
+
+<ul>
+    <li><strong>HTTP</strong> usually runs over TCP.</li>
+    <li><strong>DNS</strong> usually runs over UDP, but can use TCP when necessary.</li>
+    <li><strong>SSH</strong> runs over TCP and provides encrypted remote access.</li>
+</ul>
+
+<p>I plan to explore these further in a follow-up post, covering HTTPS, TLS and SSL certificates. I also want to understand ports and TLS better!</p>
+
+<h2>Final thoughts</h2>
+
+<p>Networking has many layers, but writing this out has helped me see how they fit together more clearly.</p>
+
+</body>
+</html>

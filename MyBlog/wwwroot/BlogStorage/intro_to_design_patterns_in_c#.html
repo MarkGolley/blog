@@ -1,0 +1,63 @@
+﻿<!-- PublishedDate: 2025-04-21 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Intro to Design Patterns in C#</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+<h1>Intro to Design Patterns in C#</h1>
+
+<p>One thing I did not realise at first: design patterns are grouped into three categories:</p>
+
+<ul>
+    <li><strong>Creational</strong> – Creating objects (e.g. Singleton, Factory)</li>
+    <li><strong>Structural</strong> – Composing objects and classes (e.g. Adapter, Decorator)</li>
+    <li><strong>Behavioural</strong> – Managing object interaction and communication (e.g. Observer)</li>
+</ul>
+
+<h2 class="mt-4">Creational Patterns</h2>
+
+<h4>Singleton</h4>
+<p>
+    Ensures a class has only one instance and provides global access to it. Often used for logging, configuration, or data connections.
+    You make the constructor private so new instances cannot be created directly. A property controls instance creation and returns
+    the single instance. For thread safety, use a <code>readonly</code> lock object and wrap access in a <code>lock</code> block.
+</p>
+
+<h4>Factory</h4>
+<p>
+    Hides the creation logic of objects. You create multiple implementations of an interface, then use a Factory to return the appropriate one
+    depending on conditions (often via a <code>switch</code>). That way, consumers do not need to concern themselves with how the object is created.
+</p>
+<p>
+    I saw Carl do this with an Entities Factory that returns impersonated or non-impersonated clients. Very tidy, and the calling code remains clean.
+</p>
+
+<h2 class="mt-4">Structural Patterns</h2>
+
+<h4>Adapter</h4>
+<p>
+    Allows you to adapt an existing class to a new interface. Useful when you have legacy code that does not align with your newer abstractions.
+    The Adapter class bridges that gap.
+</p>
+
+<h4>Decorator</h4>
+<p>
+    Adds new behaviour to an object without changing its core logic. You use an abstract decorator class that implements the same interface
+    as the wrapped object, pass the original object into it, and then override methods to extend or adjust behaviour. For example,
+    adding extra text to a log entry.
+</p>
+
+<h2 class="mt-4">Behavioural Patterns</h2>
+
+<h4>Observer</h4>
+<p>
+    Reacts automatically to changes in another object. The pattern uses a <strong>Subject</strong> that maintains a list of <strong>Observers</strong>.
+    Observers can be added or removed, and when the subject’s state changes, it notifies all observers so they can respond. This reminded me of delegates,
+    which is probably why it felt familiar.
+</p>
+</body>
+</html>
