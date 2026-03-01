@@ -1,0 +1,144 @@
+<!-- PublishedDate: 2026-03-01 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Experimenting with Agentic AI in .NET (and Realising It’s Not Just Chat Anymore)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+
+<h1>Experimenting with Agentic AI in .NET (and Realising It’s Not Just Chat Anymore)</h1>
+
+<p>I use AI tools a lot. Code completion, refactoring suggestions, explaining errors, generating test cases. At this point it feels normal and really almost expected. Because of that, I thought I had a pretty solid grasp of where AI in engineering was heading.</p>
+
+<p>Recently though, I was introduced to something slightly different. Not just “AI that suggests things”, but AI that can decide which tools to use, call them, gather data, and then synthesise a response. This started to feel different! It wasn’t just chat anymore it was orchestration.</p>
+
+<h2>From assistant to orchestrator</h2>
+
+<p>Most AI usage today is some text in and some text out. You ask a question and it replies. You paste code in and it improves it (sometimes?! Most of the time?!). It's really helpful but quite contained. What I’ve been experimenting with is closer to what people are calling “agentic systems”. Instead of only generating text, the model can:</p>
+
+<ul>
+    <li>Interpret a request</li>
+    <li>Decide which registered function to call</li>
+    <li>Execute that function</li>
+    <li>Observe the result</li>
+    <li>Call another function if needed</li>
+    <li>Then synthesise a grounded answer</li>
+</ul>
+
+<p>This “reason -> act -> observe” loop is supported by frameworks such as <a href="https://www.langchain.com/langchain" target="_blank" rel="noopener noreferrer">LangChain</a> and <a href="https://learn.microsoft.com/en-us/semantic-kernel/overview/" target="_blank" rel="noopener noreferrer">Microsoft Semantic Kernel</a>. I focused on Semantic Kernel because I work in .NET and it integrates cleanly with C#.</p>
+
+<p>The important part is not the framework itself, it’s the pattern. The model becomes a reasoning layer sitting on top of real tools and structured data which feels like a different abstraction to what I am used to.</p>
+
+<h2>Building a tiny demo to understand it properly</h2>
+
+<p>Instead of just reading about it, I built a small .NET console application to see how it actually behaves.</p>
+
+<p>The demo is intentionally simple. It registers two tools:</p>
+
+<ul>
+    <li><code>GetOrderById(int orderId)</code> – reads a fictional order from a local JSON file</li>
+    <li><code>SearchOrderLogs(int orderId)</code> – searches a local log file for related entries</li>
+</ul>
+
+<p>When I type:</p>
+
+<pre><code>Investigate order 123 and explain what went wrong.</code></pre>
+
+<p>The model does not just answer generically. It:</p>
+
+<ul>
+    <li>Calls <code>GetOrderById</code></li>
+    <li>Calls <code>SearchOrderLogs</code></li>
+    <li>Combines the results</li>
+    <li>Returns a grounded explanation</li>
+</ul>
+
+<p>The full minimal example is available on my 
+    <a href="https://github.com/MarkGolley/dotnet-agentic-demo" target="_blank" rel="noopener noreferrer">
+        GitHub
+    </a> which demonstrates the core pattern clearly.</p>
+
+<h2>What felt powerful</h2>
+
+<p>The most interesting part wasn’t that it worked, it was how it worked. Instead of manually opening files, grepping logs, and piecing together context, the model could look in multiple places at once and synthesise a summary. It reduces the distance between a question and an understanding.</p>
+
+<p>This starts to resemble a kind of natural language control layer over structured systems. We're now able to add a reasoning layer that sits above APIs and services and that feels significant.</p>
+
+<h2>What felt fragile</h2>
+
+<p>It’s also very obvious that this is not magic. If a data file is missing or if the tool description is unclear, the model can become confidently wrong. It depends heavily on:</p>
+
+<ul>
+    <li>Clear function schemas</li>
+    <li>Stable environment setup</li>
+    <li>Predictable outputs</li>
+    <li>Defensive error handling</li>
+</ul>
+
+<p>At one point I had file paths wrong and the system “worked”, but returned misleading conclusions because the tools were returning empty results. The model happily summarised incomplete information which in itself was a useful lesson.</p>
+
+<p>Prompt engineering quickly turns into interface engineering. The reliability of the system depends far more on how well the tools are designed than on how clever the prompt is and the more we put into this design the better the results will no doubt be.</p>
+
+<h2>What I learned about function schemas</h2>
+
+<p>One concept I did not properly understand at first was what people mean by “function schemas”. When you register a C# method as a callable tool, the model does not see your source code. It sees a structured contract describing the function. Under the hood, the model receives something closer to a JSON definition of the function:</p>
+
+<pre><code>{
+  "name": "GetOrderById",
+  "description": "Get an order by its numeric ID.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "orderId": {
+        "type": "integer",
+        "description": "The numeric ID of the order"
+      }
+    },
+    "required": ["orderId"]
+  }
+}</code></pre>
+
+<p>That structure is the schema. It defines what the function is called, what it does, what parameters it expects, and what types those parameters should be. If the schema is vague or unclear, the model can call the function incorrectly or chose the wrong tool.</p>
+
+<h2>Capturing process as callable capability</h2>
+
+<p>Another thing I noticed is how this pattern naturally encodes process. When you define tools, you are formalising workflows:</p>
+
+<ul>
+    <li>What to check first</li>
+    <li>Which data sources matter</li>
+    <li>How information should be summarised</li>
+</ul>
+
+<p>Some of the knowledge that would normally live in documentation becomes executable. Instead of reading a runbook and manually following steps, the system can perform those steps and return structured output. This doesn’t remove the need for engineering judgement but it does help for repeatable tasks and it feels like a small step towards capturing your knowledge in code.</p>
+
+<h2>The slightly uncomfortable bit</h2>
+
+<p>I enjoy (mostly) investigating issues - there is something satisfying about following your nose (and learning how to do it better) through logs and slowly narrowing down the root cause so if an AI system performs the first layer of investigation, does that remove some of that satisfaction?</p>
+
+<p>For me, maybe.</p>
+
+<p>But, on the other hand automating the repetitive parts feels sensible and it frees up our attention for more interesting problems. I don’t have a strong conclusion yet as I’m still very much experimenting but the shift from “AI as assistant” to “AI as orchestrator” feels real.</p>
+
+<h2>Why I think this matters all this matters</h2>
+
+<p>I don’t think this means full autonomy is around the corner becase these systems are bounded by the tools we define and the guardrails we build. But architecturally, it introduces a whole new layer - a reasoning layer coordinating capabilities</p>
+
+<p>Whether this becomes reliable and trusted will depend less on raw model capability and more on how deliberately we design around it. This experiment has mostly focused on the simplest possible orchestration pattern: one model, a couple of tools, and a clear loop.</p>
+
+<p>There are obvious next steps.</p>
+
+<ul>
+    <li>Designing multiple specialised agents and allowing them to hand tasks between each other (chaining)</li>
+    <li>Introducing explicit human-in-the-loop approvals for state-changing operations</li>
+    <li>Exploring retrieval-augmented generation (RAG) in more depth</li>
+    <li>Understanding emerging standards like the Model Context Protocol (MCP)</li>
+</ul>
+
+<p>For now, I’m treating this as an early exploration rather than a conclusion. I’ll likely write follow-up posts as I experiment further and understand the trade-offs more clearly. If nothing else, it feels like a space worth paying attention to.</p>
+
+</body>
+</html>
