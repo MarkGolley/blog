@@ -1,0 +1,49 @@
+@model MyBlog.Models.CommentThreadViewModel
+
+<div class="comment-thread">
+    <div class="comment-item">
+        <strong>@Model.Comment.Author</strong> on @Model.Comment.PostedAt.ToString("dd MMMM yyyy 'at' HH:mm 'UTC'")
+        @if (Model.TotalReplyCount > 0)
+        {
+            <span class="reply-count"> - @Model.TotalReplyCount @(Model.TotalReplyCount == 1 ? "reply" : "replies")</span>
+        }
+        <br />
+        @Html.Raw(Model.ContentHtml)
+    </div>
+
+    @if (Model.Depth < MyBlog.Services.CommentService.MaxThreadDepth)
+    {
+        <details class="reply-toggle">
+            <summary>Reply</summary>
+            <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form reply-form">
+                <input type="hidden" name="PostId" value="@Model.Comment.PostId" />
+                <input type="hidden" name="ParentCommentId" value="@Model.Comment.Id" />
+
+                <label>Name</label>
+                <input type="text" name="Author" placeholder="Your name" required />
+
+                <label>Reply</label>
+                <textarea name="Content" rows="3" placeholder="Write your reply..." required></textarea>
+
+                <button type="submit">Submit reply</button>
+            </form>
+        </details>
+    }
+    else
+    {
+        <div class="reply-limit-note">Max thread depth reached.</div>
+    }
+
+    @if (Model.Replies.Any())
+    {
+        <details class="thread-toggle" data-thread-toggle open>
+            <summary>Show thread (@Model.TotalReplyCount @(Model.TotalReplyCount == 1 ? "reply" : "replies"))</summary>
+            <div class="comment-replies">
+                @foreach (var reply in Model.Replies)
+                {
+                    <partial name="_CommentThread" model="reply" />
+                }
+            </div>
+        </details>
+    }
+</div>
