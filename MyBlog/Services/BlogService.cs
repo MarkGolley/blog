@@ -30,22 +30,41 @@ public class BlogService
         return posts.OrderByDescending(p => p.DatePosted);
     }
 
-    public BlogPost GetPostBySlug(string slug)
+    public BlogPost GetPostBySlug(string? slug)
     {
-        var path = Path.Combine(_env.WebRootPath, "BlogStorage", slug + ".html");
-
-        if (!File.Exists(path)) return null;
+        slug = Uri.UnescapeDataString(slug ?? string.Empty);
+        var path = ResolvePostPath(slug);
+        if (path == null) return null;
 
         var content = File.ReadAllText(path);
         var published = ParsePublishedDate(content);
+        var fileSlug = Path.GetFileNameWithoutExtension(path);
 
         return new BlogPost
         {
-            Id = slug,
-            Title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(slug.Replace("_", " ")),
+            Id = fileSlug,
+            Title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(fileSlug.Replace("_", " ")),
             Content = content,
             DatePosted = published
         };
+    }
+
+    private string ResolvePostPath(string slug)
+    {
+        var postsPath = Path.Combine(_env.WebRootPath, "BlogStorage");
+        var expectedFileName = slug + ".html";
+        var exactPath = Path.Combine(postsPath, expectedFileName);
+
+        if (File.Exists(exactPath))
+            return exactPath;
+
+        return Directory
+            .EnumerateFiles(postsPath, "*.html")
+            .FirstOrDefault(file =>
+                string.Equals(
+                    Path.GetFileName(file),
+                    expectedFileName,
+                    StringComparison.OrdinalIgnoreCase));
     }
 
 
