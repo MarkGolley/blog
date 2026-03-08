@@ -17,13 +17,15 @@
 
     @if (Model.Comments != null && Model.Comments.Any())
     {
+        <div class="thread-controls">
+            <button type="button" class="thread-control-btn" data-thread-action="expand">Expand all threads</button>
+            <button type="button" class="thread-control-btn" data-thread-action="collapse">Collapse all threads</button>
+        </div>
+
         <div class="comment-list">
-            @foreach (var comment in Model.Comments)
+            @foreach (var thread in Model.Comments)
             {
-                <div class="comment-item">
-                    <strong>@comment.Author</strong> on @comment.PostedAt.ToString("dd MMMM yyyy")<br />
-                    @comment.Content
-                </div>
+                <partial name="_CommentThread" model="thread" />
             }
         </div>
     }
@@ -35,14 +37,16 @@
 
 <section aria-labelledby="add-comment-title">
     <h2 id="add-comment-title">Add a comment</h2>
+    <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
     <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form">
         <input type="hidden" name="PostId" value="@Model.Post.Id" />
+        <input type="hidden" name="ParentCommentId" value="" />
 
-        <label for="author">Name</label>
-        <input type="text" id="author" name="Author" placeholder="Your name" required />
+        <label for="author-root">Name</label>
+        <input type="text" id="author-root" name="Author" placeholder="Your name" required />
 
-        <label for="content">Comment</label>
-        <textarea id="content" name="Content" rows="4" placeholder="Share your thoughts..." required></textarea>
+        <label for="content-root">Comment</label>
+        <textarea id="content-root" name="Content" rows="4" placeholder="Share your thoughts..." required></textarea>
 
         <button type="submit">Submit comment</button>
     </form>

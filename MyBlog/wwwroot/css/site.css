@@ -484,6 +484,92 @@ tbody tr:hover {
     border: 1px solid var(--border);
     margin-bottom: 0.75rem;
 }
+.comment-thread {
+    margin-bottom: 0.9rem;
+}
+
+.thread-controls {
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    margin: 0.3rem 0 0.8rem;
+}
+
+.thread-control-btn {
+    border: 1px solid var(--border);
+    background: #ffffff;
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 0.4rem 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.thread-control-btn:hover {
+    background: var(--panel-warm);
+}
+
+.comment-replies {
+    margin-left: 1.25rem;
+    padding-left: 0.9rem;
+    border-left: 2px solid rgba(32, 74, 103, 0.15);
+}
+
+.thread-toggle {
+    margin-top: 0.35rem;
+}
+
+.thread-toggle summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--accent-3);
+    margin-bottom: 0.45rem;
+}
+
+.reply-toggle summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--accent-3);
+    margin-bottom: 0.5rem;
+}
+
+.reply-count {
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+}
+
+.reply-form {
+    margin-top: 0.65rem;
+    margin-bottom: 0.9rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.reply-form button {
+    margin-top: 0.25rem;
+}
+
+.reply-limit-note {
+    margin: 0.45rem 0 0.8rem;
+    color: var(--ink-soft);
+    font-size: 0.92rem;
+}
+
+.comment-note {
+    color: var(--ink-soft);
+    margin-bottom: 0.5rem;
+}
+
+.validation-summary-errors {
+    color: #b00020;
+    margin: 0.25rem 0 0.75rem;
+}
+
+.validation-summary-errors ul {
+    margin: 0.4rem 0 0;
+}
 
 /* About page layout */
 .about-content {

@@ -2,6 +2,6 @@ namespace MyBlog.Models;
 
 public class BlogPostViewModel
 {
-    public BlogPost Post { get; set; }
-    public List<Comment> Comments { get; set; }
+    public BlogPost Post { get; set; } = null!;
+    public List<CommentThreadViewModel> Comments { get; set; } = new();
 }

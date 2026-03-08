@@ -41,12 +41,26 @@ public class BlogController : Controller
         if (!ModelState.IsValid)
         {
             var post = _blogService.GetPostBySlug(comment.PostId);
+            if (post == null) return NotFound();
             var comments = await _commentService.GetCommentsAsync(comment.PostId);
             var vm = new BlogPostViewModel { Post = post, Comments = comments };
             return View("Post", vm);
         }
 
-        await _commentService.AddCommentAsync(comment);
+        try
+        {
+            await _commentService.AddCommentAsync(comment);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            var post = _blogService.GetPostBySlug(comment.PostId);
+            if (post == null) return NotFound();
+            var comments = await _commentService.GetCommentsAsync(comment.PostId);
+            var vm = new BlogPostViewModel { Post = post, Comments = comments };
+            return View("Post", vm);
+        }
+
         await SendNewCommentAlertAsync(comment);
         
         return RedirectToRoute("blogPost", new { slug = comment.PostId });

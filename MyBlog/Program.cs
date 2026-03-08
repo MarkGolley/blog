@@ -39,6 +39,19 @@ try
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<BlogDbContext>();
     db.Database.Migrate();
+
+    if (db.Database.IsNpgsql())
+    {
+        db.Database.ExecuteSqlRaw("""
+                                  ALTER TABLE "Comments"
+                                  ADD COLUMN IF NOT EXISTS "ParentCommentId" integer;
+                                  """);
+
+        db.Database.ExecuteSqlRaw("""
+                                  CREATE INDEX IF NOT EXISTS "IX_Comments_ParentCommentId"
+                                  ON "Comments" ("ParentCommentId");
+                                  """);
+    }
 }
 catch (Exception ex)
 {

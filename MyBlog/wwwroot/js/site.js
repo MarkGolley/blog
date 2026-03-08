@@ -1,4 +1,20 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
+document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+        return;
+    }
 
-// Write your JavaScript code.
+    const action = target.getAttribute("data-thread-action");
+    if (!action) {
+        return;
+    }
+
+    const threadToggles = document.querySelectorAll("details[data-thread-toggle]");
+    threadToggles.forEach((toggle) => {
+        if (!(toggle instanceof HTMLDetailsElement)) {
+            return;
+        }
+
+        toggle.open = action === "expand";
+    });
+});
