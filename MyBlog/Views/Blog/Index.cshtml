@@ -1,4 +1,4 @@
-@model IEnumerable<MyBlog.Models.BlogPost>
+﻿@model MyBlog.Models.BlogIndexViewModel
 
 @{
     ViewData["Title"] = "My Blogs";
@@ -8,15 +8,31 @@
     <h2 id="blogs-title">My Blogs</h2>
 
     <div class="blog-list">
-        @foreach (var post in Model)
+        @foreach (var item in Model.Posts)
         {
-            <article class="blog-post">
-                <h3>
-                    <a asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">
-                        @post.Title
-                    </a>
-                </h3>
-                <div class="post-meta">@post.DatePosted.ToString("dd MMMM yyyy")</div>
+            <article class="blog-post" id="post-@item.Post.Id">
+                <div class="blog-post-row">
+                    <div class="blog-post-main">
+                        <h3>
+                            <a asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
+                                @item.Post.Title
+                            </a>
+                        </h3>
+                        <div class="post-meta">@item.Post.DatePosted.ToString("dd MMMM yyyy")</div>
+                    </div>
+                    <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
+                        <input type="hidden" name="postId" value="@item.Post.Id" />
+                        <input type="hidden" name="returnTo" value="index" />
+                        <input type="hidden" name="returnAnchor" value="post-@item.Post.Id" />
+                        <button
+                            type="submit"
+                            class="like-btn icon-like-btn like-btn-sm @(item.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
+                            aria-label="@(item.IsLikedByCurrentVisitor ? "Unlike this post" : "Like this post")">
+                            <span class="like-symbol">@Html.Raw(item.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+                            <span class="like-count">@item.LikeCount</span>
+                        </button>
+                    </form>
+                </div>
             </article>
         }
     </div>

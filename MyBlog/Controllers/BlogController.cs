@@ -8,21 +8,46 @@ namespace MyBlog.Controllers;
 
 public class BlogController : Controller
 {
+    private const string VisitorIdCookieName = "myblog_visitor_id";
+
     private readonly BlogService _blogService;
     private readonly CommentService _commentService;
+    private readonly LikeService _likeService;
     private readonly ILogger<BlogController> _logger;
 
-    public BlogController(BlogService blogService, CommentService commentService, ILogger<BlogController> logger)
+    public BlogController(
+        BlogService blogService,
+        CommentService commentService,
+        LikeService likeService,
+        ILogger<BlogController> logger)
     {
         _blogService = blogService;
         _commentService = commentService;
+        _likeService = likeService;
         _logger = logger;
     }
     
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
-        var posts = _blogService.GetAllPosts();
-        return View(posts);
+        var visitorId = GetOrCreateVisitorId();
+        var posts = _blogService.GetAllPosts().ToList();
+        var summaries = await _likeService.GetPostLikeSummariesAsync(posts.Select(x => x.Id), visitorId);
+
+        var vm = new BlogIndexViewModel
+        {
+            Posts = posts.Select(post =>
+            {
+                summaries.TryGetValue(post.Id, out var summary);
+                return new BlogListItemViewModel
+                {
+                    Post = post,
+                    LikeCount = summary.Count,
+                    IsLikedByCurrentVisitor = summary.IsLikedByVisitor
+                };
+            }).ToList()
+        };
+
+        return View(vm);
     }
     
     [HttpGet("/blog/{slug}", Name = "blogPost")]
@@ -31,8 +56,8 @@ public class BlogController : Controller
         var post = _blogService.GetPostBySlug(slug);
         if (post == null) return NotFound();
 
-        var comments = await _commentService.GetCommentsAsync(slug);
-        return View(new BlogPostViewModel { Post = post, Comments = comments });
+        var viewModel = await BuildPostViewModelAsync(post);
+        return View(viewModel);
     }
     
     [HttpPost]
@@ -42,8 +67,7 @@ public class BlogController : Controller
         {
             var post = _blogService.GetPostBySlug(comment.PostId);
             if (post == null) return NotFound();
-            var comments = await _commentService.GetCommentsAsync(comment.PostId);
-            var vm = new BlogPostViewModel { Post = post, Comments = comments };
+            var vm = await BuildPostViewModelAsync(post);
             return View("Post", vm);
         }
 
@@ -56,14 +80,160 @@ public class BlogController : Controller
             ModelState.AddModelError(string.Empty, ex.Message);
             var post = _blogService.GetPostBySlug(comment.PostId);
             if (post == null) return NotFound();
-            var comments = await _commentService.GetCommentsAsync(comment.PostId);
-            var vm = new BlogPostViewModel { Post = post, Comments = comments };
+            var vm = await BuildPostViewModelAsync(post);
             return View("Post", vm);
         }
 
         await SendNewCommentAlertAsync(comment);
         
-        return RedirectToRoute("blogPost", new { slug = comment.PostId });
+        var postUrl = Url.RouteUrl("blogPost", new { slug = comment.PostId }) ?? $"/blog/{comment.PostId}";
+        return Redirect($"{postUrl}#comment-{comment.Id}");
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> TogglePostLike(string postId, string? returnSlug, string? returnTo, string? returnAnchor)
+    {
+        if (string.IsNullOrWhiteSpace(postId))
+        {
+            return NotFound();
+        }
+
+        var post = _blogService.GetPostBySlug(postId);
+        if (post == null)
+        {
+            return NotFound();
+        }
+
+        var visitorId = GetOrCreateVisitorId();
+        await _likeService.TogglePostLikeAsync(postId, visitorId);
+
+        if (string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+        {
+            var summary = await _likeService.GetPostLikeSummaryAsync(postId, visitorId);
+            return Json(new
+            {
+                success = true,
+                count = summary.Count,
+                isLiked = summary.IsLikedByVisitor
+            });
+        }
+
+        if (string.Equals(returnTo, "index", StringComparison.OrdinalIgnoreCase))
+        {
+            var blogIndexUrl = Url.RouteUrl("blogIndex") ?? "/blog";
+            var indexAnchor = string.IsNullOrWhiteSpace(returnAnchor) ? $"post-{postId}" : returnAnchor;
+            return Redirect($"{blogIndexUrl}#{indexAnchor}");
+        }
+
+        var postUrl = Url.RouteUrl("blogPost", new { slug = returnSlug ?? postId }) ?? $"/blog/{returnSlug ?? postId}";
+        if (!string.IsNullOrWhiteSpace(returnAnchor))
+        {
+            return Redirect($"{postUrl}#{returnAnchor}");
+        }
+
+        return Redirect(postUrl);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ToggleCommentLike(int commentId, string postId, string? returnSlug, string? returnAnchor)
+    {
+        if (commentId <= 0 || string.IsNullOrWhiteSpace(postId))
+        {
+            return NotFound();
+        }
+
+        var post = _blogService.GetPostBySlug(postId);
+        if (post == null)
+        {
+            return NotFound();
+        }
+
+        var visitorId = GetOrCreateVisitorId();
+        var updated = await _likeService.ToggleCommentLikeAsync(commentId, postId, visitorId);
+        if (!updated)
+        {
+            return NotFound();
+        }
+
+        var baseUrl = Url.RouteUrl("blogPost", new { slug = returnSlug ?? postId }) ?? $"/blog/{returnSlug ?? postId}";
+        var anchor = string.IsNullOrWhiteSpace(returnAnchor) ? $"comment-{commentId}" : returnAnchor;
+        return Redirect($"{baseUrl}#{anchor}");
+    }
+
+    private async Task<BlogPostViewModel> BuildPostViewModelAsync(BlogPost post)
+    {
+        var visitorId = GetOrCreateVisitorId();
+        var comments = await _commentService.GetCommentsAsync(post.Id);
+        var commentIds = FlattenCommentIds(comments);
+        var commentLikeSummaries = await _likeService.GetCommentLikeSummariesAsync(commentIds, visitorId);
+        ApplyLikeSummaries(comments, commentLikeSummaries);
+
+        var postLikeSummary = await _likeService.GetPostLikeSummaryAsync(post.Id, visitorId);
+
+        return new BlogPostViewModel
+        {
+            Post = post,
+            Comments = comments,
+            PostLikeCount = postLikeSummary.Count,
+            IsPostLikedByCurrentVisitor = postLikeSummary.IsLikedByVisitor
+        };
+    }
+
+    private static List<int> FlattenCommentIds(IEnumerable<CommentThreadViewModel> comments)
+    {
+        var ids = new List<int>();
+        foreach (var comment in comments)
+        {
+            ids.Add(comment.Comment.Id);
+            ids.AddRange(FlattenCommentIds(comment.Replies));
+        }
+
+        return ids;
+    }
+
+    private static void ApplyLikeSummaries(
+        IEnumerable<CommentThreadViewModel> comments,
+        IReadOnlyDictionary<int, (int Count, bool IsLikedByVisitor)> summaries)
+    {
+        foreach (var comment in comments)
+        {
+            if (summaries.TryGetValue(comment.Comment.Id, out var summary))
+            {
+                comment.LikeCount = summary.Count;
+                comment.IsLikedByCurrentVisitor = summary.IsLikedByVisitor;
+            }
+            else
+            {
+                comment.LikeCount = 0;
+                comment.IsLikedByCurrentVisitor = false;
+            }
+
+            ApplyLikeSummaries(comment.Replies, summaries);
+        }
+    }
+
+    private string GetOrCreateVisitorId()
+    {
+        if (Request.Cookies.TryGetValue(VisitorIdCookieName, out var existingVisitorId) &&
+            !string.IsNullOrWhiteSpace(existingVisitorId))
+        {
+            return existingVisitorId;
+        }
+
+        var visitorId = Guid.NewGuid().ToString("N");
+        Response.Cookies.Append(
+            VisitorIdCookieName,
+            visitorId,
+            new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddYears(2),
+                IsEssential = true,
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = Request.IsHttps
+            });
+
+        return visitorId;
     }
 
     private async Task SendNewCommentAlertAsync(Comment comment)
