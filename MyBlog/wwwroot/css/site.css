@@ -390,6 +390,17 @@ tbody tr:hover {
     background: rgba(32, 74, 103, 0.04);
 }
 
+.blog-post-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+}
+
+.blog-post-main {
+    min-width: 0;
+}
+
 .blog-post h3 {
     margin-bottom: 0.25rem;
 }
@@ -402,6 +413,64 @@ tbody tr:hover {
 /* Post content */
 .post-content {
     margin-top: 0.75rem;
+}
+
+.like-form {
+    margin-top: 0.75rem;
+}
+
+.like-form-inline {
+    margin-top: 0;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.like-btn {
+    display: inline-block;
+    border: 1px solid rgba(29, 35, 44, 0.2);
+    background: #ffffff;
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 0.35rem 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.like-btn:hover {
+    background: var(--panel-warm);
+}
+
+.like-btn.liked {
+    color: #ffffff;
+    background: var(--accent);
+    border-color: rgba(30, 111, 103, 0.7);
+}
+
+.like-btn.like-btn-sm {
+    margin-top: 0.6rem;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.9rem;
+}
+
+.icon-like-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    line-height: 1;
+}
+
+.like-symbol {
+    font-size: 1.15rem;
+}
+
+.like-count {
+    min-width: 0.65rem;
+}
+
+.post-like-form-bottom {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
 }
 
 .post-content h2, .post-content h3, .post-content h4 {
@@ -483,6 +552,25 @@ tbody tr:hover {
     background: rgba(32, 74, 103, 0.04);
     border: 1px solid var(--border);
     margin-bottom: 0.75rem;
+}
+
+.comment-item-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.7rem;
+}
+
+.comment-meta {
+    min-width: 0;
+}
+
+.comment-body {
+    margin-top: 0.4rem;
+}
+
+.comment-like-form {
+    margin-top: 0;
 }
 .comment-thread {
     margin-bottom: 0.9rem;
@@ -637,5 +725,13 @@ footer {
     .about-image {
         max-width: 240px;
         margin: 0 auto;
+    }
+
+    .comment-item-head {
+        flex-wrap: wrap;
+    }
+
+    .blog-post-row {
+        align-items: flex-start;
     }
 }

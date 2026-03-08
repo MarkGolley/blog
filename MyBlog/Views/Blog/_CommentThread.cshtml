@@ -1,14 +1,34 @@
-@model MyBlog.Models.CommentThreadViewModel
+﻿@model MyBlog.Models.CommentThreadViewModel
 
-<div class="comment-thread">
+<div class="comment-thread" id="comment-@Model.Comment.Id">
     <div class="comment-item">
-        <strong>@Model.Comment.Author</strong> on @Model.Comment.PostedAt.ToString("dd MMMM yyyy 'at' HH:mm 'UTC'")
-        @if (Model.TotalReplyCount > 0)
-        {
-            <span class="reply-count"> - @Model.TotalReplyCount @(Model.TotalReplyCount == 1 ? "reply" : "replies")</span>
-        }
-        <br />
-        @Html.Raw(Model.ContentHtml)
+        <div class="comment-item-head">
+            <div class="comment-meta">
+                <strong>@Model.Comment.Author</strong> on @Model.Comment.PostedAt.ToString("dd MMMM yyyy 'at' HH:mm 'UTC'")
+                @if (Model.TotalReplyCount > 0)
+                {
+                    <span class="reply-count"> - @Model.TotalReplyCount @(Model.TotalReplyCount == 1 ? "reply" : "replies")</span>
+                }
+            </div>
+
+            <form asp-controller="Blog" asp-action="ToggleCommentLike" method="post" class="like-form like-form-inline comment-like-form">
+                <input type="hidden" name="commentId" value="@Model.Comment.Id" />
+                <input type="hidden" name="postId" value="@Model.Comment.PostId" />
+                <input type="hidden" name="returnSlug" value="@Model.Comment.PostId" />
+                <input type="hidden" name="returnAnchor" value="comment-@Model.Comment.Id" />
+                <button
+                    type="submit"
+                    class="like-btn icon-like-btn like-btn-sm @(Model.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
+                    aria-label="@(Model.IsLikedByCurrentVisitor ? "Unlike this comment" : "Like this comment")">
+                    <span class="like-symbol">@Html.Raw(Model.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+                    <span class="like-count">@Model.LikeCount</span>
+                </button>
+            </form>
+        </div>
+
+        <div class="comment-body">
+            @Html.Raw(Model.ContentHtml)
+        </div>
     </div>
 
     @if (Model.Depth < MyBlog.Services.CommentService.MaxThreadDepth)

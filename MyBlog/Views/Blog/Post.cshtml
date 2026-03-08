@@ -1,4 +1,4 @@
-@model MyBlog.Models.BlogPostViewModel
+﻿@model MyBlog.Models.BlogPostViewModel
 
 @{
     ViewData["Title"] = Model.Post.Title;
@@ -10,9 +10,21 @@
     <div class="post-content">
         @Html.Raw(Model.Post.Content)
     </div>
+    <form id="post-like-bottom" asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form post-like-form post-like-form-bottom">
+        <input type="hidden" name="postId" value="@Model.Post.Id" />
+        <input type="hidden" name="returnSlug" value="@Model.Post.Id" />
+        <input type="hidden" name="returnAnchor" value="post-like-bottom" />
+        <button
+            type="submit"
+            class="like-btn icon-like-btn @(Model.IsPostLikedByCurrentVisitor ? "liked" : string.Empty)"
+            aria-label="@(Model.IsPostLikedByCurrentVisitor ? "Unlike this post" : "Like this post")">
+            <span class="like-symbol">@Html.Raw(Model.IsPostLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+            <span class="like-count">@Model.PostLikeCount</span>
+        </button>
+    </form>
 </section>
 
-<section aria-labelledby="comments-title">
+<section id="comments" aria-labelledby="comments-title">
     <h2 id="comments-title">Comments</h2>
 
     @if (Model.Comments != null && Model.Comments.Any())
