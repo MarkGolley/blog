@@ -1,22 +1,31 @@
-﻿using Microsoft.EntityFrameworkCore;
-using MyBlog.Data;
-using MyBlog.Models;
+using System.Text;
+using Google.Cloud.Firestore;
 
 namespace MyBlog.Services;
 
 public class LikeService
 {
-    private readonly BlogDbContext _db;
+    private const string PostLikesCollection = "postLikes";
+    private const string CommentLikesCollection = "commentLikes";
+    private const string CommentsCollection = "comments";
 
-    public LikeService(BlogDbContext db)
+    private readonly FirestoreDb _db;
+
+    public LikeService(FirestoreDb db)
     {
         _db = db;
     }
 
     public async Task<(int Count, bool IsLikedByVisitor)> GetPostLikeSummaryAsync(string postId, string visitorId)
     {
-        var count = await _db.PostLikes.CountAsync(x => x.PostId == postId);
-        var isLiked = await _db.PostLikes.AnyAsync(x => x.PostId == postId && x.VisitorId == visitorId);
+        var likes = await _db.Collection(PostLikesCollection)
+            .WhereEqualTo(nameof(FirestorePostLike.PostId), postId)
+            .GetSnapshotAsync();
+
+        var count = likes.Count;
+        var isLiked = likes.Documents
+            .Any(d => d.TryGetValue<string>(nameof(FirestorePostLike.VisitorId), out var v) && v == visitorId);
+
         return (count, isLiked);
     }
 
@@ -24,26 +33,38 @@ public class LikeService
         IEnumerable<string> postIds,
         string visitorId)
     {
-        var ids = postIds.Distinct().ToList();
+        var ids = postIds
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         if (!ids.Any())
         {
             return new Dictionary<string, (int Count, bool IsLikedByVisitor)>();
         }
 
-        var summaries = await _db.PostLikes
-            .Where(x => ids.Contains(x.PostId))
-            .GroupBy(x => x.PostId)
-            .Select(g => new
-            {
-                PostId = g.Key,
-                Count = g.Count(),
-                IsLikedByVisitor = g.Any(x => x.VisitorId == visitorId)
-            })
-            .ToListAsync();
+        var result = ids.ToDictionary(id => id, _ => (0, false), StringComparer.Ordinal);
 
-        return summaries.ToDictionary(
-            x => x.PostId,
-            x => (x.Count, x.IsLikedByVisitor));
+        foreach (var batch in Batch(ids, 30))
+        {
+            var snapshot = await _db.Collection(PostLikesCollection)
+                .WhereIn(nameof(FirestorePostLike.PostId), batch.Cast<object>().ToList())
+                .GetSnapshotAsync();
+
+            foreach (var doc in snapshot.Documents)
+            {
+                var like = doc.ConvertTo<FirestorePostLike>();
+                if (!result.TryGetValue(like.PostId, out var existing))
+                {
+                    continue;
+                }
+
+                var likedByVisitor = existing.Item2 || string.Equals(like.VisitorId, visitorId, StringComparison.Ordinal);
+                result[like.PostId] = (existing.Item1 + 1, likedByVisitor);
+            }
+        }
+
+        return result;
     }
 
     public async Task<Dictionary<int, (int Count, bool IsLikedByVisitor)>> GetCommentLikeSummariesAsync(
@@ -56,70 +77,127 @@ public class LikeService
             return new Dictionary<int, (int Count, bool IsLikedByVisitor)>();
         }
 
-        var summaries = await _db.CommentLikes
-            .Where(x => ids.Contains(x.CommentId))
-            .GroupBy(x => x.CommentId)
-            .Select(g => new
-            {
-                CommentId = g.Key,
-                Count = g.Count(),
-                IsLikedByVisitor = g.Any(x => x.VisitorId == visitorId)
-            })
-            .ToListAsync();
+        var result = ids.ToDictionary(id => id, _ => (0, false));
 
-        return summaries.ToDictionary(
-            x => x.CommentId,
-            x => (x.Count, x.IsLikedByVisitor));
+        foreach (var batch in Batch(ids, 30))
+        {
+            var snapshot = await _db.Collection(CommentLikesCollection)
+                .WhereIn(nameof(FirestoreCommentLike.CommentId), batch.Cast<object>().ToList())
+                .GetSnapshotAsync();
+
+            foreach (var doc in snapshot.Documents)
+            {
+                var like = doc.ConvertTo<FirestoreCommentLike>();
+                if (!result.TryGetValue(like.CommentId, out var existing))
+                {
+                    continue;
+                }
+
+                var likedByVisitor = existing.Item2 || string.Equals(like.VisitorId, visitorId, StringComparison.Ordinal);
+                result[like.CommentId] = (existing.Item1 + 1, likedByVisitor);
+            }
+        }
+
+        return result;
     }
 
     public async Task TogglePostLikeAsync(string postId, string visitorId)
     {
-        var existing = await _db.PostLikes
-            .FirstOrDefaultAsync(x => x.PostId == postId && x.VisitorId == visitorId);
+        var docId = BuildPostLikeDocId(postId, visitorId);
+        var docRef = _db.Collection(PostLikesCollection).Document(docId);
+        var snapshot = await docRef.GetSnapshotAsync();
 
-        if (existing != null)
+        if (snapshot.Exists)
         {
-            _db.PostLikes.Remove(existing);
-        }
-        else
-        {
-            _db.PostLikes.Add(new PostLike
-            {
-                PostId = postId,
-                VisitorId = visitorId,
-                LikedAt = DateTime.UtcNow
-            });
+            await docRef.DeleteAsync();
+            return;
         }
 
-        await _db.SaveChangesAsync();
+        await docRef.CreateAsync(new FirestorePostLike
+        {
+            PostId = postId,
+            VisitorId = visitorId,
+            LikedAt = DateTime.UtcNow
+        });
     }
 
     public async Task<bool> ToggleCommentLikeAsync(int commentId, string postId, string visitorId)
     {
-        var commentExists = await _db.Comments.AnyAsync(x => x.Id == commentId && x.PostId == postId);
-        if (!commentExists)
+        var commentSnapshot = await _db.Collection(CommentsCollection)
+            .Document(commentId.ToString())
+            .GetSnapshotAsync();
+
+        if (!commentSnapshot.Exists ||
+            !commentSnapshot.TryGetValue<string>("PostId", out var existingPostId) ||
+            !string.Equals(existingPostId, postId, StringComparison.Ordinal))
         {
             return false;
         }
 
-        var existing = await _db.CommentLikes
-            .FirstOrDefaultAsync(x => x.CommentId == commentId && x.VisitorId == visitorId);
+        var docId = BuildCommentLikeDocId(commentId, visitorId);
+        var docRef = _db.Collection(CommentLikesCollection).Document(docId);
+        var snapshot = await docRef.GetSnapshotAsync();
 
-        if (existing != null)
+        if (snapshot.Exists)
         {
-            _db.CommentLikes.Remove(existing);
-        }
-        else
-        {
-            _db.CommentLikes.Add(new CommentLike
-            {
-                CommentId = commentId,
-                VisitorId = visitorId,
-                LikedAt = DateTime.UtcNow
-            });
+            await docRef.DeleteAsync();
+            return true;
         }
 
-        await _db.SaveChangesAsync();
+        await docRef.CreateAsync(new FirestoreCommentLike
+        {
+            CommentId = commentId,
+            VisitorId = visitorId,
+            LikedAt = DateTime.UtcNow
+        });
+
         return true;
+    }
+
+    private static IEnumerable<List<T>> Batch<T>(IReadOnlyList<T> items, int batchSize)
+    {
+        for (var i = 0; i < items.Count; i += batchSize)
+        {
+            var count = Math.Min(batchSize, items.Count - i);
+            yield return items.Skip(i).Take(count).ToList();
+        }
+    }
+
+    private static string BuildPostLikeDocId(string postId, string visitorId)
+        => $"{ToIdPart(postId)}_{ToIdPart(visitorId)}";
+
+    private static string BuildCommentLikeDocId(int commentId, string visitorId)
+        => $"{commentId}_{ToIdPart(visitorId)}";
+
+    private static string ToIdPart(string value)
+        => Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+    [FirestoreData]
+    private sealed class FirestorePostLike
+    {
+        [FirestoreProperty]
+        public string PostId { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public string VisitorId { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public DateTime LikedAt { get; set; }
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreCommentLike
+    {
+        [FirestoreProperty]
+        public int CommentId { get; set; }
+
+        [FirestoreProperty]
+        public string VisitorId { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public DateTime LikedAt { get; set; }
     }
 }

@@ -4,7 +4,7 @@ $image = "gcr.io/$project/myblog-app:latest"
 $region = "europe-west2"
 
 # Build Docker image
-cd C:\Users\markg\RiderProjects\MyBlog
+cd C:\Users\markg\RiderProjects\blog
 docker build -t $image .
 
 # Push Docker image to GCR
@@ -20,6 +20,5 @@ gcloud run deploy myblog-app `
   --cpu=0.25 `
   --concurrency=1 `
   --min-instances=0 `
-  --max-instances=5 `
-  --add-cloudsql-instances "my-blog-website-470819:europe-west2:myblog-db" `
+  --max-instances=1 `
   --timeout 10m

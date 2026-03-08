@@ -1,5 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using MyBlog.Data;
+using Google.Cloud.Firestore;
 using MyBlog.Models;
 
 namespace MyBlog.Services;
@@ -8,23 +7,32 @@ public class CommentService
 {
     public const int MaxThreadDepth = 5;
 
-    private readonly BlogDbContext _db;
+    private const string CommentsCollection = "comments";
+    private const string MetaCollection = "meta";
+    private const string CountersDocument = "counters";
+    private const string NextCommentIdField = "nextCommentId";
 
-    public CommentService(BlogDbContext db)
+    private readonly FirestoreDb _db;
+
+    public CommentService(FirestoreDb db)
     {
         _db = db;
     }
 
     public async Task AddCommentAsync(Comment comment)
     {
+        var commentsCollection = _db.Collection(CommentsCollection);
+
         if (comment.ParentCommentId.HasValue)
         {
-            var postComments = await _db.Comments
-                .Where(c => c.PostId == comment.PostId)
-                .Select(c => new { c.Id, c.ParentCommentId })
-                .ToListAsync();
+            var postCommentsSnapshot = await commentsCollection
+                .WhereEqualTo(nameof(FirestoreComment.PostId), comment.PostId)
+                .GetSnapshotAsync();
 
-            var commentById = postComments.ToDictionary(c => c.Id, c => c.ParentCommentId);
+            var commentById = postCommentsSnapshot.Documents
+                .Select(d => d.ConvertTo<FirestoreComment>())
+                .ToDictionary(c => c.Id, c => c.ParentCommentId);
+
             if (!commentById.ContainsKey(comment.ParentCommentId.Value))
             {
                 throw new InvalidOperationException("The comment you are replying to could not be found.");
@@ -39,8 +47,38 @@ public class CommentService
         }
 
         comment.PostedAt = DateTime.UtcNow;
-        _db.Comments.Add(comment);
-        await _db.SaveChangesAsync();
+
+        var countersRef = _db.Collection(MetaCollection).Document(CountersDocument);
+        var assignedId = await _db.RunTransactionAsync(async transaction =>
+        {
+            var countersSnapshot = await transaction.GetSnapshotAsync(countersRef);
+            var nextId = countersSnapshot.Exists &&
+                         countersSnapshot.TryGetValue<long>(NextCommentIdField, out var current)
+                ? (int)current
+                : 1;
+
+            var commentRef = commentsCollection.Document(nextId.ToString());
+
+            var doc = new FirestoreComment
+            {
+                Id = nextId,
+                Author = comment.Author,
+                Content = comment.Content,
+                PostedAt = comment.PostedAt,
+                PostId = comment.PostId,
+                ParentCommentId = comment.ParentCommentId
+            };
+
+            transaction.Create(commentRef, doc);
+            transaction.Set(countersRef, new Dictionary<string, object>
+            {
+                [NextCommentIdField] = nextId + 1
+            }, SetOptions.MergeAll);
+
+            return nextId;
+        });
+
+        comment.Id = assignedId;
     }
 
     public async Task<List<CommentThreadViewModel>> GetCommentsAsync(string postId)
@@ -48,10 +86,15 @@ public class CommentService
         if (string.IsNullOrWhiteSpace(postId))
             return new List<CommentThreadViewModel>();
 
-        var comments = await _db.Comments
-            .Where(c => c.PostId == postId)
+        var snapshot = await _db.Collection(CommentsCollection)
+            .WhereEqualTo(nameof(FirestoreComment.PostId), postId)
+            .GetSnapshotAsync();
+
+        var comments = snapshot.Documents
+            .Select(d => d.ConvertTo<FirestoreComment>())
+            .Select(MapToComment)
             .OrderBy(c => c.PostedAt)
-            .ToListAsync();
+            .ToList();
 
         var rootComments = comments
             .Where(c => !c.ParentCommentId.HasValue)
@@ -64,6 +107,16 @@ public class CommentService
 
         return BuildCommentThreads(rootComments, childrenByParent, new HashSet<int>(), 1);
     }
+
+    private static Comment MapToComment(FirestoreComment doc) => new()
+    {
+        Id = doc.Id,
+        Author = doc.Author,
+        Content = doc.Content,
+        PostedAt = doc.PostedAt,
+        PostId = doc.PostId,
+        ParentCommentId = doc.ParentCommentId
+    };
 
     private static List<CommentThreadViewModel> BuildCommentThreads(
         List<Comment> comments,
@@ -117,5 +170,27 @@ public class CommentService
             depth++;
             currentId = parentId.Value;
         }
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreComment
+    {
+        [FirestoreProperty]
+        public int Id { get; set; }
+
+        [FirestoreProperty]
+        public string Author { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public string Content { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public DateTime PostedAt { get; set; }
+
+        [FirestoreProperty]
+        public string PostId { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public int? ParentCommentId { get; set; }
     }
 }
