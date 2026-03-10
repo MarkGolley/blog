@@ -10,14 +10,14 @@
 <body>
 <h1>Why I Set Up a Pi-hole and How I Got It Working</h1>
 
-<p>This is a straightforward write-up of how I set up Pi-hole on a Raspberry Pi — what it does, how I installed it, and what tripped me up along the way.</p>
+<p>This is a straightforward write-up of how I set up Pi-hole on a Raspberry Pi, what it does, how I installed it, and what tripped me up along the way.</p>
 
 <p>I had read about Pi-hole and how it can cut down adverts across every device on your Wi-Fi. I already use browser-based blockers, but I wanted an excuse to have a proper play with a Raspberry Pi and this seemed ideal.</p>
 
 <p>Pi-hole runs as a local DNS server and filters adverts for anything on your network.</p>
 
 <h2>Why I did it</h2>
-<p>Online adverts have become increasingly intrusive — especially on streaming services, YouTube and certain sites. I mainly wanted:</p>
+<p>Online adverts have become increasingly intrusive, especially on streaming services, YouTube and certain sites. I mainly wanted:</p>
 <ul>
     <li><strong>Quicker browsing</strong> (in theory)</li>
     <li><strong>Fewer distractions</strong></li>
@@ -42,7 +42,7 @@
 <h3>Does the Pi support Wi-Fi?</h3>
 <p>I was not even certain mine did. To check:</p>
 <pre><code>iwconfig</code></pre>
-<p>I looked for <code>wlan0</code> in the output — it was there, so Wi-Fi was available.</p>
+<p>I looked for <code>wlan0</code> in the output, it was there, so Wi-Fi was available.</p>
 
 <h2>Installing Pi-hole</h2>
 <p>The installation itself is a single command:</p>
@@ -77,7 +77,7 @@
 <p>The admin dashboard lives at:</p>
 <pre><code>http://192.168.1.XXX/admin</code></pre>
 
-<p>It loaded — but showed zero activity. Not ideal.</p>
+<p>It loaded, but showed zero activity. Not ideal.</p>
 
 <img src="/BlogStorage/PostsImages/pi-dashboard.png" alt="Pi-hole dashboard showing blocked adverts statistics" style="width: 100%; max-width: 700px;">
 
@@ -139,13 +139,13 @@ listen-address=192.168.1.XXX</code></pre>
 </ul>
 
 <div class="tip">
-    Tip: Changes apply immediately — no restart required.
+    Tip: Changes apply immediately, no restart required.
 </div>
 
 <p>Once pointed at Pi-hole, adverts started disappearing on those devices.</p>
 
 <h2>Blocklists and limitations</h2>
-<p>By default, Pi-hole will not block YouTube or ITVX adverts. That is expected — those platforms often serve adverts from the same domains as the content.</p>
+<p>By default, Pi-hole will not block YouTube or ITVX adverts. That is expected, those platforms often serve adverts from the same domains as the content.</p>
 
 <p>I added a few extra lists and refreshed gravity:</p>
 <pre><code>pihole -g</code></pre>
