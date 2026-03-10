@@ -38,6 +38,8 @@
             <span class="like-count">@Model.PostLikeCount</span>
         </button>
     </form>
+
+    <partial name="_SubscribeForm" model="(Context.Request.Path + Context.Request.QueryString).ToString()" />
 </section>
 
 @if (Model.RelatedPosts.Any())

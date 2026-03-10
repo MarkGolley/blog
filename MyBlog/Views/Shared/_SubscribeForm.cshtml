@@ -1,0 +1,36 @@
+@model string
+
+@{
+    var subscribeMessage = TempData["SubscribeBanner"]?.ToString();
+    var returnPath = string.IsNullOrWhiteSpace(Model) ? "/blog" : Model;
+}
+
+<aside id="subscribe" class="subscribe-card" aria-labelledby="subscribe-title">
+    <h3 id="subscribe-title">Subscribe for new posts</h3>
+    <p class="section-intro">Get an email when a new article is published.</p>
+
+    @if (!string.IsNullOrWhiteSpace(subscribeMessage))
+    {
+        <p class="subscribe-feedback">@subscribeMessage</p>
+    }
+
+    <form asp-controller="Subscription" asp-action="Subscribe" method="post" class="subscribe-form">
+        <input type="hidden" name="ReturnPath" value="@returnPath" />
+        <div class="honeypot-field" aria-hidden="true">
+            <label for="hp-subscribe">Leave this field empty</label>
+            <input type="text" id="hp-subscribe" name="__hp" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <label for="subscribe-email">Email</label>
+        <div class="subscribe-row">
+            <input
+                type="email"
+                id="subscribe-email"
+                name="Email"
+                maxlength="320"
+                placeholder="you@example.com"
+                required />
+            <button type="submit">Subscribe</button>
+        </div>
+    </form>
+</aside>

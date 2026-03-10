@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using MyBlog.Services;
 
 namespace MyBlog.Tests;
 
@@ -120,6 +121,97 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         using var response = await client.GetAsync("/blog/%2e%2e%5c%2e%2e%5cappsettings");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Subscribe_Post_RedirectsToRequestedPath()
+    {
+        using var client = CreateClient("10.0.3.1", allowAutoRedirect: false);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/blog");
+        var email = $"subscribe-{Guid.NewGuid():N}@example.com";
+
+        using var response = await client.PostAsync("/subscribe", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Email"] = email,
+            ["ReturnPath"] = "/blog",
+            ["__hp"] = string.Empty,
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Equal("/blog", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Subscription_CanConfirmThenUnsubscribe()
+    {
+        var email = $"confirm-{Guid.NewGuid():N}@example.com";
+        using var scope = _factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<SubscriptionService>();
+        var subscribeResult = await service.SubscribeAsync(email);
+
+        Assert.Equal(SubscribeStatus.PendingConfirmation, subscribeResult.Status);
+        Assert.False(string.IsNullOrWhiteSpace(subscribeResult.ConfirmationToken));
+
+        using var client = _factory.CreateClient();
+
+        using var confirmResponse = await client.GetAsync($"/subscribe/confirm?token={Uri.EscapeDataString(subscribeResult.ConfirmationToken!)}");
+        Assert.Equal(HttpStatusCode.OK, confirmResponse.StatusCode);
+        var confirmHtml = await confirmResponse.Content.ReadAsStringAsync();
+        Assert.Contains("Subscription Confirmed", confirmHtml, StringComparison.OrdinalIgnoreCase);
+
+        var subscriber = (await service.GetConfirmedSubscribersAsync())
+            .FirstOrDefault(x => string.Equals(x.Email, email, StringComparison.OrdinalIgnoreCase));
+
+        Assert.NotNull(subscriber);
+        Assert.False(string.IsNullOrWhiteSpace(subscriber!.UnsubscribeToken));
+
+        using var unsubscribeResponse = await client.GetAsync($"/subscribe/unsubscribe?token={Uri.EscapeDataString(subscriber.UnsubscribeToken)}");
+        Assert.Equal(HttpStatusCode.OK, unsubscribeResponse.StatusCode);
+        var unsubscribeHtml = await unsubscribeResponse.Content.ReadAsStringAsync();
+        Assert.Contains("Unsubscribed", unsubscribeHtml, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task NotifyPost_RequiresAdminKey()
+    {
+        var email = $"notify-{Guid.NewGuid():N}@example.com";
+        using var scope = _factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<SubscriptionService>();
+        var postId = scope.ServiceProvider.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+
+        var subscribeResult = await service.SubscribeAsync(email);
+        await service.ConfirmAsync(subscribeResult.ConfirmationToken ?? string.Empty);
+
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var unauthorized = await client.PostAsync("/admin/subscribers/notify-post", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["PostSlug"] = postId
+        }));
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+
+        using var authorizedRequest = new HttpRequestMessage(HttpMethod.Post, "/admin/subscribers/notify-post")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["PostSlug"] = postId
+            })
+        };
+        authorizedRequest.Headers.Add("X-Admin-Key", "integration-notify-key");
+
+        using var authorized = await client.SendAsync(authorizedRequest);
+        Assert.Equal(HttpStatusCode.OK, authorized.StatusCode);
+
+        await using var stream = await authorized.Content.ReadAsStreamAsync();
+        using var json = await JsonDocument.ParseAsync(stream);
+        var root = json.RootElement;
+
+        Assert.True(root.GetProperty("success").GetBoolean());
+        Assert.Equal(postId, root.GetProperty("postId").GetString());
     }
 
     private HttpClient CreateClient(string forwardedForIp, bool allowAutoRedirect = true)

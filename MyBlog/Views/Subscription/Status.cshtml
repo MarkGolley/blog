@@ -1,0 +1,18 @@
+@model MyBlog.Models.SubscriptionStatusViewModel
+
+@{
+    ViewData["Title"] = Model.Title;
+    ViewData["MetaDescription"] = "MyBlog subscription status.";
+    ViewData["MetaRobots"] = "noindex,nofollow";
+    ViewData["CanonicalPath"] = "/blog";
+}
+
+<section aria-labelledby="subscription-status-title">
+    <h2 id="subscription-status-title">@Model.Title</h2>
+    <p class="@(Model.IsSuccess ? "subscription-status-success" : "subscription-status-error")">
+        @Model.Message
+    </p>
+    <p>
+        <a asp-controller="Blog" asp-action="Index">Back to blog</a>
+    </p>
+</section>
