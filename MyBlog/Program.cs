@@ -25,7 +25,19 @@ var firestoreDatabaseId =
     builder.Configuration["Firestore:DatabaseId"] ??
     "(default)";
 
-if (!string.IsNullOrWhiteSpace(firestoreProjectId))
+var allowInMemoryFallback = builder.Environment.IsDevelopment();
+
+if (string.IsNullOrWhiteSpace(firestoreProjectId))
+{
+    if (!allowInMemoryFallback)
+    {
+        throw new InvalidOperationException(
+            "Firestore project id is missing in non-development environment. Set GOOGLE_CLOUD_PROJECT or Firestore:ProjectId.");
+    }
+
+    Console.WriteLine("Firestore project id not configured. Using in-memory comments/likes (development only).");
+}
+else
 {
     try
     {
@@ -40,12 +52,15 @@ if (!string.IsNullOrWhiteSpace(firestoreProjectId))
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Firestore unavailable. Falling back to in-memory comments/likes for local use. {ex.Message}");
+        if (!allowInMemoryFallback)
+        {
+            throw new InvalidOperationException(
+                "Firestore initialization failed in non-development environment. Check service credentials and Firestore config.",
+                ex);
+        }
+
+        Console.WriteLine($"Firestore unavailable. Falling back to in-memory comments/likes (development only). {ex.Message}");
     }
-}
-else
-{
-    Console.WriteLine("Firestore project id not configured. Using in-memory comments/likes.");
 }
 builder.Services.AddSingleton<BlogService>();
 builder.Services.AddScoped<CommentService>();
