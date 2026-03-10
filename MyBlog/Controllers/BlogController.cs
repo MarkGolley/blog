@@ -81,7 +81,8 @@ public class BlogController : Controller
     [EnableRateLimiting("commentWrites")]
     public async Task<IActionResult> AddComment(Comment comment)
     {
-        if (!string.IsNullOrWhiteSpace(comment.Website))
+        var honeypot = Request.Form["__hp"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(honeypot))
         {
             _logger.LogWarning("Comment blocked by honeypot spam check for post {PostId}.", comment.PostId);
 
