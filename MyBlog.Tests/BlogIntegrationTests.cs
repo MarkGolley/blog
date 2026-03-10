@@ -113,6 +113,15 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.True(checks.TryGetProperty("firestore", out _), "Expected firestore check in health payload.");
     }
 
+    [Fact]
+    public async Task BlogPost_PathTraversalSlug_ReturnsNotFound()
+    {
+        using var client = _factory.CreateClient();
+
+        using var response = await client.GetAsync("/blog/%2e%2e%5c%2e%2e%5cappsettings");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private HttpClient CreateClient(string forwardedForIp, bool allowAutoRedirect = true)
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
