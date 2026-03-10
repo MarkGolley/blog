@@ -9,7 +9,20 @@
 
 <section aria-labelledby="post-title">
     <h2 id="post-title">@Model.Post.Title</h2>
-    <div class="post-meta">@Model.Post.DatePosted.ToString("dd MMMM yyyy")</div>
+    <div class="post-meta">
+        @Model.Post.DatePosted.ToString("dd MMMM yyyy")
+        <span class="meta-dot">•</span>
+        @Model.Post.ReadingTimeMinutes min read
+    </div>
+    @if (Model.Post.Tags.Any())
+    {
+        <div class="tag-list tag-list-inline">
+            @foreach (var tag in Model.Post.Tags)
+            {
+                <a class="tag-chip tag-chip-link" asp-controller="Blog" asp-action="Index" asp-route-tag="@tag">@tag</a>
+            }
+        </div>
+    }
     <div class="post-content">
         @Html.Raw(Model.Post.Content)
     </div>
@@ -26,6 +39,39 @@
         </button>
     </form>
 </section>
+
+@if (Model.RelatedPosts.Any())
+{
+    <section aria-labelledby="related-posts-title">
+        <h2 id="related-posts-title">Related posts</h2>
+        <div class="blog-list related-posts-list">
+            @foreach (var related in Model.RelatedPosts)
+            {
+                <article class="blog-post">
+                    <div class="blog-post-main">
+                        <h3>
+                            <a asp-controller="Blog" asp-action="Post" asp-route-slug="@related.Id">@related.Title</a>
+                        </h3>
+                        <div class="post-meta">
+                            @related.DatePosted.ToString("dd MMMM yyyy")
+                            <span class="meta-dot">•</span>
+                            @related.ReadingTimeMinutes min read
+                        </div>
+                        @if (related.Tags.Any())
+                        {
+                            <div class="tag-list">
+                                @foreach (var tag in related.Tags.Take(4))
+                                {
+                                    <span class="tag-chip">@tag</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
 
 <section id="comments" aria-labelledby="comments-title">
     <h2 id="comments-title">Comments</h2>

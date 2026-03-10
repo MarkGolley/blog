@@ -8,6 +8,43 @@
 
 <section id="blogs" aria-labelledby="blogs-title">
     <h2 id="blogs-title">My Blogs</h2>
+    <p class="section-intro">Browse by topic or search by keyword.</p>
+
+    <form method="get" asp-controller="Blog" asp-action="Index" class="blog-filter-form">
+        <div class="blog-filter-row">
+            <input
+                type="search"
+                name="q"
+                value="@Model.SearchQuery"
+                placeholder="Search posts..."
+                aria-label="Search blog posts" />
+
+            <select name="tag" aria-label="Filter by tag">
+                <option value="">All topics</option>
+                @foreach (var tag in Model.AvailableTags)
+                {
+                    if (string.Equals(Model.SelectedTag, tag, StringComparison.OrdinalIgnoreCase))
+                    {
+                        <option value="@tag" selected>@tag</option>
+                    }
+                    else
+                    {
+                        <option value="@tag">@tag</option>
+                    }
+                }
+            </select>
+
+            <button type="submit">Apply</button>
+            @if (!string.IsNullOrWhiteSpace(Model.SearchQuery) || !string.IsNullOrWhiteSpace(Model.SelectedTag))
+            {
+                <a class="blog-filter-reset" asp-controller="Blog" asp-action="Index">Reset</a>
+            }
+        </div>
+    </form>
+
+    <p class="blog-results-summary">
+        Showing @Model.FilteredPostCount of @Model.TotalPostCount posts.
+    </p>
 
     <div class="pinned-posts-block">
         <h3 class="blog-subtitle">Pinned Posts</h3>
@@ -27,7 +64,18 @@
                                 <div class="post-meta">
                                     <span class="pinned-badge">Pinned</span>
                                     @item.Post.DatePosted.ToString("dd MMMM yyyy")
+                                    <span class="meta-dot">•</span>
+                                    @item.Post.ReadingTimeMinutes min read
                                 </div>
+                                @if (item.Post.Tags.Any())
+                                {
+                                    <div class="tag-list">
+                                        @foreach (var tag in item.Post.Tags.Take(4))
+                                        {
+                                            <span class="tag-chip">@tag</span>
+                                        }
+                                    </div>
+                                }
                             </div>
                             <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
                                 <input type="hidden" name="postId" value="@item.Post.Id" />
@@ -67,7 +115,20 @@
                                     @item.Post.Title
                                 </a>
                             </h3>
-                            <div class="post-meta">@item.Post.DatePosted.ToString("dd MMMM yyyy")</div>
+                            <div class="post-meta">
+                                @item.Post.DatePosted.ToString("dd MMMM yyyy")
+                                <span class="meta-dot">•</span>
+                                @item.Post.ReadingTimeMinutes min read
+                            </div>
+                            @if (item.Post.Tags.Any())
+                            {
+                                <div class="tag-list">
+                                    @foreach (var tag in item.Post.Tags.Take(4))
+                                    {
+                                        <span class="tag-chip">@tag</span>
+                                    }
+                                </div>
+                            }
                         </div>
                         <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
                             <input type="hidden" name="postId" value="@item.Post.Id" />
