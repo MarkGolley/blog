@@ -38,6 +38,10 @@
             <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form reply-form">
                 <input type="hidden" name="PostId" value="@Model.Comment.PostId" />
                 <input type="hidden" name="ParentCommentId" value="@Model.Comment.Id" />
+                <div class="honeypot-field" aria-hidden="true">
+                    <label for="website-reply-@Model.Comment.Id">Website</label>
+                    <input type="text" id="website-reply-@Model.Comment.Id" name="Website" tabindex="-1" autocomplete="off" />
+                </div>
 
                 <label>Name</label>
                 <input type="text" name="Author" placeholder="Your name" required />

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MyBlog.Services;
 using MyBlog.Models;
 using MailKit.Net.Smtp;
@@ -17,6 +18,7 @@ public class ContactController(ILogger<ContactController> logger) : Controller
     }
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("contactWrites")]
     public IActionResult Index(ContactFormModel model)
     {
         if (!ModelState.IsValid)

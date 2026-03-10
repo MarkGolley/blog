@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MailKit.Net.Smtp;
 using MimeKit;
 using MyBlog.Models;
@@ -77,8 +78,22 @@ public class BlogController : Controller
     
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("commentWrites")]
     public async Task<IActionResult> AddComment(Comment comment)
     {
+        if (!string.IsNullOrWhiteSpace(comment.Website))
+        {
+            _logger.LogWarning("Comment blocked by honeypot spam check for post {PostId}.", comment.PostId);
+
+            if (string.IsNullOrWhiteSpace(comment.PostId))
+            {
+                return RedirectToAction(nameof(Index));
+            }
+
+            var spamPostUrl = Url.RouteUrl("blogPost", new { slug = comment.PostId }) ?? $"/blog/{comment.PostId}";
+            return Redirect(spamPostUrl);
+        }
+
         if (!ModelState.IsValid)
         {
             var post = _blogService.GetPostBySlug(comment.PostId);
@@ -108,6 +123,7 @@ public class BlogController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("likeWrites")]
     public async Task<IActionResult> TogglePostLike(string postId, string? returnSlug, string? returnTo, string? returnAnchor)
     {
         if (string.IsNullOrWhiteSpace(postId))
@@ -153,6 +169,7 @@ public class BlogController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("likeWrites")]
     public async Task<IActionResult> ToggleCommentLike(int commentId, string postId, string? returnSlug, string? returnAnchor)
     {
         if (commentId <= 0 || string.IsNullOrWhiteSpace(postId))
