@@ -61,6 +61,7 @@ Required secrets:
 - `ICLOUD_EMAIL`
 - `ICLOUD_APP_PASSWORD`
 - `SUBSCRIBER_NOTIFY_KEY` (or `Subscriptions:NotifyAdminKey` in config)
+- `PUBLIC_BASE_URL` (or `Site:PublicBaseUrl`, for example `https://markgolley.dev`) so email links use your domain
 
 Trigger a new-post email blast:
 
@@ -77,6 +78,11 @@ Script helper:
 ```powershell
 $env:SUBSCRIBER_NOTIFY_KEY = "your-notify-key"
 .\Deployment\notify-subscribers.ps1 `
-  -BaseUrl "https://your-domain" `
   -PostSlug "your_post_slug"
 ```
+
+Optional:
+
+- Pass `-BaseUrl` only if you need to override the default `https://markgolley.dev`.
+- Omit `-PostSlug` to get an interactive numbered list from `MyBlog/wwwroot/BlogStorage`.
+- Pass `-BlogStoragePath` if your local posts directory differs from the default.

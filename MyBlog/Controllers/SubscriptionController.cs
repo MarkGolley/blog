@@ -68,17 +68,17 @@ public class SubscriptionController : Controller
                 return Redirect(returnPath);
             }
 
-            var confirmationUrl = Url.ActionLink(
+            var confirmationPath = Url.Action(
                 action: nameof(Confirm),
                 controller: "Subscription",
-                values: new { token = result.ConfirmationToken },
-                protocol: Request.Scheme) ?? string.Empty;
-
-            var unsubscribeUrl = Url.ActionLink(
+                values: new { token = result.ConfirmationToken }) ?? "/subscribe/confirm";
+            var unsubscribePath = Url.Action(
                 action: nameof(Unsubscribe),
                 controller: "Subscription",
-                values: new { token = result.UnsubscribeToken },
-                protocol: Request.Scheme) ?? string.Empty;
+                values: new { token = result.UnsubscribeToken }) ?? "/subscribe/unsubscribe";
+
+            var confirmationUrl = BuildAbsoluteUrl(confirmationPath);
+            var unsubscribeUrl = BuildAbsoluteUrl(unsubscribePath);
 
             var emailSent = await _subscriptionEmailService.SendConfirmationEmailAsync(
                 result.Email,
@@ -190,8 +190,9 @@ public class SubscriptionController : Controller
             return NotFound(new { success = false, error = "Post not found." });
         }
 
-        var postUrl = Url.RouteUrl("blogPost", new { slug = post.Id }, Request.Scheme)
-                     ?? $"{Request.Scheme}://{Request.Host}/blog/{Uri.EscapeDataString(post.Id)}";
+        var postPath = Url.RouteUrl("blogPost", new { slug = post.Id })
+                       ?? $"/blog/{Uri.EscapeDataString(post.Id)}";
+        var postUrl = BuildAbsoluteUrl(postPath);
 
         var subscribers = await _subscriptionService.GetConfirmedSubscribersAsync();
 
@@ -207,11 +208,11 @@ public class SubscriptionController : Controller
                 continue;
             }
 
-            var unsubscribeUrl = Url.ActionLink(
+            var unsubscribePath = Url.Action(
                 action: nameof(Unsubscribe),
                 controller: "Subscription",
-                values: new { token = subscriber.UnsubscribeToken },
-                protocol: Request.Scheme) ?? string.Empty;
+                values: new { token = subscriber.UnsubscribeToken }) ?? "/subscribe/unsubscribe";
+            var unsubscribeUrl = BuildAbsoluteUrl(unsubscribePath);
 
             var emailSent = await _subscriptionEmailService.SendNewPostNotificationAsync(
                 subscriber.Email,
@@ -266,5 +267,36 @@ public class SubscriptionController : Controller
         var expectedBytes = Encoding.UTF8.GetBytes(expected);
         var providedBytes = Encoding.UTF8.GetBytes(provided);
         return CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes);
+    }
+
+    private string BuildAbsoluteUrl(string pathOrUrl)
+    {
+        if (Uri.TryCreate(pathOrUrl, UriKind.Absolute, out var absoluteUri))
+        {
+            return absoluteUri.ToString();
+        }
+
+        var relativePath = pathOrUrl.StartsWith("/", StringComparison.Ordinal)
+            ? pathOrUrl
+            : "/" + pathOrUrl;
+
+        return $"{GetPublicBaseUrl()}{relativePath}";
+    }
+
+    private string GetPublicBaseUrl()
+    {
+        var configuredBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL")
+                                ?? _configuration["Site:PublicBaseUrl"];
+
+        if (!string.IsNullOrWhiteSpace(configuredBaseUrl))
+        {
+            var trimmedConfiguredUrl = configuredBaseUrl.Trim().TrimEnd('/');
+            if (Uri.TryCreate(trimmedConfiguredUrl, UriKind.Absolute, out _))
+            {
+                return trimmedConfiguredUrl;
+            }
+        }
+
+        return $"{Request.Scheme}://{Request.Host}".TrimEnd('/');
     }
 }
