@@ -383,6 +383,29 @@ tbody tr:hover {
     gap: 0.9rem;
 }
 
+.pinned-posts-block {
+    margin-bottom: 1.2rem;
+    padding: 0.95rem;
+    border-radius: 14px;
+    border: 1px solid rgba(30, 111, 103, 0.2);
+    background: linear-gradient(120deg, rgba(30, 111, 103, 0.06), rgba(215, 165, 82, 0.08));
+}
+
+.blog-subtitle {
+    margin: 0.2rem 0 0.65rem;
+    font-size: 1.02rem;
+    color: var(--accent-3);
+}
+
+.pinned-blog-list {
+    margin-top: 0.3rem;
+}
+
+.pinned-blog-post {
+    border-color: rgba(30, 111, 103, 0.26);
+    background: rgba(255, 255, 255, 0.86);
+}
+
 .blog-post {
     padding: 0.9rem 1rem;
     border-radius: 12px;
@@ -408,6 +431,19 @@ tbody tr:hover {
 .post-meta {
     color: rgba(32, 74, 103, 0.7);
     font-size: 0.85rem;
+}
+
+.pinned-badge {
+    display: inline-block;
+    margin-right: 0.45rem;
+    padding: 0.08rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #ffffff;
+    background: linear-gradient(90deg, rgba(30, 111, 103, 0.9), rgba(32, 74, 103, 0.9));
 }
 
 /* Post content */

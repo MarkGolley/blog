@@ -12,15 +12,25 @@ public class CommentService
     private const string CountersDocument = "counters";
     private const string NextCommentIdField = "nextCommentId";
 
-    private readonly FirestoreDb _db;
+    private static readonly object LocalStateLock = new();
+    private static readonly List<Comment> LocalComments = new();
+    private static int _nextLocalCommentId = 1;
 
-    public CommentService(FirestoreDb db)
+    private readonly FirestoreDb? _db;
+
+    public CommentService(FirestoreDb? db = null)
     {
         _db = db;
     }
 
     public async Task AddCommentAsync(Comment comment)
     {
+        if (_db == null)
+        {
+            AddCommentInMemory(comment);
+            return;
+        }
+
         var commentsCollection = _db.Collection(CommentsCollection);
 
         if (comment.ParentCommentId.HasValue)
@@ -86,6 +96,30 @@ public class CommentService
         if (string.IsNullOrWhiteSpace(postId))
             return new List<CommentThreadViewModel>();
 
+        if (_db == null)
+        {
+            List<Comment> localComments;
+            lock (LocalStateLock)
+            {
+                localComments = LocalComments
+                    .Where(c => string.Equals(c.PostId, postId, StringComparison.Ordinal))
+                    .OrderBy(c => c.PostedAt)
+                    .Select(CloneComment)
+                    .ToList();
+            }
+
+            var localRootComments = localComments
+                .Where(c => !c.ParentCommentId.HasValue)
+                .ToList();
+
+            var localChildrenByParent = localComments
+                .Where(c => c.ParentCommentId.HasValue)
+                .GroupBy(c => c.ParentCommentId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            return BuildCommentThreads(localRootComments, localChildrenByParent, new HashSet<int>(), 1);
+        }
+
         var snapshot = await _db.Collection(CommentsCollection)
             .WhereEqualTo(nameof(FirestoreComment.PostId), postId)
             .GetSnapshotAsync();
@@ -107,6 +141,48 @@ public class CommentService
 
         return BuildCommentThreads(rootComments, childrenByParent, new HashSet<int>(), 1);
     }
+
+    private static void AddCommentInMemory(Comment comment)
+    {
+        lock (LocalStateLock)
+        {
+            var postComments = LocalComments
+                .Where(c => string.Equals(c.PostId, comment.PostId, StringComparison.Ordinal))
+                .ToList();
+
+            if (comment.ParentCommentId.HasValue)
+            {
+                var commentById = postComments.ToDictionary(c => c.Id, c => c.ParentCommentId);
+
+                if (!commentById.ContainsKey(comment.ParentCommentId.Value))
+                {
+                    throw new InvalidOperationException("The comment you are replying to could not be found.");
+                }
+
+                var parentDepth = GetDepth(comment.ParentCommentId.Value, commentById);
+                var replyDepth = parentDepth + 1;
+                if (replyDepth > MaxThreadDepth)
+                {
+                    throw new InvalidOperationException($"Reply depth limit reached. Max depth is {MaxThreadDepth} levels.");
+                }
+            }
+
+            comment.PostedAt = DateTime.UtcNow;
+            comment.Id = _nextLocalCommentId++;
+
+            LocalComments.Add(CloneComment(comment));
+        }
+    }
+
+    private static Comment CloneComment(Comment source) => new()
+    {
+        Id = source.Id,
+        Author = source.Author,
+        Content = source.Content,
+        PostedAt = source.PostedAt,
+        PostId = source.PostId,
+        ParentCommentId = source.ParentCommentId
+    };
 
     private static Comment MapToComment(FirestoreComment doc) => new()
     {

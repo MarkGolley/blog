@@ -7,33 +7,85 @@
 <section id="blogs" aria-labelledby="blogs-title">
     <h2 id="blogs-title">My Blogs</h2>
 
-    <div class="blog-list">
-        @foreach (var item in Model.Posts)
+    <div class="pinned-posts-block">
+        <h3 class="blog-subtitle">Pinned Posts</h3>
+        @if (Model.PinnedPosts.Any())
         {
-            <article class="blog-post" id="post-@item.Post.Id">
-                <div class="blog-post-row">
-                    <div class="blog-post-main">
-                        <h3>
-                            <a asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
-                                @item.Post.Title
-                            </a>
-                        </h3>
-                        <div class="post-meta">@item.Post.DatePosted.ToString("dd MMMM yyyy")</div>
+            <div class="blog-list pinned-blog-list">
+                @foreach (var item in Model.PinnedPosts)
+                {
+                    <article class="blog-post pinned-blog-post" id="pinned-post-@item.Post.Id">
+                        <div class="blog-post-row">
+                            <div class="blog-post-main">
+                                <h3>
+                                    <a asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
+                                        @item.Post.Title
+                                    </a>
+                                </h3>
+                                <div class="post-meta">
+                                    <span class="pinned-badge">Pinned</span>
+                                    @item.Post.DatePosted.ToString("dd MMMM yyyy")
+                                </div>
+                            </div>
+                            <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
+                                <input type="hidden" name="postId" value="@item.Post.Id" />
+                                <input type="hidden" name="returnTo" value="index" />
+                                <input type="hidden" name="returnAnchor" value="pinned-post-@item.Post.Id" />
+                                <button
+                                    type="submit"
+                                    class="like-btn icon-like-btn like-btn-sm @(item.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
+                                    aria-label="@(item.IsLikedByCurrentVisitor ? "Unlike this post" : "Like this post")">
+                                    <span class="like-symbol">@Html.Raw(item.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+                                    <span class="like-count">@item.LikeCount</span>
+                                </button>
+                            </form>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="section-intro">Pinned posts will appear here once posts start getting likes.</p>
+        }
+    </div>
+
+    <h3 class="blog-subtitle">All Posts</h3>
+
+    <div class="blog-list">
+        @if (Model.Posts.Any())
+        {
+            @foreach (var item in Model.Posts)
+            {
+                <article class="blog-post" id="post-@item.Post.Id">
+                    <div class="blog-post-row">
+                        <div class="blog-post-main">
+                            <h3>
+                                <a asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
+                                    @item.Post.Title
+                                </a>
+                            </h3>
+                            <div class="post-meta">@item.Post.DatePosted.ToString("dd MMMM yyyy")</div>
+                        </div>
+                        <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
+                            <input type="hidden" name="postId" value="@item.Post.Id" />
+                            <input type="hidden" name="returnTo" value="index" />
+                            <input type="hidden" name="returnAnchor" value="post-@item.Post.Id" />
+                            <button
+                                type="submit"
+                                class="like-btn icon-like-btn like-btn-sm @(item.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
+                                aria-label="@(item.IsLikedByCurrentVisitor ? "Unlike this post" : "Like this post")">
+                                <span class="like-symbol">@Html.Raw(item.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+                                <span class="like-count">@item.LikeCount</span>
+                            </button>
+                        </form>
                     </div>
-                    <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
-                        <input type="hidden" name="postId" value="@item.Post.Id" />
-                        <input type="hidden" name="returnTo" value="index" />
-                        <input type="hidden" name="returnAnchor" value="post-@item.Post.Id" />
-                        <button
-                            type="submit"
-                            class="like-btn icon-like-btn like-btn-sm @(item.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
-                            aria-label="@(item.IsLikedByCurrentVisitor ? "Unlike this post" : "Like this post")">
-                            <span class="like-symbol">@Html.Raw(item.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
-                            <span class="like-count">@item.LikeCount</span>
-                        </button>
-                    </form>
-                </div>
-            </article>
+                </article>
+            }
+        }
+        else
+        {
+            <p>No blog posts found.</p>
         }
     </div>
 </section>
