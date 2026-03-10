@@ -22,17 +22,28 @@ var firestoreDatabaseId =
     builder.Configuration["Firestore:DatabaseId"] ??
     "(default)";
 
-if (string.IsNullOrWhiteSpace(firestoreProjectId))
+if (!string.IsNullOrWhiteSpace(firestoreProjectId))
 {
-    throw new InvalidOperationException(
-        "Firestore project id is missing. Set GOOGLE_CLOUD_PROJECT or Firestore:ProjectId.");
-}
+    try
+    {
+        var firestoreDb = new FirestoreDbBuilder
+        {
+            ProjectId = firestoreProjectId,
+            DatabaseId = firestoreDatabaseId
+        }.Build();
 
-builder.Services.AddSingleton(_ => new FirestoreDbBuilder
+        builder.Services.AddSingleton(firestoreDb);
+        Console.WriteLine($"Firestore enabled for project '{firestoreProjectId}' and database '{firestoreDatabaseId}'.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Firestore unavailable. Falling back to in-memory comments/likes for local use. {ex.Message}");
+    }
+}
+else
 {
-    ProjectId = firestoreProjectId,
-    DatabaseId = firestoreDatabaseId
-}.Build());
+    Console.WriteLine("Firestore project id not configured. Using in-memory comments/likes.");
+}
 builder.Services.AddSingleton<BlogService>();
 builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();

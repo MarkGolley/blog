@@ -9,15 +9,30 @@ public class LikeService
     private const string CommentLikesCollection = "commentLikes";
     private const string CommentsCollection = "comments";
 
-    private readonly FirestoreDb _db;
+    private static readonly object LocalStateLock = new();
+    private static readonly HashSet<string> LocalPostLikes = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> LocalCommentLikes = new(StringComparer.Ordinal);
 
-    public LikeService(FirestoreDb db)
+    private readonly FirestoreDb? _db;
+
+    public LikeService(FirestoreDb? db = null)
     {
         _db = db;
     }
 
     public async Task<(int Count, bool IsLikedByVisitor)> GetPostLikeSummaryAsync(string postId, string visitorId)
     {
+        if (_db == null)
+        {
+            lock (LocalStateLock)
+            {
+                var likeKey = BuildLocalPostLikeKey(postId, visitorId);
+                var prefix = $"{postId}::";
+                var localCount = LocalPostLikes.Count(x => x.StartsWith(prefix, StringComparison.Ordinal));
+                return (localCount, LocalPostLikes.Contains(likeKey));
+            }
+        }
+
         var likes = await _db.Collection(PostLikesCollection)
             .WhereEqualTo(nameof(FirestorePostLike.PostId), postId)
             .GetSnapshotAsync();
@@ -44,6 +59,22 @@ public class LikeService
         }
 
         var result = ids.ToDictionary(id => id, _ => (0, false), StringComparer.Ordinal);
+
+        if (_db == null)
+        {
+            lock (LocalStateLock)
+            {
+                foreach (var id in ids)
+                {
+                    var prefix = $"{id}::";
+                    var count = LocalPostLikes.Count(x => x.StartsWith(prefix, StringComparison.Ordinal));
+                    var isLikedByVisitor = LocalPostLikes.Contains(BuildLocalPostLikeKey(id, visitorId));
+                    result[id] = (count, isLikedByVisitor);
+                }
+            }
+
+            return result;
+        }
 
         foreach (var batch in Batch(ids, 30))
         {
@@ -79,6 +110,22 @@ public class LikeService
 
         var result = ids.ToDictionary(id => id, _ => (0, false));
 
+        if (_db == null)
+        {
+            lock (LocalStateLock)
+            {
+                foreach (var id in ids)
+                {
+                    var prefix = $"{id}::";
+                    var count = LocalCommentLikes.Count(x => x.StartsWith(prefix, StringComparison.Ordinal));
+                    var isLikedByVisitor = LocalCommentLikes.Contains(BuildLocalCommentLikeKey(id, visitorId));
+                    result[id] = (count, isLikedByVisitor);
+                }
+            }
+
+            return result;
+        }
+
         foreach (var batch in Batch(ids, 30))
         {
             var snapshot = await _db.Collection(CommentLikesCollection)
@@ -103,6 +150,20 @@ public class LikeService
 
     public async Task TogglePostLikeAsync(string postId, string visitorId)
     {
+        if (_db == null)
+        {
+            lock (LocalStateLock)
+            {
+                var key = BuildLocalPostLikeKey(postId, visitorId);
+                if (!LocalPostLikes.Remove(key))
+                {
+                    LocalPostLikes.Add(key);
+                }
+            }
+
+            return;
+        }
+
         var docId = BuildPostLikeDocId(postId, visitorId);
         var docRef = _db.Collection(PostLikesCollection).Document(docId);
         var snapshot = await docRef.GetSnapshotAsync();
@@ -123,6 +184,25 @@ public class LikeService
 
     public async Task<bool> ToggleCommentLikeAsync(int commentId, string postId, string visitorId)
     {
+        if (_db == null)
+        {
+            if (commentId <= 0 || string.IsNullOrWhiteSpace(postId))
+            {
+                return false;
+            }
+
+            lock (LocalStateLock)
+            {
+                var key = BuildLocalCommentLikeKey(commentId, visitorId);
+                if (!LocalCommentLikes.Remove(key))
+                {
+                    LocalCommentLikes.Add(key);
+                }
+            }
+
+            return true;
+        }
+
         var commentSnapshot = await _db.Collection(CommentsCollection)
             .Document(commentId.ToString())
             .GetSnapshotAsync();
@@ -168,6 +248,12 @@ public class LikeService
 
     private static string BuildCommentLikeDocId(int commentId, string visitorId)
         => $"{commentId}_{ToIdPart(visitorId)}";
+
+    private static string BuildLocalPostLikeKey(string postId, string visitorId)
+        => $"{postId}::{visitorId}";
+
+    private static string BuildLocalCommentLikeKey(int commentId, string visitorId)
+        => $"{commentId}::{visitorId}";
 
     private static string ToIdPart(string value)
         => Convert.ToBase64String(Encoding.UTF8.GetBytes(value))

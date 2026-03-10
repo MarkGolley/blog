@@ -9,6 +9,7 @@ namespace MyBlog.Controllers;
 public class BlogController : Controller
 {
     private const string VisitorIdCookieName = "myblog_visitor_id";
+    private const int MaxPinnedPosts = 3;
 
     private readonly BlogService _blogService;
     private readonly CommentService _commentService;
@@ -33,18 +34,32 @@ public class BlogController : Controller
         var posts = _blogService.GetAllPosts().ToList();
         var summaries = await _likeService.GetPostLikeSummariesAsync(posts.Select(x => x.Id), visitorId);
 
+        var postItems = posts.Select(post =>
+        {
+            summaries.TryGetValue(post.Id, out var summary);
+            return new BlogListItemViewModel
+            {
+                Post = post,
+                LikeCount = summary.Count,
+                IsLikedByCurrentVisitor = summary.IsLikedByVisitor
+            };
+        }).ToList();
+
+        var pinnedPosts = postItems
+            .Where(x => x.LikeCount > 0)
+            .OrderByDescending(x => x.LikeCount)
+            .ThenByDescending(x => x.Post.DatePosted)
+            .Take(MaxPinnedPosts)
+            .ToList();
+
+        var pinnedIds = pinnedPosts
+            .Select(x => x.Post.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
         var vm = new BlogIndexViewModel
         {
-            Posts = posts.Select(post =>
-            {
-                summaries.TryGetValue(post.Id, out var summary);
-                return new BlogListItemViewModel
-                {
-                    Post = post,
-                    LikeCount = summary.Count,
-                    IsLikedByCurrentVisitor = summary.IsLikedByVisitor
-                };
-            }).ToList()
+            PinnedPosts = pinnedPosts,
+            Posts = postItems.Where(x => !pinnedIds.Contains(x.Post.Id)).ToList()
         };
 
         return View(vm);
@@ -61,6 +76,7 @@ public class BlogController : Controller
     }
     
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddComment(Comment comment)
     {
         if (!ModelState.IsValid)
@@ -91,6 +107,7 @@ public class BlogController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> TogglePostLike(string postId, string? returnSlug, string? returnTo, string? returnAnchor)
     {
         if (string.IsNullOrWhiteSpace(postId))
@@ -135,6 +152,7 @@ public class BlogController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleCommentLike(int commentId, string postId, string? returnSlug, string? returnAnchor)
     {
         if (commentId <= 0 || string.IsNullOrWhiteSpace(postId))

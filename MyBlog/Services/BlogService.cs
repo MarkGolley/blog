@@ -30,7 +30,7 @@ public class BlogService
         return posts.OrderByDescending(p => p.DatePosted);
     }
 
-    public BlogPost GetPostBySlug(string? slug)
+    public BlogPost? GetPostBySlug(string? slug)
     {
         slug = Uri.UnescapeDataString(slug ?? string.Empty);
         var path = ResolvePostPath(slug);
@@ -49,7 +49,7 @@ public class BlogService
         };
     }
 
-    private string ResolvePostPath(string slug)
+    private string? ResolvePostPath(string slug)
     {
         var postsPath = Path.Combine(_env.WebRootPath, "BlogStorage");
         var expectedFileName = slug + ".html";
