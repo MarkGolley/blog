@@ -46,3 +46,37 @@ Suggested cadence:
 
 - Daily for Firestore export
 - Weekly for local zip retention cleanup, or archive to long-term storage
+
+## Subscriber Notifications
+
+Feature summary:
+
+- Users subscribe via `POST /subscribe`
+- Email confirmation via `GET /subscribe/confirm?token=...`
+- One-click unsubscribe via `GET /subscribe/unsubscribe?token=...`
+- Admin-triggered new-post notify endpoint: `POST /admin/subscribers/notify-post`
+
+Required secrets:
+
+- `ICLOUD_EMAIL`
+- `ICLOUD_APP_PASSWORD`
+- `SUBSCRIBER_NOTIFY_KEY` (or `Subscriptions:NotifyAdminKey` in config)
+
+Trigger a new-post email blast:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://your-domain/admin/subscribers/notify-post" `
+  -Headers @{ "X-Admin-Key" = "your-notify-key" } `
+  -Body @{ "PostSlug" = "your_post_slug" }
+```
+
+Script helper:
+
+```powershell
+$env:SUBSCRIBER_NOTIFY_KEY = "your-notify-key"
+.\Deployment\notify-subscribers.ps1 `
+  -BaseUrl "https://your-domain" `
+  -PostSlug "your_post_slug"
+```

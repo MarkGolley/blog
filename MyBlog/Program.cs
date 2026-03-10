@@ -65,6 +65,8 @@ else
 builder.Services.AddSingleton<BlogService>();
 builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();
+builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddScoped<SubscriptionEmailService>();
 
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddRateLimiter(options =>
@@ -123,6 +125,18 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(10),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("subscriptionWrites", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
                 Window = TimeSpan.FromMinutes(10),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,

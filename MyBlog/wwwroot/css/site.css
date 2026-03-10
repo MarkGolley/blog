@@ -533,6 +533,57 @@ tbody tr:hover {
     background: rgba(32, 74, 103, 0.03);
 }
 
+.subscribe-card {
+    margin-top: 1.1rem;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(30, 111, 103, 0.22);
+    background: linear-gradient(130deg, rgba(30, 111, 103, 0.08), rgba(215, 165, 82, 0.1));
+}
+
+.subscribe-card h3 {
+    margin-bottom: 0.4rem;
+}
+
+.subscribe-form {
+    margin-top: 0.4rem;
+}
+
+.subscribe-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.subscribe-row input {
+    flex: 1 1 260px;
+    min-height: 2.45rem;
+    border: 1px solid rgba(29, 35, 44, 0.18);
+    border-radius: 10px;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.95rem;
+    background: #ffffff;
+    color: var(--ink);
+}
+
+.subscribe-row button {
+    border: 1px solid rgba(29, 35, 44, 0.14);
+    border-radius: 10px;
+    min-height: 2.45rem;
+    padding: 0.45rem 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: #ffffff;
+    background: linear-gradient(90deg, rgba(30, 111, 103, 0.95), rgba(32, 74, 103, 0.95));
+}
+
+.subscribe-feedback {
+    margin: 0.35rem 0 0.65rem;
+    color: var(--accent-3);
+    font-weight: 700;
+}
+
 /* Post content */
 .post-content {
     margin-top: 0.75rem;
@@ -791,6 +842,16 @@ tbody tr:hover {
     margin: 0.4rem 0 0;
 }
 
+.subscription-status-success {
+    color: var(--accent-3);
+    font-weight: 700;
+}
+
+.subscription-status-error {
+    color: #b00020;
+    font-weight: 700;
+}
+
 /* About page layout */
 .about-content {
     display: flex;
@@ -865,5 +926,9 @@ footer {
 
     .blog-post-row {
         align-items: flex-start;
+    }
+
+    .subscribe-row button {
+        width: 100%;
     }
 }
