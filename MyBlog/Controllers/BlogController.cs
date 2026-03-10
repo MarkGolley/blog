@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MailKit.Net.Smtp;
 using MimeKit;
+using System.Text.RegularExpressions;
 using MyBlog.Models;
 using MyBlog.Services;
 
@@ -11,6 +12,8 @@ public class BlogController : Controller
 {
     private const string VisitorIdCookieName = "myblog_visitor_id";
     private const int MaxPinnedPosts = 3;
+    private const int MaxRelatedPosts = 3;
+    private static readonly Regex RelatedTokenRegex = new(@"[A-Za-z0-9#\+\.]+", RegexOptions.Compiled);
 
     private readonly BlogService _blogService;
     private readonly CommentService _commentService;
@@ -29,13 +32,21 @@ public class BlogController : Controller
         _logger = logger;
     }
     
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? q, string? tag)
     {
         var visitorId = GetOrCreateVisitorId();
-        var posts = _blogService.GetAllPosts().ToList();
-        var summaries = await _likeService.GetPostLikeSummariesAsync(posts.Select(x => x.Id), visitorId);
+        var allPosts = _blogService.GetAllPosts().ToList();
+        var searchQuery = q?.Trim() ?? string.Empty;
+        var selectedTag = tag?.Trim() ?? string.Empty;
 
-        var postItems = posts.Select(post =>
+        var filteredPosts = allPosts
+            .Where(post => MatchesSearch(post, searchQuery))
+            .Where(post => MatchesTag(post, selectedTag))
+            .ToList();
+
+        var summaries = await _likeService.GetPostLikeSummariesAsync(filteredPosts.Select(x => x.Id), visitorId);
+
+        var postItems = filteredPosts.Select(post =>
         {
             summaries.TryGetValue(post.Id, out var summary);
             return new BlogListItemViewModel
@@ -60,7 +71,16 @@ public class BlogController : Controller
         var vm = new BlogIndexViewModel
         {
             PinnedPosts = pinnedPosts,
-            Posts = postItems.Where(x => !pinnedIds.Contains(x.Post.Id)).ToList()
+            Posts = postItems.Where(x => !pinnedIds.Contains(x.Post.Id)).ToList(),
+            AvailableTags = allPosts
+                .SelectMany(post => post.Tags)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            SearchQuery = searchQuery,
+            SelectedTag = selectedTag,
+            TotalPostCount = allPosts.Count,
+            FilteredPostCount = filteredPosts.Count
         };
 
         return View(vm);
@@ -205,14 +225,74 @@ public class BlogController : Controller
         ApplyLikeSummaries(comments, commentLikeSummaries);
 
         var postLikeSummary = await _likeService.GetPostLikeSummaryAsync(post.Id, visitorId);
+        var relatedPosts = _blogService.GetAllPosts()
+            .Where(candidate => !string.Equals(candidate.Id, post.Id, StringComparison.Ordinal))
+            .Select(candidate => new
+            {
+                Post = candidate,
+                Score = CalculateRelatedScore(post, candidate)
+            })
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score)
+            .ThenByDescending(x => x.Post.DatePosted)
+            .Take(MaxRelatedPosts)
+            .Select(x => x.Post)
+            .ToList();
 
         return new BlogPostViewModel
         {
             Post = post,
             Comments = comments,
+            RelatedPosts = relatedPosts,
             PostLikeCount = postLikeSummary.Count,
             IsPostLikedByCurrentVisitor = postLikeSummary.IsLikedByVisitor
         };
+    }
+
+    private static bool MatchesSearch(BlogPost post, string searchQuery)
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            return true;
+        }
+
+        return post.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
+               || post.Content.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
+               || post.Tags.Any(tag => tag.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool MatchesTag(BlogPost post, string selectedTag)
+    {
+        if (string.IsNullOrWhiteSpace(selectedTag))
+        {
+            return true;
+        }
+
+        return post.Tags.Any(tag => string.Equals(tag, selectedTag, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static int CalculateRelatedScore(BlogPost source, BlogPost candidate)
+    {
+        var commonTags = source.Tags
+            .Intersect(candidate.Tags, StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        var sourceTitleTokens = TokenizeForRelated(source.Title);
+        var candidateTitleTokens = TokenizeForRelated(candidate.Title);
+        var commonTitleTokens = sourceTitleTokens
+            .Intersect(candidateTitleTokens, StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        return (commonTags * 10) + commonTitleTokens;
+    }
+
+    private static HashSet<string> TokenizeForRelated(string value)
+    {
+        return RelatedTokenRegex
+            .Matches(value)
+            .Select(match => match.Value)
+            .Where(token => token.Length > 2)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static List<int> FlattenCommentIds(IEnumerable<CommentThreadViewModel> comments)

@@ -383,6 +383,52 @@ tbody tr:hover {
     gap: 0.9rem;
 }
 
+.blog-filter-form {
+    margin-bottom: 0.8rem;
+}
+
+.blog-filter-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.blog-filter-row input,
+.blog-filter-row select {
+    flex: 1 1 220px;
+    min-height: 2.45rem;
+    border: 1px solid rgba(29, 35, 44, 0.18);
+    border-radius: 10px;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.95rem;
+    background: #ffffff;
+    color: var(--ink);
+}
+
+.blog-filter-row button {
+    border: 1px solid rgba(29, 35, 44, 0.14);
+    border-radius: 10px;
+    min-height: 2.45rem;
+    padding: 0.45rem 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: #ffffff;
+    background: linear-gradient(90deg, rgba(30, 111, 103, 0.95), rgba(32, 74, 103, 0.95));
+}
+
+.blog-filter-reset {
+    border: none;
+    font-weight: 700;
+    color: var(--accent-3);
+}
+
+.blog-results-summary {
+    margin-bottom: 0.85rem;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+}
+
 .pinned-posts-block {
     margin-bottom: 1.2rem;
     padding: 0.95rem;
@@ -433,6 +479,10 @@ tbody tr:hover {
     font-size: 0.85rem;
 }
 
+.meta-dot {
+    margin: 0 0.4rem;
+}
+
 .pinned-badge {
     display: inline-block;
     margin-right: 0.45rem;
@@ -444,6 +494,43 @@ tbody tr:hover {
     text-transform: uppercase;
     color: #ffffff;
     background: linear-gradient(90deg, rgba(30, 111, 103, 0.9), rgba(32, 74, 103, 0.9));
+}
+
+.tag-list {
+    margin-top: 0.45rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.tag-list-inline {
+    margin-top: 0.55rem;
+    margin-bottom: 0.35rem;
+}
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.16rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(32, 74, 103, 0.2);
+    background: rgba(32, 74, 103, 0.08);
+    color: var(--accent-3);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.tag-chip-link {
+    border-bottom: none;
+}
+
+.tag-chip-link:hover {
+    border-bottom: none;
+    background: rgba(30, 111, 103, 0.16);
+}
+
+.related-posts-list .blog-post {
+    background: rgba(32, 74, 103, 0.03);
 }
 
 /* Post content */

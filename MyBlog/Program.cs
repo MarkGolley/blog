@@ -199,3 +199,5 @@ static string GetRateLimitPartitionKey(HttpContext context)
 
     return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }
+
+public partial class Program;
