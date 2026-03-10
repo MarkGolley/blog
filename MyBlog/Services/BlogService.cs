@@ -66,8 +66,14 @@ public class BlogService
 
     public BlogPost? GetPostBySlug(string? slug)
     {
-        slug = Uri.UnescapeDataString(slug ?? string.Empty);
-        var path = ResolvePostPath(slug);
+        var decodedSlug = Uri.UnescapeDataString(slug ?? string.Empty);
+        var normalizedSlug = NormalizeSlug(decodedSlug);
+        if (normalizedSlug == null)
+        {
+            return null;
+        }
+
+        var path = ResolvePostPath(normalizedSlug);
         if (path == null) return null;
 
         var content = File.ReadAllText(path);
@@ -89,11 +95,12 @@ public class BlogService
     private string? ResolvePostPath(string slug)
     {
         var postsPath = Path.Combine(_env.WebRootPath, "BlogStorage");
-        var expectedFileName = slug + ".html";
-        var exactPath = Path.Combine(postsPath, expectedFileName);
+        if (!Directory.Exists(postsPath))
+        {
+            return null;
+        }
 
-        if (File.Exists(exactPath))
-            return exactPath;
+        var expectedFileName = slug + ".html";
 
         return Directory
             .EnumerateFiles(postsPath, "*.html")
@@ -102,6 +109,36 @@ public class BlogService
                     Path.GetFileName(file),
                     expectedFileName,
                     StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? NormalizeSlug(string rawSlug)
+    {
+        if (string.IsNullOrWhiteSpace(rawSlug))
+        {
+            return null;
+        }
+
+        var slug = rawSlug.Trim();
+        if (slug.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+        {
+            slug = slug[..^5];
+        }
+
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            return null;
+        }
+
+        if (slug.Contains("..", StringComparison.Ordinal) ||
+            slug.Contains('/') ||
+            slug.Contains('\\'))
+        {
+            return null;
+        }
+
+        return slug.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+            ? null
+            : slug;
     }
 
 

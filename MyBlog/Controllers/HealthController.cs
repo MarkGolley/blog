@@ -8,11 +8,16 @@ public class HealthController : Controller
 {
     private readonly IWebHostEnvironment _env;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<HealthController> _logger;
 
-    public HealthController(IWebHostEnvironment env, IServiceProvider serviceProvider)
+    public HealthController(
+        IWebHostEnvironment env,
+        IServiceProvider serviceProvider,
+        ILogger<HealthController> logger)
     {
         _env = env;
         _serviceProvider = serviceProvider;
+        _logger = logger;
     }
 
     [HttpGet("/health")]
@@ -68,10 +73,10 @@ public class HealthController : Controller
             catch (Exception ex)
             {
                 isHealthy = false;
+                _logger.LogError(ex, "Firestore health check failed.");
                 checks["firestore"] = new
                 {
-                    status = "error",
-                    error = ex.Message
+                    status = "error"
                 };
             }
         }

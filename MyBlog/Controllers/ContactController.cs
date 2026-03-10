@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using MyBlog.Services;
 using MyBlog.Models;
 using MailKit.Net.Smtp;
+using MailKit.Security;
 using MimeKit;
-using System;
 using Microsoft.Extensions.Logging;
 
 namespace MyBlog.Controllers;
@@ -40,9 +39,10 @@ public class ContactController(ILogger<ContactController> logger) : Controller
             
             // Build email
             var emailMessage = new MimeMessage();
-            emailMessage.From.Add(new MailboxAddress(model.Name, model.Email));
+            emailMessage.From.Add(new MailboxAddress("MyBlog Contact Form", emailAddress));
+            emailMessage.ReplyTo.Add(new MailboxAddress(model.Name, model.Email));
             emailMessage.To.Add(new MailboxAddress("Mark Golley", emailAddress));
-            emailMessage.Subject = "New Contact Form Message from Your Blog";
+            emailMessage.Subject = $"New Contact Form Message from {model.Name}";
             emailMessage.Body = new TextPart("plain")
             {
                 Text = $"Name: {model.Name}\nEmail: {model.Email}\n\nMessage:\n{model.Message}"
@@ -50,7 +50,7 @@ public class ContactController(ILogger<ContactController> logger) : Controller
 
             using (var client = new SmtpClient())
             {
-                client.Connect("smtp.mail.me.com", 587, false);
+                client.Connect("smtp.mail.me.com", 587, SecureSocketOptions.StartTls);
                 client.Authenticate(emailAddress, emailPassword);
                 client.Send(emailMessage);
                 client.Disconnect(true);
