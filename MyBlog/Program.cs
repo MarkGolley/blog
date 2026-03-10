@@ -1,4 +1,6 @@
 using Google.Cloud.Firestore;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using MyBlog.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ----------------------------
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 // ----------------------------
 // Services
@@ -49,14 +52,103 @@ builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();
 
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var request = context.HttpContext.Request;
+        var isAjaxRequest = string.Equals(
+            request.Headers["X-Requested-With"],
+            "XMLHttpRequest",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (isAjaxRequest)
+        {
+            context.HttpContext.Response.ContentType = "application/json";
+            await context.HttpContext.Response.WriteAsync(
+                "{\"success\":false,\"error\":\"Too many requests. Please try again shortly.\"}",
+                cancellationToken);
+            return;
+        }
+
+        context.HttpContext.Response.ContentType = "text/plain";
+        await context.HttpContext.Response.WriteAsync(
+            "Too many requests. Please try again shortly.",
+            cancellationToken);
+    };
+
+    options.AddPolicy("commentWrites", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 6,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("likeWrites", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 50,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("contactWrites", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(10),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 
 var app = builder.Build();
 
 // ----------------------------
 // Middleware
 // ----------------------------
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+}
+
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        var headers = context.Response.Headers;
+        headers.TryAdd("X-Content-Type-Options", "nosniff");
+        headers.TryAdd("X-Frame-Options", "DENY");
+        headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
+        headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+        headers.TryAdd("X-Permitted-Cross-Domain-Policies", "none");
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
+
 app.UseStaticFiles();
 app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 // ----------------------------
@@ -76,6 +168,19 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.UseDeveloperExceptionPage();
-
 app.Run();
+
+static string GetRateLimitPartitionKey(HttpContext context)
+{
+    var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+    if (!string.IsNullOrWhiteSpace(forwardedFor))
+    {
+        var firstForwarded = forwardedFor.Split(',')[0].Trim();
+        if (!string.IsNullOrWhiteSpace(firstForwarded))
+        {
+            return firstForwarded;
+        }
+    }
+
+    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}

@@ -2,6 +2,9 @@
 
 @{
     ViewData["Title"] = Model.Post.Title;
+    ViewData["MetaDescription"] = $"Read \"{Model.Post.Title}\" on MyBlog.";
+    ViewData["CanonicalPath"] = $"/blog/{Uri.EscapeDataString(Model.Post.Id)}";
+    ViewData["OgType"] = "article";
 }
 
 <section aria-labelledby="post-title">
@@ -53,6 +56,10 @@
     <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form">
         <input type="hidden" name="PostId" value="@Model.Post.Id" />
         <input type="hidden" name="ParentCommentId" value="" />
+        <div class="honeypot-field" aria-hidden="true">
+            <label for="website-root">Website</label>
+            <input type="text" id="website-root" name="Website" tabindex="-1" autocomplete="off" />
+        </div>
 
         <label for="author-root">Name</label>
         <input type="text" id="author-root" name="Author" placeholder="Your name" required />
