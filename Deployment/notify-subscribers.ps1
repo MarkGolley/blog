@@ -14,6 +14,21 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Windows PowerShell (Desktop) can default to older TLS settings.
+if ($PSVersionTable.PSEdition -eq "Desktop") {
+    try {
+        $securityProtocol = [Net.SecurityProtocolType]::Tls12
+        if ([Enum]::GetNames([Net.SecurityProtocolType]) -contains "Tls13") {
+            $securityProtocol = $securityProtocol -bor [Net.SecurityProtocolType]::Tls13
+        }
+
+        [Net.ServicePointManager]::SecurityProtocol = $securityProtocol
+    }
+    catch {
+        # Keep default protocol set if TLS override is unavailable.
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($BlogStoragePath)) {
     $scriptDir = Split-Path -Parent $PSCommandPath
     $repoRoot = (Resolve-Path (Join-Path $scriptDir "..")).Path
@@ -95,12 +110,34 @@ Write-Host "Triggering subscriber notification..."
 Write-Host "PostSlug: $PostSlug"
 Write-Host "Endpoint: $endpoint"
 
-$response = Invoke-RestMethod `
-    -Method Post `5
-    -Uri $endpoint `
-    -Headers $headers `
-    -Body $body `
-    -TimeoutSec $TimeoutSeconds
+$maxAttempts = 3
+$response = $null
+
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    try {
+        $response = Invoke-RestMethod `
+            -Method Post `
+            -Uri $endpoint `
+            -Headers $headers `
+            -Body $body `
+            -TimeoutSec $TimeoutSeconds
+        break
+    }
+    catch {
+        if ($attempt -lt $maxAttempts) {
+            Write-Warning "Notify request failed (attempt $attempt of $maxAttempts): $($_.Exception.Message). Retrying..."
+            Start-Sleep -Seconds 2
+            continue
+        }
+
+        $details = $_.Exception.Message
+        if ($_.Exception.InnerException) {
+            $details = "$details | Inner: $($_.Exception.InnerException.Message)"
+        }
+
+        throw "Unable to reach notify endpoint '$endpoint'. $details"
+    }
+}
 
 Write-Host ""
 Write-Host "Completed."

@@ -61,7 +61,7 @@ Required secrets:
 - `ICLOUD_EMAIL`
 - `ICLOUD_APP_PASSWORD`
 - `SUBSCRIBER_NOTIFY_KEY` (or `Subscriptions:NotifyAdminKey` in config)
-- `PUBLIC_BASE_URL` (or `Site:PublicBaseUrl`, for example `https://markgolley.dev`) so email links use your domain
+- `PUBLIC_BASE_URL` (or `Site:PublicBaseUrl`, for example `https://markgolley.dev`) so email links use your domain root (no `/blog` suffix)
 
 Trigger a new-post email blast:
 

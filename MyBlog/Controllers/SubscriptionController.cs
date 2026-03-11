@@ -271,7 +271,8 @@ public class SubscriptionController : Controller
 
     private string BuildAbsoluteUrl(string pathOrUrl)
     {
-        if (Uri.TryCreate(pathOrUrl, UriKind.Absolute, out var absoluteUri))
+        if (Uri.TryCreate(pathOrUrl, UriKind.Absolute, out var absoluteUri) &&
+            IsHttpUri(absoluteUri))
         {
             return absoluteUri.ToString();
         }
@@ -291,12 +292,48 @@ public class SubscriptionController : Controller
         if (!string.IsNullOrWhiteSpace(configuredBaseUrl))
         {
             var trimmedConfiguredUrl = configuredBaseUrl.Trim().TrimEnd('/');
-            if (Uri.TryCreate(trimmedConfiguredUrl, UriKind.Absolute, out _))
+            if (Uri.TryCreate(trimmedConfiguredUrl, UriKind.Absolute, out var configuredUri) &&
+                IsHttpUri(configuredUri))
             {
                 return trimmedConfiguredUrl;
             }
         }
 
-        return $"{Request.Scheme}://{Request.Host}".TrimEnd('/');
+        var forwardedProto = Request.Headers["X-Forwarded-Proto"].FirstOrDefault()
+            ?.Split(',')[0]
+            .Trim();
+        var forwardedHost = Request.Headers["X-Forwarded-Host"].FirstOrDefault()
+            ?.Split(',')[0]
+            .Trim();
+
+        var scheme = string.Equals(forwardedProto, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(forwardedProto, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            ? forwardedProto!
+            : Request.Scheme;
+
+        if (!string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+        {
+            scheme = Uri.UriSchemeHttps;
+        }
+
+        var host = !string.IsNullOrWhiteSpace(forwardedHost)
+            ? forwardedHost
+            : Request.Host.Value;
+
+        if (!string.IsNullOrWhiteSpace(host))
+        {
+            return $"{scheme}://{host}".TrimEnd('/');
+        }
+
+        // Last-resort fallback for environments where request host/scheme cannot be inferred.
+        return "https://markgolley.dev";
+    }
+
+    private static bool IsHttpUri(Uri uri)
+    {
+        return uri.IsAbsoluteUri &&
+               (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase));
     }
 }
