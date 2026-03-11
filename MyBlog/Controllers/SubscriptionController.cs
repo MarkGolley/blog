@@ -68,17 +68,17 @@ public class SubscriptionController : Controller
                 return Redirect(returnPath);
             }
 
-            var confirmationUrl = Url.ActionLink(
+            var confirmationPath = Url.Action(
                 action: nameof(Confirm),
                 controller: "Subscription",
-                values: new { token = result.ConfirmationToken },
-                protocol: Request.Scheme) ?? string.Empty;
-
-            var unsubscribeUrl = Url.ActionLink(
+                values: new { token = result.ConfirmationToken }) ?? "/subscribe/confirm";
+            var unsubscribePath = Url.Action(
                 action: nameof(Unsubscribe),
                 controller: "Subscription",
-                values: new { token = result.UnsubscribeToken },
-                protocol: Request.Scheme) ?? string.Empty;
+                values: new { token = result.UnsubscribeToken }) ?? "/subscribe/unsubscribe";
+
+            var confirmationUrl = BuildAbsoluteUrl(confirmationPath);
+            var unsubscribeUrl = BuildAbsoluteUrl(unsubscribePath);
 
             var emailSent = await _subscriptionEmailService.SendConfirmationEmailAsync(
                 result.Email,
@@ -190,8 +190,9 @@ public class SubscriptionController : Controller
             return NotFound(new { success = false, error = "Post not found." });
         }
 
-        var postUrl = Url.RouteUrl("blogPost", new { slug = post.Id }, Request.Scheme)
-                     ?? $"{Request.Scheme}://{Request.Host}/blog/{Uri.EscapeDataString(post.Id)}";
+        var postPath = Url.RouteUrl("blogPost", new { slug = post.Id })
+                       ?? $"/blog/{Uri.EscapeDataString(post.Id)}";
+        var postUrl = BuildAbsoluteUrl(postPath);
 
         var subscribers = await _subscriptionService.GetConfirmedSubscribersAsync();
 
@@ -207,11 +208,11 @@ public class SubscriptionController : Controller
                 continue;
             }
 
-            var unsubscribeUrl = Url.ActionLink(
+            var unsubscribePath = Url.Action(
                 action: nameof(Unsubscribe),
                 controller: "Subscription",
-                values: new { token = subscriber.UnsubscribeToken },
-                protocol: Request.Scheme) ?? string.Empty;
+                values: new { token = subscriber.UnsubscribeToken }) ?? "/subscribe/unsubscribe";
+            var unsubscribeUrl = BuildAbsoluteUrl(unsubscribePath);
 
             var emailSent = await _subscriptionEmailService.SendNewPostNotificationAsync(
                 subscriber.Email,
@@ -266,5 +267,73 @@ public class SubscriptionController : Controller
         var expectedBytes = Encoding.UTF8.GetBytes(expected);
         var providedBytes = Encoding.UTF8.GetBytes(provided);
         return CryptographicOperations.FixedTimeEquals(expectedBytes, providedBytes);
+    }
+
+    private string BuildAbsoluteUrl(string pathOrUrl)
+    {
+        if (Uri.TryCreate(pathOrUrl, UriKind.Absolute, out var absoluteUri) &&
+            IsHttpUri(absoluteUri))
+        {
+            return absoluteUri.ToString();
+        }
+
+        var relativePath = pathOrUrl.StartsWith("/", StringComparison.Ordinal)
+            ? pathOrUrl
+            : "/" + pathOrUrl;
+
+        return $"{GetPublicBaseUrl()}{relativePath}";
+    }
+
+    private string GetPublicBaseUrl()
+    {
+        var configuredBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL")
+                                ?? _configuration["Site:PublicBaseUrl"];
+
+        if (!string.IsNullOrWhiteSpace(configuredBaseUrl))
+        {
+            var trimmedConfiguredUrl = configuredBaseUrl.Trim().TrimEnd('/');
+            if (Uri.TryCreate(trimmedConfiguredUrl, UriKind.Absolute, out var configuredUri) &&
+                IsHttpUri(configuredUri))
+            {
+                return trimmedConfiguredUrl;
+            }
+        }
+
+        var forwardedProto = Request.Headers["X-Forwarded-Proto"].FirstOrDefault()
+            ?.Split(',')[0]
+            .Trim();
+        var forwardedHost = Request.Headers["X-Forwarded-Host"].FirstOrDefault()
+            ?.Split(',')[0]
+            .Trim();
+
+        var scheme = string.Equals(forwardedProto, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(forwardedProto, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            ? forwardedProto!
+            : Request.Scheme;
+
+        if (!string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+        {
+            scheme = Uri.UriSchemeHttps;
+        }
+
+        var host = !string.IsNullOrWhiteSpace(forwardedHost)
+            ? forwardedHost
+            : Request.Host.Value;
+
+        if (!string.IsNullOrWhiteSpace(host))
+        {
+            return $"{scheme}://{host}".TrimEnd('/');
+        }
+
+        // Last-resort fallback for environments where request host/scheme cannot be inferred.
+        return "https://markgolley.dev";
+    }
+
+    private static bool IsHttpUri(Uri uri)
+    {
+        return uri.IsAbsoluteUri &&
+               (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase));
     }
 }

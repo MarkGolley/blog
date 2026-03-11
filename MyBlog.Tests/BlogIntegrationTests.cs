@@ -188,6 +188,9 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
             AllowAutoRedirect = false
         });
 
+        var effectiveAdminKey = Environment.GetEnvironmentVariable("SUBSCRIBER_NOTIFY_KEY")
+                                ?? "integration-notify-key";
+
         using var unauthorized = await client.PostAsync("/admin/subscribers/notify-post", new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["PostSlug"] = postId
@@ -201,7 +204,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
                 ["PostSlug"] = postId
             })
         };
-        authorizedRequest.Headers.Add("X-Admin-Key", "integration-notify-key");
+        authorizedRequest.Headers.Add("X-Admin-Key", effectiveAdminKey);
 
         using var authorized = await client.SendAsync(authorizedRequest);
         Assert.Equal(HttpStatusCode.OK, authorized.StatusCode);
