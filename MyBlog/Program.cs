@@ -16,6 +16,12 @@ builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 // Services
 // ----------------------------
 builder.Services.AddControllersWithViews();
+builder.Services.AddAuthentication("CookieAuth")
+    .AddCookie("CookieAuth", options =>
+    {
+        options.LoginPath = "/Admin/Login";
+        options.AccessDeniedPath = "/Admin/AccessDenied";
+    });
 
 var firestoreProjectId =
     Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT") ??
@@ -67,6 +73,7 @@ builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SubscriptionEmailService>();
+builder.Services.AddHttpClient<AIModerationService>();
 
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddRateLimiter(options =>
@@ -177,8 +184,9 @@ app.Use(async (context, next) =>
 
 app.UseStaticFiles();
 app.UseRouting();
-app.UseRateLimiter();
+app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // ----------------------------
 // Routes

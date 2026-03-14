@@ -916,6 +916,11 @@ thead th {
     padding: 0.75rem 0.85rem;
 }
 
+.comment-item.unapproved {
+    opacity: 0.6;
+    background-color: #f0f0f0;
+}
+
 .comment-item-head {
     display: flex;
     align-items: flex-start;
@@ -941,6 +946,35 @@ thead th {
     padding: 0.4rem 0.75rem;
     font-weight: 700;
     cursor: pointer;
+}
+
+.admin-actions {
+    margin-top: 10px;
+}
+
+.btn-approve, .btn-delete {
+    padding: 5px 10px;
+    margin-right: 5px;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-approve {
+    background-color: var(--ok);
+    color: white;
+}
+
+.btn-delete {
+    background-color: var(--danger);
+    color: white;
+}
+
+/* Moderation notice */
+.moderation-notice {
+    font-style: italic;
+    font-size: 0.9em;
+    color: var(--ink-soft);
+    margin-top: 5px;
 }
 
 .thread-toggle summary,

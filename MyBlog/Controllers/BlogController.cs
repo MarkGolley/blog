@@ -219,7 +219,8 @@ public class BlogController : Controller
     private async Task<BlogPostViewModel> BuildPostViewModelAsync(BlogPost post)
     {
         var visitorId = GetOrCreateVisitorId();
-        var comments = await _commentService.GetCommentsAsync(post.Id);
+        var isAdmin = User.IsInRole("Admin");
+        var comments = await _commentService.GetCommentsAsync(post.Id, isAdmin);
         var commentIds = FlattenCommentIds(comments);
         var commentLikeSummaries = await _likeService.GetCommentLikeSummariesAsync(commentIds, visitorId);
         ApplyLikeSummaries(comments, commentLikeSummaries);

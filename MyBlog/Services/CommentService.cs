@@ -17,10 +17,12 @@ public class CommentService
     private static int _nextLocalCommentId = 1;
 
     private readonly FirestoreDb? _db;
+    private readonly AIModerationService _aiModerationService;
 
-    public CommentService(FirestoreDb? db = null)
+    public CommentService(FirestoreDb? db = null, AIModerationService? aiModerationService = null)
     {
         _db = db;
+        _aiModerationService = aiModerationService ?? new AIModerationService(new HttpClient()); // Fallback for in-memory
     }
 
     public async Task AddCommentAsync(Comment comment)
@@ -58,40 +60,30 @@ public class CommentService
 
         comment.PostedAt = DateTime.UtcNow;
 
-        var countersRef = _db.Collection(MetaCollection).Document(CountersDocument);
-        var assignedId = await _db.RunTransactionAsync(async transaction =>
+        // AI moderation: check if content is safe
+        comment.IsApproved = await (_aiModerationService?.IsCommentSafeAsync(comment.Content) ?? Task.FromResult(true));
+
+        var doc = new FirestoreComment
         {
-            var countersSnapshot = await transaction.GetSnapshotAsync(countersRef);
-            var nextId = countersSnapshot.Exists &&
-                         countersSnapshot.TryGetValue<long>(NextCommentIdField, out var current)
-                ? (int)current
-                : 1;
+            Id = nextId,
+            Author = comment.Author,
+            Content = comment.Content,
+            PostedAt = comment.PostedAt,
+            PostId = comment.PostId,
+            ParentCommentId = comment.ParentCommentId,
+            IsApproved = comment.IsApproved
+        };
 
-            var commentRef = commentsCollection.Document(nextId.ToString());
+        transaction.Create(commentRef, doc);
+        transaction.Set(countersRef, new Dictionary<string, object>
+        {
+            [NextCommentIdField] = nextId + 1
+        }, SetOptions.MergeAll);
 
-            var doc = new FirestoreComment
-            {
-                Id = nextId,
-                Author = comment.Author,
-                Content = comment.Content,
-                PostedAt = comment.PostedAt,
-                PostId = comment.PostId,
-                ParentCommentId = comment.ParentCommentId
-            };
-
-            transaction.Create(commentRef, doc);
-            transaction.Set(countersRef, new Dictionary<string, object>
-            {
-                [NextCommentIdField] = nextId + 1
-            }, SetOptions.MergeAll);
-
-            return nextId;
-        });
-
-        comment.Id = assignedId;
+        return nextId;
     }
 
-    public async Task<List<CommentThreadViewModel>> GetCommentsAsync(string postId)
+    public async Task<List<CommentThreadViewModel>> GetCommentsAsync(string postId, bool includeUnapproved = false)
     {
         if (string.IsNullOrWhiteSpace(postId))
             return new List<CommentThreadViewModel>();
@@ -103,6 +95,7 @@ public class CommentService
             {
                 localComments = LocalComments
                     .Where(c => string.Equals(c.PostId, postId, StringComparison.Ordinal))
+                    .Where(c => includeUnapproved || c.IsApproved)
                     .OrderBy(c => c.PostedAt)
                     .Select(CloneComment)
                     .ToList();
@@ -120,13 +113,20 @@ public class CommentService
             return BuildCommentThreads(localRootComments, localChildrenByParent, new HashSet<int>(), 1);
         }
 
-        var snapshot = await _db.Collection(CommentsCollection)
-            .WhereEqualTo(nameof(FirestoreComment.PostId), postId)
-            .GetSnapshotAsync();
+        var query = _db.Collection(CommentsCollection)
+            .WhereEqualTo(nameof(FirestoreComment.PostId), postId);
+
+        if (!includeUnapproved)
+        {
+            query = query.WhereEqualTo(nameof(FirestoreComment.IsApproved), true);
+        }
+
+        var snapshot = await query.GetSnapshotAsync();
 
         var comments = snapshot.Documents
             .Select(d => d.ConvertTo<FirestoreComment>())
             .Select(MapToComment)
+            .Where(c => includeUnapproved || c.IsApproved)
             .OrderBy(c => c.PostedAt)
             .ToList();
 
@@ -140,6 +140,69 @@ public class CommentService
             .ToDictionary(g => g.Key, g => g.ToList());
 
         return BuildCommentThreads(rootComments, childrenByParent, new HashSet<int>(), 1);
+    }
+
+    public async Task<bool> ApproveCommentAsync(int commentId)
+    {
+        if (_db == null)
+        {
+            return ApproveCommentInMemory(commentId);
+        }
+
+        var commentRef = _db.Collection(CommentsCollection).Document(commentId.ToString());
+        var snapshot = await commentRef.GetSnapshotAsync();
+        if (!snapshot.Exists)
+        {
+            return false;
+        }
+
+        await commentRef.UpdateAsync(new Dictionary<string, object> { { nameof(FirestoreComment.IsApproved), true } });
+        return true;
+    }
+
+    public async Task<bool> DeleteCommentAsync(int commentId)
+    {
+        var idsToDelete = await GetCommentThreadIdsAsync(commentId);
+        if (idsToDelete.Count == 0)
+        {
+            return false;
+        }
+
+        if (_db == null)
+        {
+            return DeleteCommentsInMemory(idsToDelete);
+        }
+
+        var batch = _db.StartBatch();
+        foreach (var id in idsToDelete)
+        {
+            var commentRef = _db.Collection(CommentsCollection).Document(id.ToString());
+            batch.Delete(commentRef);
+        }
+
+        await batch.CommitAsync();
+        return true;
+    }
+
+    public async Task<List<Comment>> GetPendingCommentsAsync()
+    {
+        if (_db == null)
+        {
+            lock (LocalStateLock)
+            {
+                return LocalComments.Where(c => !c.IsApproved).OrderByDescending(c => c.PostedAt).ToList();
+            }
+        }
+
+        var snapshot = await _db.Collection(CommentsCollection)
+            .WhereEqualTo(nameof(FirestoreComment.IsApproved), false)
+            .GetSnapshotAsync();
+
+        return snapshot.Documents
+            .Select(d => d.ConvertTo<FirestoreComment>())
+            .Select(MapToComment)
+            .OrderByDescending(c => c.PostedAt)
+            .ToList();
     }
 
     private static void AddCommentInMemory(Comment comment)
@@ -168,6 +231,7 @@ public class CommentService
             }
 
             comment.PostedAt = DateTime.UtcNow;
+            comment.IsApproved = await (_aiModerationService?.IsCommentSafeAsync(comment.Content) ?? Task.FromResult(true));
             comment.Id = _nextLocalCommentId++;
 
             LocalComments.Add(CloneComment(comment));
@@ -181,7 +245,8 @@ public class CommentService
         Content = source.Content,
         PostedAt = source.PostedAt,
         PostId = source.PostId,
-        ParentCommentId = source.ParentCommentId
+        ParentCommentId = source.ParentCommentId,
+        IsApproved = source.IsApproved
     };
 
     private static Comment MapToComment(FirestoreComment doc) => new()
@@ -191,7 +256,8 @@ public class CommentService
         Content = doc.Content,
         PostedAt = doc.PostedAt,
         PostId = doc.PostId,
-        ParentCommentId = doc.ParentCommentId
+        ParentCommentId = doc.ParentCommentId,
+        IsApproved = doc.IsApproved
     };
 
     private static List<CommentThreadViewModel> BuildCommentThreads(
@@ -248,6 +314,75 @@ public class CommentService
         }
     }
 
+    private static bool ApproveCommentInMemory(int commentId)
+    {
+        lock (LocalStateLock)
+        {
+            var comment = LocalComments.FirstOrDefault(c => c.Id == commentId);
+            if (comment == null)
+            {
+                return false;
+            }
+
+            comment.IsApproved = true;
+            return true;
+        }
+    }
+
+    private async Task<List<int>> GetCommentThreadIdsAsync(int commentId)
+    {
+        if (_db == null)
+        {
+            return GetCommentThreadIdsInMemory(commentId);
+        }
+
+        var allComments = await _db.Collection(CommentsCollection).GetSnapshotAsync();
+        var comments = allComments.Documents
+            .Select(d => d.ConvertTo<FirestoreComment>())
+            .Select(MapToComment)
+            .ToList();
+
+        return GetThreadIds(commentId, comments);
+    }
+
+    private static List<int> GetCommentThreadIdsInMemory(int commentId)
+    {
+        lock (LocalStateLock)
+        {
+            return GetThreadIds(commentId, LocalComments);
+        }
+    }
+
+    private static List<int> GetThreadIds(int rootId, List<Comment> allComments)
+    {
+        var ids = new List<int>();
+        var toProcess = new Queue<int>();
+        toProcess.Enqueue(rootId);
+
+        while (toProcess.Count > 0)
+        {
+            var currentId = toProcess.Dequeue();
+            ids.Add(currentId);
+
+            var replies = allComments.Where(c => c.ParentCommentId == currentId).Select(c => c.Id);
+            foreach (var replyId in replies)
+            {
+                toProcess.Enqueue(replyId);
+            }
+        }
+
+        return ids;
+    }
+
+    private static bool DeleteCommentsInMemory(List<int> idsToDelete)
+    {
+        lock (LocalStateLock)
+        {
+            LocalComments.RemoveAll(c => idsToDelete.Contains(c.Id));
+            return true;
+        }
+    }
+
     [FirestoreData]
     private sealed class FirestoreComment
     {
@@ -268,5 +403,8 @@ public class CommentService
 
         [FirestoreProperty]
         public int? ParentCommentId { get; set; }
+
+        [FirestoreProperty]
+        public bool IsApproved { get; set; }
     }
 }

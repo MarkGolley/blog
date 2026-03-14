@@ -15,6 +15,7 @@ public class Comment
     [Required]
     public string PostId { get; set; } = string.Empty;
     public int? ParentCommentId { get; set; }
+    public bool IsApproved { get; set; } = false;
 
     public List<CommentLike> Likes { get; set; } = new();
 }
