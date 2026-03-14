@@ -47,25 +47,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const revealItems = Array.from(document.querySelectorAll("[data-reveal]"));
     if (revealItems.length > 0) {
-        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (reducedMotion) {
+        const reducedMotion =
+            typeof window.matchMedia === "function"
+            && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const canUseIntersectionObserver = typeof window.IntersectionObserver === "function";
+
+        if (reducedMotion || !canUseIntersectionObserver) {
             revealItems.forEach((item) => item.classList.add("is-visible"));
         } else {
-            const observer = new IntersectionObserver(
-                (entries, revealObserver) => {
-                    entries.forEach((entry) => {
-                        if (!entry.isIntersecting) {
-                            return;
-                        }
+            document.documentElement.classList.add("reveal-ready");
 
-                        entry.target.classList.add("is-visible");
-                        revealObserver.unobserve(entry.target);
-                    });
-                },
-                { threshold: 0.16, rootMargin: "0px 0px -10% 0px" }
-            );
+            try {
+                const observer = new IntersectionObserver(
+                    (entries, revealObserver) => {
+                        entries.forEach((entry) => {
+                            if (!entry.isIntersecting) {
+                                return;
+                            }
 
-            revealItems.forEach((item) => observer.observe(item));
+                            entry.target.classList.add("is-visible");
+                            revealObserver.unobserve(entry.target);
+                        });
+                    },
+                    {
+                        // Keep reveal usable for very tall sections (e.g., long blog posts on mobile).
+                        threshold: 0,
+                        rootMargin: "0px 0px -10% 0px"
+                    }
+                );
+
+                revealItems.forEach((item) => observer.observe(item));
+            } catch {
+                document.documentElement.classList.remove("reveal-ready");
+                revealItems.forEach((item) => item.classList.add("is-visible"));
+            }
         }
     }
 });
