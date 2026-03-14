@@ -6,11 +6,28 @@
     ViewData["CanonicalPath"] = "/blog";
 }
 
-<section id="blogs" aria-labelledby="blogs-title">
-    <h2 id="blogs-title">My Blogs</h2>
-    <p class="section-intro">Browse by topic or search by keyword.</p>
+<section id="blogs" class="blog-page" aria-labelledby="blogs-title">
+    <header class="blog-hero" data-reveal>
+        <p class="hero-kicker">Engineering Journal</p>
+        <h1 id="blogs-title">My Blogs</h1>
+        <p class="section-intro">Browse by topic, search by keyword, and surface the articles readers are pinning most.</p>
+        <div class="blog-stat-grid">
+            <article class="metric-card">
+                <p class="metric-value">@Model.TotalPostCount</p>
+                <p class="metric-label">Total published posts</p>
+            </article>
+            <article class="metric-card">
+                <p class="metric-value">@Model.FilteredPostCount</p>
+                <p class="metric-label">Visible in current filter</p>
+            </article>
+            <article class="metric-card">
+                <p class="metric-value">@Model.AvailableTags.Count</p>
+                <p class="metric-label">Topics you can explore</p>
+            </article>
+        </div>
+    </header>
 
-    <form method="get" asp-controller="Blog" asp-action="Index" class="blog-filter-form">
+    <form method="get" asp-controller="Blog" asp-action="Index" class="blog-filter-form blog-filter-card" data-reveal>
         <div class="blog-filter-row">
             <input
                 type="search"
@@ -34,7 +51,7 @@
                 }
             </select>
 
-            <button type="submit">Apply</button>
+            <button type="submit">Apply filters</button>
             @if (!string.IsNullOrWhiteSpace(Model.SearchQuery) || !string.IsNullOrWhiteSpace(Model.SelectedTag))
             {
                 <a class="blog-filter-reset" asp-controller="Blog" asp-action="Index">Reset</a>
@@ -42,22 +59,22 @@
         </div>
     </form>
 
-    <p class="blog-results-summary">
+    <p class="blog-results-summary" data-reveal>
         Showing @Model.FilteredPostCount of @Model.TotalPostCount posts.
     </p>
 
-    <div class="pinned-posts-block">
-        <h3 class="blog-subtitle">Pinned Posts</h3>
+    <div class="pinned-posts-block" data-reveal>
+        <h3 class="blog-subtitle">Pinned posts</h3>
         @if (Model.PinnedPosts.Any())
         {
             <div class="blog-list pinned-blog-list">
                 @foreach (var item in Model.PinnedPosts)
                 {
-                    <article class="blog-post pinned-blog-post" id="pinned-post-@item.Post.Id">
+                    <article class="blog-post pinned-blog-post" id="pinned-post-@item.Post.Id" data-reveal>
                         <div class="blog-post-row">
                             <div class="blog-post-main">
                                 <h3>
-                                    <a asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
+                                    <a class="post-title-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
                                         @item.Post.Title
                                     </a>
                                 </h3>
@@ -100,18 +117,18 @@
         }
     </div>
 
-    <h3 class="blog-subtitle">All Posts</h3>
+    <h3 class="blog-subtitle" data-reveal>All posts</h3>
 
     <div class="blog-list">
         @if (Model.Posts.Any())
         {
             @foreach (var item in Model.Posts)
             {
-                <article class="blog-post" id="post-@item.Post.Id">
+                <article class="blog-post" id="post-@item.Post.Id" data-reveal>
                     <div class="blog-post-row">
                         <div class="blog-post-main">
                             <h3>
-                                <a asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
+                                <a class="post-title-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
                                     @item.Post.Title
                                 </a>
                             </h3>

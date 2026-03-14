@@ -7,7 +7,7 @@
     ViewData["OgType"] = "article";
 }
 
-<section aria-labelledby="post-title">
+<section aria-labelledby="post-title" data-reveal>
     <h2 id="post-title">@Model.Post.Title</h2>
     <div class="post-meta">
         @Model.Post.DatePosted.ToString("dd MMMM yyyy")
@@ -44,7 +44,7 @@
 
 @if (Model.RelatedPosts.Any())
 {
-    <section aria-labelledby="related-posts-title">
+    <section aria-labelledby="related-posts-title" data-reveal>
         <h2 id="related-posts-title">Related posts</h2>
         <div class="blog-list related-posts-list">
             @foreach (var related in Model.RelatedPosts)
@@ -75,7 +75,7 @@
     </section>
 }
 
-<section id="comments" aria-labelledby="comments-title">
+<section id="comments" aria-labelledby="comments-title" data-reveal>
     <h2 id="comments-title">Comments</h2>
 
     @if (Model.Comments != null && Model.Comments.Any())
@@ -98,7 +98,7 @@
     }
 </section>
 
-<section aria-labelledby="add-comment-title">
+<section aria-labelledby="add-comment-title" data-reveal>
     <h2 id="add-comment-title">Add a comment</h2>
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
     <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form">

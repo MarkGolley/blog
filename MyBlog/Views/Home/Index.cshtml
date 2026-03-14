@@ -4,18 +4,47 @@
     ViewData["CanonicalPath"] = "/";
 }
 
-<section id="hero" class="hero-section">
-    <div class="container">
-        <h1>Hi, I'm Mark</h1>
-        <p>I build reliable, well-tested software in C#/.NET and Python, and I focus on clean, maintainable code.</p>
-        <div class="hero-actions">
-            <a class="btn btn-primary" asp-controller="Contact" asp-action="Index">Get in touch</a>
-            <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">See my blogs</a>
+<section id="hero" class="home-hero" data-reveal>
+    <div class="home-hero-grid">
+        <div class="hero-copy">
+            <p class="hero-kicker">C#/.NET + Python Engineer</p>
+            <h1 class="hero-title">Building maintainable systems that stay calm under production pressure.</h1>
+            <p class="hero-lead">
+                I write pragmatic, test-driven software and share what works: architecture decisions, delivery tradeoffs,
+                and practical lessons from real projects.
+            </p>
+            <div class="hero-actions">
+                <a class="btn btn-primary" asp-controller="Contact" asp-action="Index">Start a conversation</a>
+                <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">Read latest posts</a>
+            </div>
+            <div class="hero-metrics">
+                <article class="metric-card">
+                    <p class="metric-value">4 Years</p>
+                    <p class="metric-label">Hands-on software development</p>
+                </article>
+                <article class="metric-card">
+                    <p class="metric-value">.NET + Python</p>
+                    <p class="metric-label">Core stack for delivery and automation</p>
+                </article>
+                <article class="metric-card">
+                    <p class="metric-value">Testing First</p>
+                    <p class="metric-label">Quality engineered into the build cycle</p>
+                </article>
+            </div>
         </div>
+        <aside class="hero-portrait" aria-label="Profile highlights">
+            <div class="hero-portrait-frame">
+                <img src="~/images/me.jpg" alt="Portrait of Mark" />
+            </div>
+            <div class="hero-spotlight">
+                <p class="spotlight-title">Current focus</p>
+                <p>Designing clearer architecture boundaries, stronger test suites, and reliable cloud-ready deployments.</p>
+            </div>
+        </aside>
     </div>
 </section>
 
-<section aria-labelledby="quick-bits-title">
+<section aria-labelledby="quick-bits-title" class="showcase-section" data-reveal>
     <h2 id="quick-bits-title">Quick bits</h2>
     <div class="credentials-grid">
         <div class="credential-card">
@@ -33,5 +62,24 @@
             <div class="credential-value">Climbing and long walks</div>
             <p class="credential-copy">Usually with Ellie, my cocker spaniel.</p>
         </div>
+    </div>
+</section>
+
+<section aria-labelledby="focus-areas-title" class="showcase-section" data-reveal>
+    <h2 id="focus-areas-title">Writing focus</h2>
+    <p class="section-intro">Most posts are practical breakdowns from building and shipping software.</p>
+    <div class="focus-grid">
+        <a class="focus-card" asp-controller="Blog" asp-action="Index" asp-route-tag="C#">
+            <p class="focus-title">C# and .NET</p>
+            <p>Clean architecture, practical patterns, and maintainable backend workflows.</p>
+        </a>
+        <a class="focus-card" asp-controller="Blog" asp-action="Index" asp-route-tag="Testing">
+            <p class="focus-title">Testing and quality</p>
+            <p>xUnit, test strategy, and reliability habits that reduce production risk.</p>
+        </a>
+        <a class="focus-card" asp-controller="Blog" asp-action="Index" asp-route-tag="Cloud">
+            <p class="focus-title">Cloud and deployment</p>
+            <p>Lessons from hosting, infrastructure decisions, and real operational concerns.</p>
+        </a>
     </div>
 </section>

@@ -5,7 +5,7 @@
     ViewData["CanonicalPath"] = "/contact";
 }
 
-<section id="contact" aria-labelledby="contact-title">
+<section id="contact" aria-labelledby="contact-title" data-reveal>
     <h2 id="contact-title">Get in touch</h2>
     <p class="section-intro">
         Got a question, a project idea, or just want to say hi? Feel free to use any of the methods below.
@@ -19,17 +19,16 @@
 
     @if (ViewBag.MessageSent != null && ViewBag.MessageSent == true)
     {
-        <p class="confirmation-message">Thanks for your message! I’ll get back to you shortly.</p>
+        <p class="confirmation-message">Thanks for your message! I'll get back to you shortly.</p>
     }
     @if (ViewBag.Error != null)
     {
         <p class="error-message">@ViewBag.Error</p>
     }
 
-
     <form method="post" asp-action="Index" class="contact-form">
         @Html.AntiForgeryToken()
-        
+
         <label for="name">Your name</label>
         <input type="text" id="name" name="Name" value="@Model?.Name" placeholder="Enter your name" required />
 
