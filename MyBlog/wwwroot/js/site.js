@@ -69,7 +69,11 @@ document.addEventListener("DOMContentLoaded", () => {
                             revealObserver.unobserve(entry.target);
                         });
                     },
-                    { threshold: 0.16, rootMargin: "0px 0px -10% 0px" }
+                    {
+                        // Keep reveal usable for very tall sections (e.g., long blog posts on mobile).
+                        threshold: 0,
+                        rootMargin: "0px 0px -10% 0px"
+                    }
                 );
 
                 revealItems.forEach((item) => observer.observe(item));
