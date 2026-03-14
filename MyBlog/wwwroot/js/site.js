@@ -1,3 +1,75 @@
+document.addEventListener("DOMContentLoaded", () => {
+    const navToggle = document.querySelector("[data-nav-toggle]");
+    const navMenu = document.querySelector("[data-nav-menu]");
+    if (navToggle instanceof HTMLButtonElement && navMenu instanceof HTMLElement) {
+        const closeNav = () => {
+            navMenu.classList.remove("is-open");
+            navToggle.setAttribute("aria-expanded", "false");
+        };
+
+        navToggle.addEventListener("click", () => {
+            const willOpen = !navMenu.classList.contains("is-open");
+            navMenu.classList.toggle("is-open", willOpen);
+            navToggle.setAttribute("aria-expanded", String(willOpen));
+        });
+
+        document.addEventListener("click", (event) => {
+            if (!(event.target instanceof Node)) {
+                return;
+            }
+
+            if (navMenu.contains(event.target) || navToggle.contains(event.target)) {
+                return;
+            }
+
+            closeNav();
+        });
+
+        window.addEventListener("resize", () => {
+            if (window.innerWidth > 800) {
+                closeNav();
+            }
+        });
+    }
+
+    const progressBar = document.querySelector("[data-scroll-progress]");
+    if (progressBar instanceof HTMLElement) {
+        const updateProgress = () => {
+            const documentHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = documentHeight > 0 ? (window.scrollY / documentHeight) * 100 : 0;
+            progressBar.style.width = `${Math.min(Math.max(progress, 0), 100)}%`;
+        };
+
+        window.addEventListener("scroll", updateProgress, { passive: true });
+        window.addEventListener("resize", updateProgress);
+        updateProgress();
+    }
+
+    const revealItems = Array.from(document.querySelectorAll("[data-reveal]"));
+    if (revealItems.length > 0) {
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (reducedMotion) {
+            revealItems.forEach((item) => item.classList.add("is-visible"));
+        } else {
+            const observer = new IntersectionObserver(
+                (entries, revealObserver) => {
+                    entries.forEach((entry) => {
+                        if (!entry.isIntersecting) {
+                            return;
+                        }
+
+                        entry.target.classList.add("is-visible");
+                        revealObserver.unobserve(entry.target);
+                    });
+                },
+                { threshold: 0.16, rootMargin: "0px 0px -10% 0px" }
+            );
+
+            revealItems.forEach((item) => observer.observe(item));
+        }
+    }
+});
+
 document.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
@@ -11,21 +83,15 @@ document.addEventListener("click", (event) => {
 
     const threadToggles = document.querySelectorAll("details[data-thread-toggle]");
     threadToggles.forEach((toggle) => {
-        if (!(toggle instanceof HTMLDetailsElement)) {
-            return;
+        if (toggle instanceof HTMLDetailsElement) {
+            toggle.open = action === "expand";
         }
-
-        toggle.open = action === "expand";
     });
 });
 
 document.addEventListener("submit", async (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLFormElement)) {
-        return;
-    }
-
-    if (target.dataset.likeAsync !== "true") {
+    if (!(target instanceof HTMLFormElement) || target.dataset.likeAsync !== "true") {
         return;
     }
 
@@ -59,7 +125,7 @@ document.addEventListener("submit", async (event) => {
         const count = button.querySelector(".like-count");
 
         if (symbol instanceof HTMLElement) {
-            symbol.textContent = payload.isLiked ? "♥" : "♡";
+            symbol.textContent = payload.isLiked ? "\u2665" : "\u2661";
         }
 
         if (count instanceof HTMLElement) {

@@ -47,26 +47,67 @@
     @await RenderSectionAsync("Head", required: false)
 </head>
 <body>
-<header class="navbar">
-    <div class="container">
-        <a class="nav-brand" asp-controller="Home" asp-action="Index">MyBlog</a>
-        <nav class="nav-links" aria-label="Primary">
-            <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
-            <a class="nav-link" asp-controller="Blog" asp-action="Index">My Blogs</a>
-            <a class="nav-link" asp-controller="Learning" asp-action="Index">Learning Plan</a>
-            <a class="nav-link" asp-controller="Contact" asp-action="Index">Contact</a>
-            <a class="nav-link" asp-controller="About" asp-action="Index">About</a>
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+
+    bool IsController(string controller)
+    {
+        return string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase);
+    }
+
+    bool IsActive(string controller, string action = "Index")
+    {
+        return string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase)
+               && string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+<a class="skip-link" href="#main-content">Skip to content</a>
+<div class="page-aurora" aria-hidden="true">
+    <span class="orb orb-a"></span>
+    <span class="orb orb-b"></span>
+    <span class="orb orb-c"></span>
+</div>
+<div class="scroll-progress" aria-hidden="true" data-scroll-progress></div>
+
+<header class="site-header">
+    <div class="container nav-shell">
+        <a class="nav-brand" asp-controller="Home" asp-action="Index">
+            <span class="brand-wordmark">Mark Golley</span>
+            <span class="brand-subtitle">Engineering Notes</span>
+        </a>
+
+        <button
+            type="button"
+            class="nav-toggle"
+            aria-expanded="false"
+            aria-controls="primary-nav"
+            data-nav-toggle>
+            <span class="sr-only">Toggle navigation</span>
+            <span class="nav-toggle-bar"></span>
+            <span class="nav-toggle-bar"></span>
+            <span class="nav-toggle-bar"></span>
+        </button>
+
+        <nav id="primary-nav" class="nav-links" aria-label="Primary" data-nav-menu>
+            <a class="nav-link @(IsActive("Home") ? "is-active" : string.Empty)" asp-controller="Home" asp-action="Index">Home</a>
+            <a class="nav-link @(IsController("Blog") ? "is-active" : string.Empty)" asp-controller="Blog" asp-action="Index">Blog</a>
+            <a class="nav-link @(IsActive("Learning") ? "is-active" : string.Empty)" asp-controller="Learning" asp-action="Index">Learning</a>
+            <a class="nav-link @(IsActive("Contact") ? "is-active" : string.Empty)" asp-controller="Contact" asp-action="Index">Contact</a>
+            <a class="nav-link @(IsActive("About") ? "is-active" : string.Empty)" asp-controller="About" asp-action="Index">About</a>
         </nav>
     </div>
 </header>
 
-<main role="main" class="container">
+<main id="main-content" role="main" class="container page-main" data-page-main>
     @RenderBody()
 </main>
 
-<footer>
-    <div class="container">
-        &copy; 2026 - MyBlog
+<footer class="site-footer">
+    <div class="container footer-shell">
+        <p>&copy; @DateTime.UtcNow.Year Mark Golley</p>
+        <p>Built with ASP.NET Core, clean architecture, and obsessive pragmatism.</p>
     </div>
 </footer>
 
