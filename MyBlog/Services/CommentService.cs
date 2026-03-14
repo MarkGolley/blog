@@ -22,14 +22,14 @@ public class CommentService
     public CommentService(FirestoreDb? db = null, AIModerationService? aiModerationService = null)
     {
         _db = db;
-        _aiModerationService = aiModerationService ?? new AIModerationService(new HttpClient()); // Fallback for in-memory
+        _aiModerationService = aiModerationService;
     }
 
     public async Task AddCommentAsync(Comment comment)
     {
         if (_db == null)
         {
-            AddCommentInMemory(comment);
+            await AddCommentInMemory(comment, _aiModerationService);
             return;
         }
 
@@ -63,24 +63,38 @@ public class CommentService
         // AI moderation: check if content is safe
         comment.IsApproved = await (_aiModerationService?.IsCommentSafeAsync(comment.Content) ?? Task.FromResult(true));
 
-        var doc = new FirestoreComment
+        var countersRef = _db.Collection(MetaCollection).Document(CountersDocument);
+        var assignedId = await _db.RunTransactionAsync(async transaction =>
         {
-            Id = nextId,
-            Author = comment.Author,
-            Content = comment.Content,
-            PostedAt = comment.PostedAt,
-            PostId = comment.PostId,
-            ParentCommentId = comment.ParentCommentId,
-            IsApproved = comment.IsApproved
-        };
+            var countersSnapshot = await transaction.GetSnapshotAsync(countersRef);
+            var nextId = countersSnapshot.Exists &&
+                          countersSnapshot.TryGetValue<long>(NextCommentIdField, out var current)
+                ? (int)current
+                : 1;
 
-        transaction.Create(commentRef, doc);
-        transaction.Set(countersRef, new Dictionary<string, object>
-        {
-            [NextCommentIdField] = nextId + 1
-        }, SetOptions.MergeAll);
+            var commentRef = commentsCollection.Document(nextId.ToString());
 
-        return nextId;
+            var doc = new FirestoreComment
+            {
+                Id = nextId,
+                Author = comment.Author,
+                Content = comment.Content,
+                PostedAt = comment.PostedAt,
+                PostId = comment.PostId,
+                ParentCommentId = comment.ParentCommentId,
+                IsApproved = comment.IsApproved
+            };
+
+            transaction.Create(commentRef, doc);
+            transaction.Set(countersRef, new Dictionary<string, object>
+            {
+                [NextCommentIdField] = nextId + 1
+            }, SetOptions.MergeAll);
+
+            return nextId;
+        });
+
+        comment.Id = assignedId;
     }
 
     public async Task<List<CommentThreadViewModel>> GetCommentsAsync(string postId, bool includeUnapproved = false)
@@ -205,8 +219,11 @@ public class CommentService
             .ToList();
     }
 
-    private static void AddCommentInMemory(Comment comment)
+    private async Task AddCommentInMemory(Comment comment, AIModerationService? aiModerationService)
     {
+        // AI check outside lock
+        comment.IsApproved = await (aiModerationService?.IsCommentSafeAsync(comment.Content) ?? Task.FromResult(true));
+
         lock (LocalStateLock)
         {
             var postComments = LocalComments
@@ -231,7 +248,6 @@ public class CommentService
             }
 
             comment.PostedAt = DateTime.UtcNow;
-            comment.IsApproved = await (_aiModerationService?.IsCommentSafeAsync(comment.Content) ?? Task.FromResult(true));
             comment.Id = _nextLocalCommentId++;
 
             LocalComments.Add(CloneComment(comment));

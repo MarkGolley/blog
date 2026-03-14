@@ -8,9 +8,9 @@ public class AIModerationService
     private readonly HttpClient _httpClient;
     private readonly string? _apiKey;
 
-    public AIModerationService(IHttpClientFactory httpClientFactory)
+    public AIModerationService(HttpClient httpClient)
     {
-        _httpClient = httpClientFactory.CreateClient();
+        _httpClient = httpClient;
         _apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
     }
 
