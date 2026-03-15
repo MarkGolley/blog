@@ -1,6 +1,7 @@
 ﻿@model MyBlog.Models.BlogPostViewModel
 
 @{
+    var commentBanner = TempData["CommentBanner"]?.ToString();
     ViewData["Title"] = Model.Post.Title;
     ViewData["MetaDescription"] = $"Read \"{Model.Post.Title}\" on MyBlog.";
     ViewData["CanonicalPath"] = $"/blog/{Uri.EscapeDataString(Model.Post.Id)}";
@@ -77,6 +78,10 @@
 
 <section id="comments" aria-labelledby="comments-title" data-reveal>
     <h2 id="comments-title">Comments</h2>
+    @if (!string.IsNullOrWhiteSpace(commentBanner))
+    {
+        <p class="moderation-notice">@commentBanner</p>
+    }
 
     @if (Model.Comments != null && Model.Comments.Any())
     {

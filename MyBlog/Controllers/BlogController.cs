@@ -11,6 +11,7 @@ namespace MyBlog.Controllers;
 public class BlogController : Controller
 {
     private const string VisitorIdCookieName = "myblog_visitor_id";
+    private const string CommentBannerTempDataKey = "CommentBanner";
     private const int MaxPinnedPosts = 3;
     private const int MaxRelatedPosts = 3;
     private static readonly Regex RelatedTokenRegex = new(@"[A-Za-z0-9#\+\.]+", RegexOptions.Compiled);
@@ -139,6 +140,13 @@ public class BlogController : Controller
         await SendNewCommentAlertAsync(comment);
         
         var postUrl = Url.RouteUrl("blogPost", new { slug = comment.PostId }) ?? $"/blog/{comment.PostId}";
+        if (!comment.IsApproved)
+        {
+            TempData[CommentBannerTempDataKey] =
+                "Your comment was not published because it did not meet our moderation standards.";
+            return Redirect($"{postUrl}#add-comment-title");
+        }
+
         return Redirect($"{postUrl}#comment-{comment.Id}");
     }
 
