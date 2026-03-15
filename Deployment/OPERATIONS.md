@@ -20,7 +20,7 @@ Invoke-RestMethod http://localhost:5207/health
 Run from repo root:
 
 ```powershell
-.\run_predeploy_checks.bat
+.\run_checks.ps1 -Mode PreDeploy
 ```
 
 What it does:
@@ -28,6 +28,21 @@ What it does:
 - Runs the existing test suite.
 - Installs Playwright Chromium for browser-based checks.
 - Runs mobile + desktop E2E checks that exercise comment moderation banner visibility and admin login/logout flows.
+
+If `OPENAI_API_KEY` is not set in your environment, the live moderation test is automatically skipped.
+
+Additional modes:
+
+```powershell
+.\run_checks.ps1 -Mode Tests
+.\run_checks.ps1 -Mode E2E
+.\run_checks.ps1 -Mode PreDeploy -SkipBrowserInstall
+```
+
+Batch wrappers are available if you want double-click launch:
+
+- `run_tests.bat` -> runs `run_checks.ps1 -Mode Tests`
+- `run_predeploy_checks.bat` -> runs `run_checks.ps1 -Mode PreDeploy`
 
 ## Backup Routine
 
