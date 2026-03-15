@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Net.Http.Headers;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -17,14 +16,6 @@ public class AIModerationService
     private readonly string? _apiKey;
     private readonly ILogger<AIModerationService> _logger;
 
-    private static readonly Regex LocalProfanityRegex = new(
-        @"\b(fuck|fucking|shit|bitch|asshole|bastard|cunt|motherfucker|dickhead|wanker)\b",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private static readonly Regex LocalAbuseRegex = new(
-        @"\b(kill yourself|kys|go die)\b",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
     public AIModerationService(HttpClient httpClient, IConfiguration configuration, ILogger<AIModerationService> logger)
     {
         _httpClient = httpClient;
@@ -39,21 +30,17 @@ public class AIModerationService
             return true;
         }
 
-        if (IsBlockedByLocalRules(content))
-        {
-            return false;
-        }
-
         if (string.IsNullOrWhiteSpace(_apiKey))
         {
-            _logger.LogWarning("OPENAI_API_KEY is missing. Falling back to local moderation rules only.");
-            return true;
+            _logger.LogWarning("OPENAI_API_KEY is missing. Comment will require manual review.");
+            return false;
         }
 
         try
         {
             var requestBody = new
             {
+                model = "omni-moderation-latest",
                 input = content
             };
 
@@ -87,11 +74,6 @@ public class AIModerationService
             _logger.LogError(ex, "AI moderation request failed. Comment will require manual review.");
             return false; // Err on side of caution
         }
-    }
-
-    private static bool IsBlockedByLocalRules(string content)
-    {
-        return LocalProfanityRegex.IsMatch(content) || LocalAbuseRegex.IsMatch(content);
     }
 
     private class OpenAIModerationResponse

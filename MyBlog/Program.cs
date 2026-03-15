@@ -105,7 +105,7 @@ var openAiApiKey =
     Environment.GetEnvironmentVariable("OPENAI_API_KEY");
 if (string.IsNullOrWhiteSpace(openAiApiKey))
 {
-    Console.WriteLine("WARNING: OPENAI_API_KEY is not configured. AI moderation API calls will be skipped and only local moderation rules will run.");
+    Console.WriteLine("WARNING: OPENAI_API_KEY is not configured. All new comments will require manual review.");
 }
 
 builder.Services.AddRouting(options => options.LowercaseUrls = true);

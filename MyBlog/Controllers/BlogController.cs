@@ -112,7 +112,7 @@ public class BlogController : Controller
                 return RedirectToAction(nameof(Index));
             }
 
-            var spamPostUrl = Url.RouteUrl("blogPost", new { slug = comment.PostId }) ?? $"/blog/{comment.PostId}";
+            var spamPostUrl = BuildPostPath(comment.PostId);
             return Redirect(spamPostUrl);
         }
 
@@ -139,7 +139,7 @@ public class BlogController : Controller
 
         await SendNewCommentAlertAsync(comment);
         
-        var postUrl = Url.RouteUrl("blogPost", new { slug = comment.PostId }) ?? $"/blog/{comment.PostId}";
+        var postUrl = BuildPostPath(comment.PostId);
         if (!comment.IsApproved)
         {
             TempData[CommentBannerTempDataKey] =
@@ -182,12 +182,12 @@ public class BlogController : Controller
 
         if (string.Equals(returnTo, "index", StringComparison.OrdinalIgnoreCase))
         {
-            var blogIndexUrl = Url.RouteUrl("blogIndex") ?? "/blog";
+            var blogIndexUrl = BuildBlogIndexPath();
             var indexAnchor = string.IsNullOrWhiteSpace(returnAnchor) ? $"post-{postId}" : returnAnchor;
             return Redirect($"{blogIndexUrl}#{indexAnchor}");
         }
 
-        var postUrl = Url.RouteUrl("blogPost", new { slug = returnSlug ?? postId }) ?? $"/blog/{returnSlug ?? postId}";
+        var postUrl = BuildPostPath(returnSlug ?? postId);
         if (!string.IsNullOrWhiteSpace(returnAnchor))
         {
             return Redirect($"{postUrl}#{returnAnchor}");
@@ -219,7 +219,7 @@ public class BlogController : Controller
             return NotFound();
         }
 
-        var baseUrl = Url.RouteUrl("blogPost", new { slug = returnSlug ?? postId }) ?? $"/blog/{returnSlug ?? postId}";
+        var baseUrl = BuildPostPath(returnSlug ?? postId);
         var anchor = string.IsNullOrWhiteSpace(returnAnchor) ? $"comment-{commentId}" : returnAnchor;
         return Redirect($"{baseUrl}#{anchor}");
     }
@@ -335,6 +335,16 @@ public class BlogController : Controller
 
             ApplyLikeSummaries(comment.Replies, summaries);
         }
+    }
+
+    private static string BuildPostPath(string slug)
+    {
+        return $"/blog/{Uri.EscapeDataString(slug)}";
+    }
+
+    private static string BuildBlogIndexPath()
+    {
+        return "/blog";
     }
 
     private string GetOrCreateVisitorId()
