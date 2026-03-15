@@ -15,6 +15,20 @@ Example:
 Invoke-RestMethod http://localhost:5207/health
 ```
 
+## Pre-Deploy Checks
+
+Run from repo root:
+
+```powershell
+.\run_predeploy_checks.bat
+```
+
+What it does:
+
+- Runs the existing test suite.
+- Installs Playwright Chromium for browser-based checks.
+- Runs mobile + desktop E2E checks that exercise comment moderation banner visibility and admin login/logout flows.
+
 ## Backup Routine
 
 Script: `Deployment/backup.ps1`
