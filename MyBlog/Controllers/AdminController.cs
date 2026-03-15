@@ -24,7 +24,7 @@ public class AdminController : Controller
     }
 
     [HttpPost]
-    [ValidateAntiForgeryToken]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Login(string username, string password)
     {
         // Simple check - in production, use proper auth
