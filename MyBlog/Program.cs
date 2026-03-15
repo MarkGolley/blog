@@ -229,6 +229,24 @@ app.Use(async (context, next) =>
         headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
         headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
         headers.TryAdd("X-Permitted-Cross-Domain-Policies", "none");
+
+        if (ShouldDisableCaching(context))
+        {
+            headers["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate, private";
+            headers["Pragma"] = "no-cache";
+            headers["Expires"] = "0";
+
+            var varyValues = headers.Vary.ToString();
+            if (string.IsNullOrWhiteSpace(varyValues))
+            {
+                headers["Vary"] = "Cookie";
+            }
+            else if (!varyValues.Contains("Cookie", StringComparison.OrdinalIgnoreCase))
+            {
+                headers["Vary"] = $"{varyValues}, Cookie";
+            }
+        }
+
         return Task.CompletedTask;
     });
 
@@ -311,6 +329,27 @@ static string GetRateLimitPartitionKey(HttpContext context)
     }
 
     return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
+
+static bool ShouldDisableCaching(HttpContext context)
+{
+    if (context.Response.Headers.ContainsKey("Set-Cookie"))
+    {
+        return true;
+    }
+
+    var path = context.Request.Path.Value ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(path))
+    {
+        return false;
+    }
+
+    return path.Equals("/admin", StringComparison.OrdinalIgnoreCase)
+           || path.StartsWith("/admin/", StringComparison.OrdinalIgnoreCase)
+           || path.Equals("/blog", StringComparison.OrdinalIgnoreCase)
+           || path.StartsWith("/blog/", StringComparison.OrdinalIgnoreCase)
+           || path.Equals("/subscribe", StringComparison.OrdinalIgnoreCase)
+           || path.StartsWith("/subscribe/", StringComparison.OrdinalIgnoreCase);
 }
 
 static bool ShouldRecoverFromBadRequest(string requestPath)

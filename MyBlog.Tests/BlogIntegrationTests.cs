@@ -441,6 +441,19 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task DynamicPages_ReturnNoStoreCacheHeaders()
+    {
+        using var client = CreateClient("10.0.3.9", allowAutoRedirect: false);
+        var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+
+        using var adminLoginResponse = await client.GetAsync("/Admin/Login");
+        Assert.True(adminLoginResponse.Headers.CacheControl?.NoStore ?? false);
+
+        using var postResponse = await client.GetAsync($"/blog/{Uri.EscapeDataString(postId)}");
+        Assert.True(postResponse.Headers.CacheControl?.NoStore ?? false);
+    }
+
+    [Fact]
     public async Task AdminLogin_MissingAntiForgeryToken_StillAuthenticates()
     {
         using var client = CreateClient("10.0.3.3", allowAutoRedirect: false);
