@@ -100,6 +100,14 @@ builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SubscriptionEmailService>();
 builder.Services.AddHttpClient<AIModerationService>();
 
+var openAiApiKey =
+    builder.Configuration["OPENAI_API_KEY"] ??
+    Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+if (string.IsNullOrWhiteSpace(openAiApiKey))
+{
+    Console.WriteLine("WARNING: OPENAI_API_KEY is not configured. AI moderation API calls will be skipped and only local moderation rules will run.");
+}
+
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 builder.Services.AddRateLimiter(options =>
 {
