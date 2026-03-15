@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.WebUtilities;
 using MyBlog.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -239,6 +240,44 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var httpContext = statusCodeContext.HttpContext;
+    if (httpContext.Response.StatusCode != StatusCodes.Status400BadRequest)
+    {
+        return;
+    }
+
+    if (!HttpMethods.IsPost(httpContext.Request.Method))
+    {
+        return;
+    }
+
+    if (string.Equals(
+            httpContext.Request.Headers["X-Requested-With"],
+            "XMLHttpRequest",
+            StringComparison.OrdinalIgnoreCase))
+    {
+        return;
+    }
+
+    var requestPath = httpContext.Request.Path.Value ?? string.Empty;
+    if (!ShouldRecoverFromBadRequest(requestPath))
+    {
+        return;
+    }
+
+    var returnPath = ResolveBadRequestReturnPath(httpContext.Request, requestPath);
+    if (string.IsNullOrWhiteSpace(returnPath))
+    {
+        return;
+    }
+
+    var returnPathWithFlag = AddOrReplaceQueryParameter(returnPath, "form", "expired");
+    httpContext.Response.Clear();
+    httpContext.Response.StatusCode = StatusCodes.Status303SeeOther;
+    httpContext.Response.Headers.Location = returnPathWithFlag;
+});
 
 // ----------------------------
 // Routes
@@ -272,6 +311,107 @@ static string GetRateLimitPartitionKey(HttpContext context)
     }
 
     return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
+
+static bool ShouldRecoverFromBadRequest(string requestPath)
+{
+    if (string.IsNullOrWhiteSpace(requestPath))
+    {
+        return false;
+    }
+
+    return requestPath.Equals("/Admin/Login", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/Admin/Logout", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/Admin/Approve", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/Admin/Delete", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/Blog/AddComment", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/Blog/TogglePostLike", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/Blog/ToggleCommentLike", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/Subscribe", StringComparison.OrdinalIgnoreCase);
+}
+
+static string? ResolveBadRequestReturnPath(HttpRequest request, string requestPath)
+{
+    var referer = request.Headers.Referer.FirstOrDefault();
+    if (TryGetSafeLocalPath(referer, request.Host, out var localPath))
+    {
+        return localPath;
+    }
+
+    if (requestPath.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase))
+    {
+        return requestPath.Equals("/Admin/Login", StringComparison.OrdinalIgnoreCase)
+            ? "/Admin/Login"
+            : "/Admin";
+    }
+
+    if (requestPath.StartsWith("/Blog", StringComparison.OrdinalIgnoreCase))
+    {
+        return "/blog";
+    }
+
+    if (requestPath.Equals("/Subscribe", StringComparison.OrdinalIgnoreCase))
+    {
+        return "/blog";
+    }
+
+    return null;
+}
+
+static bool TryGetSafeLocalPath(string? referer, HostString requestHost, out string? localPath)
+{
+    localPath = null;
+    if (string.IsNullOrWhiteSpace(referer))
+    {
+        return false;
+    }
+
+    if (!Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
+    {
+        return false;
+    }
+
+    if (!string.Equals(refererUri.Host, requestHost.Host, StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    localPath = $"{refererUri.AbsolutePath}{refererUri.Query}";
+    return !string.IsNullOrWhiteSpace(localPath);
+}
+
+static string AddOrReplaceQueryParameter(string path, string key, string value)
+{
+    var anchorIndex = path.IndexOf('#');
+    var anchor = anchorIndex >= 0 ? path[anchorIndex..] : string.Empty;
+    var pathWithoutAnchor = anchorIndex >= 0 ? path[..anchorIndex] : path;
+    var questionMarkIndex = pathWithoutAnchor.IndexOf('?');
+    var basePath = questionMarkIndex >= 0 ? pathWithoutAnchor[..questionMarkIndex] : pathWithoutAnchor;
+    var rawQuery = questionMarkIndex >= 0 ? pathWithoutAnchor[(questionMarkIndex + 1)..] : string.Empty;
+
+    var queryValues = QueryHelpers.ParseQuery(rawQuery);
+    var flattenedValues = new List<KeyValuePair<string, string?>>();
+    foreach (var pair in queryValues)
+    {
+        if (string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        foreach (var item in pair.Value)
+        {
+            if (item is null)
+            {
+                continue;
+            }
+
+            flattenedValues.Add(new KeyValuePair<string, string?>(pair.Key, item));
+        }
+    }
+
+    flattenedValues.Add(new KeyValuePair<string, string?>(key, value));
+    var queryString = QueryString.Create(flattenedValues).ToUriComponent();
+    return $"{basePath}{queryString}{anchor}";
 }
 
 public partial class Program;

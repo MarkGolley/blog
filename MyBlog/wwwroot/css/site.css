@@ -977,6 +977,18 @@ thead th {
     margin-top: 5px;
 }
 
+.moderation-banner,
+.form-expired-notice {
+    margin: 0.4rem 0 0.9rem;
+    padding: 0.72rem 0.85rem;
+    border-radius: 12px;
+    border: 1px solid rgba(181, 60, 60, 0.45);
+    background: linear-gradient(140deg, rgba(255, 232, 232, 0.95), rgba(255, 245, 245, 0.95));
+    color: #8f1f1f;
+    font-style: normal;
+    font-weight: 700;
+}
+
 .thread-toggle summary,
 .reply-toggle summary {
     cursor: pointer;

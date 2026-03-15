@@ -1,8 +1,17 @@
 @{
     ViewData["Title"] = "Admin Login";
+    var formState = Context.Request.Query["form"].ToString();
+    var isFormExpired = string.Equals(formState, "expired", StringComparison.OrdinalIgnoreCase);
 }
 
 <h2>Admin Login</h2>
+
+@if (isFormExpired)
+{
+    <p class="form-expired-notice" role="alert">
+        Your login form token expired after a refresh. Please sign in again.
+    </p>
+}
 
 <form asp-controller="Admin" asp-action="Login" method="post">
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>

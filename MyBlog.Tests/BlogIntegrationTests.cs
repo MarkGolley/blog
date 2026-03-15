@@ -440,6 +440,47 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, adminResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task AdminLogin_MissingAntiForgeryToken_RedirectsToFreshLoginForm()
+    {
+        using var client = CreateClient("10.0.3.3", allowAutoRedirect: false);
+
+        using var response = await client.PostAsync("/Admin/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["username"] = "admin",
+            ["password"] = "password"
+        }));
+
+        Assert.Equal(HttpStatusCode.SeeOther, response.StatusCode);
+        Assert.Equal("/Admin/Login?form=expired", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task AddComment_MissingAntiForgeryToken_RedirectsToPostWithExpiredFormFlag()
+    {
+        var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+        using var client = CreateClient("10.0.3.4", allowAutoRedirect: false);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/Blog/AddComment")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["PostId"] = postId,
+                ["Author"] = "No Token User",
+                ["Content"] = "Testing anti-forgery recovery path.",
+                ["ParentCommentId"] = string.Empty,
+                ["__hp"] = string.Empty
+            })
+        };
+        request.Headers.Referrer = new Uri($"http://localhost/blog/{Uri.EscapeDataString(postId)}");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.SeeOther, response.StatusCode);
+        var location = response.Headers.Location?.OriginalString ?? string.Empty;
+        Assert.StartsWith($"/blog/{Uri.EscapeDataString(postId)}?form=expired", location, StringComparison.OrdinalIgnoreCase);
+    }
+
     private HttpClient CreateClient(string forwardedForIp, bool allowAutoRedirect = true)
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions

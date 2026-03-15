@@ -3,6 +3,8 @@
 @{
     var commentBanner = TempData["CommentBanner"]?.ToString();
     var commentStatus = Context.Request.Query["commentStatus"].ToString();
+    var formState = Context.Request.Query["form"].ToString();
+    var isFormExpired = string.Equals(formState, "expired", StringComparison.OrdinalIgnoreCase);
     if (string.IsNullOrWhiteSpace(commentBanner) &&
         string.Equals(commentStatus, "moderated", StringComparison.OrdinalIgnoreCase))
     {
@@ -107,9 +109,15 @@
 
 <section aria-labelledby="add-comment-title" data-reveal>
     <h2 id="add-comment-title">Add a comment</h2>
+    @if (isFormExpired)
+    {
+        <p class="form-expired-notice" role="alert">
+            Your form token expired after a refresh. Please submit your comment again.
+        </p>
+    }
     @if (!string.IsNullOrWhiteSpace(commentBanner))
     {
-        <p class="moderation-notice" role="status">@commentBanner</p>
+        <p class="moderation-notice moderation-banner" role="status">@commentBanner</p>
     }
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
     <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form">
