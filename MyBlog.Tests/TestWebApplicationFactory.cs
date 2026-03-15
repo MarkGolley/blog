@@ -16,5 +16,12 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
                 ["Subscriptions:NotifyAdminKey"] = "integration-notify-key"
             });
         });
+
+        // Set OPENAI_API_KEY for moderation tests
+        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            builder.UseSetting("OPENAI_API_KEY", apiKey);
+        }
     }
 }

@@ -19,10 +19,10 @@ public class CommentService
     private readonly FirestoreDb? _db;
     private readonly AIModerationService _aiModerationService;
 
-    public CommentService(FirestoreDb? db = null, AIModerationService? aiModerationService = null)
+    public CommentService(AIModerationService aiModerationService, FirestoreDb? db = null)
     {
         _db = db;
-        _aiModerationService = aiModerationService;
+        _aiModerationService = aiModerationService ?? throw new ArgumentNullException(nameof(aiModerationService));
     }
 
     public async Task AddCommentAsync(Comment comment)
@@ -61,7 +61,7 @@ public class CommentService
         comment.PostedAt = DateTime.UtcNow;
 
         // AI moderation: check if content is safe
-        comment.IsApproved = await (_aiModerationService?.IsCommentSafeAsync(comment.Content) ?? Task.FromResult(true));
+        comment.IsApproved = await _aiModerationService.IsCommentSafeAsync(comment.Content);
 
         var countersRef = _db.Collection(MetaCollection).Document(CountersDocument);
         var assignedId = await _db.RunTransactionAsync(async transaction =>
@@ -222,7 +222,7 @@ public class CommentService
     private async Task AddCommentInMemory(Comment comment, AIModerationService? aiModerationService)
     {
         // AI check outside lock
-        comment.IsApproved = await (aiModerationService?.IsCommentSafeAsync(comment.Content) ?? Task.FromResult(true));
+        comment.IsApproved = await aiModerationService.IsCommentSafeAsync(comment.Content);
 
         lock (LocalStateLock)
         {

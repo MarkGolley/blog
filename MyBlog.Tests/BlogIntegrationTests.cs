@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using MyBlog.Models;
 using MyBlog.Services;
 
 namespace MyBlog.Tests;
@@ -77,6 +78,159 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, tooDeepResponse.StatusCode);
         var responseBody = await tooDeepResponse.Content.ReadAsStringAsync();
         Assert.Contains("Reply depth limit reached", responseBody, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AddComment_SafeContent_IsApprovedImmediately()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var comment = new Comment
+        {
+            PostId = postId,
+            Author = "Test User",
+            Content = "This is a great article, thanks for sharing!"
+        };
+        await commentService.AddCommentAsync(comment);
+
+        Assert.True(comment.IsApproved, "Safe comment should be approved immediately");
+        Assert.NotEqual(0, comment.Id);
+    }
+
+    [Fact]
+    public async Task AddComment_UnsafeContent_RequiresManualReview()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var comment = new Comment
+        {
+            PostId = postId,
+            Author = "Spammer",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(comment);
+
+        Assert.False(comment.IsApproved, "Unsafe content should be flagged and require manual review");
+    }
+
+    [Fact]
+    public async Task GetComments_NonAdmin_ExcludesUnapprovedComments()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var safeComment = new Comment
+        {
+            PostId = postId,
+            Author = "Good User",
+            Content = "Great post!"
+        };
+        await commentService.AddCommentAsync(safeComment);
+
+        var unsafeComment = new Comment
+        {
+            PostId = postId,
+            Author = "Bad User",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(unsafeComment);
+
+        var visibleComments = await commentService.GetCommentsAsync(postId, includeUnapproved: false);
+
+        Assert.Contains(visibleComments, c => c.Comment.Id == safeComment.Id);
+        Assert.DoesNotContain(visibleComments, c => c.Comment.Id == unsafeComment.Id);
+    }
+
+    [Fact]
+    public async Task GetComments_Admin_IncludesUnapprovedComments()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var safeComment = new Comment
+        {
+            PostId = postId,
+            Author = "Good User",
+            Content = "Great post!"
+        };
+        await commentService.AddCommentAsync(safeComment);
+
+        var unsafeComment = new Comment
+        {
+            PostId = postId,
+            Author = "Bad User",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(unsafeComment);
+
+        var allComments = await commentService.GetCommentsAsync(postId, includeUnapproved: true);
+
+        Assert.Contains(allComments, c => c.Comment.Id == safeComment.Id);
+        Assert.Contains(allComments, c => c.Comment.Id == unsafeComment.Id);
+    }
+
+    [Fact]
+    public async Task ApproveComment_SetsFlagAndMakesVisible()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var flaggedComment = new Comment
+        {
+            PostId = postId,
+            Author = "Flagged User",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(flaggedComment);
+
+        Assert.False(flaggedComment.IsApproved);
+
+        await commentService.ApproveCommentAsync(flaggedComment.Id);
+
+        var visibleComments = await commentService.GetCommentsAsync(postId, includeUnapproved: false);
+        Assert.Contains(visibleComments, c => c.Comment.Id == flaggedComment.Id && c.Comment.IsApproved);
+    }
+
+    [Fact]
+    public async Task GetPendingComments_ReturnsOnlyUnapprovedComments()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var approvedComment = new Comment
+        {
+            PostId = postId,
+            Author = "Good User",
+            Content = "Great post!"
+        };
+        await commentService.AddCommentAsync(approvedComment);
+
+        var pendingComment = new Comment
+        {
+            PostId = postId,
+            Author = "Pending User",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(pendingComment);
+
+        var pending = (await commentService.GetPendingCommentsAsync()).ToList();
+
+        Assert.Contains(pending, c => c.Id == pendingComment.Id && !c.IsApproved);
+        Assert.DoesNotContain(pending, c => c.Id == approvedComment.Id);
     }
 
     [Fact]
