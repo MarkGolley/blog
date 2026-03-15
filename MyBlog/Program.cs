@@ -1,6 +1,9 @@
 using Google.Cloud.Firestore;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 using MyBlog.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +19,13 @@ builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 // Services
 // ----------------------------
 builder.Services.AddControllersWithViews();
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = "myblog.antiforgery.v2";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+});
 builder.Services.AddAuthentication("CookieAuth")
     .AddCookie("CookieAuth", options =>
     {
@@ -32,6 +42,7 @@ var firestoreDatabaseId =
     "(default)";
 
 var allowInMemoryFallback = builder.Environment.IsDevelopment();
+var firestoreEnabled = false;
 
 if (string.IsNullOrWhiteSpace(firestoreProjectId))
 {
@@ -54,6 +65,7 @@ else
         }.Build();
 
         builder.Services.AddSingleton(firestoreDb);
+        firestoreEnabled = true;
         Console.WriteLine($"Firestore enabled for project '{firestoreProjectId}' and database '{firestoreDatabaseId}'.");
     }
     catch (Exception ex)
@@ -68,6 +80,19 @@ else
         Console.WriteLine($"Firestore unavailable. Falling back to in-memory comments/likes (development only). {ex.Message}");
     }
 }
+var dataProtectionApplicationName =
+    Environment.GetEnvironmentVariable("DATA_PROTECTION_APP_NAME") ??
+    builder.Configuration["DataProtection:ApplicationName"] ??
+    "myblog";
+
+builder.Services.AddDataProtection().SetApplicationName(dataProtectionApplicationName);
+if (firestoreEnabled)
+{
+    builder.Services.AddSingleton<IXmlRepository, FirestoreDataProtectionKeyRepository>();
+    builder.Services.AddOptions<KeyManagementOptions>()
+        .Configure<IXmlRepository>((options, repository) => { options.XmlRepository = repository; });
+}
+
 builder.Services.AddSingleton<BlogService>();
 builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();
