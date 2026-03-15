@@ -73,9 +73,49 @@ public class AIModerationServiceTests
         Assert.Equal(1, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task IsCommentSafeAsync_WithApiKey_UnexpectedPayload_IsHeldForManualReview()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key"
+            })
+            .Build();
+
+        using var handler = new FakeOpenAiModerationHandler(@"{""results"":[{}]}");
+        using var client = new HttpClient(handler);
+        var service = new AIModerationService(client, config, NullLogger<AIModerationService>.Instance);
+
+        var isSafe = await service.IsCommentSafeAsync("edge-case payload");
+
+        Assert.False(isSafe);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task IsCommentSafeAsync_WithApiKey_MissingResults_IsHeldForManualReview()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key"
+            })
+            .Build();
+
+        using var handler = new FakeOpenAiModerationHandler(@"{""id"":""modr_test""}");
+        using var client = new HttpClient(handler);
+        var service = new AIModerationService(client, config, NullLogger<AIModerationService>.Instance);
+
+        var isSafe = await service.IsCommentSafeAsync("another edge-case payload");
+
+        Assert.False(isSafe);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
     private sealed class FakeOpenAiModerationHandler : HttpMessageHandler
     {
-        private readonly bool _flagged;
+        private readonly string _responseJson;
 
         public int RequestCount { get; private set; }
         public Uri? LastRequestUri { get; private set; }
@@ -84,8 +124,13 @@ public class AIModerationServiceTests
         public string LastRequestBody { get; private set; } = string.Empty;
 
         public FakeOpenAiModerationHandler(bool flagged)
+            : this($@"{{""results"":[{{""flagged"":{flagged.ToString().ToLowerInvariant()}}}]}}")
         {
-            _flagged = flagged;
+        }
+
+        public FakeOpenAiModerationHandler(string responseJson)
+        {
+            _responseJson = responseJson;
         }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -96,11 +141,9 @@ public class AIModerationServiceTests
             LastAuthParameter = request.Headers.Authorization?.Parameter;
             LastRequestBody = await (request.Content?.ReadAsStringAsync(cancellationToken) ?? Task.FromResult(string.Empty));
 
-            var json = $@"{{""results"":[{{""flagged"":{_flagged.ToString().ToLowerInvariant()}}}]}}";
-
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
+                Content = new StringContent(_responseJson, Encoding.UTF8, "application/json")
             };
         }
     }

@@ -180,6 +180,34 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task BlogPost_AdminSession_DoesNotRenderPendingComments()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var pendingComment = new Comment
+        {
+            PostId = postId,
+            Author = "Pending Visibility Test",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(pendingComment);
+        Assert.False(pendingComment.IsApproved, "Expected test comment to require moderation.");
+
+        using var client = CreateClient("10.0.1.2");
+        await LoginAsAdminAsync(client);
+
+        var postHtml = await client.GetStringAsync($"/blog/{Uri.EscapeDataString(postId)}");
+        Assert.DoesNotContain($"id=\"comment-{pendingComment.Id}\"", postHtml, StringComparison.Ordinal);
+
+        var adminHtml = await client.GetStringAsync("/Admin");
+        Assert.Contains("Pending Comments", adminHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Pending Visibility Test", adminHtml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ApproveComment_SetsFlagAndMakesVisible()
     {
         using var scope = _factory.Services.CreateScope();
@@ -477,5 +505,23 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         Assert.True(match.Success, $"Anti-forgery token was not found in response for '{path}'.");
         return match.Groups[1].Value;
+    }
+
+    private static async Task LoginAsAdminAsync(HttpClient client)
+    {
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/Admin/Login");
+        var username = Environment.GetEnvironmentVariable("ADMIN_USERNAME") ?? "admin";
+        var password = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "password";
+
+        using var response = await client.PostAsync("/Admin/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["username"] = username,
+            ["password"] = password,
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.True(
+            response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Found,
+            $"Expected success or redirect when logging in as admin, got {(int)response.StatusCode}.");
     }
 }

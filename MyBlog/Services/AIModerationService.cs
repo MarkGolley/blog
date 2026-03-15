@@ -55,7 +55,14 @@ public class AIModerationService
 
             var responseContent = await response.Content.ReadAsStringAsync();
             var moderationResult = JsonSerializer.Deserialize<OpenAIModerationResponse>(responseContent, JsonOptions);
-            var flagged = moderationResult?.Results?.FirstOrDefault()?.Flagged == true;
+            var firstResult = moderationResult?.Results?.FirstOrDefault();
+            if (firstResult?.Flagged is not bool flagged)
+            {
+                _logger.LogWarning(
+                    "OpenAI moderation response did not include a usable flagged decision. Comment will require manual review.");
+                return false;
+            }
+
             var requestId = response.Headers.TryGetValues("x-request-id", out var values)
                 ? values.FirstOrDefault()
                 : null;
@@ -83,6 +90,6 @@ public class AIModerationService
 
     private class ModerationResult
     {
-        public bool Flagged { get; set; }
+        public bool? Flagged { get; set; }
     }
 }

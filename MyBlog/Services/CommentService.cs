@@ -219,7 +219,7 @@ public class CommentService
             .ToList();
     }
 
-    private async Task AddCommentInMemory(Comment comment, AIModerationService? aiModerationService)
+    private async Task AddCommentInMemory(Comment comment, AIModerationService aiModerationService)
     {
         // AI check outside lock
         comment.IsApproved = await aiModerationService.IsCommentSafeAsync(comment.Content);
