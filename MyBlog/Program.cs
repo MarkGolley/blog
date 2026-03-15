@@ -12,6 +12,10 @@ var builder = WebApplication.CreateBuilder(args);
 var secureCookiePolicy = builder.Environment.IsDevelopment()
     ? CookieSecurePolicy.SameAsRequest
     : CookieSecurePolicy.Always;
+var appVersion =
+    Environment.GetEnvironmentVariable("APP_VERSION")
+    ?? builder.Configuration["App:Version"]
+    ?? "unknown";
 
 // ----------------------------
 // Cloud Run Port Binding
@@ -229,6 +233,7 @@ app.Use(async (context, next) =>
         headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
         headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
         headers.TryAdd("X-Permitted-Cross-Domain-Policies", "none");
+        headers["X-App-Version"] = appVersion;
 
         if (ShouldDisableCaching(context))
         {

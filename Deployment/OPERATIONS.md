@@ -44,6 +44,20 @@ Batch wrappers are available if you want double-click launch:
 - `run_tests.bat` -> runs `run_checks.ps1 -Mode Tests`
 - `run_predeploy_checks.bat` -> runs `run_checks.ps1 -Mode PreDeploy`
 
+## Deployment Verification
+
+After deploy, verify that the latest revision is serving:
+
+```powershell
+curl.exe -sSI https://markgolley.dev/admin/login
+```
+
+Check these headers:
+
+- `X-App-Version` should match the deploy timestamp tag printed by `Deployment/deploy.ps1`.
+- `CF-Cache-Status` should be `DYNAMIC`.
+- `Cache-Control` should include `no-store`.
+
 ## Backup Routine
 
 Script: `Deployment/backup.ps1`

@@ -454,6 +454,16 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Responses_IncludeAppVersionHeader()
+    {
+        using var client = CreateClient("10.0.3.10", allowAutoRedirect: false);
+
+        using var response = await client.GetAsync("/admin/login");
+        Assert.True(response.Headers.TryGetValues("X-App-Version", out var values));
+        Assert.False(string.IsNullOrWhiteSpace(values.FirstOrDefault()));
+    }
+
+    [Fact]
     public async Task AdminLogin_MissingAntiForgeryToken_StillAuthenticates()
     {
         using var client = CreateClient("10.0.3.3", allowAutoRedirect: false);
