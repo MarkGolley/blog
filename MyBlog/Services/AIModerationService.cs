@@ -1,17 +1,23 @@
 using System.Text.Json;
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Configuration;
 
 namespace MyBlog.Services;
 
 public class AIModerationService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly HttpClient _httpClient;
     private readonly string? _apiKey;
 
-    public AIModerationService(HttpClient httpClient)
+    public AIModerationService(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
-        _apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        _apiKey = configuration["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
     }
 
     public async Task<bool> IsCommentSafeAsync(string content)
@@ -39,7 +45,7 @@ public class AIModerationService
             response.EnsureSuccessStatusCode();
 
             var responseContent = await response.Content.ReadAsStringAsync();
-            var moderationResult = JsonSerializer.Deserialize<OpenAIModerationResponse>(responseContent);
+            var moderationResult = JsonSerializer.Deserialize<OpenAIModerationResponse>(responseContent, JsonOptions);
 
             // If any category is flagged, consider unsafe
             return moderationResult?.Results?.FirstOrDefault()?.Flagged != true;
