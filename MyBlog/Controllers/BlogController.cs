@@ -12,6 +12,10 @@ public class BlogController : Controller
 {
     private const string VisitorIdCookieName = "myblog_visitor_id";
     private const string CommentBannerTempDataKey = "CommentBanner";
+    private const string ModerationStatusQueryKey = "commentStatus";
+    private const string ModerationStatusPendingValue = "moderated";
+    private const string CommentModerationBannerMessage =
+        "Your comment was not published because it did not meet our moderation standards.";
     private const int MaxPinnedPosts = 3;
     private const int MaxRelatedPosts = 3;
     private static readonly Regex RelatedTokenRegex = new(@"[A-Za-z0-9#\+\.]+", RegexOptions.Compiled);
@@ -88,6 +92,7 @@ public class BlogController : Controller
     }
     
     [HttpGet("/blog/{slug}", Name = "blogPost")]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> Post(string slug)
     {
         var post = _blogService.GetPostBySlug(slug);
@@ -142,9 +147,8 @@ public class BlogController : Controller
         var postUrl = BuildPostPath(comment.PostId);
         if (!comment.IsApproved)
         {
-            TempData[CommentBannerTempDataKey] =
-                "Your comment was not published because it did not meet our moderation standards.";
-            return Redirect($"{postUrl}#add-comment-title");
+            TempData[CommentBannerTempDataKey] = CommentModerationBannerMessage;
+            return Redirect($"{postUrl}?{ModerationStatusQueryKey}={ModerationStatusPendingValue}#add-comment-title");
         }
 
         return Redirect($"{postUrl}#comment-{comment.Id}");

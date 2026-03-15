@@ -17,6 +17,7 @@ public class AdminController : Controller
     }
 
     [HttpGet]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Login()
     {
         return View();
@@ -29,12 +30,14 @@ public class AdminController : Controller
         // Simple check - in production, use proper auth
         var adminUsername = Environment.GetEnvironmentVariable("ADMIN_USERNAME") ?? "admin";
         var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "password";
+        var normalizedUsername = username?.Trim() ?? string.Empty;
 
-        if (username == adminUsername && password == adminPassword)
+        if (string.Equals(normalizedUsername, adminUsername, StringComparison.OrdinalIgnoreCase) &&
+            password == adminPassword)
         {
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, username),
+                new Claim(ClaimTypes.Name, normalizedUsername),
                 new Claim(ClaimTypes.Role, "Admin")
             };
 
@@ -63,6 +66,7 @@ public class AdminController : Controller
     }
 
     [Authorize]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> Index()
     {
         var pendingComments = await _commentService.GetPendingCommentsAsync();

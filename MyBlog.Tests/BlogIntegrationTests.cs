@@ -120,6 +120,34 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task AddComment_UnsafeContent_RedirectsWithModerationStatusAndShowsBanner()
+    {
+        var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+        using var client = CreateClient("10.0.1.3", allowAutoRedirect: false);
+
+        var response = await SubmitCommentAsync(
+            client,
+            postId,
+            parentCommentId: null,
+            author: "Banner Test",
+            content: "kill yourself you deserve to die");
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        var location = response.Headers.Location;
+        Assert.NotNull(location);
+        Assert.Contains("commentStatus=moderated", location!.OriginalString, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("#add-comment-title", location.OriginalString, StringComparison.Ordinal);
+
+        var redirectedPath = location.OriginalString.Split('#')[0];
+        var postHtml = await client.GetStringAsync(redirectedPath);
+
+        Assert.Contains(
+            "Your comment was not published because it did not meet our moderation standards.",
+            postHtml,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetComments_NonAdmin_ExcludesUnapprovedComments()
     {
         using var scope = _factory.Services.CreateScope();
@@ -399,6 +427,19 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Equal(postId, root.GetProperty("postId").GetString());
     }
 
+    [Fact]
+    public async Task AdminLogin_CanLoginLogoutAndLoginAgain()
+    {
+        using var client = CreateClient("10.0.3.2", allowAutoRedirect: false);
+
+        await LoginAsAdminAsync(client);
+        await LogoutAsAdminAsync(client);
+        await LoginAsAdminAsync(client);
+
+        using var adminResponse = await client.GetAsync("/Admin");
+        Assert.Equal(HttpStatusCode.OK, adminResponse.StatusCode);
+    }
+
     private HttpClient CreateClient(string forwardedForIp, bool allowAutoRedirect = true)
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -523,5 +564,19 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.True(
             response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Found,
             $"Expected success or redirect when logging in as admin, got {(int)response.StatusCode}.");
+    }
+
+    private static async Task LogoutAsAdminAsync(HttpClient client)
+    {
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/Admin");
+
+        using var response = await client.PostAsync("/Admin/Logout", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.True(
+            response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Found,
+            $"Expected success or redirect when logging out admin, got {(int)response.StatusCode}.");
     }
 }

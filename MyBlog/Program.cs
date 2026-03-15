@@ -4,9 +4,13 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
+using Microsoft.AspNetCore.HttpOverrides;
 using MyBlog.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+var secureCookiePolicy = builder.Environment.IsDevelopment()
+    ? CookieSecurePolicy.SameAsRequest
+    : CookieSecurePolicy.Always;
 
 // ----------------------------
 // Cloud Run Port Binding
@@ -19,18 +23,32 @@ builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 // Services
 // ----------------------------
 builder.Services.AddControllersWithViews();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto |
+        ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = "myblog.antiforgery.v2";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SameSite = SameSiteMode.Strict;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = secureCookiePolicy;
 });
 builder.Services.AddAuthentication("CookieAuth")
     .AddCookie("CookieAuth", options =>
     {
         options.LoginPath = "/Admin/Login";
         options.AccessDeniedPath = "/Admin/AccessDenied";
+        options.Cookie.Name = "myblog.auth.v1";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = secureCookiePolicy;
+        options.SlidingExpiration = true;
     });
 
 var firestoreProjectId =
@@ -199,6 +217,7 @@ else
     app.UseHsts();
 }
 
+app.UseForwardedHeaders();
 app.Use(async (context, next) =>
 {
     context.Response.OnStarting(() =>
