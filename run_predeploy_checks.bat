@@ -1,5 +1,5 @@
 @echo off
 setlocal
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run_checks.ps1" -Mode PreDeploy
-exit /b %ERRORLEVEL%
+set SCRIPT_DIR=%~dp0
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%run_checks.ps1" -Mode PreDeploy %*
+endlocal
