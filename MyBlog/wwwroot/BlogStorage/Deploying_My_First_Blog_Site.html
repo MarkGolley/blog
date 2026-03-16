@@ -22,6 +22,18 @@
 <pre><code>bash: line 1: dotnet: command not found</code></pre>
 <p>Render describes their Static Site option as “great for blogs”, which sounded right at first. But it only works for purely static HTML/CSS/JS with no server-side code. That was the issue.</p>
 
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">Why "dotnet not found" happened on Render Static Site and why Web Service fixed it.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <p>Render Static Sites are designed to host build output like plain HTML, CSS, and JavaScript. They are not a runtime for ASP.NET Core processes.</p>
+        <p>My app needed a server process to run MVC routes and middleware, so it required a containerized runtime environment rather than static hosting.</p>
+        <p>Switching to Render Web Service + Docker gave me the correct runtime model: build image, run container, expose HTTP port.</p>
+    </div>
+</details>
+
 <h2>Attempt 2: Docker Deployment – Web Service</h2>
 <p>A Web Service supports server-side code and building from a Dockerfile, so it was a better fit for my C# ASP.NET Core application.</p>
 <p>I wrote a <code>Dockerfile</code> using the official .NET 8 SDK image, published the app, and exposed port 80.</p>

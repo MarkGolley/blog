@@ -29,6 +29,19 @@
 <pre><code>var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Urls.Add($"http://0.0.0.0:{port}");
 app.Run();</code></pre>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">Why Cloud Run port binding matters for container health and traffic routing.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <p>Cloud Run injects a <code>PORT</code> environment variable and expects your process to listen on that exact port.</p>
+        <p>If your app binds to a different port, the container can start but fails readiness checks, so Cloud Run cannot route traffic to it.</p>
+        <p>Binding to <code>0.0.0.0:{PORT}</code> ensures the service is reachable from the Cloud Run proxy rather than only from inside the container.</p>
+    </div>
+</details>
+
 <p>Before pushing anything, I tested the container locally:</p>
 <pre><code>docker build -t myblog-app .
 docker run -p 8080:8080 -e PORT=8080 myblog-app</code></pre>

@@ -1,0 +1,141 @@
+<!-- PublishedDate: 2026-03-16 -->
+<!-- Tags: ASP.NET, C#, AI, Moderation, Security, Testing -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>What 16 Hours of AI Comment Moderation and Admin Work Taught Me</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+
+<h1>What 16 Hours of AI Comment Moderation and Admin Work Taught Me</h1>
+
+<p>I thought this would be a quick feature. Add AI moderation, add an admin page, done. In reality it was around 16 hours and touched authentication, security headers, anti-forgery behaviour, UI feedback, test coverage, and deployment quirks 😮‍💨.</p>
+
+<p>It was definitely worth doing though. The comment system now behaves much more like a real production feature rather than a basic form that accepts everything.</p>
+
+<h2>What I was trying to solve</h2>
+
+<p>I wanted two clear outcomes:</p>
+
+<ul>
+    <li>New comments and replies should be checked before they appear publicly</li>
+    <li>I need an admin flow to approve or delete comments quickly</li>
+</ul>
+
+<p>The tricky part is that this is not one feature, it is a chain of features that all need to work together without breaking the reader experience.</p>
+
+<h2>Part 1: AI moderation in the comment pipeline</h2>
+
+<p>I added an <code>AIModerationService</code> that calls OpenAI's moderation endpoint using <code>omni-moderation-latest</code>. Every comment is checked in <code>CommentService.AddCommentAsync</code> before it is stored. It seems like a cheap and efficient way to get moderation in place without having to moderate myself! I also added cost controls to limit the spend to just $1, which gets you a massive amount of moderation!!</p>
+
+<p>Beyond this, an important design choice was fail-safe behaviour:</p>
+
+<ul>
+    <li>If the API key is missing, the comment is held for manual review</li>
+    <li>If the moderation call fails, my budget is exceeded, or the payload is unexpected, the comment is held for manual review</li>
+    <li>Only clearly safe comments are auto-approved</li>
+</ul>
+
+<p>That sounds strict, but strict is what I wanted for moderation. Better to review one extra comment than publish one harmful one (given my work background this makes sense!!).</p>
+
+<h2>Part 2: separating pending vs visible comments</h2>
+
+<p>Each comment now has an <code>IsApproved</code> flag. Public blog pages only render approved comments, while pending comments are visible in admin.</p>
+
+<p>On submit, I also added clear user feedback. If a comment is held back, the user is redirected to the post with a moderation status and sees a clear banner message near the form. This avoids the "did my comment just disappear?" confusion.</p>
+
+<p>Replies go through the same moderation path, and the existing thread depth limits still apply.</p>
+
+<h2>Part 3: building an admin layer that is simple but usable</h2>
+
+<p>I added an <code>AdminController</code> with a cookie-auth login flow and a dashboard listing pending comments. Credentials are read from environment variables. Once logged in, I can:</p>
+
+<ul>
+    <li>Approve a pending comment</li>
+    <li>Delete a comment</li>
+    <li>Delete full comment threads (parent and all replies)</li>
+</ul>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">Cookie auth flow explained. Skip this section if you already know cookie-based auth.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <h3>Step 1: login request</h3>
+        <p>You post username/password to <code>/Admin/Login</code>. The server checks those values against admin credentials from environment variables.</p>
+
+        <h3>Step 2: session cookie is created</h3>
+        <p>If credentials match, the server creates a <code>ClaimsIdentity</code> with an <code>Admin</code> role and calls <code>SignInAsync</code>. ASP.NET Core then issues an encrypted auth cookie called <code>__session</code>.</p>
+
+        <h3>Step 3: protected routes trust the cookie</h3>
+        <p>On later requests, the browser automatically sends that cookie. Any action marked with <code>[Authorize]</code> (for example approve/delete actions) only runs if that cookie is valid.</p>
+
+        <h3>Step 4: logout clears access</h3>
+        <p>When logout runs, <code>SignOutAsync</code> clears the auth session, so protected admin actions are blocked again until you log back in.</p>
+
+        <p>I also hardened the cookie settings so it is not just "works on my machine". The cookie is <code>HttpOnly</code>, uses <code>SameSite=Lax</code>, is marked secure in production, and auth pages are served with no-store caching to avoid stale session pages.</p>
+
+        <p>This is still a simple admin model (shared credentials from environment variables), but it is a practical step up from no auth at all and it keeps moderation tooling private.</p>
+    </div>
+</details>
+
+<p>That last point mattered. Deleting just the parent and leaving orphaned replies would create messy data and confusing UI, so delete operations now walk the thread and remove descendants too.</p>
+
+<h2>The awkward bits that consumed most of the time</h2>
+
+<p>The big effort was not writing the happy path. It was handling everything around it.</p>
+
+<ul>
+    <li>Anti-forgery token issues on repeated form interactions</li>
+    <li>Recovering from 400 responses by redirecting users back with a <code>form=expired</code> hint</li>
+    <li>Honeypot handling and clearer messaging when hidden fields are auto-filled</li>
+    <li>No-store caching on dynamic/admin pages so auth and moderation state is never stale</li>
+    <li>Case-insensitive admin login handling</li>
+</ul>
+
+<p>Each one looks minor on its own, but together they are the difference between "works on localhost" and "works reliably".</p>
+
+<h2>Testing was what made this feel safe to ship</h2>
+
+<p>I ended up with a mix of tests around the flow:</p>
+
+<ul>
+    <li>Unit tests for moderation service behaviour (safe, flagged, missing key, unexpected payload)</li>
+    <li>Integration tests for comment visibility, moderation redirects, admin actions, and auth flows</li>
+    <li>Live moderation verification tests (when API key is available)</li>
+    <li>Playwright E2E checks for mobile moderation banners and login/logout journeys</li>
+</ul>
+
+<p>Without these tests I would not trust changes around security and moderation because regressions here are easy to miss and expensive when they leak into production.</p>
+
+<h2>What I learned</h2>
+
+<p>A few things stood out:</p>
+
+<ul>
+    <li>Moderation is a reliability feature, not just an AI feature</li>
+    <li>Fail-safe defaults are essential when external APIs are involved</li>
+    <li>Admin tooling needs just as much thought as public UX</li>
+    <li>Most engineering time goes into edge cases and operational behaviour</li>
+    <li>Automated tests are the only way to keep confidence while iterating quickly</li>
+</ul>
+
+<h2>What I would improve next</h2>
+
+<p>This is a good baseline, but there is still plenty to improve:</p>
+
+<ul>
+    <li>Move from simple env-var credentials to a stronger admin auth model</li>
+    <li>Add soft delete and moderation audit history</li>
+    <li>Add moderator notes/reason codes on approvals and rejections</li>
+    <li>Potentially queue moderation for better resilience under heavy load</li>
+</ul>
+
+<p>Overall, this was one of those features that looked small and taught me a lot. The functionality is better, but the bigger win is understanding the full lifecycle around trust, safety, and operability.</p>
+
+</body>
+</html>

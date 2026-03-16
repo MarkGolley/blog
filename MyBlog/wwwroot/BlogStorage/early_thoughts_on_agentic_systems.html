@@ -15,6 +15,18 @@
 
 <p>Recently though, I was introduced to something slightly different. Not just “AI that suggests things”, but AI that can decide which tools to use, call them, gather data, and then synthesise a response. This started to feel different! It wasn’t just chat anymore it was orchestration.</p>
 
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">How agentic AI differs from normal assistant chat and why that changes system design.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <p>Standard assistant workflows are usually prompt in, response out.</p>
+        <p>Agentic workflows add a loop: reason about intent, call tools, inspect results, and decide whether to call more tools before responding.</p>
+        <p>That shift pushes engineering effort toward tool contracts, runtime safety, and observability rather than just prompt wording.</p>
+    </div>
+</details>
+
 <h2>From assistant to orchestrator</h2>
 
 <p>Most AI usage today is some text in and some text out. You ask a question and it replies. You paste code in and it improves it (sometimes?! Most of the time?!). It's really helpful but quite contained. What I’ve been experimenting with is closer to what people are calling “agentic systems”. Instead of only generating text, the model can:</p>

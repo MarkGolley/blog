@@ -15,6 +15,18 @@
 
 <p>So the comments feature 'worked'… but comments did not persist. Which slightly defeats the point of a comment section right?</p>
 
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">Why local comment storage looked fine at first but failed after deployment cycles.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <p>Cloud Run instances are ephemeral. Writing to local disk inside the container does not create durable application data.</p>
+        <p>When instances are replaced or new revisions are deployed, local files can disappear because state is tied to that specific container lifecycle.</p>
+        <p>Moving comments to Cloud SQL separates application compute from data persistence, which is the core cloud-native pattern.</p>
+    </div>
+</details>
+
 <h2>The obvious fix: use a real database</h2>
 
 <p>The correct solution was to move comments into Cloud SQL using PostgreSQL and Entity Framework Core, so on paper this looked straightforward:</p>
