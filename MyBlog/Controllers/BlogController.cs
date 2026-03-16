@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Antiforgery;
 using MailKit.Net.Smtp;
 using MimeKit;
 using System.Text.RegularExpressions;
@@ -11,6 +12,14 @@ namespace MyBlog.Controllers;
 public class BlogController : Controller
 {
     private const string VisitorIdCookieName = "myblog_visitor_id";
+    private const string CommentBannerTempDataKey = "CommentBanner";
+    private const string ModerationStatusQueryKey = "commentStatus";
+    private const string ModerationStatusPendingValue = "moderated";
+    private const string ModerationStatusBlockedValue = "blocked";
+    private const string CommentModerationBannerMessage =
+        "Your comment was not published because it did not meet our moderation standards.";
+    private const string CommentSubmissionBlockedBannerMessage =
+        "Your comment could not be submitted. Please try again and make sure auto-fill is off for hidden fields.";
     private const int MaxPinnedPosts = 3;
     private const int MaxRelatedPosts = 3;
     private static readonly Regex RelatedTokenRegex = new(@"[A-Za-z0-9#\+\.]+", RegexOptions.Compiled);
@@ -18,17 +27,20 @@ public class BlogController : Controller
     private readonly BlogService _blogService;
     private readonly CommentService _commentService;
     private readonly LikeService _likeService;
+    private readonly IAntiforgery _antiforgery;
     private readonly ILogger<BlogController> _logger;
 
     public BlogController(
         BlogService blogService,
         CommentService commentService,
         LikeService likeService,
+        IAntiforgery antiforgery,
         ILogger<BlogController> logger)
     {
         _blogService = blogService;
         _commentService = commentService;
         _likeService = likeService;
+        _antiforgery = antiforgery;
         _logger = logger;
     }
     
@@ -87,6 +99,7 @@ public class BlogController : Controller
     }
     
     [HttpGet("/blog/{slug}", Name = "blogPost")]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> Post(string slug)
     {
         var post = _blogService.GetPostBySlug(slug);
@@ -111,8 +124,9 @@ public class BlogController : Controller
                 return RedirectToAction(nameof(Index));
             }
 
-            var spamPostUrl = Url.RouteUrl("blogPost", new { slug = comment.PostId }) ?? $"/blog/{comment.PostId}";
-            return Redirect(spamPostUrl);
+            var spamPostUrl = BuildPostPath(comment.PostId);
+            TempData[CommentBannerTempDataKey] = CommentSubmissionBlockedBannerMessage;
+            return Redirect($"{spamPostUrl}?{ModerationStatusQueryKey}={ModerationStatusBlockedValue}#add-comment-title");
         }
 
         if (!ModelState.IsValid)
@@ -138,8 +152,27 @@ public class BlogController : Controller
 
         await SendNewCommentAlertAsync(comment);
         
-        var postUrl = Url.RouteUrl("blogPost", new { slug = comment.PostId }) ?? $"/blog/{comment.PostId}";
+        var postUrl = BuildPostPath(comment.PostId);
+        if (!comment.IsApproved)
+        {
+            TempData[CommentBannerTempDataKey] = CommentModerationBannerMessage;
+            return Redirect($"{postUrl}?{ModerationStatusQueryKey}={ModerationStatusPendingValue}#add-comment-title");
+        }
+
         return Redirect($"{postUrl}#comment-{comment.Id}");
+    }
+
+    [HttpGet("/blog/comment-token")]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult CommentToken()
+    {
+        var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+        if (string.IsNullOrWhiteSpace(tokens.RequestToken))
+        {
+            return StatusCode(500, new { success = false, error = "Unable to refresh form token." });
+        }
+
+        return Json(new { success = true, token = tokens.RequestToken });
     }
 
     [HttpPost]
@@ -174,12 +207,12 @@ public class BlogController : Controller
 
         if (string.Equals(returnTo, "index", StringComparison.OrdinalIgnoreCase))
         {
-            var blogIndexUrl = Url.RouteUrl("blogIndex") ?? "/blog";
+            var blogIndexUrl = BuildBlogIndexPath();
             var indexAnchor = string.IsNullOrWhiteSpace(returnAnchor) ? $"post-{postId}" : returnAnchor;
             return Redirect($"{blogIndexUrl}#{indexAnchor}");
         }
 
-        var postUrl = Url.RouteUrl("blogPost", new { slug = returnSlug ?? postId }) ?? $"/blog/{returnSlug ?? postId}";
+        var postUrl = BuildPostPath(returnSlug ?? postId);
         if (!string.IsNullOrWhiteSpace(returnAnchor))
         {
             return Redirect($"{postUrl}#{returnAnchor}");
@@ -211,7 +244,7 @@ public class BlogController : Controller
             return NotFound();
         }
 
-        var baseUrl = Url.RouteUrl("blogPost", new { slug = returnSlug ?? postId }) ?? $"/blog/{returnSlug ?? postId}";
+        var baseUrl = BuildPostPath(returnSlug ?? postId);
         var anchor = string.IsNullOrWhiteSpace(returnAnchor) ? $"comment-{commentId}" : returnAnchor;
         return Redirect($"{baseUrl}#{anchor}");
     }
@@ -219,7 +252,7 @@ public class BlogController : Controller
     private async Task<BlogPostViewModel> BuildPostViewModelAsync(BlogPost post)
     {
         var visitorId = GetOrCreateVisitorId();
-        var comments = await _commentService.GetCommentsAsync(post.Id);
+        var comments = await _commentService.GetCommentsAsync(post.Id, includeUnapproved: false);
         var commentIds = FlattenCommentIds(comments);
         var commentLikeSummaries = await _likeService.GetCommentLikeSummariesAsync(commentIds, visitorId);
         ApplyLikeSummaries(comments, commentLikeSummaries);
@@ -326,6 +359,16 @@ public class BlogController : Controller
 
             ApplyLikeSummaries(comment.Replies, summaries);
         }
+    }
+
+    private static string BuildPostPath(string slug)
+    {
+        return $"/blog/{Uri.EscapeDataString(slug)}";
+    }
+
+    private static string BuildBlogIndexPath()
+    {
+        return "/blog";
     }
 
     private string GetOrCreateVisitorId()

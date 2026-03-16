@@ -15,6 +15,83 @@ Example:
 Invoke-RestMethod http://localhost:5207/health
 ```
 
+## Pre-Deploy Checks
+
+Run from repo root:
+
+```powershell
+.\run_checks.ps1 -Mode PreDeploy
+```
+
+What it does:
+
+- Runs the existing test suite.
+- Installs Playwright Chromium for browser-based checks.
+- Runs mobile + desktop E2E checks that exercise comment moderation banner visibility and admin login/logout flows.
+
+If `OPENAI_API_KEY` is not set in your environment, the live moderation test is automatically skipped.
+
+Additional modes:
+
+```powershell
+.\run_checks.ps1 -Mode Tests
+.\run_checks.ps1 -Mode E2E
+.\run_checks.ps1 -Mode PreDeploy -SkipBrowserInstall
+```
+
+Batch wrappers are available if you want double-click launch:
+
+- `run_tests.bat` -> runs `run_checks.ps1 -Mode Tests`
+- `run_predeploy_checks.bat` -> runs `run_checks.ps1 -Mode PreDeploy`
+
+## Deployment Verification
+
+After deploy, verify that the latest revision is serving:
+
+```powershell
+curl.exe -sSI https://markgolley.dev/admin/login
+```
+
+Check these headers:
+
+- `X-App-Version` should match the deploy timestamp tag printed by `Deployment/deploy.ps1`.
+- `CF-Cache-Status` should be `DYNAMIC`.
+- `Cache-Control` should include `no-store`.
+
+### Auth + Comment Smoke Check
+
+Run this after each deploy:
+
+```powershell
+.\Deployment\verify-production-auth.ps1
+```
+
+What it verifies:
+
+- Admin login works on direct Cloud Run URL.
+- Admin login works on your public domain.
+- Moderated comment flow redirects with `commentStatus=moderated` on both direct and public URLs.
+- Admin login may complete via either `302 -> /admin` or a direct `200` dashboard render, both treated as valid.
+
+If direct passes but public fails, the issue is edge/proxy behavior (not app code), usually cookie stripping on `GET /admin`.
+
+Quick signal for cookie stripping on public edge:
+
+- Repeat `GET /blog` twice with the same cookie jar.
+- If `myblog.antiforgery.v2` changes on every GET for public edge but stays stable on direct Cloud Run, the edge is not forwarding cookies on GET.
+
+Cloudflare guidance in that case:
+
+- Ensure cache is bypassed for dynamic routes (`/admin*`, `/blog*`, `/subscribe*`, `/health`).
+- Ensure no Transform Rule / Worker removes the `Cookie` request header on those routes.
+- Ensure no rule strips auth cookies (for this app: `myblog.auth.v1`) before origin fetch.
+
+Convenience wrapper:
+
+```powershell
+.\Deployment\verify-production-auth.bat
+```
+
 ## Backup Routine
 
 Script: `Deployment/backup.ps1`

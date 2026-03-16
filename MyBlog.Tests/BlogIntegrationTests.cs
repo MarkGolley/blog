@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using MyBlog.Models;
 using MyBlog.Services;
 
 namespace MyBlog.Tests;
@@ -77,6 +78,244 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, tooDeepResponse.StatusCode);
         var responseBody = await tooDeepResponse.Content.ReadAsStringAsync();
         Assert.Contains("Reply depth limit reached", responseBody, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AddComment_SafeContent_IsApprovedImmediately()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var comment = new Comment
+        {
+            PostId = postId,
+            Author = "Test User",
+            Content = "This is a great article, thanks for sharing!"
+        };
+        await commentService.AddCommentAsync(comment);
+
+        Assert.True(comment.IsApproved, "Safe comment should be approved immediately");
+        Assert.NotEqual(0, comment.Id);
+    }
+
+    [Fact]
+    public async Task AddComment_UnsafeContent_RequiresManualReview()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var comment = new Comment
+        {
+            PostId = postId,
+            Author = "Spammer",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(comment);
+
+        Assert.False(comment.IsApproved, "Unsafe content should be flagged and require manual review");
+    }
+
+    [Fact]
+    public async Task AddComment_UnsafeContent_RedirectsWithModerationStatusAndShowsBanner()
+    {
+        var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+        using var client = CreateClient("10.0.1.3", allowAutoRedirect: false);
+
+        var response = await SubmitCommentAsync(
+            client,
+            postId,
+            parentCommentId: null,
+            author: "Banner Test",
+            content: "kill yourself you deserve to die");
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        var location = response.Headers.Location;
+        Assert.NotNull(location);
+        Assert.Contains("commentStatus=moderated", location!.OriginalString, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("#add-comment-title", location.OriginalString, StringComparison.Ordinal);
+
+        var redirectedPath = location.OriginalString.Split('#')[0];
+        var postHtml = await client.GetStringAsync(redirectedPath);
+
+        Assert.Contains(
+            "Your comment was not published because it did not meet our moderation standards.",
+            postHtml,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AddComment_HoneypotTriggered_RedirectsWithBlockedStatusAndShowsBanner()
+    {
+        var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+        using var client = CreateClient("10.0.1.4", allowAutoRedirect: false);
+
+        var response = await SubmitCommentAsync(
+            client,
+            postId,
+            parentCommentId: null,
+            author: "Honeypot Banner Test",
+            content: "This should be blocked by honeypot.",
+            honeypotValue: "autofilled");
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        var location = response.Headers.Location;
+        Assert.NotNull(location);
+        Assert.Contains("commentStatus=blocked", location!.OriginalString, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("#add-comment-title", location.OriginalString, StringComparison.Ordinal);
+
+        var redirectedPath = location.OriginalString.Split('#')[0];
+        var postHtml = await client.GetStringAsync(redirectedPath);
+
+        Assert.Contains(
+            "Your comment could not be submitted. Please try again and make sure auto-fill is off for hidden fields.",
+            postHtml,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetComments_NonAdmin_ExcludesUnapprovedComments()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var safeComment = new Comment
+        {
+            PostId = postId,
+            Author = "Good User",
+            Content = "Great post!"
+        };
+        await commentService.AddCommentAsync(safeComment);
+
+        var unsafeComment = new Comment
+        {
+            PostId = postId,
+            Author = "Bad User",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(unsafeComment);
+
+        var visibleComments = await commentService.GetCommentsAsync(postId, includeUnapproved: false);
+
+        Assert.Contains(visibleComments, c => c.Comment.Id == safeComment.Id);
+        Assert.DoesNotContain(visibleComments, c => c.Comment.Id == unsafeComment.Id);
+    }
+
+    [Fact]
+    public async Task GetComments_Admin_IncludesUnapprovedComments()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var safeComment = new Comment
+        {
+            PostId = postId,
+            Author = "Good User",
+            Content = "Great post!"
+        };
+        await commentService.AddCommentAsync(safeComment);
+
+        var unsafeComment = new Comment
+        {
+            PostId = postId,
+            Author = "Bad User",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(unsafeComment);
+
+        var allComments = await commentService.GetCommentsAsync(postId, includeUnapproved: true);
+
+        Assert.Contains(allComments, c => c.Comment.Id == safeComment.Id);
+        Assert.Contains(allComments, c => c.Comment.Id == unsafeComment.Id);
+    }
+
+    [Fact]
+    public async Task BlogPost_AdminSession_DoesNotRenderPendingComments()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var pendingComment = new Comment
+        {
+            PostId = postId,
+            Author = "Pending Visibility Test",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(pendingComment);
+        Assert.False(pendingComment.IsApproved, "Expected test comment to require moderation.");
+
+        using var client = CreateClient("10.0.1.2");
+        await LoginAsAdminAsync(client);
+
+        var postHtml = await client.GetStringAsync($"/blog/{Uri.EscapeDataString(postId)}");
+        Assert.DoesNotContain($"id=\"comment-{pendingComment.Id}\"", postHtml, StringComparison.Ordinal);
+
+        var adminHtml = await client.GetStringAsync("/Admin");
+        Assert.Contains("Pending Comments", adminHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Pending Visibility Test", adminHtml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ApproveComment_SetsFlagAndMakesVisible()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var flaggedComment = new Comment
+        {
+            PostId = postId,
+            Author = "Flagged User",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(flaggedComment);
+
+        Assert.False(flaggedComment.IsApproved);
+
+        await commentService.ApproveCommentAsync(flaggedComment.Id);
+
+        var visibleComments = await commentService.GetCommentsAsync(postId, includeUnapproved: false);
+        Assert.Contains(visibleComments, c => c.Comment.Id == flaggedComment.Id && c.Comment.IsApproved);
+    }
+
+    [Fact]
+    public async Task GetPendingComments_ReturnsOnlyUnapprovedComments()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var commentService = scope.ServiceProvider.GetRequiredService<CommentService>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postId = blogService.GetAllPosts().First().Id;
+
+        var approvedComment = new Comment
+        {
+            PostId = postId,
+            Author = "Good User",
+            Content = "Great post!"
+        };
+        await commentService.AddCommentAsync(approvedComment);
+
+        var pendingComment = new Comment
+        {
+            PostId = postId,
+            Author = "Pending User",
+            Content = "kill yourself you deserve to die"
+        };
+        await commentService.AddCommentAsync(pendingComment);
+
+        var pending = (await commentService.GetPendingCommentsAsync()).ToList();
+
+        Assert.Contains(pending, c => c.Id == pendingComment.Id && !c.IsApproved);
+        Assert.DoesNotContain(pending, c => c.Id == approvedComment.Id);
     }
 
     [Fact]
@@ -217,6 +456,110 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Equal(postId, root.GetProperty("postId").GetString());
     }
 
+    [Fact]
+    public async Task AdminLogin_CanLoginLogoutAndLoginAgain()
+    {
+        using var client = CreateClient("10.0.3.2", allowAutoRedirect: false);
+
+        await LoginAsAdminAsync(client);
+        await LogoutAsAdminAsync(client);
+        await LoginAsAdminAsync(client);
+
+        using var adminResponse = await client.GetAsync("/Admin");
+        Assert.Equal(HttpStatusCode.OK, adminResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminIndex_Post_IsMethodNotAllowed()
+    {
+        using var client = CreateClient("10.0.3.11", allowAutoRedirect: false);
+        await LoginAsAdminAsync(client);
+
+        using var response = await client.PostAsync("/Admin", new FormUrlEncodedContent(new Dictionary<string, string>()));
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DynamicPages_ReturnNoStoreCacheHeaders()
+    {
+        using var client = CreateClient("10.0.3.9", allowAutoRedirect: false);
+        var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+
+        using var adminLoginResponse = await client.GetAsync("/Admin/Login");
+        Assert.True(adminLoginResponse.Headers.CacheControl?.NoStore ?? false);
+
+        using var postResponse = await client.GetAsync($"/blog/{Uri.EscapeDataString(postId)}");
+        Assert.True(postResponse.Headers.CacheControl?.NoStore ?? false);
+    }
+
+    [Fact]
+    public async Task Responses_IncludeAppVersionHeader()
+    {
+        using var client = CreateClient("10.0.3.10", allowAutoRedirect: false);
+
+        using var response = await client.GetAsync("/admin/login");
+        Assert.True(response.Headers.TryGetValues("X-App-Version", out var values));
+        Assert.False(string.IsNullOrWhiteSpace(values.FirstOrDefault()));
+    }
+
+    [Fact]
+    public async Task CommentTokenEndpoint_ReturnsTokenPayload()
+    {
+        using var client = CreateClient("10.0.3.12", allowAutoRedirect: false);
+
+        using var response = await client.GetAsync("/blog/comment-token");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var json = await JsonDocument.ParseAsync(stream);
+        var root = json.RootElement;
+
+        Assert.True(root.GetProperty("success").GetBoolean());
+        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("token").GetString()));
+    }
+
+    [Fact]
+    public async Task AdminLogin_MissingAntiForgeryToken_StillAuthenticates()
+    {
+        using var client = CreateClient("10.0.3.3", allowAutoRedirect: false);
+
+        using var response = await client.PostAsync("/Admin/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["username"] = "admin",
+            ["password"] = "password"
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Pending Comments", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AddComment_MissingAntiForgeryToken_RedirectsToPostWithExpiredFormFlag()
+    {
+        var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+        using var client = CreateClient("10.0.3.4", allowAutoRedirect: false);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/Blog/AddComment")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["PostId"] = postId,
+                ["Author"] = "No Token User",
+                ["Content"] = "Testing anti-forgery recovery path.",
+                ["ParentCommentId"] = string.Empty,
+                ["__hp"] = string.Empty
+            })
+        };
+        request.Headers.Referrer = new Uri($"http://localhost/blog/{Uri.EscapeDataString(postId)}");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.SeeOther, response.StatusCode);
+        var location = response.Headers.Location?.OriginalString ?? string.Empty;
+        Assert.StartsWith($"/blog/{Uri.EscapeDataString(postId)}?form=expired", location, StringComparison.OrdinalIgnoreCase);
+    }
+
     private HttpClient CreateClient(string forwardedForIp, bool allowAutoRedirect = true)
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -258,7 +601,8 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         string postId,
         int? parentCommentId,
         string author,
-        string content)
+        string content,
+        string? honeypotValue = "")
     {
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, $"/blog/{Uri.EscapeDataString(postId)}");
 
@@ -268,7 +612,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
             ["Author"] = author,
             ["Content"] = content,
             ["ParentCommentId"] = parentCommentId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            ["__hp"] = string.Empty,
+            ["__hp"] = honeypotValue ?? string.Empty,
             ["__RequestVerificationToken"] = antiForgeryToken
         };
 
@@ -323,5 +667,35 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         Assert.True(match.Success, $"Anti-forgery token was not found in response for '{path}'.");
         return match.Groups[1].Value;
+    }
+
+    private static async Task LoginAsAdminAsync(HttpClient client)
+    {
+        var username = Environment.GetEnvironmentVariable("ADMIN_USERNAME") ?? "admin";
+        var password = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "password";
+
+        using var response = await client.PostAsync("/Admin/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["username"] = username,
+            ["password"] = password
+        }));
+
+        Assert.True(
+            response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Found,
+            $"Expected success or redirect when logging in as admin, got {(int)response.StatusCode}.");
+    }
+
+    private static async Task LogoutAsAdminAsync(HttpClient client)
+    {
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/Admin");
+
+        using var response = await client.PostAsync("/Admin/Logout", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.True(
+            response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Found,
+            $"Expected success or redirect when logging out admin, got {(int)response.StatusCode}.");
     }
 }

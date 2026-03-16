@@ -1,7 +1,7 @@
 ﻿@model MyBlog.Models.CommentThreadViewModel
 
 <div class="comment-thread" id="comment-@Model.Comment.Id">
-    <div class="comment-item">
+    <div class="comment-item @(Model.Comment.IsApproved ? "" : "unapproved")">
         <div class="comment-item-head">
             <div class="comment-meta">
                 <strong>@Model.Comment.Author</strong> on @Model.Comment.PostedAt.ToString("dd MMMM yyyy 'at' HH:mm 'UTC'")
@@ -28,6 +28,10 @@
 
         <div class="comment-body">
             @Html.Raw(Model.ContentHtml)
+            @if (!Model.Comment.IsApproved)
+            {
+                <p class="moderation-notice">This comment is awaiting moderation.</p>
+            }
         </div>
     </div>
 
@@ -69,5 +73,24 @@
                 }
             </div>
         </details>
+    }
+
+    @if (User.IsInRole("Admin"))
+    {
+        <div class="admin-actions">
+            @if (!Model.Comment.IsApproved)
+            {
+                <form asp-controller="Admin" asp-action="Approve" method="post" style="display:inline;">
+                    <input type="hidden" name="commentId" value="@Model.Comment.Id" />
+                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                    <button type="submit" class="btn-approve">Approve</button>
+                </form>
+            }
+            <form asp-controller="Admin" asp-action="Delete" method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this comment?');">
+                <input type="hidden" name="commentId" value="@Model.Comment.Id" />
+                <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                <button type="submit" class="btn-delete">Delete</button>
+            </form>
+        </div>
     }
 </div>

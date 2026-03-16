@@ -1,0 +1,35 @@
+@model List<MyBlog.Models.Comment>
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<h2>Pending Comments</h2>
+
+@if (Model.Any())
+{
+    <ul>
+        @foreach (var comment in Model)
+        {
+            <li>
+                <strong>@comment.Author</strong> on @comment.PostedAt.ToString("dd MMMM yyyy 'at' HH:mm 'UTC'") for post @comment.PostId<br />
+                <p>@Html.Raw(MyBlog.Services.CommentContentFormatter.ToSafeHtml(comment.Content))</p>
+                <form asp-controller="Admin" asp-action="Approve" method="post" style="display:inline;">
+                    <input type="hidden" name="commentId" value="@comment.Id" />
+                    <button type="submit">Approve</button>
+                </form>
+                <form asp-controller="Admin" asp-action="Delete" method="post" style="display:inline;" onsubmit="return confirm('Delete this comment?');">
+                    <input type="hidden" name="commentId" value="@comment.Id" />
+                    <button type="submit">Delete</button>
+                </form>
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <p>No pending comments.</p>
+}
+
+<form asp-controller="Admin" asp-action="Logout" method="post">
+    <button type="submit">Logout</button>
+</form>

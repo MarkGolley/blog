@@ -19,7 +19,54 @@
             canonicalPath = "/" + canonicalPath;
         }
 
-        var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}".TrimEnd('/');
+        var configuration = Context.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration;
+        var configuredBaseUrl = Environment.GetEnvironmentVariable("PUBLIC_BASE_URL")
+                                ?? configuration?["Site:PublicBaseUrl"];
+
+        string baseUrl;
+        if (!string.IsNullOrWhiteSpace(configuredBaseUrl) &&
+            Uri.TryCreate(configuredBaseUrl.Trim().TrimEnd('/'), UriKind.Absolute, out var configuredUri) &&
+            (string.Equals(configuredUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(configuredUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)))
+        {
+            baseUrl = configuredUri.ToString().TrimEnd('/');
+        }
+        else
+        {
+            var forwardedProto = Context.Request.Headers["X-Forwarded-Proto"].FirstOrDefault()
+                ?.Split(',')[0]
+                .Trim();
+            var forwardedHost = Context.Request.Headers["X-FH-Requested-Host"].FirstOrDefault()
+                ?.Split(',')[0]
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(forwardedHost))
+            {
+                forwardedHost = Context.Request.Headers["X-Forwarded-Host"].FirstOrDefault()
+                    ?.Split(',')[0]
+                    .Trim();
+            }
+
+            var scheme = string.Equals(forwardedProto, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(forwardedProto, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                ? forwardedProto!
+                : Context.Request.Scheme;
+
+            if (!string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            {
+                scheme = Uri.UriSchemeHttps;
+            }
+
+            var host = !string.IsNullOrWhiteSpace(forwardedHost)
+                ? forwardedHost
+                : Context.Request.Host.Value;
+
+            baseUrl = !string.IsNullOrWhiteSpace(host)
+                ? $"{scheme}://{host}".TrimEnd('/')
+                : "https://markgolley.dev";
+        }
+
         var canonicalUrl = $"{baseUrl}{canonicalPath}";
         var ogImagePath = ViewData["OgImage"]?.ToString() ?? "/images/me.jpg";
         var ogImageUrl = ogImagePath.StartsWith("http", StringComparison.OrdinalIgnoreCase)

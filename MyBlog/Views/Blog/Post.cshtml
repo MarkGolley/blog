@@ -1,6 +1,22 @@
 ﻿@model MyBlog.Models.BlogPostViewModel
 
 @{
+    var commentBanner = TempData["CommentBanner"]?.ToString();
+    var commentStatus = Context.Request.Query["commentStatus"].ToString();
+    var formState = Context.Request.Query["form"].ToString();
+    var isFormExpired = string.Equals(formState, "expired", StringComparison.OrdinalIgnoreCase);
+    if (string.IsNullOrWhiteSpace(commentBanner))
+    {
+        if (string.Equals(commentStatus, "moderated", StringComparison.OrdinalIgnoreCase))
+        {
+            commentBanner = "Your comment was not published because it did not meet our moderation standards.";
+        }
+        else if (string.Equals(commentStatus, "blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            commentBanner = "Your comment could not be submitted. Please try again and make sure auto-fill is off for hidden fields.";
+        }
+    }
+
     ViewData["Title"] = Model.Post.Title;
     ViewData["MetaDescription"] = $"Read \"{Model.Post.Title}\" on MyBlog.";
     ViewData["CanonicalPath"] = $"/blog/{Uri.EscapeDataString(Model.Post.Id)}";
@@ -77,7 +93,6 @@
 
 <section id="comments" aria-labelledby="comments-title" data-reveal>
     <h2 id="comments-title">Comments</h2>
-
     @if (Model.Comments != null && Model.Comments.Any())
     {
         <div class="thread-controls">
@@ -100,8 +115,24 @@
 
 <section aria-labelledby="add-comment-title" data-reveal>
     <h2 id="add-comment-title">Add a comment</h2>
+    @if (isFormExpired)
+    {
+        <p class="form-expired-notice" role="alert">
+            Your form token expired after a refresh. Please submit your comment again.
+        </p>
+    }
+    @if (!string.IsNullOrWhiteSpace(commentBanner))
+    {
+        <p class="moderation-notice moderation-banner" role="status">@commentBanner</p>
+    }
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
-    <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form">
+    <form
+        asp-controller="Blog"
+        asp-action="AddComment"
+        method="post"
+        class="contact-form"
+        data-refresh-antiforgery="true"
+        data-antiforgery-refresh-url="@Url.Action("CommentToken", "Blog")">
         <input type="hidden" name="PostId" value="@Model.Post.Id" />
         <input type="hidden" name="ParentCommentId" value="" />
         <div class="honeypot-field" aria-hidden="true">
