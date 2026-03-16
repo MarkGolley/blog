@@ -23,6 +23,18 @@ Run from repo root:
 .\run_checks.ps1 -Mode PreDeploy
 ```
 
+Deployment now runs these checks automatically before image build/push when you use:
+
+```powershell
+.\Deployment\deploy.ps1
+```
+
+Optional deploy flags:
+
+- `-SkipPreDeployChecks` skips all pre-deploy checks.
+- `-SkipBrowserInstall` keeps checks enabled but skips Playwright browser install.
+- `-SkipProductionSmokeCheck` skips post-deploy production auth/comment smoke checks.
+
 What it does:
 
 - Runs the existing test suite.
@@ -60,7 +72,8 @@ Check these headers:
 
 ### Auth + Comment Smoke Check
 
-Run this after each deploy:
+This is run automatically at the end of `.\Deployment\deploy.ps1`.
+You can still run it manually after each deploy:
 
 ```powershell
 .\Deployment\verify-production-auth.ps1

@@ -1,3 +1,10 @@
+[CmdletBinding()]
+param(
+    [switch]$SkipPreDeployChecks,
+    [switch]$SkipBrowserInstall,
+    [switch]$SkipProductionSmokeCheck
+)
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
@@ -27,6 +34,27 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
 Push-Location $repoRoot
 try {
+    if (-not $SkipPreDeployChecks) {
+        $checkArgs = @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", (Join-Path $repoRoot "run_checks.ps1"),
+            "-Mode", "PreDeploy"
+        )
+
+        if ($SkipBrowserInstall) {
+            $checkArgs += "-SkipBrowserInstall"
+        }
+
+        Invoke-External `
+            -Label "Running pre-deploy checks" `
+            -Command "powershell" `
+            -Arguments $checkArgs
+    }
+    else {
+        Write-Host "Skipping pre-deploy checks because -SkipPreDeployChecks was provided."
+    }
+
     $previousBuildkit = $env:DOCKER_BUILDKIT
     $env:DOCKER_BUILDKIT = "0"
     Invoke-External `
@@ -63,6 +91,23 @@ try {
             "--max-instances=1",
             "--timeout", "10m"
         )
+
+    if (-not $SkipProductionSmokeCheck) {
+        Invoke-External `
+            -Label "Running production auth smoke checks" `
+            -Command "powershell" `
+            -Arguments @(
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", (Join-Path $repoRoot "Deployment\verify-production-auth.ps1"),
+                "-ProjectId", $project,
+                "-Service", $service,
+                "-Region", $region
+            )
+    }
+    else {
+        Write-Host "Skipping production auth smoke checks because -SkipProductionSmokeCheck was provided."
+    }
 
     Write-Host "Deployed image: $image"
     Write-Host "APP_VERSION set to: $tag"

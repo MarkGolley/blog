@@ -811,6 +811,62 @@ main > section.blog-page {
     color: var(--ink-soft);
 }
 
+.post-capsule {
+    margin: 1rem 0 1.1rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 14px;
+    border: 1px solid rgba(15, 109, 120, 0.28);
+    background: linear-gradient(132deg, rgba(15, 109, 120, 0.1), rgba(255, 255, 255, 0.92));
+    box-shadow: 0 8px 16px rgba(10, 24, 42, 0.08);
+}
+
+.post-capsule-label {
+    display: block;
+    margin: 0 0 0.22rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--brand-deep);
+}
+
+.post-capsule-text {
+    margin: 0;
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.post-capsule-details {
+    padding: 0;
+    overflow: hidden;
+}
+
+.post-capsule-details > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.85rem 0.95rem;
+}
+
+.post-capsule-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.post-capsule-details > summary .post-capsule-text {
+    display: block;
+}
+
+.post-capsule-details-body {
+    padding: 0 0.95rem 0.9rem;
+}
+
+.post-capsule-details-body h3 {
+    margin-top: 0.8rem;
+}
+
+.post-capsule-details-body p:last-child {
+    margin-bottom: 0;
+}
+
 .post-content img {
     max-width: 100%;
     border-radius: 12px;
