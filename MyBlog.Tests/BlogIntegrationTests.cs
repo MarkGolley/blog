@@ -148,6 +148,35 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task AddComment_HoneypotTriggered_RedirectsWithBlockedStatusAndShowsBanner()
+    {
+        var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
+        using var client = CreateClient("10.0.1.4", allowAutoRedirect: false);
+
+        var response = await SubmitCommentAsync(
+            client,
+            postId,
+            parentCommentId: null,
+            author: "Honeypot Banner Test",
+            content: "This should be blocked by honeypot.",
+            honeypotValue: "autofilled");
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        var location = response.Headers.Location;
+        Assert.NotNull(location);
+        Assert.Contains("commentStatus=blocked", location!.OriginalString, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("#add-comment-title", location.OriginalString, StringComparison.Ordinal);
+
+        var redirectedPath = location.OriginalString.Split('#')[0];
+        var postHtml = await client.GetStringAsync(redirectedPath);
+
+        Assert.Contains(
+            "Your comment could not be submitted. Please try again and make sure auto-fill is off for hidden fields.",
+            postHtml,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetComments_NonAdmin_ExcludesUnapprovedComments()
     {
         using var scope = _factory.Services.CreateScope();
@@ -545,7 +574,8 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         string postId,
         int? parentCommentId,
         string author,
-        string content)
+        string content,
+        string? honeypotValue = "")
     {
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, $"/blog/{Uri.EscapeDataString(postId)}");
 
@@ -555,7 +585,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
             ["Author"] = author,
             ["Content"] = content,
             ["ParentCommentId"] = parentCommentId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            ["__hp"] = string.Empty,
+            ["__hp"] = honeypotValue ?? string.Empty,
             ["__RequestVerificationToken"] = antiForgeryToken
         };
 

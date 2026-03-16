@@ -5,10 +5,16 @@
     var commentStatus = Context.Request.Query["commentStatus"].ToString();
     var formState = Context.Request.Query["form"].ToString();
     var isFormExpired = string.Equals(formState, "expired", StringComparison.OrdinalIgnoreCase);
-    if (string.IsNullOrWhiteSpace(commentBanner) &&
-        string.Equals(commentStatus, "moderated", StringComparison.OrdinalIgnoreCase))
+    if (string.IsNullOrWhiteSpace(commentBanner))
     {
-        commentBanner = "Your comment was not published because it did not meet our moderation standards.";
+        if (string.Equals(commentStatus, "moderated", StringComparison.OrdinalIgnoreCase))
+        {
+            commentBanner = "Your comment was not published because it did not meet our moderation standards.";
+        }
+        else if (string.Equals(commentStatus, "blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            commentBanner = "Your comment could not be submitted. Please try again and make sure auto-fill is off for hidden fields.";
+        }
     }
 
     ViewData["Title"] = Model.Post.Title;

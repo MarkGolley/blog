@@ -14,8 +14,11 @@ public class BlogController : Controller
     private const string CommentBannerTempDataKey = "CommentBanner";
     private const string ModerationStatusQueryKey = "commentStatus";
     private const string ModerationStatusPendingValue = "moderated";
+    private const string ModerationStatusBlockedValue = "blocked";
     private const string CommentModerationBannerMessage =
         "Your comment was not published because it did not meet our moderation standards.";
+    private const string CommentSubmissionBlockedBannerMessage =
+        "Your comment could not be submitted. Please try again and make sure auto-fill is off for hidden fields.";
     private const int MaxPinnedPosts = 3;
     private const int MaxRelatedPosts = 3;
     private static readonly Regex RelatedTokenRegex = new(@"[A-Za-z0-9#\+\.]+", RegexOptions.Compiled);
@@ -118,7 +121,8 @@ public class BlogController : Controller
             }
 
             var spamPostUrl = BuildPostPath(comment.PostId);
-            return Redirect(spamPostUrl);
+            TempData[CommentBannerTempDataKey] = CommentSubmissionBlockedBannerMessage;
+            return Redirect($"{spamPostUrl}?{ModerationStatusQueryKey}={ModerationStatusBlockedValue}#add-comment-title");
         }
 
         if (!ModelState.IsValid)
