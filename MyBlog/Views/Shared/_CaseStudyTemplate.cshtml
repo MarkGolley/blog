@@ -1,0 +1,50 @@
+@model CaseStudyTemplateViewModel
+
+<article class="case-template" data-reveal>
+    <header class="case-template-header">
+        <h3 class="case-template-title">@Model.Title</h3>
+        <span class="case-status-pill">@Model.Status</span>
+    </header>
+
+    <p class="case-one-liner">@Model.OneLiner</p>
+
+    <div class="case-block">
+        <h4>Why this matters</h4>
+        <p>@Model.WhyItMatters</p>
+    </div>
+
+    @if (Model.TechnicalScope.Count > 0)
+    {
+        <div class="case-block">
+            <h4>Technical scope</h4>
+            <ul class="case-list">
+                @foreach (var item in Model.TechnicalScope)
+                {
+                    <li>@item</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (Model.ProofChecklist.Count > 0)
+    {
+        <div class="case-block">
+            <h4>Proof checklist</h4>
+            <ul class="case-list">
+                @foreach (var item in Model.ProofChecklist)
+                {
+                    <li>@item</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="case-block">
+        <h4>Recruiter signal</h4>
+        <p>@Model.RecruiterSignal</p>
+    </div>
+
+    <div class="case-next-milestone">
+        <strong>Next milestone:</strong> @Model.NextMilestone
+    </div>
+</article>

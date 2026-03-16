@@ -1,0 +1,137 @@
+@model ModerationPlaygroundViewModel
+@{
+    ViewData["Title"] = "AI Experiments";
+    ViewData["MetaDescription"] =
+        "Applied AI experiments from Mark Golley focused on evaluation quality, safety testing, and practical engineering tradeoffs.";
+    ViewData["CanonicalPath"] = "/ai-experiments";
+}
+
+<section aria-labelledby="ai-experiments-title" class="portfolio-hero" data-reveal>
+    <p class="hero-kicker">Applied AI</p>
+    <h1 id="ai-experiments-title">AI experiments with hard metrics and failure analysis.</h1>
+    <p class="section-intro">
+        These experiments are intentionally smaller than full projects, but each one includes a benchmark, guardrails, and known limitations.
+        The goal is fast iteration without sacrificing engineering rigor.
+    </p>
+    <div class="hero-actions">
+        <a class="btn btn-primary" asp-controller="Projects" asp-action="Index">View full projects</a>
+        <a class="btn btn-secondary" asp-controller="Contact" asp-action="Index">Collaborate</a>
+    </div>
+</section>
+
+<section aria-labelledby="moderation-playground-title" data-reveal>
+    <h2 id="moderation-playground-title">Try the moderation playground</h2>
+    <p class="section-intro">
+        This runs the same moderation service used in comment workflows. Paste a sample comment to see whether it would be allowed automatically or sent for manual review.
+    </p>
+
+    <form method="post" asp-action="Index" class="contact-form">
+        @Html.AntiForgeryToken()
+        <label asp-for="InputText">Comment text</label>
+        <textarea asp-for="InputText" rows="5" maxlength="2000" placeholder="Type or paste a comment sample..."></textarea>
+        <span asp-validation-for="InputText" class="text-danger"></span>
+
+        <button type="submit">Run moderation check</button>
+    </form>
+
+    @if (Model.HasResult)
+    {
+        var resultClass = Model.IsSafe == true
+            ? "moderation-demo-result safe"
+            : Model.IsSafe == false
+                ? "moderation-demo-result blocked"
+                : "moderation-demo-result neutral";
+
+        <div class="@resultClass">
+            <p class="moderation-demo-title">@Model.ResultTitle</p>
+            <p>@Model.ResultMessage</p>
+            @if (Model.LatencyMs.HasValue)
+            {
+                <p class="moderation-demo-meta">Latency: @Model.LatencyMs.Value ms</p>
+            }
+        </div>
+    }
+</section>
+
+<section aria-labelledby="experiment-templates-title" data-reveal>
+    <h2 id="experiment-templates-title">Experiment templates</h2>
+    <p class="section-intro">Each experiment captures baseline, intervention, and measured delta.</p>
+
+    <div class="case-template-grid">
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "Prompt Injection Defense Bench",
+            Status = "In progress",
+            OneLiner = "Benchmark how moderation and prompt hardening rules perform against prompt-injection and jailbreak attempts.",
+            WhyItMatters = "Shows practical AI safety work using repeatable attack scenarios and measurable defensive improvements.",
+            TechnicalScope = new[]
+            {
+                "Build an attack prompt set that targets instruction override patterns.",
+                "Evaluate baseline model responses before adding any hardening layers.",
+                "Apply layered defenses and compare block rate, false positives, and escaped attempts.",
+                "Log failure categories to guide next defense iteration."
+            },
+            ProofChecklist = new[]
+            {
+                "Baseline and post-hardening scorecards.",
+                "Top escaped attack examples with mitigation notes.",
+                "Automated evaluation script in repository.",
+                "Documented residual risk and open gaps."
+            },
+            RecruiterSignal = "Understands modern LLM attack surfaces and can engineer measurable defenses.",
+            NextMilestone = "Complete first benchmark pass and publish initial defense delta."
+        }' />
+
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "RAG Answer Quality Evaluator",
+            Status = "Planned",
+            OneLiner = "Evaluate retrieval-augmented answers for grounding, citation quality, and hallucination rate.",
+            WhyItMatters = "Demonstrates that retrieval quality and evaluation design are treated as first-class engineering concerns.",
+            TechnicalScope = new[]
+            {
+                "Create a curated question set with expected citation targets.",
+                "Score outputs for factual grounding and citation usefulness.",
+                "Compare chunking and retrieval strategies across the same query set.",
+                "Track quality and latency together to expose practical tradeoffs."
+            },
+            ProofChecklist = new[]
+            {
+                "Evaluation rubric with pass/fail thresholds.",
+                "Comparison table for retrieval strategies.",
+                "Sample outputs with annotated failure reasons.",
+                "Recommendation memo for production approach."
+            },
+            RecruiterSignal = "Can evaluate AI systems systematically instead of relying on ad hoc demos.",
+            NextMilestone = "Ship rubric and benchmark questions with a reproducible scoring script."
+        }' />
+
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "Model Cost and Latency Profiler",
+            Status = "Planned",
+            OneLiner = "Profile model usage to map token cost and response latency under realistic request patterns.",
+            WhyItMatters = "Highlights operational thinking by balancing quality, speed, and spend before scaling usage.",
+            TechnicalScope = new[]
+            {
+                "Run controlled prompts against multiple model configurations.",
+                "Capture p50, p95 latency and token spend per task type.",
+                "Identify quality floor to avoid overpaying for marginal gains.",
+                "Recommend routing policy by request criticality."
+            },
+            ProofChecklist = new[]
+            {
+                "Cost-latency scatter plot and selection rationale.",
+                "Benchmark harness and prompt fixtures in source control.",
+                "Risk notes for rate limits and burst traffic.",
+                "Policy doc defining default model and fallback choices."
+            },
+            RecruiterSignal = "Can make economically sound AI architecture decisions with measurable justification.",
+            NextMilestone = "Implement baseline profiler and gather first benchmark dataset."
+        }' />
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

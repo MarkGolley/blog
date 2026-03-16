@@ -66,9 +66,17 @@
 </section>
 
 <section aria-labelledby="focus-areas-title" class="showcase-section" data-reveal>
-    <h2 id="focus-areas-title">Writing focus</h2>
-    <p class="section-intro">Most posts are practical breakdowns from building and shipping software.</p>
+    <h2 id="focus-areas-title">Focus areas</h2>
+    <p class="section-intro">A mix of production projects, AI experiments, and practical writeups from shipping software.</p>
     <div class="focus-grid">
+        <a class="focus-card" asp-controller="Projects" asp-action="Index">
+            <p class="focus-title">Projects</p>
+            <p>Production-focused builds with architecture tradeoffs, testing evidence, and measurable outcomes.</p>
+        </a>
+        <a class="focus-card" asp-controller="AIExperiments" asp-action="Index">
+            <p class="focus-title">AI experiments</p>
+            <p>Evaluation-driven experiments on safety, quality, and performance with explicit failure analysis.</p>
+        </a>
         <a class="focus-card" asp-controller="Blog" asp-action="Index" asp-route-tag="C#">
             <p class="focus-title">C# and .NET</p>
             <p>Clean architecture, practical patterns, and maintainable backend workflows.</p>

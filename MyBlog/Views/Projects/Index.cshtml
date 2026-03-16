@@ -1,0 +1,98 @@
+@{
+    ViewData["Title"] = "Projects";
+    ViewData["MetaDescription"] =
+        "Production-focused engineering projects from Mark Golley, including architecture decisions, testing evidence, and measurable outcomes.";
+    ViewData["CanonicalPath"] = "/projects";
+}
+
+<section aria-labelledby="projects-title" class="portfolio-hero" data-reveal>
+    <p class="hero-kicker">Recruiter Focus</p>
+    <h1 id="projects-title">Projects that prove production engineering depth.</h1>
+    <p class="section-intro">
+        These are the project builds I am shipping with explicit architecture choices, testing strategy, and measurable outcomes.
+        Each entry follows the same case-study structure so implementation and results are easy to review.
+    </p>
+    <div class="hero-actions">
+        <a class="btn btn-primary" asp-controller="Contact" asp-action="Index">Discuss a role</a>
+        <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">Read implementation writeups</a>
+    </div>
+</section>
+
+<section aria-labelledby="project-templates-title" data-reveal>
+    <h2 id="project-templates-title">Project case-study templates</h2>
+    <p class="section-intro">Each project is tracked from scope through proof, not just a demo link.</p>
+
+    <div class="case-template-grid">
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "AI Moderation v2 for Blog Comments",
+            Status = "In progress",
+            OneLiner = "Extend moderation from simple pass/fail to an eval-driven, resilient pipeline with safety and performance controls.",
+            WhyItMatters = "Demonstrates practical AI delivery in a live product with guardrails, telemetry, and failure handling.",
+            TechnicalScope = new[]
+            {
+                "Create a labeled benchmark set from anonymized comments and edge-case prompts.",
+                "Add a repeatable evaluation harness with precision, recall, and false-positive tracking.",
+                "Implement deterministic fallback for model timeouts and unavailable API responses.",
+                "Measure latency and per-request cost to keep moderation predictable under load."
+            },
+            ProofChecklist = new[]
+            {
+                "Architecture decision record with tradeoffs and rejected alternatives.",
+                "Before/after metrics table and confusion matrix snapshot.",
+                "Unit, integration, and E2E tests for approval and block scenarios.",
+                "Failure-injection note covering graceful degradation behavior."
+            },
+            RecruiterSignal = "Can design and operate AI features under production constraints, not just wire up model calls.",
+            NextMilestone = "Ship benchmark harness and first baseline metrics report."
+        }' />
+
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "Operational Reliability Dashboard",
+            Status = "Planned",
+            OneLiner = "Build observability around comments, likes, and subscriptions with SLOs and alert-ready dashboards.",
+            WhyItMatters = "Shows ownership of reliability and incident prevention for real user-facing workflows.",
+            TechnicalScope = new[]
+            {
+                "Emit structured logs and request traces for critical write paths.",
+                "Define service-level indicators for moderation latency and comment publish success.",
+                "Build dashboard views for error budgets and top failure modes.",
+                "Add runbook steps for common operational incidents."
+            },
+            ProofChecklist = new[]
+            {
+                "Dashboard screenshots with sample incident timeline.",
+                "Load test output and bottleneck analysis.",
+                "Operational runbook linked from repository docs.",
+                "Post-incident review template with preventative actions."
+            },
+            RecruiterSignal = "Can improve system reliability with measurable outcomes and clear operational process.",
+            NextMilestone = "Finalize core SLOs and implement first telemetry events."
+        }' />
+
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "Subscriber Digest Pipeline",
+            Status = "Planned",
+            OneLiner = "Automate weekly subscriber digests with content ranking, dedupe logic, and delivery safeguards.",
+            WhyItMatters = "Demonstrates backend workflow design, data quality, and safe delivery automation.",
+            TechnicalScope = new[]
+            {
+                "Design ranking rules using engagement and recency signals.",
+                "Implement idempotent digest generation jobs and retry behavior.",
+                "Add unsubscribe-safe filtering and per-subscriber content selection.",
+                "Track send success, bounces, and retry outcomes for observability."
+            },
+            ProofChecklist = new[]
+            {
+                "End-to-end architecture diagram for data flow and retries.",
+                "Integration tests covering ranking and duplicate prevention.",
+                "Synthetic load run for large subscriber batches.",
+                "Delivery metrics summary from staging runs."
+            },
+            RecruiterSignal = "Able to build dependable automation with correctness and operational safeguards.",
+            NextMilestone = "Implement digest generation service and test data fixtures."
+        }' />
+    </div>
+</section>
