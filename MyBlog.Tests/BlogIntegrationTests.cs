@@ -503,6 +503,22 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task CommentTokenEndpoint_ReturnsTokenPayload()
+    {
+        using var client = CreateClient("10.0.3.12", allowAutoRedirect: false);
+
+        using var response = await client.GetAsync("/blog/comment-token");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var json = await JsonDocument.ParseAsync(stream);
+        var root = json.RootElement;
+
+        Assert.True(root.GetProperty("success").GetBoolean());
+        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("token").GetString()));
+    }
+
+    [Fact]
     public async Task AdminLogin_MissingAntiForgeryToken_StillAuthenticates()
     {
         using var client = CreateClient("10.0.3.3", allowAutoRedirect: false);
@@ -513,8 +529,9 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
             ["password"] = "password"
         }));
 
-        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
-        Assert.Equal("/admin", response.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Pending Comments", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -654,15 +671,13 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
     private static async Task LoginAsAdminAsync(HttpClient client)
     {
-        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/Admin/Login");
         var username = Environment.GetEnvironmentVariable("ADMIN_USERNAME") ?? "admin";
         var password = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "password";
 
         using var response = await client.PostAsync("/Admin/Login", new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["username"] = username,
-            ["password"] = password,
-            ["__RequestVerificationToken"] = antiForgeryToken
+            ["password"] = password
         }));
 
         Assert.True(

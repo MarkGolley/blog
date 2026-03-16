@@ -126,7 +126,13 @@
         <p class="moderation-notice moderation-banner" role="status">@commentBanner</p>
     }
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
-    <form asp-controller="Blog" asp-action="AddComment" method="post" class="contact-form">
+    <form
+        asp-controller="Blog"
+        asp-action="AddComment"
+        method="post"
+        class="contact-form"
+        data-refresh-antiforgery="true"
+        data-antiforgery-refresh-url="@Url.Action("CommentToken", "Blog")">
         <input type="hidden" name="PostId" value="@Model.Post.Id" />
         <input type="hidden" name="ParentCommentId" value="" />
         <div class="honeypot-field" aria-hidden="true">

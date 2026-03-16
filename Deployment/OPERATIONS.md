@@ -71,8 +71,14 @@ What it verifies:
 - Admin login works on direct Cloud Run URL.
 - Admin login works on your public domain.
 - Moderated comment flow redirects with `commentStatus=moderated` on both direct and public URLs.
+- Admin login may complete via either `302 -> /admin` or a direct `200` dashboard render, both treated as valid.
 
 If direct passes but public fails, the issue is edge/proxy behavior (not app code), usually cookie stripping on `GET /admin`.
+
+Quick signal for cookie stripping on public edge:
+
+- Repeat `GET /blog` twice with the same cookie jar.
+- If `myblog.antiforgery.v2` changes on every GET for public edge but stays stable on direct Cloud Run, the edge is not forwarding cookies on GET.
 
 Cloudflare guidance in that case:
 

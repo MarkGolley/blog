@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Antiforgery;
 using MailKit.Net.Smtp;
 using MimeKit;
 using System.Text.RegularExpressions;
@@ -26,17 +27,20 @@ public class BlogController : Controller
     private readonly BlogService _blogService;
     private readonly CommentService _commentService;
     private readonly LikeService _likeService;
+    private readonly IAntiforgery _antiforgery;
     private readonly ILogger<BlogController> _logger;
 
     public BlogController(
         BlogService blogService,
         CommentService commentService,
         LikeService likeService,
+        IAntiforgery antiforgery,
         ILogger<BlogController> logger)
     {
         _blogService = blogService;
         _commentService = commentService;
         _likeService = likeService;
+        _antiforgery = antiforgery;
         _logger = logger;
     }
     
@@ -156,6 +160,19 @@ public class BlogController : Controller
         }
 
         return Redirect($"{postUrl}#comment-{comment.Id}");
+    }
+
+    [HttpGet("/blog/comment-token")]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult CommentToken()
+    {
+        var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+        if (string.IsNullOrWhiteSpace(tokens.RequestToken))
+        {
+            return StatusCode(500, new { success = false, error = "Unable to refresh form token." });
+        }
+
+        return Json(new { success = true, token = tokens.RequestToken });
     }
 
     [HttpPost]

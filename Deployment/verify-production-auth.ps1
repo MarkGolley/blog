@@ -69,7 +69,8 @@ function Get-HeaderValue {
 function Get-AntiForgeryToken {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Html
+        [string]$Html,
+        [switch]$AllowMissing
     )
 
     $match = [regex]::Match($Html, 'name="__RequestVerificationToken"[^>]*value="([^"]+)"')
@@ -78,6 +79,10 @@ function Get-AntiForgeryToken {
     }
 
     if (-not $match.Success) {
+        if ($AllowMissing) {
+            return ""
+        }
+
         throw "Anti-forgery token was not found in HTML."
     }
 
@@ -141,9 +146,18 @@ function Test-AdminFlow {
 
     try {
         $loginHtml = Invoke-Curl @("-sS", "-c", $cookieFile, "$BaseUrl/admin/login")
-        $antiForgeryToken = Get-AntiForgeryToken -Html $loginHtml
+        $antiForgeryToken = Get-AntiForgeryToken -Html $loginHtml -AllowMissing
 
-        $form = "username=$([Uri]::EscapeDataString($Username))&password=$([Uri]::EscapeDataString($Password))&__RequestVerificationToken=$([Uri]::EscapeDataString($antiForgeryToken))"
+        $formParts = @(
+            "username=$([Uri]::EscapeDataString($Username))",
+            "password=$([Uri]::EscapeDataString($Password))"
+        )
+
+        if (-not [string]::IsNullOrWhiteSpace($antiForgeryToken)) {
+            $formParts += "__RequestVerificationToken=$([Uri]::EscapeDataString($antiForgeryToken))"
+        }
+
+        $form = [string]::Join("&", $formParts)
         $loginHeaders = Invoke-Curl @(
             "-sS", "-D", "-", "-o", "NUL",
             "-b", $cookieFile, "-c", $cookieFile,
@@ -169,7 +183,7 @@ function Test-AdminFlow {
             AdminStatus                    = $adminStatus
             AdminLocation                  = $adminLocation
             AdminBodyContainsPendingComments = $adminBodyContainsPendingComments
-            Success                        = ($loginStatus -eq 302 -and $adminStatus -eq 200 -and $adminBodyContainsPendingComments)
+            Success                        = (($loginStatus -eq 302 -or $loginStatus -eq 200) -and $adminStatus -eq 200 -and $adminBodyContainsPendingComments)
         }
     }
     finally {

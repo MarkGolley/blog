@@ -1,19 +1,10 @@
 @{
     ViewData["Title"] = "Admin Login";
-    var formState = Context.Request.Query["form"].ToString();
-    var isFormExpired = string.Equals(formState, "expired", StringComparison.OrdinalIgnoreCase);
 }
 
 <h2>Admin Login</h2>
 
-@if (isFormExpired)
-{
-    <p class="form-expired-notice" role="alert">
-        Your login form token expired after a refresh. Please sign in again.
-    </p>
-}
-
-<form asp-controller="Admin" asp-action="Login" method="post">
+<form asp-controller="Admin" asp-action="Login" method="post" asp-antiforgery="false">
     <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
     <div>
         <label for="username">Username:</label>
@@ -24,5 +15,4 @@
         <input type="password" id="password" name="password" required />
     </div>
     <button type="submit">Login</button>
-    @Html.AntiForgeryToken()
 </form>

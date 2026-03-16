@@ -55,7 +55,7 @@ builder.Services.AddAuthentication(options =>
     {
         options.LoginPath = "/Admin/Login";
         options.AccessDeniedPath = "/Admin/AccessDenied";
-        options.Cookie.Name = "myblog.auth.v1";
+        options.Cookie.Name = "__session";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = secureCookiePolicy;
@@ -370,8 +370,7 @@ static bool ShouldRecoverFromBadRequest(string requestPath)
         return false;
     }
 
-    return requestPath.Equals("/Admin/Login", StringComparison.OrdinalIgnoreCase)
-           || requestPath.Equals("/Admin/Logout", StringComparison.OrdinalIgnoreCase)
+    return requestPath.Equals("/Admin/Logout", StringComparison.OrdinalIgnoreCase)
            || requestPath.Equals("/Admin/Approve", StringComparison.OrdinalIgnoreCase)
            || requestPath.Equals("/Admin/Delete", StringComparison.OrdinalIgnoreCase)
            || requestPath.Equals("/Blog/AddComment", StringComparison.OrdinalIgnoreCase)

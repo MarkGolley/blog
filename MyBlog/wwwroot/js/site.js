@@ -106,6 +106,73 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("submit", async (event) => {
     const target = event.target;
+    if (!(target instanceof HTMLFormElement) || target.dataset.refreshAntiforgery !== "true") {
+        return;
+    }
+
+    if (target.dataset.antiforgeryRefreshed === "true") {
+        return;
+    }
+
+    const refreshUrl = target.dataset.antiforgeryRefreshUrl;
+    if (!refreshUrl) {
+        return;
+    }
+
+    event.preventDefault();
+
+    const submitter = event.submitter instanceof HTMLElement ? event.submitter : target.querySelector("button[type='submit']");
+    const disableTarget =
+        submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
+            ? submitter
+            : null;
+
+    let didSubmit = false;
+    if (disableTarget) {
+        disableTarget.disabled = true;
+    }
+
+    try {
+        const response = await fetch(refreshUrl, {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        if (response.ok) {
+            const payload = await response.json();
+            const token = typeof payload?.token === "string" ? payload.token : "";
+
+            if (token.length > 0) {
+                let tokenInput = target.querySelector("input[name='__RequestVerificationToken']");
+                if (!(tokenInput instanceof HTMLInputElement)) {
+                    tokenInput = document.createElement("input");
+                    tokenInput.type = "hidden";
+                    tokenInput.name = "__RequestVerificationToken";
+                    target.appendChild(tokenInput);
+                }
+
+                tokenInput.value = token;
+                target.dataset.antiforgeryRefreshed = "true";
+            }
+        }
+
+        didSubmit = true;
+        target.submit();
+    } catch {
+        // Fall back to the original submit path if token refresh fails.
+        didSubmit = true;
+        target.submit();
+    } finally {
+        if (!didSubmit && disableTarget) {
+            disableTarget.disabled = false;
+        }
+    }
+});
+
+document.addEventListener("submit", async (event) => {
+    const target = event.target;
     if (!(target instanceof HTMLFormElement) || target.dataset.likeAsync !== "true") {
         return;
     }

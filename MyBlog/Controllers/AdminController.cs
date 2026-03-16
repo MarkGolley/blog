@@ -48,8 +48,7 @@ public class AdminController : Controller
             };
 
             await HttpContext.SignInAsync("CookieAuth", new ClaimsPrincipal(claimsIdentity), authProperties);
-
-            return RedirectToAction("Index");
+            return await RenderDashboardAsync();
         }
 
         ModelState.AddModelError(string.Empty, "Invalid login attempt.");
@@ -76,18 +75,24 @@ public class AdminController : Controller
     [Authorize]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Approve(int commentId, string returnUrl)
+    public async Task<IActionResult> Approve(int commentId)
     {
         await _commentService.ApproveCommentAsync(commentId);
-        return Redirect(returnUrl ?? "/Admin");
+        return await RenderDashboardAsync();
     }
 
     [Authorize]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(int commentId, string returnUrl)
+    public async Task<IActionResult> Delete(int commentId)
     {
         await _commentService.DeleteCommentAsync(commentId);
-        return Redirect(returnUrl ?? "/Admin");
+        return await RenderDashboardAsync();
+    }
+
+    private async Task<IActionResult> RenderDashboardAsync()
+    {
+        var pendingComments = await _commentService.GetPendingCommentsAsync();
+        return View("Index", pendingComments);
     }
 }
