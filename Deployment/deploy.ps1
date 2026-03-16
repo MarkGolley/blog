@@ -3,7 +3,7 @@ $project = "my-blog-website-470819"
 $service = "myblog-app"
 $region = "europe-west2"
 $tag = (Get-Date -Format "yyyyMMdd-HHmmss")
-$image = "gcr.io/$project/$service:$tag"
+$image = "gcr.io/$project/${service}:$tag"
 
 # Build Docker image
 cd C:\Users\markg\RiderProjects\blog
