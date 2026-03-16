@@ -470,6 +470,16 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task AdminIndex_Post_IsMethodNotAllowed()
+    {
+        using var client = CreateClient("10.0.3.11", allowAutoRedirect: false);
+        await LoginAsAdminAsync(client);
+
+        using var response = await client.PostAsync("/Admin", new FormUrlEncodedContent(new Dictionary<string, string>()));
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+    }
+
+    [Fact]
     public async Task DynamicPages_ReturnNoStoreCacheHeaders()
     {
         using var client = CreateClient("10.0.3.9", allowAutoRedirect: false);

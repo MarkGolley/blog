@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MyBlog.Services;
@@ -41,7 +40,7 @@ public class AdminController : Controller
                 new Claim(ClaimTypes.Role, "Admin")
             };
 
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var claimsIdentity = new ClaimsIdentity(claims, "CookieAuth");
             var authProperties = new AuthenticationProperties
             {
                 IsPersistent = true,
@@ -66,6 +65,7 @@ public class AdminController : Controller
     }
 
     [Authorize]
+    [HttpGet]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> Index()
     {

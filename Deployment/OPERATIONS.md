@@ -58,6 +58,34 @@ Check these headers:
 - `CF-Cache-Status` should be `DYNAMIC`.
 - `Cache-Control` should include `no-store`.
 
+### Auth + Comment Smoke Check
+
+Run this after each deploy:
+
+```powershell
+.\Deployment\verify-production-auth.ps1
+```
+
+What it verifies:
+
+- Admin login works on direct Cloud Run URL.
+- Admin login works on your public domain.
+- Moderated comment flow redirects with `commentStatus=moderated` on both direct and public URLs.
+
+If direct passes but public fails, the issue is edge/proxy behavior (not app code), usually cookie stripping on `GET /admin`.
+
+Cloudflare guidance in that case:
+
+- Ensure cache is bypassed for dynamic routes (`/admin*`, `/blog*`, `/subscribe*`, `/health`).
+- Ensure no Transform Rule / Worker removes the `Cookie` request header on those routes.
+- Ensure no rule strips auth cookies (for this app: `myblog.auth.v1`) before origin fetch.
+
+Convenience wrapper:
+
+```powershell
+.\Deployment\verify-production-auth.bat
+```
+
 ## Backup Routine
 
 Script: `Deployment/backup.ps1`

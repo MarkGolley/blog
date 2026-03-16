@@ -44,7 +44,13 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.SecurePolicy = secureCookiePolicy;
 });
-builder.Services.AddAuthentication("CookieAuth")
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = "CookieAuth";
+        options.DefaultChallengeScheme = "CookieAuth";
+        options.DefaultSignInScheme = "CookieAuth";
+        options.DefaultSignOutScheme = "CookieAuth";
+    })
     .AddCookie("CookieAuth", options =>
     {
         options.LoginPath = "/Admin/Login";
