@@ -65,7 +65,10 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         await page.FillAsync("#author-root", "Mobile E2E");
         await page.FillAsync("#content-root", "kill yourself you deserve to die");
         await page.ClickAsync("section[aria-labelledby='add-comment-title'] button[type='submit']");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.WaitForFunctionAsync(
+            "() => window.location.href.toLowerCase().includes('commentstatus=moderated')",
+            null,
+            new() { Timeout = 15000 });
 
         Assert.Contains("commentStatus=moderated", page.Url, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("#add-comment-title", page.Url, StringComparison.OrdinalIgnoreCase);
@@ -242,6 +245,7 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
             startInfo.Environment["ADMIN_USERNAME"] = AdminUsername;
             startInfo.Environment["ADMIN_PASSWORD"] = AdminPassword;
             startInfo.Environment["SUBSCRIBER_NOTIFY_KEY"] = "integration-notify-key";
+            startInfo.Environment["OPENAI_API_KEY"] = string.Empty;
 
             var process = new Process
             {

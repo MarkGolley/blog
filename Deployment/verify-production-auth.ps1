@@ -103,6 +103,27 @@ function Get-FirstBlogSlug {
     return [Uri]::UnescapeDataString($match.Groups[1].Value)
 }
 
+function Get-PendingCommentId {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Html,
+        [Parameter(Mandatory = $true)]
+        [string]$Author,
+        [Parameter(Mandatory = $true)]
+        [string]$ContentMarker
+    )
+
+    $escapedAuthor = [regex]::Escape($Author)
+    $escapedContentMarker = [regex]::Escape($ContentMarker)
+    $pattern = "(?is)<li>\s*<strong>\s*$escapedAuthor\s*</strong>.*?$escapedContentMarker.*?name=""commentId""\s+value=""(\d+)"""
+    $match = [regex]::Match($Html, $pattern)
+    if (-not $match.Success) {
+        return ""
+    }
+
+    return $match.Groups[1].Value
+}
+
 function Resolve-AdminCredential {
     param(
         [Parameter(Mandatory = $false)]
@@ -128,6 +149,104 @@ function Resolve-AdminCredential {
     }
 
     return $fromSecret.Trim()
+}
+
+function Remove-PendingSmokeComment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BaseUrl,
+        [Parameter(Mandatory = $true)]
+        [string]$Username,
+        [Parameter(Mandatory = $true)]
+        [string]$Password,
+        [Parameter(Mandatory = $true)]
+        [string]$Author,
+        [Parameter(Mandatory = $true)]
+        [string]$ContentMarker
+    )
+
+    $cookieFile = [System.IO.Path]::GetTempFileName()
+    $attempts = 0
+
+    try {
+        $loginHtml = Invoke-Curl @("-sS", "-c", $cookieFile, "$BaseUrl/admin/login")
+        $antiForgeryToken = Get-AntiForgeryToken -Html $loginHtml -AllowMissing
+
+        $formParts = @(
+            "username=$([Uri]::EscapeDataString($Username))",
+            "password=$([Uri]::EscapeDataString($Password))"
+        )
+
+        if (-not [string]::IsNullOrWhiteSpace($antiForgeryToken)) {
+            $formParts += "__RequestVerificationToken=$([Uri]::EscapeDataString($antiForgeryToken))"
+        }
+
+        $form = [string]::Join("&", $formParts)
+        $loginHeaders = Invoke-Curl @(
+            "-sS", "-D", "-", "-o", "NUL",
+            "-b", $cookieFile, "-c", $cookieFile,
+            "-X", "POST", "$BaseUrl/admin/login",
+            "-H", "Content-Type: application/x-www-form-urlencoded",
+            "--data", $form
+        )
+
+        $loginStatus = Get-HeaderStatusCode -Headers $loginHeaders
+        if ($loginStatus -ne 200 -and $loginStatus -ne 302) {
+            return [PSCustomObject]@{
+                Attempted  = $true
+                Success    = $false
+                CommentId  = ""
+                DeleteStatus = 0
+                Attempts   = $attempts
+                Message    = "Admin login failed for cleanup with status $loginStatus."
+            }
+        }
+
+        $timeoutAt = [DateTime]::UtcNow.AddSeconds(20)
+        while ([DateTime]::UtcNow -lt $timeoutAt) {
+            $attempts++
+            $adminHtml = Invoke-Curl @("-sS", "-b", $cookieFile, "-c", $cookieFile, "$BaseUrl/admin")
+            $commentId = Get-PendingCommentId -Html $adminHtml -Author $Author -ContentMarker $ContentMarker
+
+            if (-not [string]::IsNullOrWhiteSpace($commentId)) {
+                $token = Get-AntiForgeryToken -Html $adminHtml
+                $deleteForm = "commentId=$([Uri]::EscapeDataString($commentId))&__RequestVerificationToken=$([Uri]::EscapeDataString($token))"
+                $deleteHeaders = Invoke-Curl @(
+                    "-sS", "-D", "-", "-o", "NUL",
+                    "-b", $cookieFile, "-c", $cookieFile,
+                    "-X", "POST", "$BaseUrl/admin/delete",
+                    "-H", "Content-Type: application/x-www-form-urlencoded",
+                    "--data", $deleteForm
+                )
+
+                $deleteStatus = Get-HeaderStatusCode -Headers $deleteHeaders
+                $cleanupSuccess = ($deleteStatus -eq 200 -or $deleteStatus -eq 302)
+
+                return [PSCustomObject]@{
+                    Attempted  = $true
+                    Success    = $cleanupSuccess
+                    CommentId  = $commentId
+                    DeleteStatus = $deleteStatus
+                    Attempts   = $attempts
+                    Message    = if ($cleanupSuccess) { "Deleted pending smoke comment." } else { "Delete returned status $deleteStatus." }
+                }
+            }
+
+            Start-Sleep -Milliseconds 750
+        }
+
+        return [PSCustomObject]@{
+            Attempted  = $true
+            Success    = $false
+            CommentId  = ""
+            DeleteStatus = 0
+            Attempts   = $attempts
+            Message    = "Pending smoke comment was not found in admin queue for cleanup."
+        }
+    }
+    finally {
+        Remove-Item -Path $cookieFile -ErrorAction SilentlyContinue
+    }
 }
 
 function Test-AdminFlow {
@@ -196,10 +315,27 @@ function Test-CommentModerationFlow {
         [Parameter(Mandatory = $true)]
         [string]$Label,
         [Parameter(Mandatory = $true)]
-        [string]$BaseUrl
+        [string]$BaseUrl,
+        [Parameter(Mandatory = $true)]
+        [string]$Username,
+        [Parameter(Mandatory = $true)]
+        [string]$Password
     )
 
     $cookieFile = [System.IO.Path]::GetTempFileName()
+    $author = "Smoke Test $([Guid]::NewGuid().ToString('N'))"
+    $contentMarker = "smoke-$([Guid]::NewGuid().ToString('N'))"
+    $status = 0
+    $location = ""
+    $submitted = $false
+    $cleanup = [PSCustomObject]@{
+        Attempted = $false
+        Success = $false
+        CommentId = ""
+        DeleteStatus = 0
+        Attempts = 0
+        Message = "Cleanup not attempted."
+    }
 
     try {
         $blogHtml = Invoke-Curl @("-sS", "-c", $cookieFile, "$BaseUrl/blog")
@@ -208,7 +344,7 @@ function Test-CommentModerationFlow {
         $postHtml = Invoke-Curl @("-sS", "-b", $cookieFile, "-c", $cookieFile, "$BaseUrl/blog/$([Uri]::EscapeDataString($slug))")
         $token = Get-AntiForgeryToken -Html $postHtml
 
-        $form = "PostId=$([Uri]::EscapeDataString($slug))&Author=$([Uri]::EscapeDataString('Smoke Test'))&Content=$([Uri]::EscapeDataString('kill yourself you deserve to die'))&ParentCommentId=&__hp=&__RequestVerificationToken=$([Uri]::EscapeDataString($token))"
+        $form = "PostId=$([Uri]::EscapeDataString($slug))&Author=$([Uri]::EscapeDataString($author))&Content=$([Uri]::EscapeDataString("kill yourself you deserve to die $contentMarker"))&ParentCommentId=&__hp=&__RequestVerificationToken=$([Uri]::EscapeDataString($token))"
 
         $headers = Invoke-Curl @(
             "-sS", "-D", "-", "-o", "NUL",
@@ -218,19 +354,48 @@ function Test-CommentModerationFlow {
             "--data", $form
         )
 
+        $submitted = $true
         $status = Get-HeaderStatusCode -Headers $headers
         $location = Get-HeaderValue -Headers $headers -HeaderName "location"
-
-        [PSCustomObject]@{
-            Label    = $Label
-            BaseUrl  = $BaseUrl
-            Status   = $status
-            Location = $location
-            Success  = ($status -eq 302 -and $location.IndexOf("commentStatus=moderated", [StringComparison]::OrdinalIgnoreCase) -ge 0)
-        }
     }
     finally {
         Remove-Item -Path $cookieFile -ErrorAction SilentlyContinue
+
+        if ($submitted) {
+            try {
+                $cleanup = Remove-PendingSmokeComment `
+                    -BaseUrl $BaseUrl `
+                    -Username $Username `
+                    -Password $Password `
+                    -Author $author `
+                    -ContentMarker $contentMarker
+            }
+            catch {
+                $cleanup = [PSCustomObject]@{
+                    Attempted  = $true
+                    Success    = $false
+                    CommentId  = ""
+                    DeleteStatus = 0
+                    Attempts   = 0
+                    Message    = "Cleanup threw: $($_.Exception.Message)"
+                }
+            }
+        }
+    }
+
+    $moderationSucceeded = ($status -eq 302 -and $location.IndexOf("commentStatus=moderated", [StringComparison]::OrdinalIgnoreCase) -ge 0)
+    $cleanupExpected = $moderationSucceeded
+
+    [PSCustomObject]@{
+        Label           = $Label
+        BaseUrl         = $BaseUrl
+        Status          = $status
+        Location        = $location
+        Success         = $moderationSucceeded
+        CleanupExpected = $cleanupExpected
+        CleanupSuccess  = $cleanup.Success
+        CleanupMessage  = $cleanup.Message
+        CleanupCommentId = $cleanup.CommentId
     }
 }
 
@@ -262,8 +427,16 @@ $publicAdmin = Test-AdminFlow -Label "Public Edge" -BaseUrl $PublicBaseUrl -User
 $directComment = $null
 $publicComment = $null
 if (-not $SkipCommentCheck) {
-    $directComment = Test-CommentModerationFlow -Label "Direct Cloud Run" -BaseUrl $DirectBaseUrl
-    $publicComment = Test-CommentModerationFlow -Label "Public Edge" -BaseUrl $PublicBaseUrl
+    $directComment = Test-CommentModerationFlow `
+        -Label "Direct Cloud Run" `
+        -BaseUrl $DirectBaseUrl `
+        -Username $resolvedAdminUsername `
+        -Password $resolvedAdminPassword
+    $publicComment = Test-CommentModerationFlow `
+        -Label "Public Edge" `
+        -BaseUrl $PublicBaseUrl `
+        -Username $resolvedAdminUsername `
+        -Password $resolvedAdminPassword
 }
 
 Write-Host "Admin flow results:"
@@ -272,8 +445,8 @@ Write-Host " - $($publicAdmin.Label): login=$($publicAdmin.LoginStatus), admin=$
 
 if (-not $SkipCommentCheck) {
     Write-Host "Comment moderation flow results:"
-    Write-Host " - $($directComment.Label): status=$($directComment.Status), success=$($directComment.Success)"
-    Write-Host " - $($publicComment.Label): status=$($publicComment.Status), success=$($publicComment.Success)"
+    Write-Host " - $($directComment.Label): status=$($directComment.Status), success=$($directComment.Success), cleanup=$($directComment.CleanupSuccess)"
+    Write-Host " - $($publicComment.Label): status=$($publicComment.Status), success=$($publicComment.Success), cleanup=$($publicComment.CleanupSuccess)"
 }
 
 if ($directAdmin.Success -and -not $publicAdmin.Success) {
@@ -293,6 +466,14 @@ if (-not $directAdmin.Success -or -not $publicAdmin.Success) {
 
 if (-not $SkipCommentCheck -and (-not $directComment.Success -or -not $publicComment.Success)) {
     throw "Comment moderation smoke test failed."
+}
+
+if (-not $SkipCommentCheck -and (($directComment.CleanupExpected -and -not $directComment.CleanupSuccess) -or ($publicComment.CleanupExpected -and -not $publicComment.CleanupSuccess))) {
+    throw @"
+Comment smoke check submitted moderated comments but cleanup failed.
+ - $($directComment.Label): cleanupExpected=$($directComment.CleanupExpected), cleanupSuccess=$($directComment.CleanupSuccess), details=$($directComment.CleanupMessage)
+ - $($publicComment.Label): cleanupExpected=$($publicComment.CleanupExpected), cleanupSuccess=$($publicComment.CleanupSuccess), details=$($publicComment.CleanupMessage)
+"@
 }
 
 Write-Host ""
