@@ -47,7 +47,9 @@ public class AdminController : Controller
                 ExpiresUtc = DateTimeOffset.UtcNow.AddHours(1)
             };
 
-            await HttpContext.SignInAsync("CookieAuth", new ClaimsPrincipal(claimsIdentity), authProperties);
+            var principal = new ClaimsPrincipal(claimsIdentity);
+            await HttpContext.SignInAsync("CookieAuth", principal, authProperties);
+            HttpContext.User = principal;
             return await RenderDashboardAsync();
         }
 
