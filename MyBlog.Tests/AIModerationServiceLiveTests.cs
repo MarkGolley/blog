@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using MyBlog.Models;
 using MyBlog.Services;
 
 namespace MyBlog.Tests;
@@ -8,7 +9,7 @@ namespace MyBlog.Tests;
 public class AIModerationServiceLiveTests
 {
     [Fact]
-    public async Task IsCommentSafeAsync_LiveOpenAiCall_UsesConfiguredApiKey()
+    public async Task EvaluateCommentAsync_LiveOpenAiCall_UsesConfiguredApiKey()
     {
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         Assert.False(
@@ -30,14 +31,15 @@ public class AIModerationServiceLiveTests
 
         var service = new AIModerationService(client, config, NullLogger<AIModerationService>.Instance);
 
-        var isSafe = await service.IsCommentSafeAsync("This is a clean live moderation diagnostics comment.");
+        var result = await service.EvaluateCommentAsync("This is a clean live moderation diagnostics comment.");
 
         Assert.Equal(1, trackingHandler.RequestCount);
         Assert.Equal(new Uri("https://api.openai.com/v1/moderations"), trackingHandler.LastRequestUri);
         Assert.Equal("Bearer", trackingHandler.LastAuthScheme);
         Assert.Equal(apiKey, trackingHandler.LastAuthParameter);
         Assert.Equal(HttpStatusCode.OK, trackingHandler.LastResponseStatusCode);
-        Assert.True(isSafe, "Expected clean input to be approved by moderation.");
+        Assert.Equal(ModerationDecision.Allow, result.Decision);
+        Assert.Equal("openai_clear", result.ReasonCode);
     }
 
     private sealed class TrackingHttpHandler : DelegatingHandler

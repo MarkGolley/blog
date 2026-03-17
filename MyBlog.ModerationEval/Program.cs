@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using MyBlog.Models;
 using MyBlog.Services;
 
 var settings = EvalSettings.Parse(args);
@@ -67,8 +68,9 @@ static async Task<int> RunAsync(EvalSettings settings)
     foreach (var sample in cases)
     {
         var sw = Stopwatch.StartNew();
-        var predictedIsSafe = await moderationService.IsCommentSafeAsync(sample.Text);
+        var evaluation = await moderationService.EvaluateCommentAsync(sample.Text);
         sw.Stop();
+        var predictedIsSafe = evaluation.Decision == ModerationDecision.Allow;
 
         var expectedIsUnsafe = !sample.ExpectedIsSafe;
         var predictedIsUnsafe = !predictedIsSafe;
@@ -81,7 +83,9 @@ static async Task<int> RunAsync(EvalSettings settings)
             predictedIsSafe,
             outcome,
             sw.ElapsedMilliseconds,
-            sample.Text));
+            sample.Text,
+            evaluation.Decision.ToString(),
+            evaluation.ReasonCode));
 
         if (settings.DelayMs > 0)
         {
@@ -227,7 +231,7 @@ static double SafeDivide(double numerator, double denominator)
 static string BuildMarkdownReport(ModerationEvalRunReport report)
 {
     var sb = new StringBuilder();
-    sb.AppendLine("# AI Moderation Baseline Report");
+    sb.AppendLine("# AI Moderation Diagnostics Report");
     sb.AppendLine();
     sb.AppendLine($"- Run ID: `{report.RunId}`");
     sb.AppendLine($"- UTC timestamp: `{report.RunUtc:yyyy-MM-dd HH:mm:ss}`");
@@ -280,12 +284,12 @@ static string BuildMarkdownReport(ModerationEvalRunReport report)
     }
     else
     {
-        sb.AppendLine("| ID | Category | Expected | Predicted | Latency ms |");
-        sb.AppendLine("|---|---|---|---|---:|");
+        sb.AppendLine("| ID | Category | Expected | Predicted | Decision | Reason | Latency ms |");
+        sb.AppendLine("|---|---|---|---|---|---|---:|");
         foreach (var miss in misses)
         {
             sb.AppendLine(
-                $"| {miss.Id} | {miss.Category} | {(miss.ExpectedIsSafe ? "Safe" : "Unsafe")} | {(miss.PredictedIsSafe ? "Safe" : "Unsafe")} | {miss.LatencyMs} |");
+                $"| {miss.Id} | {miss.Category} | {(miss.ExpectedIsSafe ? "Safe" : "Unsafe")} | {(miss.PredictedIsSafe ? "Safe" : "Unsafe")} | {miss.PredictedDecision} | {miss.ReasonCode} | {miss.LatencyMs} |");
         }
     }
 
@@ -311,9 +315,9 @@ static void PrintUsage()
         "  dotnet run --project MyBlog.ModerationEval -- [--dataset <path>] [--outdir <path>] [--label <value>] [--limit <n>] [--timeout <seconds>] [--delay-ms <ms>]");
     Console.WriteLine();
     Console.WriteLine("Defaults:");
-    Console.WriteLine("  --dataset docs/ai-moderation-v2/datasets/baseline-v1.json");
+    Console.WriteLine("  --dataset docs/ai-moderation-v2/datasets/smoke-v1.json");
     Console.WriteLine("  --outdir  artifacts/moderation-eval/reports");
-    Console.WriteLine("  --label   baseline-v1");
+    Console.WriteLine("  --label   smoke-v1");
     Console.WriteLine("  --timeout 30");
     Console.WriteLine("  --delay-ms 0");
 }
@@ -329,9 +333,9 @@ internal sealed record EvalSettings(
 {
     public static EvalSettings Parse(string[] args)
     {
-        var dataset = Path.Combine("docs", "ai-moderation-v2", "datasets", "baseline-v1.json");
+        var dataset = Path.Combine("docs", "ai-moderation-v2", "datasets", "smoke-v1.json");
         var outdir = Path.Combine("artifacts", "moderation-eval", "reports");
-        var label = "baseline-v1";
+        var label = "smoke-v1";
         int? limit = null;
         var timeoutSeconds = 30;
         var delayMs = 0;
@@ -412,7 +416,9 @@ internal sealed record ModerationEvalResult(
     bool PredictedIsSafe,
     ModerationOutcome Outcome,
     long LatencyMs,
-    string Text)
+    string Text,
+    string PredictedDecision,
+    string ReasonCode)
 {
     public bool IsCorrect => Outcome is ModerationOutcome.TruePositive or ModerationOutcome.TrueNegative;
 }

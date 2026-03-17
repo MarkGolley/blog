@@ -3,8 +3,8 @@ param(
     [ValidateSet("Tests", "E2E", "PreDeploy", "ModerationEval")]
     [string]$Mode = "PreDeploy",
     [switch]$SkipBrowserInstall,
-    [string]$ModerationDataset = "docs/ai-moderation-v2/datasets/baseline-v1.json",
-    [string]$ModerationLabel = "baseline-v1"
+    [string]$ModerationDataset = "docs/ai-moderation-v2/datasets/smoke-v1.json",
+    [string]$ModerationLabel = "smoke-v1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -64,7 +64,7 @@ try {
     }
 
     if ($Mode -eq "ModerationEval") {
-        Invoke-Step -Name "Running AI moderation benchmark harness" -Action {
+        Invoke-Step -Name "Running AI moderation smoke diagnostics" -Action {
             dotnet run --project "MyBlog.ModerationEval" -- --dataset $ModerationDataset --label $ModerationLabel
         }
     }

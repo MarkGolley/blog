@@ -10,16 +10,16 @@ namespace MyBlog.Controllers;
 public class AIExperimentsController : Controller
 {
     private readonly AIModerationService _aiModerationService;
-    private readonly IConfiguration _configuration;
+    private readonly PromptRiskScannerService _promptRiskScannerService;
     private readonly ILogger<AIExperimentsController> _logger;
 
     public AIExperimentsController(
         AIModerationService aiModerationService,
-        IConfiguration configuration,
+        PromptRiskScannerService promptRiskScannerService,
         ILogger<AIExperimentsController> logger)
     {
         _aiModerationService = aiModerationService;
-        _configuration = configuration;
+        _promptRiskScannerService = promptRiskScannerService;
         _logger = logger;
     }
 
@@ -29,58 +29,100 @@ public class AIExperimentsController : Controller
         return View(new ModerationPlaygroundViewModel());
     }
 
-    [HttpPost("")]
+    [HttpPost("moderation")]
     [ValidateAntiForgeryToken]
     [EnableRateLimiting("moderationChecks")]
-    public async Task<IActionResult> Index(ModerationPlaygroundViewModel model)
+    public async Task<IActionResult> RunModeration(ModerationPlaygroundViewModel model)
     {
         model.InputText = model.InputText?.Trim() ?? string.Empty;
+        model.PromptRiskInput = model.PromptRiskInput?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(model.InputText) || model.InputText.Length < 3)
+        {
+            ModelState.AddModelError(nameof(model.InputText), "Enter at least 3 characters to run moderation.");
+        }
+
+        if (model.InputText.Length > 2000)
+        {
+            ModelState.AddModelError(nameof(model.InputText), "Text must be 2000 characters or fewer.");
+        }
 
         if (!ModelState.IsValid)
         {
-            return View(model);
-        }
-
-        if (!IsModerationDemoAvailable())
-        {
-            model.HasResult = true;
-            model.IsSafe = null;
-            model.ResultTitle = "Demo unavailable";
-            model.ResultMessage = "The moderation demo is temporarily unavailable because the API key is not configured.";
-            return View(model);
+            return View("Index", model);
         }
 
         var timer = Stopwatch.StartNew();
-        var isSafe = await _aiModerationService.IsCommentSafeAsync(model.InputText);
+        var result = await _aiModerationService.EvaluateCommentAsync(model.InputText);
         timer.Stop();
 
-        model.HasResult = true;
-        model.IsSafe = isSafe;
+        model.HasModerationResult = true;
+        model.Decision = result.Decision;
+        model.FlaggedByModel = result.FlaggedByModel;
+        model.ReasonCode = result.ReasonCode;
         model.LatencyMs = timer.ElapsedMilliseconds;
 
-        if (isSafe)
+        switch (result.Decision)
         {
-            model.ResultTitle = "Allowed";
-            model.ResultMessage = "This sample would pass automated moderation.";
-        }
-        else
-        {
-            model.ResultTitle = "Blocked or manual review";
-            model.ResultMessage =
-                "This sample would be blocked or held for manual review by the current moderation policy.";
+            case ModerationDecision.Allow:
+                model.ResultTitle = "Allowed";
+                model.ResultMessage = "This sample passes automated moderation.";
+                break;
+            case ModerationDecision.Block:
+                model.ResultTitle = "Blocked";
+                model.ResultMessage = "This sample is blocked by moderation policy.";
+                break;
+            default:
+                model.ResultTitle = "Manual review";
+                model.ResultMessage = "No automated approval decision was available for this sample.";
+                break;
         }
 
         _logger.LogInformation(
-            "Moderation playground evaluated sample. IsSafe={IsSafe} LatencyMs={LatencyMs}",
-            isSafe,
+            "Moderation playground evaluated sample. Decision={Decision} ReasonCode={ReasonCode} LatencyMs={LatencyMs}",
+            result.Decision,
+            result.ReasonCode,
             model.LatencyMs ?? 0);
 
-        return View(model);
+        return View("Index", model);
     }
 
-    private bool IsModerationDemoAvailable()
+    [HttpPost("prompt-risk")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting("promptRiskChecks")]
+    public IActionResult RunPromptRisk(ModerationPlaygroundViewModel model)
     {
-        var apiKey = _configuration["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        return !string.IsNullOrWhiteSpace(apiKey);
+        model.InputText = model.InputText?.Trim() ?? string.Empty;
+        model.PromptRiskInput = model.PromptRiskInput?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(model.PromptRiskInput) || model.PromptRiskInput.Length < 3)
+        {
+            ModelState.AddModelError(nameof(model.PromptRiskInput), "Enter at least 3 characters to scan for risk patterns.");
+        }
+
+        if (model.PromptRiskInput.Length > 2000)
+        {
+            ModelState.AddModelError(nameof(model.PromptRiskInput), "Prompt must be 2000 characters or fewer.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View("Index", model);
+        }
+
+        var result = _promptRiskScannerService.Evaluate(model.PromptRiskInput);
+        model.HasPromptRiskResult = true;
+        model.PromptRiskScore = result.RiskScore;
+        model.PromptRiskLevel = result.RiskLevel;
+        model.PromptRiskMatchedRules = result.MatchedRules;
+        model.PromptRiskSummary = result.Summary;
+        model.PromptRiskRecommendation = result.Recommendation;
+
+        _logger.LogInformation(
+            "Prompt risk scanner evaluated sample. RiskLevel={RiskLevel} RiskScore={RiskScore}",
+            result.RiskLevel,
+            result.RiskScore);
+
+        return View("Index", model);
     }
 }

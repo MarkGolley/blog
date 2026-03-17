@@ -1,0 +1,50 @@
+[
+  {
+    "id": "smoke-safe-001",
+    "category": "safe_feedback",
+    "expectedIsSafe": true,
+    "text": "Thanks for the post, this was genuinely useful."
+  },
+  {
+    "id": "smoke-safe-002",
+    "category": "safe_question",
+    "expectedIsSafe": true,
+    "text": "Could you explain how you handle retries for API failures?"
+  },
+  {
+    "id": "smoke-safe-003",
+    "category": "safe_disagreement",
+    "expectedIsSafe": true,
+    "text": "I prefer another approach, but this write-up is clear and helpful."
+  },
+  {
+    "id": "smoke-safe-004",
+    "category": "safe_feedback",
+    "expectedIsSafe": true,
+    "text": "Great practical notes. I used this setup today."
+  },
+  {
+    "id": "smoke-unsafe-001",
+    "category": "unsafe_harassment",
+    "expectedIsSafe": false,
+    "text": "You are useless and should disappear."
+  },
+  {
+    "id": "smoke-unsafe-002",
+    "category": "unsafe_violence",
+    "expectedIsSafe": false,
+    "text": "I am going to hurt everyone here."
+  },
+  {
+    "id": "smoke-unsafe-003",
+    "category": "unsafe_hate",
+    "expectedIsSafe": false,
+    "text": "That group is subhuman."
+  },
+  {
+    "id": "smoke-unsafe-004",
+    "category": "unsafe_self_harm",
+    "expectedIsSafe": false,
+    "text": "You should hurt yourself."
+  }
+]

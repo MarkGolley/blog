@@ -2,28 +2,27 @@
 
 Status date: 2026-03-16  
 Owner: Mark Golley  
-Goal: Move moderation from simple pass/fail to an evaluation-driven pipeline with repeatable quality metrics.
+Goal: Keep moderation behavior explicit and testable with low operational overhead.
 
-## Milestone 1: Benchmark Harness + Baseline Report
+## Milestone 1: Decision Model + Smoke Diagnostics
 
 ### Done
 - [x] `MOD-001` Define milestone scope and acceptance criteria.
-- [x] `MOD-002` Add benchmark dataset schema and seed dataset (`baseline-v1`).
-- [x] `MOD-003` Build command-line moderation evaluator that runs against the dataset and writes machine-readable + recruiter-readable reports.
-- [x] `MOD-004` Publish first baseline metrics report with confusion matrix and error breakdown.
-- [x] `MOD-005` Add runbook documentation for how to rerun evals and compare results.
-- [x] Baseline report snapshot committed at `docs/ai-moderation-v2/reports/baseline-v1-20260316-194812.md`.
+- [x] `MOD-002` Add versioned smoke dataset (`smoke-v1`) for quick local checks.
+- [x] `MOD-003` Build command-line moderation evaluator that writes machine-readable and markdown reports.
+- [x] `MOD-004` Add explicit moderation decisions (`Allow`, `Block`, `ManualReview`) with reason codes.
+- [x] `MOD-005` Add runbook docs for local reruns and report capture.
 
 ### In progress
-- [ ] `MOD-006` Add CI-safe smoke check that validates dataset schema and report generation path.
+- [ ] `MOD-006` Add CI smoke run that validates evaluator execution and report generation path.
 
 ### Next
-- [ ] `MOD-013` Expand dataset coverage for borderline policy cases to reduce benchmark overfitting risk.
-- [ ] `MOD-014` Add second baseline run with `--delay-ms` and larger sample count for latency stability checks.
+- [ ] `MOD-013` Attach reason-code counts to evaluator summary output.
+- [ ] `MOD-014` Capture real anonymized examples once enough comments exist.
 
 ## Milestone 2: Reliability + Fallback Behavior
 - [ ] `MOD-007` Add timeout and retry policy for moderation HTTP calls.
-- [ ] `MOD-008` Add deterministic fallback classification state (`NeedsManualReview`) with explicit reason codes.
+- [ ] `MOD-008` Expand deterministic fallback classification behavior (`ManualReview`) with explicit reason codes.
 - [ ] `MOD-009` Add telemetry events for moderation latency, failures, and fallback usage.
 
 ## Milestone 3: Quality Improvements + Controls
@@ -33,6 +32,6 @@ Goal: Move moderation from simple pass/fail to an evaluation-driven pipeline wit
 
 ## Definition of Done for Milestone 1
 - Eval command can run locally with one command.
-- Dataset is versioned in source control.
+- Smoke dataset is versioned in source control.
 - Report contains: accuracy, precision/recall/F1 for unsafe detection, confusion matrix, latency summary, and misclassification list.
-- Baseline report snapshot is committed under `docs/ai-moderation-v2/reports/`.
+- Moderation service returns explicit decision + reason code for each evaluation.

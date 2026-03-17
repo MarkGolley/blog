@@ -60,8 +60,9 @@ public class CommentService
 
         comment.PostedAt = DateTime.UtcNow;
 
-        // AI moderation: check if content is safe
-        comment.IsApproved = await _aiModerationService.IsCommentSafeAsync(comment.Content);
+        // AI moderation: approve only explicit Allow decisions.
+        var moderation = await _aiModerationService.EvaluateCommentAsync(comment.Content);
+        comment.IsApproved = moderation.Decision == ModerationDecision.Allow;
 
         var countersRef = _db.Collection(MetaCollection).Document(CountersDocument);
         var assignedId = await _db.RunTransactionAsync(async transaction =>
@@ -222,7 +223,8 @@ public class CommentService
     private async Task AddCommentInMemory(Comment comment, AIModerationService aiModerationService)
     {
         // AI check outside lock
-        comment.IsApproved = await aiModerationService.IsCommentSafeAsync(comment.Content);
+        var moderation = await aiModerationService.EvaluateCommentAsync(comment.Content);
+        comment.IsApproved = moderation.Decision == ModerationDecision.Allow;
 
         lock (LocalStateLock)
         {

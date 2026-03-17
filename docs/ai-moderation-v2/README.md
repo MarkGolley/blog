@@ -1,13 +1,13 @@
-# AI Moderation v2 Milestone 1
+# AI Moderation v2 Diagnostics
 
-Milestone 1 delivers a repeatable moderation benchmark flow and baseline report.
+This folder tracks a lightweight moderation diagnostics loop for a low-volume comment system.
 
 ## Run the evaluator
 
 From repository root:
 
 ```powershell
-dotnet run --project MyBlog.ModerationEval -- --dataset docs/ai-moderation-v2/datasets/baseline-v1.json --label baseline-v1
+dotnet run --project MyBlog.ModerationEval -- --dataset docs/ai-moderation-v2/datasets/smoke-v1.json --label smoke-v1
 ```
 
 Or use the helper script:
@@ -19,8 +19,8 @@ Or use the helper script:
 ## Tracked assets
 
 - Ticket tracker: `docs/ai-moderation-v2/TICKETS.md`
-- Dataset: `docs/ai-moderation-v2/datasets/baseline-v1.json`
-- Baseline report snapshot: `docs/ai-moderation-v2/reports/baseline-v1-20260316-194812.md`
+- Smoke dataset: `docs/ai-moderation-v2/datasets/smoke-v1.json`
+- Snapshot report example: `docs/ai-moderation-v2/reports/baseline-v1-20260316-194812.md`
 
 ## Generated run artifacts
 

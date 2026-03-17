@@ -1120,6 +1120,44 @@ thead th {
     font-size: 0.88rem;
 }
 
+.policy-note {
+    margin-top: -0.1rem;
+    margin-bottom: 0.7rem;
+    padding: 0.58rem 0.72rem;
+    border-radius: 10px;
+    border: 1px solid rgba(16, 63, 101, 0.22);
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+}
+
+.prompt-risk-result {
+    margin-top: 0.9rem;
+    padding: 0.78rem 0.88rem;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.prompt-risk-result.risk-low {
+    border-color: rgba(22, 114, 77, 0.42);
+    background: linear-gradient(140deg, rgba(228, 249, 236, 0.95), rgba(247, 255, 250, 0.95));
+}
+
+.prompt-risk-result.risk-medium {
+    border-color: rgba(227, 156, 65, 0.42);
+    background: linear-gradient(140deg, rgba(255, 244, 225, 0.95), rgba(255, 250, 241, 0.95));
+}
+
+.prompt-risk-result.risk-high,
+.prompt-risk-result.risk-critical {
+    border-color: rgba(181, 60, 60, 0.42);
+    background: linear-gradient(140deg, rgba(255, 235, 235, 0.95), rgba(255, 247, 247, 0.95));
+}
+
+.prompt-risk-rules {
+    margin-top: 0.5rem;
+}
+
 .portfolio-hero {
     padding: clamp(1.1rem, 2.3vw, 2rem);
 }
@@ -1169,8 +1207,32 @@ thead th {
     margin-top: 0.55rem;
 }
 
+.case-details {
+    margin-top: 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.85);
+    overflow: hidden;
+}
+
+.case-details > summary {
+    cursor: pointer;
+    list-style: none;
+    font-weight: 700;
+    padding: 0.62rem 0.72rem;
+    color: var(--brand-deep);
+}
+
+.case-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.case-details-body {
+    padding: 0 0.72rem 0.72rem;
+}
+
 .case-block {
-    margin-top: 0.8rem;
+    margin-top: 0.7rem;
 }
 
 .case-block h4 {

@@ -2,49 +2,55 @@
 @{
     ViewData["Title"] = "AI Experiments";
     ViewData["MetaDescription"] =
-        "Applied AI experiments from Mark Golley focused on evaluation quality, safety testing, and practical engineering tradeoffs.";
+        "Applied AI experiments from Mark Golley focused on practical safety checks and real-world behavior.";
     ViewData["CanonicalPath"] = "/ai-experiments";
 }
 
 <section aria-labelledby="ai-experiments-title" class="portfolio-hero" data-reveal>
     <p class="hero-kicker">Applied AI</p>
-    <h1 id="ai-experiments-title">AI experiments with hard metrics and failure analysis.</h1>
+    <h1 id="ai-experiments-title">Small AI experiments you can run directly.</h1>
     <p class="section-intro">
-        These experiments are intentionally smaller than full projects, but each one includes a benchmark, guardrails, and known limitations.
-        The goal is fast iteration without sacrificing engineering rigor.
+        These are lightweight checks from the same stack used on this site.
     </p>
     <div class="hero-actions">
-        <a class="btn btn-primary" asp-controller="Projects" asp-action="Index">View full projects</a>
-        <a class="btn btn-secondary" asp-controller="Contact" asp-action="Index">Collaborate</a>
+        <a class="btn btn-primary" asp-controller="Projects" asp-action="Index">View projects</a>
+        <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">Read blog</a>
     </div>
 </section>
 
 <section aria-labelledby="moderation-playground-title" data-reveal>
-    <h2 id="moderation-playground-title">Try the moderation playground</h2>
+    <h2 id="moderation-playground-title">Moderation playground</h2>
     <p class="section-intro">
-        This runs the same moderation service used in comment workflows. Paste a sample comment to see whether it would be allowed automatically or sent for manual review.
+        Paste sample comment text to see <code>Allow</code>, <code>Block</code>, or <code>ManualReview</code>.
     </p>
+    <p class="policy-note">Manual review is the safe fallback when no confident automated decision is available.</p>
 
-    <form method="post" asp-action="Index" class="contact-form">
+    <form method="post" asp-action="RunModeration" class="contact-form">
         @Html.AntiForgeryToken()
         <label asp-for="InputText">Comment text</label>
-        <textarea asp-for="InputText" rows="5" maxlength="2000" placeholder="Type or paste a comment sample..."></textarea>
+        <textarea asp-for="InputText" rows="4" maxlength="2000" placeholder="Type or paste a comment sample..."></textarea>
         <span asp-validation-for="InputText" class="text-danger"></span>
+        <input type="hidden" asp-for="PromptRiskInput" />
 
         <button type="submit">Run moderation check</button>
     </form>
 
-    @if (Model.HasResult)
+    @if (Model.HasModerationResult)
     {
-        var resultClass = Model.IsSafe == true
+        var resultClass = Model.Decision == ModerationDecision.Allow
             ? "moderation-demo-result safe"
-            : Model.IsSafe == false
+            : Model.Decision == ModerationDecision.Block
                 ? "moderation-demo-result blocked"
                 : "moderation-demo-result neutral";
 
         <div class="@resultClass">
             <p class="moderation-demo-title">@Model.ResultTitle</p>
             <p>@Model.ResultMessage</p>
+            <p class="moderation-demo-meta">Reason: @Model.ReasonCode</p>
+            @if (Model.FlaggedByModel.HasValue)
+            {
+                <p class="moderation-demo-meta">Model flagged: @(Model.FlaggedByModel.Value ? "Yes" : "No")</p>
+            }
             @if (Model.LatencyMs.HasValue)
             {
                 <p class="moderation-demo-meta">Latency: @Model.LatencyMs.Value ms</p>
@@ -53,81 +59,98 @@
     }
 </section>
 
-<section aria-labelledby="experiment-templates-title" data-reveal>
-    <h2 id="experiment-templates-title">Experiment templates</h2>
-    <p class="section-intro">Each experiment captures baseline, intervention, and measured delta.</p>
+<section aria-labelledby="prompt-risk-scanner-title" data-reveal>
+    <h2 id="prompt-risk-scanner-title">Prompt risk scanner</h2>
+    <p class="section-intro">
+        Fast heuristic scan for common injection and exfiltration patterns.
+    </p>
+
+    <form method="post" asp-action="RunPromptRisk" class="contact-form">
+        @Html.AntiForgeryToken()
+        <label asp-for="PromptRiskInput">Prompt text</label>
+        <textarea asp-for="PromptRiskInput" rows="4" maxlength="2000" placeholder="Type or paste a prompt..."></textarea>
+        <span asp-validation-for="PromptRiskInput" class="text-danger"></span>
+        <input type="hidden" asp-for="InputText" />
+        <button type="submit">Scan prompt risk</button>
+    </form>
+
+    @if (Model.HasPromptRiskResult)
+    {
+        var riskClass = Model.PromptRiskLevel switch
+        {
+            "Critical" => "prompt-risk-result risk-critical",
+            "High" => "prompt-risk-result risk-high",
+            "Medium" => "prompt-risk-result risk-medium",
+            _ => "prompt-risk-result risk-low"
+        };
+
+        <div class="@riskClass">
+            <p class="moderation-demo-title">@Model.PromptRiskLevel risk (@Model.PromptRiskScore/100)</p>
+            <p>@Model.PromptRiskSummary</p>
+            <p class="moderation-demo-meta">Recommendation: @Model.PromptRiskRecommendation</p>
+
+            @if (Model.PromptRiskMatchedRules.Count > 0)
+            {
+                <ul class="case-list prompt-risk-rules">
+                    @foreach (var rule in Model.PromptRiskMatchedRules)
+                    {
+                        <li>@rule</li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+</section>
+
+<section aria-labelledby="experiment-roadmap-title" data-reveal>
+    <h2 id="experiment-roadmap-title">Experiment roadmap</h2>
+    <p class="section-intro">Current direction and next implementation steps.</p>
 
     <div class="case-template-grid">
         <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
         {
             Title = "Prompt Injection Defense Bench",
             Status = "In progress",
-            OneLiner = "Benchmark how moderation and prompt hardening rules perform against prompt-injection and jailbreak attempts.",
-            WhyItMatters = "Shows practical AI safety work using repeatable attack scenarios and measurable defensive improvements.",
+            OneLiner = "Run attack prompts against current safeguards and track escapes.",
+            WhyItMatters = "Makes prompt hardening measurable instead of guesswork.",
             TechnicalScope = new[]
             {
-                "Build an attack prompt set that targets instruction override patterns.",
-                "Evaluate baseline model responses before adding any hardening layers.",
-                "Apply layered defenses and compare block rate, false positives, and escaped attempts.",
-                "Log failure categories to guide next defense iteration."
+                "Maintain a compact attack suite with realistic misuse patterns.",
+                "Compare current defenses against previous run output.",
+                "Track escaped prompts and categorize failure type.",
+                "Document one mitigation per escaped case."
             },
             ProofChecklist = new[]
             {
-                "Baseline and post-hardening scorecards.",
-                "Top escaped attack examples with mitigation notes.",
-                "Automated evaluation script in repository.",
-                "Documented residual risk and open gaps."
+                "Run report with escaped count and risk level.",
+                "Examples of escaped prompts with mitigation notes.",
+                "Regression tests for fixed cases."
             },
-            RecruiterSignal = "Understands modern LLM attack surfaces and can engineer measurable defenses.",
-            NextMilestone = "Complete first benchmark pass and publish initial defense delta."
+            WhatItShows = "Practical safety iteration with visible before/after behavior.",
+            NextMilestone = "Publish first escaped-prompt review and mitigation patch."
         }' />
 
         <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
         {
-            Title = "RAG Answer Quality Evaluator",
+            Title = "Prompt Repair Assistant",
             Status = "Planned",
-            OneLiner = "Evaluate retrieval-augmented answers for grounding, citation quality, and hallucination rate.",
-            WhyItMatters = "Demonstrates that retrieval quality and evaluation design are treated as first-class engineering concerns.",
+            OneLiner = "Suggest safer rewrites when prompt risk is medium/high.",
+            WhyItMatters = "Turns risk detection into an actionable UX loop people can actually use.",
             TechnicalScope = new[]
             {
-                "Create a curated question set with expected citation targets.",
-                "Score outputs for factual grounding and citation usefulness.",
-                "Compare chunking and retrieval strategies across the same query set.",
-                "Track quality and latency together to expose practical tradeoffs."
+                "Map risky phrases to safe rewrite templates.",
+                "Preserve user intent while removing attack patterns.",
+                "Attach short explanation of what was changed.",
+                "Measure drop in risk score after rewrite."
             },
             ProofChecklist = new[]
             {
-                "Evaluation rubric with pass/fail thresholds.",
-                "Comparison table for retrieval strategies.",
-                "Sample outputs with annotated failure reasons.",
-                "Recommendation memo for production approach."
+                "Before/after prompt pairs with risk deltas.",
+                "Automated tests for rewrite stability.",
+                "False-positive review notes."
             },
-            RecruiterSignal = "Can evaluate AI systems systematically instead of relying on ad hoc demos.",
-            NextMilestone = "Ship rubric and benchmark questions with a reproducible scoring script."
-        }' />
-
-        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
-        {
-            Title = "Model Cost and Latency Profiler",
-            Status = "Planned",
-            OneLiner = "Profile model usage to map token cost and response latency under realistic request patterns.",
-            WhyItMatters = "Highlights operational thinking by balancing quality, speed, and spend before scaling usage.",
-            TechnicalScope = new[]
-            {
-                "Run controlled prompts against multiple model configurations.",
-                "Capture p50, p95 latency and token spend per task type.",
-                "Identify quality floor to avoid overpaying for marginal gains.",
-                "Recommend routing policy by request criticality."
-            },
-            ProofChecklist = new[]
-            {
-                "Cost-latency scatter plot and selection rationale.",
-                "Benchmark harness and prompt fixtures in source control.",
-                "Risk notes for rate limits and burst traffic.",
-                "Policy doc defining default model and fallback choices."
-            },
-            RecruiterSignal = "Can make economically sound AI architecture decisions with measurable justification.",
-            NextMilestone = "Implement baseline profiler and gather first benchmark dataset."
+            WhatItShows = "Ability to build user-facing safety tooling, not just backend checks.",
+            NextMilestone = "Implement initial rewrite rules and validation tests."
         }' />
     </div>
 </section>
