@@ -8,12 +8,15 @@
 - Checks currently included:
 - `blogStorage` (post files folder exists and post count)
 - `firestore` (quick read check, or `development-fallback` in local Development mode)
+- `dailyCapsule` (AI generation/persistence status, last failures, last served source/date)
 
 Example:
 
 ```powershell
 Invoke-RestMethod http://localhost:5207/health
 ```
+
+If `checks.dailyCapsule.status` is `degraded`, treat it as an alert condition even when the site still serves fallback capsule content.
 
 ## Pre-Deploy Checks
 
@@ -176,3 +179,32 @@ Optional:
 - Pass `-BaseUrl` only if you need to override the default `https://markgolley.dev`.
 - Omit `-PostSlug` to get an interactive numbered list from `MyBlog/wwwroot/BlogStorage`.
 - Pass `-BlogStoragePath` if your local posts directory differs from the default.
+
+## Daily Capsule Warm-Up
+
+Purpose:
+
+- Pre-generate and persist today’s capsule shortly after UK midnight so first visitors do not trigger generation.
+
+Endpoint:
+
+- `POST /admin/daily-capsule/warmup`
+- Header: `X-Admin-Key`
+
+Required secret:
+
+- `DAILY_CAPSULE_WARMUP_KEY` (or `DailyCapsule:WarmupAdminKey` in config)
+
+Manual trigger:
+
+```powershell
+$env:DAILY_CAPSULE_WARMUP_KEY = "your-warmup-key"
+.\Deployment\warm-daily-capsule.ps1
+```
+
+Suggested scheduler setup:
+
+1. Use Cloud Scheduler (or equivalent) with cron `5 0 * * *` and timezone `Europe/London`.
+2. Call `POST https://your-domain/admin/daily-capsule/warmup`.
+3. Include header `X-Admin-Key: <warmup-key>`.
+4. Alert on non-2xx responses.

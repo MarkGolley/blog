@@ -1,4 +1,6 @@
 ﻿<!DOCTYPE html>
+@using MyBlog.Services
+@inject IDailyCodingCapsuleProvider DailyCodingCapsuleService
 <html lang="en">
 <head>
     <meta charset="utf-8"/>
@@ -97,6 +99,8 @@
 @{
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    DailyCodingCapsuleViewModel? navCapsule = null;
+    DailyCodingCapsuleViewModel? previousNavCapsule = null;
 
     bool IsController(string controller)
     {
@@ -107,6 +111,17 @@
     {
         return string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase)
                && string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase);
+    }
+
+    try
+    {
+        navCapsule = await DailyCodingCapsuleService.GetCapsuleForCurrentDayAsync(Context.RequestAborted);
+        previousNavCapsule = await DailyCodingCapsuleService.TryGetStoredCapsuleForOffsetDaysAsync(-1, Context.RequestAborted);
+    }
+    catch
+    {
+        navCapsule = null;
+        previousNavCapsule = null;
     }
 }
 
@@ -124,6 +139,64 @@
             <span class="brand-wordmark">Mark Golley</span>
             <span class="brand-subtitle">Engineering Notes</span>
         </a>
+
+        @if (navCapsule is not null)
+        {
+            <details class="nav-capsule" data-nav-capsule>
+                <summary class="nav-capsule-summary">
+                    <span class="nav-capsule-label">Today in code</span>
+                    <span class="nav-capsule-cta" aria-hidden="true">
+                        <span class="nav-capsule-spark"></span>
+                        <span class="nav-capsule-cta-text">Open</span>
+                    </span>
+                </summary>
+                <div class="nav-capsule-panel">
+                    @if (previousNavCapsule is not null)
+                    {
+                        <div class="nav-capsule-controls">
+                            <button type="button" class="nav-capsule-nav-btn" data-nav-capsule-prev aria-label="Show yesterday's insight">←</button>
+                            <span class="nav-capsule-controls-label" data-nav-capsule-day-label>Today</span>
+                            <button type="button" class="nav-capsule-nav-btn" data-nav-capsule-next aria-label="Show today's insight" hidden>→</button>
+                        </div>
+                    }
+
+                    <div class="nav-capsule-content" data-nav-capsule-content="today">
+                        <div class="nav-capsule-head">
+                            <span class="nav-capsule-pill">@navCapsule.CapsuleType</span>
+                            <p class="nav-capsule-panel-title">@navCapsule.Title</p>
+                        </div>
+                        <p class="nav-capsule-copy">@navCapsule.Body</p>
+                        <p class="nav-capsule-example">
+                            <span class="nav-capsule-example-label">Example</span>
+                            <code>@navCapsule.Example</code>
+                        </p>
+                        <p class="nav-capsule-reset">
+                            Refreshes in
+                            <span
+                                data-daily-capsule-countdown="true"
+                                data-next-reset-utc="@navCapsule.NextResetUtcIso">
+                                calculating...
+                            </span>
+                        </p>
+                    </div>
+
+                    @if (previousNavCapsule is not null)
+                    {
+                        <div class="nav-capsule-content" data-nav-capsule-content="yesterday" hidden>
+                            <div class="nav-capsule-head">
+                                <span class="nav-capsule-pill">@previousNavCapsule.CapsuleType</span>
+                                <p class="nav-capsule-panel-title">@previousNavCapsule.Title</p>
+                            </div>
+                            <p class="nav-capsule-copy">@previousNavCapsule.Body</p>
+                            <p class="nav-capsule-example">
+                                <span class="nav-capsule-example-label">Example</span>
+                                <code>@previousNavCapsule.Example</code>
+                            </p>
+                        </div>
+                    }
+                </div>
+            </details>
+        }
 
         <button
             type="button"
