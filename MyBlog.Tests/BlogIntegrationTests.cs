@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MyBlog.Models;
 using MyBlog.Services;
 
@@ -351,6 +352,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         var checks = root.GetProperty("checks");
         Assert.True(checks.TryGetProperty("blogStorage", out _), "Expected blogStorage check in health payload.");
         Assert.True(checks.TryGetProperty("firestore", out _), "Expected firestore check in health payload.");
+        Assert.True(checks.TryGetProperty("dailyCapsule", out _), "Expected dailyCapsule check in health payload.");
     }
 
     [Fact]
@@ -457,6 +459,47 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task DailyCapsuleWarmup_RequiresAdminKey()
+    {
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var unauthorized = await client.PostAsync(
+            "/admin/daily-capsule/warmup",
+            new FormUrlEncodedContent(new Dictionary<string, string>()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+    }
+
+    [Fact]
+    public async Task DailyCapsuleWarmup_WithValidAdminKey_ReturnsSuccessPayload()
+    {
+        using var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/admin/daily-capsule/warmup")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>())
+        };
+        request.Headers.Add("X-Admin-Key", "integration-daily-capsule-key");
+
+        using var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var json = await JsonDocument.ParseAsync(stream);
+        var root = json.RootElement;
+
+        Assert.True(root.GetProperty("success").GetBoolean());
+        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("source").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("nextResetUtc").GetString()));
+    }
+
+    [Fact]
     public async Task AdminLogin_CanLoginLogoutAndLoginAgain()
     {
         using var client = CreateClient("10.0.3.2", allowAutoRedirect: false);
@@ -490,6 +533,43 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         using var postResponse = await client.GetAsync($"/blog/{Uri.EscapeDataString(postId)}");
         Assert.True(postResponse.Headers.CacheControl?.NoStore ?? false);
+    }
+
+    [Fact]
+    public async Task HomeIndex_RendersDailyCapsuleAndCountdown()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("Today in code", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-daily-capsule-countdown=\"true\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-next-reset-utc=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task HomeIndex_NavCapsule_DoesNotShowYesterdayArrow_WhenNoStoredHistory()
+    {
+        var factory = CreateFactoryWithCapsuleProvider(new FakeDailyCodingCapsuleProvider(includeStoredYesterday: false));
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("Today in code", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-nav-capsule-prev", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-nav-capsule-next", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task HomeIndex_NavCapsule_ShowsYesterdayArrow_WhenStoredHistoryExists()
+    {
+        var factory = CreateFactoryWithCapsuleProvider(new FakeDailyCodingCapsuleProvider(includeStoredYesterday: true));
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("data-nav-capsule-prev", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-nav-capsule-next", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -570,6 +650,18 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         client.DefaultRequestHeaders.Add("X-Forwarded-For", forwardedForIp);
         return client;
+    }
+
+    private WebApplicationFactory<Program> CreateFactoryWithCapsuleProvider(IDailyCodingCapsuleProvider provider)
+    {
+        return _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IDailyCodingCapsuleProvider>();
+                services.AddSingleton(provider);
+            });
+        });
     }
 
     private static async Task LikePostAsync(HttpClient client, string postId)
@@ -697,5 +789,54 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.True(
             response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.Found,
             $"Expected success or redirect when logging out admin, got {(int)response.StatusCode}.");
+    }
+
+    private sealed class FakeDailyCodingCapsuleProvider : IDailyCodingCapsuleProvider
+    {
+        private readonly bool _includeStoredYesterday;
+        private readonly DailyCodingCapsuleViewModel _today;
+        private readonly DailyCodingCapsuleViewModel _yesterday;
+
+        public FakeDailyCodingCapsuleProvider(bool includeStoredYesterday)
+        {
+            _includeStoredYesterday = includeStoredYesterday;
+            _today = new DailyCodingCapsuleViewModel
+            {
+                CapsuleType = "Tip",
+                Title = "Write clear commit messages",
+                Body = "Use concise, descriptive commit messages so teammates can scan intent quickly.",
+                Example = "feat(auth): validate token expiry in reset flow",
+                Source = "test",
+                NextResetUtcIso = DateTimeOffset.UtcNow.AddHours(3).ToString("O", CultureInfo.InvariantCulture)
+            };
+            _yesterday = new DailyCodingCapsuleViewModel
+            {
+                CapsuleType = "Fact",
+                Title = "Latency compounds quickly",
+                Body = "Sequential network calls add up quickly; parallelise independent IO.",
+                Example = "Task.WhenAll(profileTask, settingsTask, alertsTask)",
+                Source = "test",
+                NextResetUtcIso = DateTimeOffset.UtcNow.AddHours(3).ToString("O", CultureInfo.InvariantCulture)
+            };
+        }
+
+        public Task<DailyCodingCapsuleViewModel> GetCapsuleForCurrentDayAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_today);
+        }
+
+        public Task<DailyCodingCapsuleViewModel> GetCapsuleForOffsetDaysAsync(int offsetDays, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(offsetDays < 0 ? _yesterday : _today);
+        }
+
+        public Task<DailyCodingCapsuleViewModel?> TryGetStoredCapsuleForOffsetDaysAsync(int offsetDays, CancellationToken cancellationToken = default)
+        {
+            DailyCodingCapsuleViewModel? result =
+                offsetDays == -1 && _includeStoredYesterday
+                    ? _yesterday
+                    : null;
+            return Task.FromResult(result);
+        }
     }
 }

@@ -128,6 +128,8 @@ builder.Services.AddScoped<LikeService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SubscriptionEmailService>();
 builder.Services.AddHttpClient<AIModerationService>();
+builder.Services.AddHttpClient<DailyCodingCapsuleService>();
+builder.Services.AddTransient<IDailyCodingCapsuleProvider>(sp => sp.GetRequiredService<DailyCodingCapsuleService>());
 
 var openAiApiKey =
     builder.Configuration["OPENAI_API_KEY"] ??

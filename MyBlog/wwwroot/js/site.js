@@ -32,6 +32,66 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    const navCapsule = document.querySelector("[data-nav-capsule]");
+    if (navCapsule instanceof HTMLDetailsElement) {
+        const todayContent = navCapsule.querySelector("[data-nav-capsule-content='today']");
+        const yesterdayContent = navCapsule.querySelector("[data-nav-capsule-content='yesterday']");
+        const prevButton = navCapsule.querySelector("[data-nav-capsule-prev]");
+        const nextButton = navCapsule.querySelector("[data-nav-capsule-next]");
+        const dayLabel = navCapsule.querySelector("[data-nav-capsule-day-label]");
+
+        if (
+            todayContent instanceof HTMLElement
+            && yesterdayContent instanceof HTMLElement
+            && prevButton instanceof HTMLButtonElement
+            && nextButton instanceof HTMLButtonElement
+            && dayLabel instanceof HTMLElement
+        ) {
+            const showDay = (day) => {
+                const showYesterday = day === "yesterday";
+                todayContent.hidden = showYesterday;
+                yesterdayContent.hidden = !showYesterday;
+                prevButton.hidden = showYesterday;
+                nextButton.hidden = !showYesterday;
+                dayLabel.textContent = showYesterday ? "Yesterday" : "Today";
+            };
+
+            prevButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                showDay("yesterday");
+            });
+
+            nextButton.addEventListener("click", (event) => {
+                event.preventDefault();
+                showDay("today");
+            });
+
+            navCapsule.addEventListener("toggle", () => {
+                if (!navCapsule.open) {
+                    showDay("today");
+                }
+            });
+        }
+
+        document.addEventListener("click", (event) => {
+            if (!(event.target instanceof Node)) {
+                return;
+            }
+
+            if (navCapsule.contains(event.target)) {
+                return;
+            }
+
+            navCapsule.open = false;
+        });
+
+        window.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                navCapsule.open = false;
+            }
+        });
+    }
+
     const progressBar = document.querySelector("[data-scroll-progress]");
     if (progressBar instanceof HTMLElement) {
         const updateProgress = () => {
@@ -81,6 +141,40 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.documentElement.classList.remove("reveal-ready");
                 revealItems.forEach((item) => item.classList.add("is-visible"));
             }
+        }
+    }
+
+    const capsuleCountdown = document.querySelector("[data-daily-capsule-countdown='true']");
+    if (capsuleCountdown instanceof HTMLElement) {
+        const nextResetUtcIso = capsuleCountdown.dataset.nextResetUtc;
+        const nextResetUtcMs = typeof nextResetUtcIso === "string" ? Date.parse(nextResetUtcIso) : Number.NaN;
+
+        if (!Number.isNaN(nextResetUtcMs)) {
+            let intervalHandle = 0;
+            const renderCountdown = () => {
+                const millisecondsRemaining = nextResetUtcMs - Date.now();
+                if (millisecondsRemaining <= 0) {
+                    capsuleCountdown.textContent = "refreshing...";
+                    if (intervalHandle !== 0) {
+                        window.clearInterval(intervalHandle);
+                    }
+
+                    window.setTimeout(() => window.location.reload(), 1400);
+                    return;
+                }
+
+                const totalSeconds = Math.floor(millisecondsRemaining / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                capsuleCountdown.textContent =
+                    `${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+            };
+
+            renderCountdown();
+            intervalHandle = window.setInterval(renderCountdown, 1000);
+        } else {
+            capsuleCountdown.textContent = "unavailable";
         }
     }
 });

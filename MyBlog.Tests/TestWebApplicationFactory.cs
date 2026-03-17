@@ -13,7 +13,9 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Subscriptions:NotifyAdminKey"] = "integration-notify-key"
+                ["Subscriptions:NotifyAdminKey"] = "integration-notify-key",
+                ["DailyCapsule:EnableAiGeneration"] = "false",
+                ["DailyCapsule:WarmupAdminKey"] = "integration-daily-capsule-key"
             });
         });
 

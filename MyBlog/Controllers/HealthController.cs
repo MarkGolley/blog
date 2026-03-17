@@ -1,5 +1,6 @@
 using Google.Cloud.Firestore;
 using Microsoft.AspNetCore.Mvc;
+using MyBlog.Services;
 
 namespace MyBlog.Controllers;
 
@@ -78,6 +79,40 @@ public class HealthController : Controller
                 {
                     status = "error"
                 };
+            }
+        }
+
+        var dailyCapsuleService = _serviceProvider.GetService<DailyCodingCapsuleService>();
+        if (dailyCapsuleService == null)
+        {
+            checks["dailyCapsule"] = new
+            {
+                status = "error",
+                error = "Daily capsule service unavailable."
+            };
+            isHealthy = false;
+        }
+        else
+        {
+            var capsuleStatus = dailyCapsuleService.GetOperationalStatus();
+            checks["dailyCapsule"] = new
+            {
+                status = capsuleStatus.Status,
+                aiGenerationEnabled = capsuleStatus.AiGenerationEnabled,
+                persistence = capsuleStatus.PersistenceEnabled ? "firestore" : "memory",
+                lastGenerationAttemptUtc = capsuleStatus.LastGenerationAttemptUtc,
+                lastGenerationSuccessUtc = capsuleStatus.LastGenerationSuccessUtc,
+                lastGenerationFailureUtc = capsuleStatus.LastGenerationFailureUtc,
+                lastGenerationFailureReason = capsuleStatus.LastGenerationFailureReason,
+                lastPersistFailureUtc = capsuleStatus.LastPersistFailureUtc,
+                lastPersistFailureReason = capsuleStatus.LastPersistFailureReason,
+                lastServedUkDate = capsuleStatus.LastServedUkDate,
+                lastServedSource = capsuleStatus.LastServedSource
+            };
+
+            if (string.Equals(capsuleStatus.Status, "degraded", StringComparison.OrdinalIgnoreCase))
+            {
+                isHealthy = false;
             }
         }
 
