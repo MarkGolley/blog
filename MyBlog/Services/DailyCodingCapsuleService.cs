@@ -55,6 +55,7 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
     private readonly string? _apiKey;
     private readonly string _model;
     private readonly bool _enableAiGeneration;
+    private readonly bool _enableHistoryFallback;
     private readonly TimeZoneInfo _ukTimeZone;
     private readonly FirestoreDb? _db;
     private static readonly SemaphoreSlim RefreshLock = new(1, 1);
@@ -81,6 +82,7 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
         _apiKey = configuration["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         _model = configuration["DailyCapsule:Model"] ?? "gpt-4.1-mini";
         _enableAiGeneration = GetBool(configuration["DailyCapsule:EnableAiGeneration"], defaultValue: true);
+        _enableHistoryFallback = GetBool(configuration["DailyCapsule:EnableHistoryFallback"], defaultValue: false);
         _ukTimeZone = ResolveUkTimeZone(logger);
     }
 
@@ -138,11 +140,6 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
         int offsetDays,
         CancellationToken cancellationToken = default)
     {
-        if (_db is null)
-        {
-            return null;
-        }
-
         if (offsetDays > 0)
         {
             return null;
@@ -156,14 +153,23 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
 
         if (!TryGetCachedCapsule(targetUkDate, out var cachedCapsule))
         {
-            var persisted = await TryGetPersistedCapsuleAsync(targetUkDate, cancellationToken);
-            if (persisted is null)
+            var persisted = _db is null
+                ? null
+                : await TryGetPersistedCapsuleAsync(targetUkDate, cancellationToken);
+
+            if (persisted is not null)
+            {
+                CacheByDate[targetUkDate] = persisted;
+                cachedCapsule = persisted;
+            }
+            else if (_enableHistoryFallback && boundedOffset < 0)
+            {
+                return await GetCapsuleForOffsetDaysAsync(boundedOffset, cancellationToken);
+            }
+            else
             {
                 return null;
             }
-
-            CacheByDate[targetUkDate] = persisted;
-            cachedCapsule = persisted;
         }
 
         return ToViewModel(cachedCapsule, GetNextResetUtc(targetUkDate));

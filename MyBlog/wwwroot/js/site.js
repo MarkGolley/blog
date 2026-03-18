@@ -38,22 +38,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const yesterdayContent = navCapsule.querySelector("[data-nav-capsule-content='yesterday']");
         const prevButton = navCapsule.querySelector("[data-nav-capsule-prev]");
         const nextButton = navCapsule.querySelector("[data-nav-capsule-next]");
-        const dayLabel = navCapsule.querySelector("[data-nav-capsule-day-label]");
 
         if (
             todayContent instanceof HTMLElement
             && yesterdayContent instanceof HTMLElement
             && prevButton instanceof HTMLButtonElement
             && nextButton instanceof HTMLButtonElement
-            && dayLabel instanceof HTMLElement
         ) {
             const showDay = (day) => {
                 const showYesterday = day === "yesterday";
                 todayContent.hidden = showYesterday;
                 yesterdayContent.hidden = !showYesterday;
-                prevButton.hidden = showYesterday;
-                nextButton.hidden = !showYesterday;
-                dayLabel.textContent = showYesterday ? "Yesterday" : "Today";
+                prevButton.disabled = showYesterday;
+                prevButton.setAttribute("aria-disabled", String(showYesterday));
+                nextButton.disabled = !showYesterday;
+                nextButton.setAttribute("aria-disabled", String(!showYesterday));
             };
 
             prevButton.addEventListener("click", (event) => {
@@ -71,6 +70,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     showDay("today");
                 }
             });
+
+            showDay("today");
         }
 
         document.addEventListener("click", (event) => {

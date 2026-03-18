@@ -153,11 +153,8 @@
                 <div class="nav-capsule-panel">
                     @if (previousNavCapsule is not null)
                     {
-                        <div class="nav-capsule-controls">
-                            <button type="button" class="nav-capsule-nav-btn" data-nav-capsule-prev aria-label="Show yesterday's insight">←</button>
-                            <span class="nav-capsule-controls-label" data-nav-capsule-day-label>Today</span>
-                            <button type="button" class="nav-capsule-nav-btn" data-nav-capsule-next aria-label="Show today's insight" hidden>→</button>
-                        </div>
+                        <button type="button" class="nav-capsule-nav-btn nav-capsule-nav-btn-prev" data-nav-capsule-prev aria-label="Show yesterday's insight">&#8249;</button>
+                        <button type="button" class="nav-capsule-nav-btn nav-capsule-nav-btn-next" data-nav-capsule-next aria-label="Show today's insight" aria-disabled="true" disabled>&#8250;</button>
                     }
 
                     <div class="nav-capsule-content" data-nav-capsule-content="today">
