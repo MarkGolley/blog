@@ -1540,7 +1540,9 @@ thead th {
     }
 
     .nav-capsule-panel {
-        position: static;
+        position: relative;
+        top: auto;
+        left: auto;
         width: 100%;
         margin-top: 0.4rem;
     }
