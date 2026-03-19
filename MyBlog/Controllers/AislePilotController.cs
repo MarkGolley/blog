@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using MyBlog.Models;
 using MyBlog.Services;
@@ -36,6 +37,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     }
 
     [HttpPost("")]
+    [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
     public IActionResult Index(AislePilotPageViewModel pageModel)
     {
@@ -61,6 +63,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     }
 
     [HttpPost("suggest-from-pantry")]
+    [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
     public IActionResult SuggestFromPantry(AislePilotPageViewModel pageModel)
     {
@@ -84,6 +87,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     }
 
     [HttpPost("swap-meal")]
+    [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
     public IActionResult SwapMeal(AislePilotPageViewModel pageModel, int dayIndex, string? currentMealName, List<string>? currentPlanMealNames)
     {
@@ -122,6 +126,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     }
 
     [HttpPost("export/plan-pack")]
+    [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
     public IActionResult ExportPlanPack(AislePilotPageViewModel pageModel)
     {
@@ -147,6 +152,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     }
 
     [HttpPost("export/checklist")]
+    [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
     public IActionResult ExportChecklist(AislePilotPageViewModel pageModel)
     {

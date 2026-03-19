@@ -8,6 +8,7 @@
 - Checks currently included:
 - `blogStorage` (post files folder exists and post count)
 - `firestore` (quick read check, or `development-fallback` in local Development mode)
+- `aislePilotMealCache` (current number of cached AI meals in Firestore plus minimum expected count)
 - `dailyCapsule` (AI generation/persistence status, last failures, last served source/date)
 
 Example:
@@ -17,6 +18,12 @@ Invoke-RestMethod http://localhost:5207/health
 ```
 
 If `checks.dailyCapsule.status` is `degraded`, treat it as an alert condition even when the site still serves fallback capsule content.
+
+For Aisle Pilot cache visibility in release checks:
+
+- `checks.aislePilotMealCache.count` gives current cached meals.
+- `checks.aislePilotMealCache.minimumExpected` comes from `AislePilot:MinCacheCountForHealth` (or env `AISLEPILOT_MIN_CACHE_COUNT`).
+- Set `AislePilot:FailHealthOnLowCache=true` (or env `AISLEPILOT_FAIL_HEALTH_ON_LOW_CACHE=true`) only if you want `/health` to return degraded when cache is below minimum.
 
 ## Pre-Deploy Checks
 
@@ -88,6 +95,13 @@ What it verifies:
 - Admin login works on your public domain.
 - Moderated comment flow redirects with `commentStatus=moderated` on both direct and public URLs.
 - Admin login may complete via either `302 -> /admin` or a direct `200` dashboard render, both treated as valid.
+- Reports Aisle Pilot cached meal count from `/health` for both direct and public URLs.
+
+Optional stricter release gate:
+
+```powershell
+.\Deployment\verify-production-auth.ps1 -FailOnLowAislePilotMeals -MinAislePilotMeals 20
+```
 
 If direct passes but public fails, the issue is edge/proxy behavior (not app code), usually cookie stripping on `GET /admin`.
 

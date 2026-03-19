@@ -3,7 +3,9 @@ using MyBlog.Models;
 using MyBlog.Utilities;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 
@@ -15,6 +17,7 @@ public sealed class AislePilotService : IAislePilotService
     {
         PropertyNameCaseInsensitive = true
     };
+    private static readonly Regex TrailingCommaRegex = new(",(?=\\s*[}\\]])", RegexOptions.Compiled);
 
     private const int MaxAiMealNameLength = 90;
     private const int MaxAiIngredientNameLength = 60;
@@ -26,6 +29,8 @@ public sealed class AislePilotService : IAislePilotService
     private const int RetryAiMealPlanMaxTokens = 3000;
     private const string AiMealsCollection = "aislePilotAiMeals";
     private const string AiUnavailableMessage = "Sorry, AI is broken right now. Please try again shortly.";
+    private const string OpenAiChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
+    private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(45);
 
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
@@ -548,8 +553,18 @@ public sealed class AislePilotService : IAislePilotService
             selectedMeals.Count,
             aiBatch.OpenAiRequestId ?? "n/a");
 
-        AddMealsToAiPool(aiMeals);
-        await PersistAiMealsAsync(aiMeals, cancellationToken);
+        var persistedMeals = await PersistAiMealsAsync(aiMeals, cancellationToken);
+        if (persistedMeals.Count > 0)
+        {
+            AddMealsToAiPool(persistedMeals);
+        }
+        else
+        {
+            _logger?.LogWarning(
+                "AislePilot generated {MealCount} meals but none were persisted; skipping shared AI meal pool update.",
+                aiMeals.Count);
+        }
+
         return BuildPlanFromMeals(request, context, selectedMeals, cookDays, usedAiGeneratedMeals: true);
     }
 
@@ -584,19 +599,12 @@ public sealed class AislePilotService : IAislePilotService
             }
         };
 
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+        if (string.IsNullOrWhiteSpace(responseContent))
         {
-            Content = new StringContent(
-                JsonSerializer.Serialize(requestBody),
-                Encoding.UTF8,
-                "application/json")
-        };
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey!);
+            return null;
+        }
 
-        using var response = await _httpClient!.SendAsync(requestMessage, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
         var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
         var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
         if (string.IsNullOrWhiteSpace(rawJson))
@@ -607,7 +615,21 @@ public sealed class AislePilotService : IAislePilotService
         try
         {
             var normalizedJson = NormalizeModelJson(rawJson);
-            var aiPayload = ParseAiPlanPayload(normalizedJson);
+            if (!TryParseAiPlanPayloadWithRecovery(normalizedJson, out var aiPayload, out var repairedJson))
+            {
+                var sample = normalizedJson.Length <= 280 ? normalizedJson : normalizedJson[..280];
+                _logger?.LogWarning(
+                    "AislePilot AI generation returned malformed JSON after repair attempts. PayloadSample={PayloadSample}",
+                    sample);
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(repairedJson))
+            {
+                _logger?.LogInformation("AislePilot AI JSON required light repair before parsing.");
+            }
+
+            var effectiveJson = repairedJson ?? normalizedJson;
             var aiMeals = ValidateAndMapAiMeals(
                 aiPayload,
                 context.DietaryModes,
@@ -616,7 +638,7 @@ public sealed class AislePilotService : IAislePilotService
                 out var validationReason);
             if (aiMeals is null)
             {
-                var sample = normalizedJson.Length <= 280 ? normalizedJson : normalizedJson[..280];
+                var sample = effectiveJson.Length <= 280 ? effectiveJson : effectiveJson[..280];
                 _logger?.LogWarning(
                     "AislePilot AI payload validation failed. Reason={Reason}. PayloadSample={PayloadSample}",
                     validationReason ?? "unknown",
@@ -624,10 +646,7 @@ public sealed class AislePilotService : IAislePilotService
                 return null;
             }
 
-            var requestId = response.Headers.TryGetValues("x-request-id", out var values)
-                ? values.FirstOrDefault()
-                : null;
-
+            var requestId = (string?)null;
             return new AiMealBatchResult(aiMeals, requestId);
         }
         catch (JsonException ex)
@@ -852,19 +871,12 @@ public sealed class AislePilotService : IAislePilotService
             }
         };
 
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+        if (string.IsNullOrWhiteSpace(responseContent))
         {
-            Content = new StringContent(
-                JsonSerializer.Serialize(requestBody),
-                Encoding.UTF8,
-                "application/json")
-        };
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            return null;
+        }
 
-        using var response = await _httpClient.SendAsync(requestMessage, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
         var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
         var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
         if (string.IsNullOrWhiteSpace(rawJson))
@@ -872,7 +884,12 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
-        var aiPayload = JsonSerializer.Deserialize<AislePilotAiMealPayload>(rawJson, JsonOptions);
+        var normalizedJson = NormalizeModelJson(rawJson);
+        if (!TryParseAiMealPayloadWithRecovery(normalizedJson, out var aiPayload))
+        {
+            return null;
+        }
+
         var strictModes = context.DietaryModes
             .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
             .ToArray();
@@ -888,8 +905,18 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
-        AddMealsToAiPool([replacement]);
-        await PersistAiMealsAsync([replacement], cancellationToken);
+        var persistedMeals = await PersistAiMealsAsync([replacement], cancellationToken);
+        if (persistedMeals.Count > 0)
+        {
+            AddMealsToAiPool(persistedMeals);
+        }
+        else
+        {
+            _logger?.LogWarning(
+                "AislePilot generated swap meal '{MealName}' but it was not persisted; skipping shared AI meal pool update.",
+                replacement.Name);
+        }
+
         return replacement;
     }
 
@@ -963,27 +990,47 @@ public sealed class AislePilotService : IAislePilotService
         }
     }
 
-    private async Task PersistAiMealsAsync(
+    private async Task<IReadOnlyList<MealTemplate>> PersistAiMealsAsync(
         IReadOnlyList<MealTemplate> meals,
         CancellationToken cancellationToken = default)
     {
-        if (_db is null || meals.Count == 0)
+        if (meals.Count == 0)
         {
-            return;
+            return [];
         }
 
+        if (_db is null)
+        {
+            _logger?.LogWarning(
+                "AislePilot generated {MealCount} meals but Firestore is unavailable; meals will be memory-only for this runtime.",
+                meals.Count);
+            return [];
+        }
+
+        var persistedMeals = new List<MealTemplate>(meals.Count);
         foreach (var meal in meals)
         {
             try
             {
                 var docRef = _db.Collection(AiMealsCollection).Document(ToAiMealDocumentId(meal.Name));
                 await docRef.SetAsync(ToFirestoreDocument(meal), cancellationToken: cancellationToken);
+                persistedMeals.Add(meal);
             }
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Unable to persist AislePilot AI meal '{MealName}'.", meal.Name);
             }
         }
+
+        if (persistedMeals.Count < meals.Count)
+        {
+            _logger?.LogWarning(
+                "AislePilot persisted {PersistedCount} of {TotalCount} AI meals to Firestore.",
+                persistedMeals.Count,
+                meals.Count);
+        }
+
+        return persistedMeals;
     }
 
     private static string BuildAiMealSwapPrompt(
@@ -1673,7 +1720,7 @@ Return JSON only with this schema:
         return new FirestoreAislePilotMeal
         {
             Name = meal.Name,
-            BaseCostForTwo = meal.BaseCostForTwo,
+            BaseCostForTwo = (double)meal.BaseCostForTwo,
             IsQuick = meal.IsQuick,
             Tags = meal.Tags.ToList(),
             Ingredients = meal.Ingredients
@@ -1681,9 +1728,9 @@ Return JSON only with this schema:
                 {
                     Name = ingredient.Name,
                     Department = ingredient.Department,
-                    QuantityForTwo = ingredient.QuantityForTwo,
+                    QuantityForTwo = (double)ingredient.QuantityForTwo,
                     Unit = ingredient.Unit,
-                    EstimatedCostForTwo = ingredient.EstimatedCostForTwo
+                    EstimatedCostForTwo = (double)ingredient.EstimatedCostForTwo
                 })
                 .ToList(),
             RecipeSteps = meal.AiRecipeSteps?.ToList() ?? [],
@@ -1702,7 +1749,7 @@ Return JSON only with this schema:
         var payload = new AislePilotAiMealPayload
         {
             Name = doc.Name,
-            BaseCostForTwo = doc.BaseCostForTwo,
+            BaseCostForTwo = (decimal)doc.BaseCostForTwo,
             IsQuick = doc.IsQuick,
             Tags = doc.Tags,
             Ingredients = doc.Ingredients?
@@ -1710,9 +1757,9 @@ Return JSON only with this schema:
                 {
                     Name = ingredient.Name,
                     Department = ingredient.Department,
-                    QuantityForTwo = ingredient.QuantityForTwo,
+                    QuantityForTwo = (decimal)ingredient.QuantityForTwo,
                     Unit = ingredient.Unit,
-                    EstimatedCostForTwo = ingredient.EstimatedCostForTwo
+                    EstimatedCostForTwo = (decimal)ingredient.EstimatedCostForTwo
                 })
                 .ToList(),
             RecipeSteps = doc.RecipeSteps
@@ -2333,6 +2380,358 @@ Return JSON only with this schema:
         return JsonSerializer.Deserialize<AislePilotAiPlanPayload>(normalizedJson, JsonOptions);
     }
 
+    private static bool TryParseAiPlanPayloadWithRecovery(
+        string normalizedJson,
+        out AislePilotAiPlanPayload? aiPayload,
+        out string? repairedJson)
+    {
+        aiPayload = null;
+        repairedJson = null;
+
+        try
+        {
+            aiPayload = ParseAiPlanPayload(normalizedJson);
+            return aiPayload is not null;
+        }
+        catch (JsonException)
+        {
+            if (!TryRepairMalformedJson(normalizedJson, out var repaired))
+            {
+                return false;
+            }
+
+            try
+            {
+                aiPayload = ParseAiPlanPayload(repaired);
+                repairedJson = repaired;
+                return aiPayload is not null;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+    }
+
+    private static bool TryParseAiMealPayloadWithRecovery(
+        string normalizedJson,
+        out AislePilotAiMealPayload? aiPayload)
+    {
+        aiPayload = null;
+
+        try
+        {
+            aiPayload = JsonSerializer.Deserialize<AislePilotAiMealPayload>(normalizedJson, JsonOptions);
+            return aiPayload is not null;
+        }
+        catch (JsonException)
+        {
+            if (!TryRepairMalformedJson(normalizedJson, out var repaired))
+            {
+                return false;
+            }
+
+            try
+            {
+                aiPayload = JsonSerializer.Deserialize<AislePilotAiMealPayload>(repaired, JsonOptions);
+                return aiPayload is not null;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+    }
+
+    private static bool TryRepairMalformedJson(string input, out string repaired)
+    {
+        repaired = input;
+        var updated = input;
+
+        var trailingCommaFixed = TrailingCommaRegex.Replace(updated, string.Empty);
+        if (!ReferenceEquals(trailingCommaFixed, updated))
+        {
+            updated = trailingCommaFixed;
+        }
+
+        var leadingZeroFixed = NormalizeLeadingZeroNumbers(updated);
+        if (!string.Equals(leadingZeroFixed, updated, StringComparison.Ordinal))
+        {
+            updated = leadingZeroFixed;
+        }
+
+        if (string.Equals(updated, input, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        repaired = updated;
+        return true;
+    }
+
+    private static string NormalizeLeadingZeroNumbers(string json)
+    {
+        var result = new StringBuilder(json.Length);
+        var inString = false;
+        var isEscaped = false;
+
+        for (var i = 0; i < json.Length; i++)
+        {
+            var ch = json[i];
+            if (inString)
+            {
+                result.Append(ch);
+                if (isEscaped)
+                {
+                    isEscaped = false;
+                }
+                else if (ch == '\\')
+                {
+                    isEscaped = true;
+                }
+                else if (ch == '"')
+                {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                inString = true;
+                result.Append(ch);
+                continue;
+            }
+
+            if ((ch == '-' || char.IsDigit(ch)) &&
+                IsJsonNumberTokenStart(json, i) &&
+                TryReadJsonNumberToken(json, i, out var tokenLength, out var normalizedToken))
+            {
+                result.Append(normalizedToken);
+                i += tokenLength - 1;
+                continue;
+            }
+
+            result.Append(ch);
+        }
+
+        return result.ToString();
+    }
+
+    private async Task<string?> SendOpenAiRequestWithRetryAsync(
+        object requestBody,
+        CancellationToken cancellationToken)
+    {
+        if (_httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
+        {
+            return null;
+        }
+
+        var serializedBody = JsonSerializer.Serialize(requestBody);
+        var maxAttempts = 2;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(OpenAiRequestTimeout);
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, OpenAiChatCompletionsEndpoint)
+            {
+                Content = new StringContent(serializedBody, Encoding.UTF8, "application/json")
+            };
+            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+
+            try
+            {
+                using var response = await _httpClient.SendAsync(requestMessage, timeoutCts.Token);
+                var responseContent = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    return responseContent;
+                }
+
+                var shouldRetry = attempt < maxAttempts && IsTransientOpenAiStatus(response.StatusCode);
+                var errorSample = responseContent.Length <= 220 ? responseContent : responseContent[..220];
+                _logger?.LogWarning(
+                    "AislePilot OpenAI call failed with status {StatusCode}. Attempt={Attempt}/{MaxAttempts}. ResponseSample={ResponseSample}",
+                    (int)response.StatusCode,
+                    attempt,
+                    maxAttempts,
+                    errorSample);
+
+                if (!shouldRetry)
+                {
+                    return null;
+                }
+
+                var delay = GetRetryDelay(response, attempt);
+                await Task.Delay(delay, cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger?.LogWarning(
+                    "AislePilot OpenAI call timed out after {TimeoutSeconds}s. Attempt={Attempt}/{MaxAttempts}.",
+                    OpenAiRequestTimeout.TotalSeconds,
+                    attempt,
+                    maxAttempts);
+
+                if (attempt >= maxAttempts)
+                {
+                    return null;
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger?.LogWarning(
+                    ex,
+                    "AislePilot OpenAI HTTP request failed. Attempt={Attempt}/{MaxAttempts}.",
+                    attempt,
+                    maxAttempts);
+
+                if (attempt >= maxAttempts)
+                {
+                    return null;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsTransientOpenAiStatus(HttpStatusCode statusCode)
+    {
+        return statusCode == HttpStatusCode.TooManyRequests ||
+               statusCode == HttpStatusCode.RequestTimeout ||
+               statusCode == HttpStatusCode.BadGateway ||
+               statusCode == HttpStatusCode.ServiceUnavailable ||
+               statusCode == HttpStatusCode.GatewayTimeout ||
+               (int)statusCode >= 500;
+    }
+
+    private static TimeSpan GetRetryDelay(HttpResponseMessage response, int attempt)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+        if (retryAfter?.Delta is TimeSpan delta && delta > TimeSpan.Zero)
+        {
+            return delta <= TimeSpan.FromSeconds(10) ? delta : TimeSpan.FromSeconds(10);
+        }
+
+        if (retryAfter?.Date is DateTimeOffset date)
+        {
+            var computed = date - DateTimeOffset.UtcNow;
+            if (computed > TimeSpan.Zero)
+            {
+                return computed <= TimeSpan.FromSeconds(10) ? computed : TimeSpan.FromSeconds(10);
+            }
+        }
+
+        return attempt == 1 ? TimeSpan.FromSeconds(1.5) : TimeSpan.FromSeconds(3);
+    }
+
+    private static bool IsJsonNumberTokenStart(string json, int index)
+    {
+        for (var i = index - 1; i >= 0; i--)
+        {
+            var ch = json[i];
+            if (char.IsWhiteSpace(ch))
+            {
+                continue;
+            }
+
+            return ch is ':' or '[' or ',';
+        }
+
+        return true;
+    }
+
+    private static bool TryReadJsonNumberToken(
+        string json,
+        int index,
+        out int tokenLength,
+        out string normalizedToken)
+    {
+        tokenLength = 0;
+        normalizedToken = string.Empty;
+        var cursor = index;
+        var sign = string.Empty;
+
+        if (cursor < json.Length && json[cursor] == '-')
+        {
+            sign = "-";
+            cursor++;
+        }
+
+        var integralStart = cursor;
+        while (cursor < json.Length && char.IsDigit(json[cursor]))
+        {
+            cursor++;
+        }
+
+        if (cursor == integralStart)
+        {
+            return false;
+        }
+
+        var integralDigits = json[integralStart..cursor];
+        var fractionalPart = string.Empty;
+        var exponentPart = string.Empty;
+
+        if (cursor < json.Length && json[cursor] == '.')
+        {
+            var fractionalStart = cursor;
+            cursor++;
+            var fractionalDigitsStart = cursor;
+            while (cursor < json.Length && char.IsDigit(json[cursor]))
+            {
+                cursor++;
+            }
+
+            if (cursor == fractionalDigitsStart)
+            {
+                return false;
+            }
+
+            fractionalPart = json[fractionalStart..cursor];
+        }
+
+        if (cursor < json.Length && (json[cursor] == 'e' || json[cursor] == 'E'))
+        {
+            var exponentStart = cursor;
+            cursor++;
+            if (cursor < json.Length && (json[cursor] == '+' || json[cursor] == '-'))
+            {
+                cursor++;
+            }
+
+            var exponentDigitsStart = cursor;
+            while (cursor < json.Length && char.IsDigit(json[cursor]))
+            {
+                cursor++;
+            }
+
+            if (cursor == exponentDigitsStart)
+            {
+                return false;
+            }
+
+            exponentPart = json[exponentStart..cursor];
+        }
+
+        var normalizedIntegral = integralDigits;
+        if (integralDigits.Length > 1 && integralDigits[0] == '0')
+        {
+            normalizedIntegral = integralDigits.TrimStart('0');
+            if (normalizedIntegral.Length == 0)
+            {
+                normalizedIntegral = "0";
+            }
+        }
+
+        tokenLength = cursor - index;
+        normalizedToken = sign + normalizedIntegral + fractionalPart + exponentPart;
+        return true;
+    }
+
     private static string NormalizeAiDepartment(string? department)
     {
         var normalized = ClampAndNormalize(department, MaxAiDepartmentLength);
@@ -2695,7 +3094,7 @@ Return JSON only with this schema:
         public string Name { get; set; } = string.Empty;
 
         [FirestoreProperty]
-        public decimal BaseCostForTwo { get; set; }
+        public double BaseCostForTwo { get; set; }
 
         [FirestoreProperty]
         public bool IsQuick { get; set; }
@@ -2726,13 +3125,13 @@ Return JSON only with this schema:
         public string Department { get; set; } = string.Empty;
 
         [FirestoreProperty]
-        public decimal QuantityForTwo { get; set; }
+        public double QuantityForTwo { get; set; }
 
         [FirestoreProperty]
         public string Unit { get; set; } = string.Empty;
 
         [FirestoreProperty]
-        public decimal EstimatedCostForTwo { get; set; }
+        public double EstimatedCostForTwo { get; set; }
     }
 
     private sealed record AiMealBatchResult(

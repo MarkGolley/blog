@@ -217,6 +217,18 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+
+    options.AddPolicy("aislePilotWrites", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5000,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
 });
 
 var app = builder.Build();
@@ -335,17 +347,24 @@ app.Run();
 
 static string GetRateLimitPartitionKey(HttpContext context)
 {
-    var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-    if (!string.IsNullOrWhiteSpace(forwardedFor))
+    var ip = context.Connection.RemoteIpAddress?.ToString();
+    var userAgent = context.Request.Headers.UserAgent.ToString();
+
+    if (string.IsNullOrWhiteSpace(ip))
     {
-        var firstForwarded = forwardedFor.Split(',')[0].Trim();
-        if (!string.IsNullOrWhiteSpace(firstForwarded))
-        {
-            return firstForwarded;
-        }
+        ip = "unknown-ip";
     }
 
-    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    if (string.IsNullOrWhiteSpace(userAgent))
+    {
+        userAgent = "unknown-ua";
+    }
+    else if (userAgent.Length > 120)
+    {
+        userAgent = userAgent[..120];
+    }
+
+    return $"{ip}|{userAgent}";
 }
 
 static bool ShouldDisableCaching(HttpContext context)

@@ -7,7 +7,9 @@ param(
     [string]$Region = "europe-west2",
     [string]$AdminUsername = "",
     [string]$AdminPassword = "",
-    [switch]$SkipCommentCheck
+    [switch]$SkipCommentCheck,
+    [int]$MinAislePilotMeals = -1,
+    [switch]$FailOnLowAislePilotMeals
 )
 
 $ErrorActionPreference = "Stop"
@@ -399,6 +401,28 @@ function Test-CommentModerationFlow {
     }
 }
 
+function Test-HealthSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+        [Parameter(Mandatory = $true)]
+        [string]$BaseUrl
+    )
+
+    $healthJson = Invoke-Curl @("-sS", "$BaseUrl/health")
+    $health = $healthJson | ConvertFrom-Json
+    $cacheCheck = $health.checks.aislePilotMealCache
+
+    [PSCustomObject]@{
+        Label = $Label
+        BaseUrl = $BaseUrl
+        OverallStatus = [string]$health.status
+        CacheStatus = if ($null -ne $cacheCheck) { [string]$cacheCheck.status } else { "unknown" }
+        CacheCount = if ($null -ne $cacheCheck) { [int]$cacheCheck.count } else { 0 }
+        MinimumExpected = if ($null -ne $cacheCheck) { [int]$cacheCheck.minimumExpected } else { 0 }
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($DirectBaseUrl)) {
     $resolvedDirectBaseUrl = & gcloud run services describe $Service --region $Region --project $ProjectId --format "value(status.url)"
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resolvedDirectBaseUrl)) {
@@ -474,6 +498,20 @@ Comment smoke check submitted moderated comments but cleanup failed.
  - $($directComment.Label): cleanupExpected=$($directComment.CleanupExpected), cleanupSuccess=$($directComment.CleanupSuccess), details=$($directComment.CleanupMessage)
  - $($publicComment.Label): cleanupExpected=$($publicComment.CleanupExpected), cleanupSuccess=$($publicComment.CleanupSuccess), details=$($publicComment.CleanupMessage)
 "@
+}
+
+$directHealth = Test-HealthSnapshot -Label "Direct Cloud Run" -BaseUrl $DirectBaseUrl
+$publicHealth = Test-HealthSnapshot -Label "Public Edge" -BaseUrl $PublicBaseUrl
+$effectiveMinAislePilotMeals = if ($MinAislePilotMeals -ge 0) { $MinAislePilotMeals } else { [Math]::Max($directHealth.MinimumExpected, $publicHealth.MinimumExpected) }
+
+Write-Host "Health snapshot:"
+Write-Host " - $($directHealth.Label): status=$($directHealth.OverallStatus), aislePilotCache=$($directHealth.CacheCount), cacheStatus=$($directHealth.CacheStatus), minimumExpected=$($directHealth.MinimumExpected)"
+Write-Host " - $($publicHealth.Label): status=$($publicHealth.OverallStatus), aislePilotCache=$($publicHealth.CacheCount), cacheStatus=$($publicHealth.CacheStatus), minimumExpected=$($publicHealth.MinimumExpected)"
+
+if ($FailOnLowAislePilotMeals) {
+    if ($directHealth.CacheCount -lt $effectiveMinAislePilotMeals -or $publicHealth.CacheCount -lt $effectiveMinAislePilotMeals) {
+        throw "AislePilot cache count is below the required minimum ($effectiveMinAislePilotMeals). Direct=$($directHealth.CacheCount), Public=$($publicHealth.CacheCount)."
+    }
 }
 
 Write-Host ""
