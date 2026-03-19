@@ -13,4 +13,5 @@ public class CaseStudyTemplateViewModel
     public string CtaText { get; init; } = string.Empty;
     public string CtaController { get; init; } = string.Empty;
     public string CtaAction { get; init; } = "Index";
+    public string CtaIconPath { get; init; } = string.Empty;
 }

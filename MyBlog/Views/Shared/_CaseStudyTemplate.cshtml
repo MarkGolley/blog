@@ -59,7 +59,13 @@
     @if (!string.IsNullOrWhiteSpace(Model.CtaText) && !string.IsNullOrWhiteSpace(Model.CtaController))
     {
         <div class="case-template-actions">
-            <a class="btn btn-primary" asp-controller="@Model.CtaController" asp-action="@Model.CtaAction">@Model.CtaText</a>
+            <a class="btn btn-primary" asp-controller="@Model.CtaController" asp-action="@Model.CtaAction">
+                @if (!string.IsNullOrWhiteSpace(Model.CtaIconPath))
+                {
+                    <img class="btn-logo-icon" src="@Url.Content(Model.CtaIconPath)" alt="" aria-hidden="true" />
+                }
+                <span>@Model.CtaText</span>
+            </a>
         </div>
     }
 </article>
