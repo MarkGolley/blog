@@ -228,10 +228,6 @@
                 <p class="aislepilot-stat-value">@result.Supermarket</p>
             </article>
             <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Meal source</p>
-                <p class="aislepilot-stat-value">@result.PlanSourceLabel</p>
-            </article>
-            <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Budget</p>
                 <p class="aislepilot-stat-value">@result.WeeklyBudget.ToString("C", ukCulture)</p>
             </article>
@@ -269,12 +265,7 @@
         <div class="aislepilot-window-viewport" data-window-viewport>
             <div class="aislepilot-window-track" data-window-track>
                 <section id="aislepilot-meals" aria-label="Meals" class="aislepilot-window-panel" data-window-name="Meals">
-                    <p class="aislepilot-window-meta">
-                        @mealCount meals generated for this week.
-                        @(result.UsedAiGeneratedMeals
-                            ? $" This plan came from {result.PlanSourceLabel.ToLowerInvariant()}."
-                            : string.Empty)
-                    </p>
+                    <p class="aislepilot-window-meta">@mealCount meals generated for this week.</p>
                     @if (result.LeftoverDays > 0)
                     {
                         <div class="aislepilot-leftover-editor">

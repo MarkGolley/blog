@@ -20,9 +20,10 @@ public sealed class AislePilotService : IAislePilotService
     private const int MaxAiIngredientNameLength = 60;
     private const int MaxAiDepartmentLength = 32;
     private const int MaxAiUnitLength = 18;
-    private const int ExtraAiMealCount = 0;
-    private const int PrimaryAiMealPlanMaxTokens = 3200;
-    private const int RetryAiMealPlanMaxTokens = 2200;
+    private const int MaxAiRecipeStepLength = 220;
+    private const int ExtraAiMealCount = 3;
+    private const int PrimaryAiMealPlanMaxTokens = 4600;
+    private const int RetryAiMealPlanMaxTokens = 3000;
     private const string AiMealsCollection = "aislePilotAiMeals";
     private const string AiUnavailableMessage = "Sorry, AI is broken right now. Please try again shortly.";
 
@@ -329,6 +330,7 @@ public sealed class AislePilotService : IAislePilotService
     private readonly string? _apiKey;
     private readonly string _model;
     private readonly bool _enableAiGeneration;
+    private readonly bool _allowTemplateFallback;
     private readonly FirestoreDb? _db;
 
     public AislePilotService(
@@ -343,6 +345,10 @@ public sealed class AislePilotService : IAislePilotService
         _apiKey = configuration?["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         _model = configuration?["AislePilot:Model"] ?? "gpt-4.1-mini";
         _enableAiGeneration = !bool.TryParse(configuration?["AislePilot:EnableAiGeneration"], out var parsed) || parsed;
+        _allowTemplateFallback =
+            bool.TryParse(configuration?["AislePilot:AllowTemplateFallback"], out var allowTemplateFallback)
+                ? allowTemplateFallback
+                : httpClient is null;
     }
 
     public IReadOnlyList<string> GetSupportedSupermarkets()
@@ -399,6 +405,12 @@ public sealed class AislePilotService : IAislePilotService
     {
         var context = BuildPlanContext(request);
         var cookDays = NormalizeCookDays(request.CookDays);
+        if (ShouldUseTemplateFallback())
+        {
+            _logger?.LogWarning("AislePilot is using local meal templates because AI generation is unavailable in this runtime.");
+            return BuildPlanFromTemplateCatalog(request, context, cookDays);
+        }
+
         var pooledAiPlan = TryBuildPlanFromAiPool(request, context, cookDays);
         if (pooledAiPlan is not null)
         {
@@ -412,6 +424,38 @@ public sealed class AislePilotService : IAislePilotService
         }
 
         throw new InvalidOperationException(AiUnavailableMessage);
+    }
+
+    private bool ShouldUseTemplateFallback()
+    {
+        return _allowTemplateFallback &&
+               (!_enableAiGeneration || _httpClient is null || string.IsNullOrWhiteSpace(_apiKey));
+    }
+
+    private AislePilotPlanResultViewModel BuildPlanFromTemplateCatalog(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays)
+    {
+        var selectedMeals = SelectMeals(
+            MealTemplates,
+            context.DietaryModes,
+            request.WeeklyBudget,
+            context.HouseholdFactor,
+            request.PreferQuickMeals,
+            context.DislikesOrAllergens,
+            cookDays);
+
+        // Keep swap behavior consistent by making fallback-selected meals available in the in-memory pool.
+        AddMealsToAiPool(selectedMeals);
+
+        return BuildPlanFromMeals(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: false,
+            planSourceLabel: "Template fallback");
     }
 
     private AislePilotPlanResultViewModel? TryBuildPlanWithAi(
@@ -633,13 +677,21 @@ public sealed class AislePilotService : IAislePilotService
 
         var context = BuildPlanContext(request);
         EnsureAiMealPoolHydrated();
-        var availableAiMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
         var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(currentPlanMealNames, cookDays);
+        if (selectedMeals is null && _allowTemplateFallback)
+        {
+            var fallbackPlan = BuildPlanFromTemplateCatalog(request, context, cookDays);
+            selectedMeals = BuildSelectedMealsFromCurrentPlanNames(
+                fallbackPlan.MealPlan.Select(meal => meal.MealName).ToList(),
+                cookDays);
+        }
+
         if (selectedMeals is null)
         {
             throw new InvalidOperationException("Could not resolve the current plan for swapping. Generate a fresh AI plan and try again.");
         }
 
+        var availableAiMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
         var currentName = string.IsNullOrWhiteSpace(currentMealName)
             ? selectedMeals[dayIndex].Name
             : currentMealName.Trim();
@@ -807,7 +859,7 @@ public sealed class AislePilotService : IAislePilotService
         var strictModes = context.DietaryModes
             .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
             .ToArray();
-        var replacement = ValidateAndMapAiMeal(aiPayload, strictModes, out _);
+        var replacement = ValidateAndMapAiMeal(aiPayload, strictModes, requireRecipeSteps: true, out _);
         if (replacement is null)
         {
             return null;
@@ -959,6 +1011,7 @@ Rules:
 - `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
 - `quantityForTwo` must be a positive number.
 - `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
+- `recipeSteps` must contain 5-8 concrete, meal-specific cooking steps in order.
 
 Return JSON only with this schema:
 {
@@ -966,6 +1019,13 @@ Return JSON only with this schema:
   "baseCostForTwo": 0,
   "isQuick": true,
   "tags": ["Balanced"],
+  "recipeSteps": [
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
   "ingredients": [
     {
       "name": "",
@@ -1242,6 +1302,11 @@ Return JSON only with this schema:
 
     private static IReadOnlyList<string> BuildRecipeSteps(MealTemplate template)
     {
+        if (template.AiRecipeSteps is { Count: >= 5 })
+        {
+            return template.AiRecipeSteps;
+        }
+
         var mealName = template.Name.Trim().ToLowerInvariant();
 
         return mealName switch
@@ -1578,6 +1643,7 @@ Return JSON only with this schema:
                     EstimatedCostForTwo = ingredient.EstimatedCostForTwo
                 })
                 .ToList(),
+            RecipeSteps = meal.AiRecipeSteps?.ToList() ?? [],
             CreatedAtUtc = DateTime.UtcNow,
             Source = "openai"
         };
@@ -1605,12 +1671,17 @@ Return JSON only with this schema:
                     Unit = ingredient.Unit,
                     EstimatedCostForTwo = ingredient.EstimatedCostForTwo
                 })
-                .ToList()
+                .ToList(),
+            RecipeSteps = doc.RecipeSteps
         };
 
-        return ValidateAndMapAiMeal(payload, doc.Tags?
-            .Where(mode => !string.Equals(mode, "Balanced", StringComparison.OrdinalIgnoreCase))
-            .ToArray() ?? [], out _);
+        return ValidateAndMapAiMeal(
+            payload,
+            doc.Tags?
+                .Where(mode => !string.Equals(mode, "Balanced", StringComparison.OrdinalIgnoreCase))
+                .ToArray() ?? [],
+            requireRecipeSteps: false,
+            out _);
     }
 
     private static bool ContainsToken(MealTemplate meal, string token)
@@ -1905,6 +1976,8 @@ Rules:
 - `quantityForTwo` must be a positive number.
 - `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
 - Include all requested dietary modes in each meal's tags, except Balanced is optional.
+- `recipeSteps` must contain 5-8 concrete, meal-specific cooking steps in order.
+- Do not write generic filler; include relevant timings, heat levels, and ingredient usage.
 {{(compactJson ? "- Keep ingredient names short and return compact JSON with no markdown, no comments, and no unnecessary whitespace." : string.Empty)}}
 
 Return JSON only with this schema:
@@ -1915,6 +1988,13 @@ Return JSON only with this schema:
       "baseCostForTwo": 0,
       "isQuick": true,
       "tags": ["Balanced"],
+      "recipeSteps": [
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
       "ingredients": [
         {
           "name": "",
@@ -1954,7 +2034,7 @@ Return JSON only with this schema:
         for (var i = 0; i < rawMeals.Count; i++)
         {
             var rawMeal = rawMeals[i];
-            var meal = ValidateAndMapAiMeal(rawMeal, strictModes, out var mealReason);
+            var meal = ValidateAndMapAiMeal(rawMeal, strictModes, requireRecipeSteps: true, out var mealReason);
             if (meal is null)
             {
                 validationReason = $"invalid_meal_at_index_{i}:{mealReason ?? "unknown"}";
@@ -1982,6 +2062,7 @@ Return JSON only with this schema:
     private static MealTemplate? ValidateAndMapAiMeal(
         AislePilotAiMealPayload? payload,
         IReadOnlyList<string> strictModes,
+        bool requireRecipeSteps,
         out string? validationReason)
     {
         validationReason = null;
@@ -2050,12 +2131,22 @@ Return JSON only with this schema:
             return null;
         }
 
+        var recipeSteps = CleanAiRecipeSteps(payload.RecipeSteps);
+        if (requireRecipeSteps && recipeSteps.Count < 5)
+        {
+            validationReason = $"recipe_steps_invalid:{recipeSteps.Count}";
+            return null;
+        }
+
         return new MealTemplate(
             name,
             decimal.Round(baseCostForTwo, 2, MidpointRounding.AwayFromZero),
             payload.IsQuick ?? false,
             tags,
-            ingredients.Select(item => item.mapped!).ToList());
+            ingredients.Select(item => item.mapped!).ToList())
+        {
+            AiRecipeSteps = recipeSteps.Count == 0 ? null : recipeSteps
+        };
     }
 
     private static IngredientTemplate? ValidateAndMapAiIngredient(
@@ -2079,7 +2170,7 @@ Return JSON only with this schema:
             string.IsNullOrWhiteSpace(department) ||
             string.IsNullOrWhiteSpace(unit) ||
             quantityForTwo <= 0m ||
-            quantityForTwo > 20m ||
+            !IsAiIngredientQuantityReasonable(unit, quantityForTwo) ||
             estimatedCostForTwo <= 0m ||
             estimatedCostForTwo > 20m)
         {
@@ -2094,6 +2185,42 @@ Return JSON only with this schema:
             decimal.Round(quantityForTwo, 2, MidpointRounding.AwayFromZero),
             unit,
             decimal.Round(estimatedCostForTwo, 2, MidpointRounding.AwayFromZero));
+    }
+
+    private static bool IsAiIngredientQuantityReasonable(string unit, decimal quantity)
+    {
+        var normalizedUnit = unit.Trim().ToLowerInvariant();
+        var max = normalizedUnit switch
+        {
+            "g" => 5000m,
+            "ml" => 5000m,
+            "kg" => 15m,
+            "l" => 10m,
+            "pcs" => 60m,
+            "tins" => 24m,
+            "tin" => 24m,
+            "pack" => 20m,
+            "packs" => 20m,
+            "bottle" => 12m,
+            "bottles" => 12m,
+            "jar" => 12m,
+            "jars" => 12m,
+            "head" => 12m,
+            "fillets" => 20m,
+            _ => 100m
+        };
+
+        return quantity <= max;
+    }
+
+    private static IReadOnlyList<string> CleanAiRecipeSteps(IReadOnlyList<string>? recipeSteps)
+    {
+        return recipeSteps?
+            .Select(step => ClampAndNormalize(step, MaxAiRecipeStepLength))
+            .Where(step => !string.IsNullOrWhiteSpace(step) && step.Length >= 12)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToList() ?? [];
     }
 
     private static string NormalizeModelJson(string rawJson)
@@ -2467,7 +2594,10 @@ Return JSON only with this schema:
         decimal BaseCostForTwo,
         bool IsQuick,
         IReadOnlyList<string> Tags,
-        IReadOnlyList<IngredientTemplate> Ingredients);
+        IReadOnlyList<IngredientTemplate> Ingredients)
+    {
+        public IReadOnlyList<string>? AiRecipeSteps { get; init; }
+    }
 
     private sealed record IngredientTemplate(
         string Name,
@@ -2503,6 +2633,7 @@ Return JSON only with this schema:
         public bool? IsQuick { get; set; }
         public List<string>? Tags { get; set; }
         public List<AislePilotAiIngredientPayload>? Ingredients { get; set; }
+        public List<string>? RecipeSteps { get; set; }
     }
 
     private sealed class AislePilotAiIngredientPayload
@@ -2531,6 +2662,9 @@ Return JSON only with this schema:
 
         [FirestoreProperty]
         public List<FirestoreAislePilotIngredient> Ingredients { get; set; } = [];
+
+        [FirestoreProperty]
+        public List<string> RecipeSteps { get; set; } = [];
 
         [FirestoreProperty]
         public DateTime CreatedAtUtc { get; set; }
