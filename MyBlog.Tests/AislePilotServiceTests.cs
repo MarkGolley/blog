@@ -14,11 +14,24 @@ public class AislePilotServiceTests
     [InlineData(1.00, "kg", "1000 g")]
     [InlineData(1.24, "kg", "1.2 kg")]
     [InlineData(2.06, "kg", "2.1 kg")]
-    [InlineData(0.45, "bottle", "0.45 bottle")]
+    [InlineData(0.45, "bottle", "1 bottle")]
+    [InlineData(1.2, "bottle", "2 bottles")]
+    [InlineData(0.06, "jar", "1 jar")]
     [InlineData(6, "pcs", "6 pcs")]
     public void QuantityDisplayFormatter_FormatsQuantitiesAsExpected(decimal quantity, string unit, string expected)
     {
         var formatted = QuantityDisplayFormatter.Format(quantity, unit);
+
+        Assert.Equal(expected, formatted);
+    }
+
+    [Theory]
+    [InlineData(0.45, "bottle", "0.45 bottle")]
+    [InlineData(0.06, "jar", "0.06 jar")]
+    [InlineData(1.24, "kg", "1.2 kg")]
+    public void QuantityDisplayFormatter_RecipeFormatting_PreservesPreciseAmounts(decimal quantity, string unit, string expected)
+    {
+        var formatted = QuantityDisplayFormatter.FormatForRecipe(quantity, unit);
 
         Assert.Equal(expected, formatted);
     }
@@ -90,6 +103,27 @@ public class AislePilotServiceTests
 
         Assert.Equal(7, result.MealPlan.Count);
         Assert.All(result.MealPlan, meal => Assert.Contains(meal.MealName, allowedMeals));
+    }
+
+    [Fact]
+    public void BuildPlan_RecipeMethods_AreDetailedWithAtLeastFiveSteps()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            CookDays = 7
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.NotEmpty(result.MealPlan);
+        Assert.All(result.MealPlan, meal =>
+        {
+            Assert.True(meal.RecipeSteps.Count >= 5, $"Expected at least 5 steps for '{meal.MealName}' but got {meal.RecipeSteps.Count}.");
+            Assert.All(meal.RecipeSteps, step => Assert.False(string.IsNullOrWhiteSpace(step)));
+        });
     }
 
     [Fact]

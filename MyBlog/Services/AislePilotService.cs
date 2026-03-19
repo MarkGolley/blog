@@ -561,7 +561,7 @@ public sealed class AislePilotService : IAislePilotService
                         ingredient.QuantityForTwo * householdFactor * mealPortionMultiplier,
                         2,
                         MidpointRounding.AwayFromZero);
-                    return $"{QuantityDisplayFormatter.Format(quantity, ingredient.Unit)} {ingredient.Name}";
+                    return $"{QuantityDisplayFormatter.FormatForRecipe(quantity, ingredient.Unit)} {ingredient.Name}";
                 })
                 .ToList();
             var basePrepMinutes = template.IsQuick ? 25 : 40;
@@ -605,54 +605,148 @@ public sealed class AislePilotService : IAislePilotService
 
     private static IReadOnlyList<string> BuildRecipeSteps(MealTemplate template)
     {
-        if (template.Name.Contains("stir fry", StringComparison.OrdinalIgnoreCase))
-        {
-            return
-            [
-                "Cook rice or noodles first and set aside.",
-                "Stir-fry protein and veg on high heat for 6-8 minutes.",
-                "Add sauce, combine with carbs, and cook 2 more minutes."
-            ];
-        }
+        var mealName = template.Name.Trim().ToLowerInvariant();
 
-        if (template.Name.Contains("curry", StringComparison.OrdinalIgnoreCase) ||
-            template.Name.Contains("chilli", StringComparison.OrdinalIgnoreCase))
+        return mealName switch
         {
-            return
+            "chicken stir fry with rice" =>
             [
-                "Saute base ingredients (onion/garlic/spices) until fragrant.",
-                "Add main protein or lentils with liquids and simmer 20-25 minutes.",
-                "Taste, adjust seasoning, and serve with preferred side."
-            ];
-        }
-
-        if (template.Name.Contains("salad", StringComparison.OrdinalIgnoreCase))
-        {
-            return
+                "Rinse the rice and cook according to pack instructions; spread on a tray to steam off if you want less sticky rice.",
+                "Slice the chicken and peppers into even strips so they cook at the same speed.",
+                "Heat a large wok or frying pan until very hot, add a little oil, then cook the chicken for 4-5 minutes until lightly browned.",
+                "Add the peppers and stir-fry for 2-3 minutes so they stay slightly crisp.",
+                "Add cooked rice and soy sauce, tossing over high heat for 1-2 minutes until everything is coated and hot.",
+                "Taste, adjust seasoning, and serve immediately."
+            ],
+            "salmon, potatoes, and broccoli" =>
             [
-                "Cook grains if needed and let them cool slightly.",
-                "Prep and combine vegetables, protein, and dressing.",
+                "Heat oven to 210C (fan 190C).",
+                "Cut potatoes into wedges, toss with oil, salt, and pepper, then roast for 20 minutes.",
+                "Season salmon and broccoli, then add both to the tray.",
+                "Roast for another 12-15 minutes, until the salmon flakes easily and potatoes are golden.",
+                "Rest for 2 minutes, then serve with any pan juices."
+            ],
+            "turkey chilli with beans" =>
+            [
+                "Heat a deep pan with a little oil and soften chopped onion and garlic for 4-5 minutes.",
+                "Add turkey mince and cook until no pink remains, breaking it up with a spoon.",
+                "Stir in chilli seasoning, then add chopped tomatoes, beans, and a small splash of water.",
+                "Simmer uncovered for 20-25 minutes, stirring occasionally until thickened.",
+                "Taste and adjust salt, pepper, or spice level before serving."
+            ],
+            "veggie lentil curry" =>
+            [
+                "Rinse the lentils until the water runs mostly clear.",
+                "Cook onion, garlic, and curry paste in a pan for 3-4 minutes until fragrant.",
+                "Add lentils, coconut milk, and enough water to just cover; bring to a gentle simmer.",
+                "Cook for 20-25 minutes, stirring now and then, until lentils are soft.",
+                "Stir through spinach for 1-2 minutes until wilted, then season and serve."
+            ],
+            "tofu noodle bowls" =>
+            [
+                "Press tofu for 10 minutes to remove excess moisture, then cube it.",
+                "Cook noodles according to pack instructions, drain, and rinse quickly with warm water.",
+                "Pan-fry tofu in a little oil until golden on most sides, then set aside.",
+                "Stir-fry carrots and any other veg for 2-3 minutes, add sauce, then return tofu to the pan.",
+                "Add noodles and toss for 1-2 minutes until evenly coated and piping hot."
+            ],
+            "greek yogurt chicken wraps" =>
+            [
+                "Season chicken strips and cook in a hot pan for 6-8 minutes until cooked through.",
+                "Mix Greek yogurt with a pinch of salt and pepper for a quick sauce.",
+                "Warm the wraps briefly in a dry pan or microwave so they stay flexible.",
+                "Layer lettuce, cooked chicken, and yogurt sauce onto each wrap.",
+                "Roll tightly, slice in half, and serve."
+            ],
+            "paneer tikka tray bake" =>
+            [
+                "Heat oven to 200C (fan 180C).",
+                "Cut paneer, onions, and peppers into similar-size chunks.",
+                "Toss everything with tikka seasoning, a little oil, and salt.",
+                "Spread on a tray in one layer and roast for 25 minutes, turning once halfway.",
+                "Roast a few more minutes if needed for lightly charred edges, then serve."
+            ],
+            "prawn tomato pasta" =>
+            [
+                "Bring a large pan of salted water to the boil and cook pasta until al dente.",
+                "In a separate pan, simmer passata for 6-8 minutes with a little salt and pepper.",
+                "Add prawns and cook for 2-3 minutes until pink and just firm.",
+                "Drain pasta, reserving a splash of water, then combine pasta with sauce and prawns.",
+                "Loosen with reserved pasta water if needed, top with parmesan, and serve."
+            ],
+            "beef and veg rice bowls" =>
+            [
+                "Cook rice first and keep warm.",
+                "Brown beef mince in a hot pan, breaking it up as it cooks.",
+                "Add onions and cook for 3-4 minutes until softened, then add peas.",
+                "Stir in cooked rice and any sauce/seasoning, then toss for 2-3 minutes until hot.",
+                "Taste, adjust seasoning, and serve in bowls."
+            ],
+            "chickpea quinoa salad bowls" =>
+            [
+                "Rinse quinoa and cook according to pack instructions, then cool for 10 minutes.",
+                "Drain chickpeas and chop cucumber and tomatoes into bite-size pieces.",
+                "Whisk a simple dressing (olive oil, acid, salt, pepper).",
+                "Combine quinoa, chickpeas, and veg in a large bowl, then pour over dressing.",
                 "Toss well and chill for 10 minutes before serving."
-            ];
-        }
-
-        if (template.Name.Contains("baked", StringComparison.OrdinalIgnoreCase) ||
-            template.Name.Contains("tray bake", StringComparison.OrdinalIgnoreCase))
-        {
-            return
+            ],
+            "egg fried rice" =>
             [
-                "Heat oven to 200C and prep vegetables on a tray.",
-                "Add seasoned protein/paneer and roast for 25-30 minutes.",
-                "Check doneness, rest briefly, and plate."
-            ];
-        }
-
-        return
-        [
-            "Prep and portion all ingredients before starting.",
-            "Cook protein and main components until done, then combine.",
-            "Finish with seasoning or sauce and serve warm."
-        ];
+                "Cook rice ahead if possible and let it cool slightly so grains separate.",
+                "Scramble eggs in a hot pan with a little oil, then remove and set aside.",
+                "Cook mixed veg for 2-3 minutes, add rice, and stir-fry until hot.",
+                "Add soy sauce and return eggs to the pan, breaking eggs up as you toss.",
+                "Cook for 1-2 more minutes, then serve immediately."
+            ],
+            "baked cod with sweet potato wedges" =>
+            [
+                "Heat oven to 210C (fan 190C).",
+                "Cut sweet potatoes into wedges, season, and roast for 20 minutes.",
+                "Add cod and green beans to the tray, drizzle lightly with oil, and season.",
+                "Roast for another 12-15 minutes until cod flakes easily and wedges are tender.",
+                "Rest briefly, then serve."
+            ],
+            _ when mealName.Contains("stir fry", StringComparison.OrdinalIgnoreCase) =>
+            [
+                "Prep all vegetables and protein into even pieces before heating the pan.",
+                "Cook your base carb (rice/noodles) first and keep warm.",
+                "Stir-fry protein on high heat until just cooked, then remove temporarily.",
+                "Cook vegetables quickly so they stay crisp, then return protein to the pan.",
+                "Add sauce and carb, toss until hot, taste, and serve."
+            ],
+            _ when mealName.Contains("curry", StringComparison.OrdinalIgnoreCase) || mealName.Contains("chilli", StringComparison.OrdinalIgnoreCase) =>
+            [
+                "Cook aromatics (onion/garlic/spices) until fragrant.",
+                "Add protein or pulses and stir so everything is coated in spices.",
+                "Pour in liquids and simmer gently until the base thickens.",
+                "Adjust with water as needed and cook until ingredients are tender.",
+                "Taste, season, and serve with your preferred side."
+            ],
+            _ when mealName.Contains("salad", StringComparison.OrdinalIgnoreCase) =>
+            [
+                "Cook grains or protein first if needed and let them cool slightly.",
+                "Prepare all fresh vegetables and herbs.",
+                "Mix a quick dressing in a separate bowl.",
+                "Combine ingredients in a large bowl and toss with dressing.",
+                "Rest for 5-10 minutes so flavours settle before serving."
+            ],
+            _ when mealName.Contains("baked", StringComparison.OrdinalIgnoreCase) || mealName.Contains("tray bake", StringComparison.OrdinalIgnoreCase) =>
+            [
+                "Preheat oven and line a tray.",
+                "Season vegetables first and give them a short head start in the oven.",
+                "Add protein or main component and continue roasting until cooked through.",
+                "Turn halfway for even colour and texture.",
+                "Rest briefly, then serve with pan juices."
+            ],
+            _ =>
+            [
+                "Prep and portion ingredients before you start cooking.",
+                "Cook your base carb if using one, then keep warm.",
+                "Cook protein and key vegetables until done.",
+                "Combine everything with sauce or seasoning and heat through.",
+                "Taste, adjust seasoning, and serve warm."
+            ]
+        };
     }
 
     private static IReadOnlyList<AislePilotShoppingItemViewModel> BuildShoppingList(

@@ -12,6 +12,21 @@ namespace MyBlog.Controllers;
 [Route("projects/aisle-pilot")]
 public class AislePilotController(IAislePilotService aislePilotService) : Controller
 {
+    private const string AislePilotMarkSvg = """
+        <svg width="128" height="128" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="#103F65" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M120 180 H320 L360 300 H160 Z" />
+            <circle cx="200" cy="360" r="20" fill="#103F65" />
+            <circle cx="320" cy="360" r="20" fill="#103F65" />
+          </g>
+          <rect x="98" y="220" width="90" height="12" rx="6" fill="#0F6D78" />
+          <rect x="86" y="250" width="108" height="12" rx="6" fill="#0F6D78" />
+          <rect x="170" y="220" width="120" height="12" rx="6" fill="#0F6D78" />
+          <rect x="180" y="250" width="100" height="12" rx="6" fill="#0F6D78" />
+          <path d="M260 260 L360 220 L360 300 Z" fill="#E39C41" />
+        </svg>
+        """;
+
     [HttpGet("")]
     public IActionResult Index()
     {
@@ -93,7 +108,8 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         var result = aislePilotService.BuildPlan(request);
         var bytes = BuildPlanPackPdf(request, result);
         var fileName = $"aislepilot-plan-pack-{DateTime.UtcNow:yyyyMMdd}.pdf";
-        return File(bytes, "application/pdf", fileName);
+        Response.Headers.ContentDisposition = $"inline; filename=\"{fileName}\"";
+        return File(bytes, "application/pdf");
     }
 
     [HttpPost("export/checklist")]
@@ -225,13 +241,11 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         var ukCulture = CultureInfo.GetCultureInfo("en-GB");
         const string ink = "#142033";
         const string inkSoft = "#45556D";
-        const string white = "#FFFFFF";
-        const string brand = "#0F6D78";
         const string brandDeep = "#103F65";
         const string panel = "#FFFFFF";
         const string panelSoft = "#F0F6FF";
-        const string line = "#C8D7E8";
-        const string lineStrong = "#AFC3DA";
+        const string line = "#D8E3EF";
+        const string lineStrong = "#C9D8E8";
         const string ok = "#166247";
         const string okSoft = "#EAF7EF";
         const string danger = "#92261F";
@@ -248,7 +262,6 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                 : "On budget";
         var budgetStatusColor = result.IsOverBudget ? danger : ok;
         var budgetStatusBackground = result.IsOverBudget ? dangerSoft : okSoft;
-        var totalShoppingItems = result.ShoppingItems.Count;
 
         var aisleRank = result.AisleOrderUsed
             .Select((department, index) => new { department, index })
@@ -283,6 +296,13 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             overviewRows.Add(("Dislikes/allergens", request.DislikesOrAllergens));
         }
 
+        var leftOverviewRows = overviewRows
+            .Where((_, index) => index % 2 == 0)
+            .ToList();
+        var rightOverviewRows = overviewRows
+            .Where((_, index) => index % 2 == 1)
+            .ToList();
+
         return Document.Create(document =>
             {
                 document.Page(page =>
@@ -296,95 +316,34 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                     {
                         header.Spacing(0);
                         header.Item()
-                            .Border(1)
+                            .Border(0.7f)
                             .BorderColor(lineStrong)
                             .Background(panelSoft)
-                            .Padding(14)
-                            .Row(row =>
-                            {
-                                row.RelativeItem().Column(column =>
-                                {
-                                    column.Spacing(3);
-                                    column.Item()
-                                        .Border(1)
-                                        .BorderColor(line)
-                                        .Background(panel)
-                                        .PaddingVertical(2)
-                                        .PaddingHorizontal(7)
-                                        .AlignLeft()
-                                        .Text("AislePilot Export")
-                                        .FontSize(8)
-                                        .SemiBold()
-                                        .FontColor(brandDeep);
-
-                                    column.Item().Text("AislePilot Plan Pack").FontSize(20).SemiBold().FontColor(brandDeep);
-                                    column.Item().Text("Weekly meal plan, aisle-sorted shopping, and practical recipes")
-                                        .FontSize(9.5f)
-                                        .FontColor(inkSoft);
-                                });
-
-                                row.AutoItem().AlignMiddle().Border(1).BorderColor(line).Background(panel).Padding(8).Column(meta =>
-                                    {
-                                        meta.Spacing(2);
-                                        meta.Item().Text("Generated").FontSize(8).SemiBold().FontColor(inkSoft);
-                                        meta.Item().Text(generatedAt.ToString("dd MMM yyyy, HH:mm", ukCulture)).FontSize(9).SemiBold().FontColor(brandDeep);
-                                    });
-                            });
-
-                        header.Item()
-                            .BorderLeft(1)
-                            .BorderRight(1)
-                            .BorderBottom(1)
-                            .BorderColor(lineStrong)
-                            .Background(panelSoft)
-                            .PaddingVertical(6)
                             .PaddingHorizontal(10)
+                            .PaddingVertical(7)
                             .Row(row =>
                             {
                                 row.Spacing(6);
                                 row.AutoItem()
-                                    .Border(1)
-                                    .BorderColor(line)
-                                    .Background("#E8F3F4")
-                                    .PaddingVertical(3)
-                                    .PaddingHorizontal(8)
-                                    .Text($"Store: {result.Supermarket}")
-                                    .FontSize(8.5f)
-                                    .SemiBold()
-                                    .FontColor(brand);
+                                    .Width(34)
+                                    .Height(34)
+                                    .AlignMiddle()
+                                    .Svg(AislePilotMarkSvg);
 
-                                row.AutoItem()
-                                    .Border(1)
-                                    .BorderColor(line)
-                                    .Background("#EAF0F8")
-                                    .PaddingVertical(3)
-                                    .PaddingHorizontal(8)
-                                    .Text($"Cook days: {result.CookDays}")
-                                    .FontSize(8.5f)
-                                    .SemiBold()
-                                    .FontColor(brandDeep);
+                                row.RelativeItem().Column(column =>
+                                {
+                                    column.Spacing(1);
+                                    column.Item().Text("Aisle Pilot").FontSize(15.5f).SemiBold().FontColor(brandDeep);
+                                    column.Item().Text("Weekly meal plan, aisle-sorted shopping, and practical recipes")
+                                        .FontSize(8.2f)
+                                        .FontColor(inkSoft);
+                                });
 
-                                row.AutoItem()
-                                    .Border(1)
-                                    .BorderColor(line)
-                                    .Background(panel)
-                                    .PaddingVertical(3)
-                                    .PaddingHorizontal(8)
-                                    .Text($"Items: {totalShoppingItems}")
-                                    .FontSize(8.5f)
-                                    .SemiBold()
-                                    .FontColor(brandDeep);
-
-                                row.AutoItem()
-                                    .Border(1)
-                                    .BorderColor(line)
-                                    .Background(budgetStatusBackground)
-                                    .PaddingVertical(3)
-                                    .PaddingHorizontal(8)
-                                    .Text(budgetStatusText)
-                                    .FontSize(8.5f)
-                                    .SemiBold()
-                                    .FontColor(budgetStatusColor);
+                                row.AutoItem().AlignMiddle().Border(0.7f).BorderColor(line).Background(panel).PaddingVertical(4).PaddingHorizontal(6).Column(meta =>
+                                    {
+                                        meta.Spacing(1);
+                                        meta.Item().Text(generatedAt.ToString("dd MMM yyyy, HH:mm", ukCulture)).FontSize(8.1f).SemiBold().FontColor(brandDeep);
+                                    });
                             });
                     });
 
@@ -394,23 +353,20 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
 
                         content.Item().Section("toc").Column(toc =>
                         {
-                            toc.Spacing(5);
+                            toc.Spacing(4);
                             toc.Item().Text("Quick links").FontSize(11.5f).SemiBold().FontColor(brandDeep);
                             toc.Item().Row(row =>
                             {
-                                row.Spacing(6);
-                                row.AutoItem().Border(1).BorderColor(brandDeep).Background(brandDeep).PaddingVertical(4).PaddingHorizontal(10)
-                                    .SectionLink("overview").Text("Overview").FontSize(9.5f).SemiBold().FontColor(white);
-                                row.AutoItem().Border(1).BorderColor(brandDeep).Background(brandDeep).PaddingVertical(4).PaddingHorizontal(10)
-                                    .SectionLink("shopping").Text("Shopping list").FontSize(9.5f).SemiBold().FontColor(white);
-                                row.AutoItem().Border(1).BorderColor(brandDeep).Background(brandDeep).PaddingVertical(4).PaddingHorizontal(10)
-                                    .SectionLink("meals").Text("Meals and recipes").FontSize(9.5f).SemiBold().FontColor(white);
-                                row.AutoItem().Border(1).BorderColor(brandDeep).Background(brandDeep).PaddingVertical(4).PaddingHorizontal(10)
-                                    .SectionLink("budget-notes").Text("Budget notes").FontSize(9.5f).SemiBold().FontColor(white);
+                                row.Spacing(9);
+                                row.AutoItem().SectionLink("overview").Text("Overview").FontSize(9.5f).SemiBold().FontColor(brandDeep);
+                                row.AutoItem().Text("•").FontSize(9f).FontColor(lineStrong);
+                                row.AutoItem().SectionLink("shopping").Text("Shopping list").FontSize(9.5f).SemiBold().FontColor(brandDeep);
+                                row.AutoItem().Text("•").FontSize(9f).FontColor(lineStrong);
+                                row.AutoItem().SectionLink("meals").Text("Meals and recipes").FontSize(9.5f).SemiBold().FontColor(brandDeep);
                             });
                         });
 
-                        content.Item().Section("overview").Border(1).BorderColor(line).Background(panel).Padding(11).Column(section =>
+                        content.Item().Section("overview").Border(0.7f).BorderColor(line).Background(panel).Padding(11).Column(section =>
                         {
                             section.Spacing(7);
                             section.Item().Text("Plan overview").FontSize(13.5f).SemiBold().FontColor(brandDeep);
@@ -418,19 +374,19 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                             section.Item().Row(row =>
                             {
                                 row.Spacing(7);
-                                row.RelativeItem().Border(1).BorderColor(line).Background(panelSoft).Padding(8).Column(metric =>
+                                row.RelativeItem().Border(0.7f).BorderColor(line).Background(panelSoft).Padding(8).Column(metric =>
                                 {
                                     metric.Spacing(2);
                                     metric.Item().Text("Weekly budget").FontSize(8.5f).SemiBold().FontColor(inkSoft);
                                     metric.Item().Text(result.WeeklyBudget.ToString("C", ukCulture)).FontSize(12).SemiBold().FontColor(brandDeep);
                                 });
-                                row.RelativeItem().Border(1).BorderColor(line).Background(panelSoft).Padding(8).Column(metric =>
+                                row.RelativeItem().Border(0.7f).BorderColor(line).Background(panelSoft).Padding(8).Column(metric =>
                                 {
                                     metric.Spacing(2);
                                     metric.Item().Text("Estimated total").FontSize(8.5f).SemiBold().FontColor(inkSoft);
                                     metric.Item().Text(result.EstimatedTotalCost.ToString("C", ukCulture)).FontSize(12).SemiBold().FontColor(brandDeep);
                                 });
-                                row.RelativeItem().Border(1).BorderColor(line).Background(budgetStatusBackground).Padding(8).Column(metric =>
+                                row.RelativeItem().Border(0.7f).BorderColor(line).Background(budgetStatusBackground).Padding(8).Column(metric =>
                                 {
                                     metric.Spacing(2);
                                     metric.Item().Text("Budget status").FontSize(8.5f).SemiBold().FontColor(inkSoft);
@@ -438,110 +394,156 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                                 });
                             });
 
-                            section.Item().Table(table =>
+                            section.Item().Row(grid =>
                             {
-                                table.ColumnsDefinition(columns =>
+                                grid.Spacing(10);
+
+                                grid.RelativeItem().Table(table =>
                                 {
-                                    columns.ConstantColumn(118);
-                                    columns.RelativeColumn();
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.ConstantColumn(112);
+                                        columns.RelativeColumn();
+                                    });
+
+                                    foreach (var row in leftOverviewRows)
+                                    {
+                                        table.Cell()
+                                            .BorderBottom(0.6f)
+                                            .BorderColor(line)
+                                            .PaddingVertical(4)
+                                            .PaddingRight(8)
+                                            .Text(row.Label)
+                                            .FontSize(9f)
+                                            .SemiBold()
+                                            .FontColor(inkSoft);
+
+                                        table.Cell()
+                                            .BorderBottom(0.6f)
+                                            .BorderColor(line)
+                                            .PaddingVertical(4)
+                                            .Text(row.Value)
+                                            .FontSize(9.5f)
+                                            .FontColor(ink);
+                                    }
                                 });
 
-                                foreach (var row in overviewRows)
+                                grid.RelativeItem().Table(table =>
                                 {
-                                    table.Cell()
-                                        .BorderBottom(1)
-                                        .BorderColor(line)
-                                        .PaddingVertical(4)
-                                        .PaddingRight(8)
-                                        .Text(row.Label)
-                                        .FontSize(9f)
-                                        .SemiBold()
-                                        .FontColor(inkSoft);
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.ConstantColumn(112);
+                                        columns.RelativeColumn();
+                                    });
 
-                                    table.Cell()
-                                        .BorderBottom(1)
-                                        .BorderColor(line)
-                                        .PaddingVertical(4)
-                                        .Text(row.Value)
-                                        .FontSize(9.5f)
-                                        .FontColor(ink);
-                                }
+                                    foreach (var row in rightOverviewRows)
+                                    {
+                                        table.Cell()
+                                            .BorderBottom(0.6f)
+                                            .BorderColor(line)
+                                            .PaddingVertical(4)
+                                            .PaddingRight(8)
+                                            .Text(row.Label)
+                                            .FontSize(9f)
+                                            .SemiBold()
+                                            .FontColor(inkSoft);
+
+                                        table.Cell()
+                                            .BorderBottom(0.6f)
+                                            .BorderColor(line)
+                                            .PaddingVertical(4)
+                                            .Text(row.Value)
+                                            .FontSize(9.5f)
+                                            .FontColor(ink);
+                                    }
+                                });
                             });
                         });
 
-                        content.Item().Section("shopping").Border(1).BorderColor(line).Background(panel).Padding(11).Column(section =>
+                        content.Item().Section("shopping").Border(0.7f).BorderColor(line).Background(panel).Padding(11).Column(section =>
                         {
                             section.Spacing(7);
-                            section.Item().Text("Shopping list (aisle ordered)").FontSize(13.5f).SemiBold().FontColor(brandDeep);
-                            section.Item().Text($"Aisle order: {string.Join(" -> ", result.AisleOrderUsed)}").FontSize(9).FontColor(inkSoft);
+                            section.Item().Text("Shopping list").FontSize(13.5f).SemiBold().FontColor(brandDeep);
 
-                            foreach (var department in groupedItems)
+                            section.Item().MultiColumn(columns =>
                             {
-                                section.Item().Border(1).BorderColor(line).Background(panelSoft).Padding(8).Column(group =>
+                                columns.Columns(2);
+                                columns.Spacing(10);
+                                columns.BalanceHeight();
+
+                                columns.Content().Column(list =>
                                 {
-                                    group.Spacing(5);
-                                    group.Item().Row(row =>
+                                    list.Spacing(7);
+
+                                    foreach (var department in groupedItems)
                                     {
-                                        row.RelativeItem().Text(department.Department).FontSize(10.5f).SemiBold().FontColor(brandDeep);
-                                        row.AutoItem().Text(department.Total.ToString("C", ukCulture)).FontSize(9.5f).SemiBold().FontColor(inkSoft);
-                                    });
-
-                                    group.Item().Table(table =>
-                                    {
-                                        table.ColumnsDefinition(columns =>
+                                        list.Item().Border(0.7f).BorderColor(line).Background(panelSoft).Padding(8).Column(group =>
                                         {
-                                            columns.RelativeColumn(6);
-                                            columns.RelativeColumn(2);
-                                            columns.RelativeColumn(2);
+                                            group.Spacing(5);
+                                            group.Item().Row(row =>
+                                            {
+                                                row.RelativeItem().Text(department.Department).FontSize(10.5f).SemiBold().FontColor(brandDeep);
+                                                row.AutoItem().Text(department.Total.ToString("C", ukCulture)).FontSize(9.5f).SemiBold().FontColor(inkSoft);
+                                            });
+
+                                            group.Item().Table(table =>
+                                            {
+                                                table.ColumnsDefinition(columns =>
+                                                {
+                                                    columns.RelativeColumn(6);
+                                                    columns.RelativeColumn(2);
+                                                    columns.RelativeColumn(2);
+                                                });
+
+                                                table.Header(header =>
+                                                {
+                                                    header.Cell()
+                                                        .BorderBottom(0.7f)
+                                                        .BorderColor(lineStrong)
+                                                        .PaddingBottom(4)
+                                                        .Text("Item")
+                                                        .FontSize(8.5f)
+                                                        .SemiBold()
+                                                        .FontColor(inkSoft);
+                                                    header.Cell()
+                                                        .BorderBottom(0.7f)
+                                                        .BorderColor(lineStrong)
+                                                        .PaddingBottom(4)
+                                                        .AlignRight()
+                                                        .Text("Qty")
+                                                        .FontSize(8.5f)
+                                                        .SemiBold()
+                                                        .FontColor(inkSoft);
+                                                    header.Cell()
+                                                        .BorderBottom(0.7f)
+                                                        .BorderColor(lineStrong)
+                                                        .PaddingBottom(4)
+                                                        .AlignRight()
+                                                        .Text("Est.")
+                                                        .FontSize(8.5f)
+                                                        .SemiBold()
+                                                        .FontColor(inkSoft);
+                                                });
+
+                                                foreach (var item in department.Items)
+                                                {
+                                                    table.Cell().PaddingVertical(4)
+                                                        .Text($"[ ] {item.Name}")
+                                                        .FontSize(9.2f);
+                                                    table.Cell().PaddingVertical(4).AlignRight()
+                                                        .Text(item.QuantityDisplay)
+                                                        .FontSize(9.2f)
+                                                        .FontColor(inkSoft);
+                                                    table.Cell().PaddingVertical(4).AlignRight()
+                                                        .Text(item.EstimatedCost.ToString("C", ukCulture))
+                                                        .FontSize(9.2f)
+                                                        .SemiBold();
+                                                }
+                                            });
                                         });
-
-                                        table.Header(header =>
-                                        {
-                                            header.Cell()
-                                                .BorderBottom(1)
-                                                .BorderColor(lineStrong)
-                                                .PaddingBottom(4)
-                                                .Text("Item")
-                                                .FontSize(8.5f)
-                                                .SemiBold()
-                                                .FontColor(inkSoft);
-                                            header.Cell()
-                                                .BorderBottom(1)
-                                                .BorderColor(lineStrong)
-                                                .PaddingBottom(4)
-                                                .AlignRight()
-                                                .Text("Qty")
-                                                .FontSize(8.5f)
-                                                .SemiBold()
-                                                .FontColor(inkSoft);
-                                            header.Cell()
-                                                .BorderBottom(1)
-                                                .BorderColor(lineStrong)
-                                                .PaddingBottom(4)
-                                                .AlignRight()
-                                                .Text("Est.")
-                                                .FontSize(8.5f)
-                                                .SemiBold()
-                                                .FontColor(inkSoft);
-                                        });
-
-                                        foreach (var item in department.Items)
-                                        {
-                                            table.Cell().BorderBottom(1).BorderColor(line).PaddingVertical(4)
-                                                .Text($"[ ] {item.Name}")
-                                                .FontSize(9.2f);
-                                            table.Cell().BorderBottom(1).BorderColor(line).PaddingVertical(4).AlignRight()
-                                                .Text(item.QuantityDisplay)
-                                                .FontSize(9.2f)
-                                                .FontColor(inkSoft);
-                                            table.Cell().BorderBottom(1).BorderColor(line).PaddingVertical(4).AlignRight()
-                                                .Text(item.EstimatedCost.ToString("C", ukCulture))
-                                                .FontSize(9.2f)
-                                                .SemiBold();
-                                        }
-                                    });
+                                    }
                                 });
-                            }
+                            });
 
                             section.Item().PaddingTop(2).AlignRight().Text(text =>
                             {
@@ -550,8 +552,6 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                                 });
                         });
 
-                        content.Item().PageBreak();
-
                         content.Item().Section("meals").Column(section =>
                         {
                             section.Spacing(8);
@@ -559,7 +559,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
 
                             foreach (var meal in result.MealPlan)
                             {
-                                section.Item().Border(1).BorderColor(line).Background(panel).Padding(9).Column(card =>
+                                section.Item().Border(0.7f).BorderColor(line).Background(panel).Padding(9).Column(card =>
                                 {
                                     card.Spacing(5);
                                     card.Item().Text($"{meal.Day} - {meal.MealName}").FontSize(11.5f).SemiBold().FontColor(brandDeep);
@@ -567,14 +567,14 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                                     card.Item().Row(meta =>
                                     {
                                         meta.Spacing(6);
-                                        meta.AutoItem().Border(1).BorderColor(line).Background(panelSoft).PaddingVertical(2).PaddingHorizontal(6)
+                                        meta.AutoItem().Background(panelSoft).PaddingVertical(2).PaddingHorizontal(6)
                                             .Text($"Cost {meal.EstimatedCost.ToString("C", ukCulture)}").FontSize(8.5f).SemiBold().FontColor(inkSoft);
-                                        meta.AutoItem().Border(1).BorderColor(line).Background(panelSoft).PaddingVertical(2).PaddingHorizontal(6)
+                                        meta.AutoItem().Background(panelSoft).PaddingVertical(2).PaddingHorizontal(6)
                                             .Text($"{meal.EstimatedPrepMinutes} mins").FontSize(8.5f).SemiBold().FontColor(inkSoft);
 
                                         if (meal.LeftoverDaysCovered > 0)
                                         {
-                                            meta.AutoItem().Border(1).BorderColor(line).Background(okSoft).PaddingVertical(2).PaddingHorizontal(6)
+                                            meta.AutoItem().Background(okSoft).PaddingVertical(2).PaddingHorizontal(6)
                                                 .Text($"Covers {meal.LeftoverDaysCovered} leftover day(s)").FontSize(8.5f).SemiBold().FontColor(ok);
                                         }
                                     });
@@ -585,7 +585,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                                     {
                                         row.Spacing(8);
 
-                                        row.RelativeItem().Border(1).BorderColor(line).Background(panelSoft).Padding(7).Column(block =>
+                                        row.RelativeItem().Background(panelSoft).Padding(7).Column(block =>
                                         {
                                             block.Spacing(3);
                                             block.Item().Text("Ingredients").FontSize(9f).SemiBold().FontColor(brandDeep);
@@ -596,7 +596,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                                             }
                                         });
 
-                                        row.RelativeItem().Border(1).BorderColor(line).Background(panelSoft).Padding(7).Column(block =>
+                                        row.RelativeItem().Background(panelSoft).Padding(7).Column(block =>
                                         {
                                             block.Spacing(3);
                                             block.Item().Text("Method").FontSize(9f).SemiBold().FontColor(brandDeep);
@@ -611,31 +611,6 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                             }
                         });
 
-                        content.Item().Section("budget-notes").Border(1).BorderColor(line).Background(panelSoft).Padding(11).Column(section =>
-                        {
-                            section.Spacing(6);
-                            section.Item().Text("Budget notes").FontSize(13).SemiBold().FontColor(brandDeep);
-                            section.Item()
-                                .Border(1)
-                                .BorderColor(line)
-                                .Background(budgetStatusBackground)
-                                .Padding(8)
-                                .Text(budgetStatusText)
-                                .SemiBold()
-                                .FontColor(budgetStatusColor);
-
-                            if (result.BudgetTips.Count == 0)
-                            {
-                                section.Item().Text("No additional budget suggestions for this plan.").FontColor(inkSoft);
-                            }
-                            else
-                            {
-                                foreach (var tip in result.BudgetTips)
-                                {
-                                    section.Item().Text($"- {tip}");
-                                }
-                            }
-                        });
                     });
 
                     page.Footer().Column(footer =>
@@ -643,9 +618,16 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                         footer.Item().LineHorizontal(1).LineColor(line);
                         footer.Item().PaddingTop(4).Row(row =>
                         {
+                            row.Spacing(6);
+                            row.AutoItem()
+                                .Width(11)
+                                .Height(11)
+                                .AlignMiddle()
+                                .Svg(AislePilotMarkSvg);
+
                             row.RelativeItem().DefaultTextStyle(style => style.FontSize(8.5f)).Text(text =>
                             {
-                                text.Span("AislePilot").SemiBold().FontColor(brandDeep);
+                                text.Span("Aisle Pilot").SemiBold().FontColor(brandDeep);
                                 text.Span(" | ").FontColor(inkSoft);
                                 text.Span(result.Supermarket).FontColor(inkSoft);
                             });

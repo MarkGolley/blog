@@ -1584,6 +1584,13 @@ thead th {
     border: 2px dashed rgba(16, 63, 101, 0.22);
     background: linear-gradient(140deg, rgba(255, 255, 255, 0.62), rgba(244, 248, 255, 0.72));
     box-shadow: none;
+    display: grid;
+    place-items: center;
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
 }
 
 .case-template-header {

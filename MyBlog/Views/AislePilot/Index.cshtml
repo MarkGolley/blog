@@ -5,19 +5,26 @@
     ViewData["MetaDescription"] =
         "AislePilot prototype: generate a weekly meal plan, track budget, and create a supermarket-ordered shopping list.";
     ViewData["CanonicalPath"] = "/projects/aisle-pilot";
+    ViewData["OgImage"] = "/images/aislepilot-icon.svg";
     var ukCulture = CultureInfo.GetCultureInfo("en-GB");
     var selectedDietary = Model.Request.DietaryModes.ToHashSet(StringComparer.OrdinalIgnoreCase);
     var hasResult = Model.HasResult && Model.Result is not null;
     var setupHiddenAttribute = hasResult ? "hidden" : null;
+    var appHeadClass = hasResult ? "aislepilot-app-head is-compact" : "aislepilot-app-head";
 }
 
 <div class="aislepilot-app">
-    <section aria-labelledby="aislepilot-title" class="aislepilot-app-head" data-reveal>
-        <p class="aislepilot-app-badge">AislePilot Beta</p>
-        <h1 id="aislepilot-title" class="aislepilot-app-title">Plan meals like an app, shop by aisle.</h1>
-        <p class="aislepilot-app-subtitle">
-            Mobile-first weekly planning with supermarket-aware shopping order, recipes, and exports for real in-store use.
-        </p>
+    <section aria-label="AislePilot header" class="@appHeadClass" data-reveal>
+        <div class="aislepilot-brand-lockup" aria-label="AislePilot brand">
+            <img class="aislepilot-brand-logo" src="~/images/aislepilot-logo-horizontal.svg" alt="AislePilot" />
+        </div>
+        @if (!hasResult)
+        {
+            <h1 id="aislepilot-title" class="aislepilot-app-title">Plan your week faster, shop aisle by aisle.</h1>
+            <p class="aislepilot-app-subtitle">
+                Mobile-first weekly planning with supermarket-aware shopping order, recipes, and exports for real in-store use.
+            </p>
+        }
         <div class="hero-actions">
             <a class="btn btn-secondary" asp-controller="Projects" asp-action="Index">Back to projects</a>
             @if (hasResult)
@@ -38,7 +45,7 @@
                 <div class="aislepilot-inline-fields">
                     <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
                         <label asp-for="Request.Supermarket">Supermarket</label>
-                        <select asp-for="Request.Supermarket">
+                        <select asp-for="Request.Supermarket" class="aislepilot-supermarket-select">
                             @foreach (var store in Model.SupermarketOptions)
                             {
                                 <option value="@store">@store</option>
@@ -462,6 +469,9 @@
 </div>
 
 @section Head {
+    <link rel="icon" type="image/svg+xml" href="~/images/aislepilot-favicon.svg" />
+    <link rel="apple-touch-icon" href="~/images/aislepilot-icon.svg" />
+    <meta name="theme-color" content="#103F65" />
     <link rel="stylesheet" href="~/css/aisle-pilot.css" asp-append-version="true" />
     <noscript>
         <style>

@@ -1,0 +1,20 @@
+<svg width="900" height="220" viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(20, 8)">
+    <g fill="none" stroke="#103F65" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M40 70 H155 L180 145 H65 Z" />
+      <circle cx="92" cy="178" r="12" fill="#103F65" />
+      <circle cx="152" cy="178" r="12" fill="#103F65" />
+    </g>
+
+    <rect x="18" y="94" width="54" height="8" rx="4" fill="#0F6D78" />
+    <rect x="10" y="112" width="62" height="8" rx="4" fill="#0F6D78" />
+    <rect x="66" y="94" width="78" height="8" rx="4" fill="#0F6D78" />
+    <rect x="72" y="112" width="66" height="8" rx="4" fill="#0F6D78" />
+
+    <path d="M130 118 L182 94 L182 138 Z" fill="#E39C41" />
+  </g>
+
+  <text x="255" y="145" font-family="'Space Grotesk', 'Segoe UI', Arial, sans-serif" font-size="96" font-weight="700">
+    <tspan fill="#103F65">Aisle</tspan><tspan fill="#0F6D78">Pilot</tspan>
+  </text>
+</svg>
