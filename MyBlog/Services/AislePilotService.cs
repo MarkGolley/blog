@@ -534,6 +534,14 @@ public sealed class AislePilotService : IAislePilotService
             context.DislikesOrAllergens,
             cookDays);
 
+        if (!HasUniqueMealNames(selectedMeals, cookDays))
+        {
+            _logger?.LogWarning(
+                "AislePilot AI generation did not yield enough unique meals for {CookDays} cook days.",
+                cookDays);
+            return null;
+        }
+
         _logger?.LogInformation(
             "AislePilot generated {MealCount} meals via AI and selected {SelectedMealCount} for the visible plan. OpenAIRequestId={OpenAIRequestId}",
             aiMeals.Count,
@@ -651,6 +659,14 @@ public sealed class AislePilotService : IAislePilotService
             context.DislikesOrAllergens,
             cookDays);
 
+        if (!HasUniqueMealNames(selectedMeals, cookDays))
+        {
+            _logger?.LogInformation(
+                "AislePilot AI meal pool did not contain enough unique meals for {CookDays} cook days; requesting fresh AI meals.",
+                cookDays);
+            return null;
+        }
+
         return BuildPlanFromMeals(
             request,
             context,
@@ -733,7 +749,8 @@ public sealed class AislePilotService : IAislePilotService
                     request.WeeklyBudget,
                     context.HouseholdFactor,
                     request.PreferQuickMeals,
-                    dayMultiplier);
+                    dayMultiplier,
+                    allowAlreadyUsedMeals: ShouldUseTemplateFallback());
             }
         }
 
@@ -1133,7 +1150,7 @@ Return JSON only with this schema:
         };
     }
 
-    private static MealTemplate SelectSwapCandidate(
+    private static MealTemplate? SelectSwapCandidate(
         IReadOnlyList<MealTemplate> allCandidates,
         IReadOnlyList<MealTemplate> selectedMeals,
         int dayIndex,
@@ -1141,11 +1158,12 @@ Return JSON only with this schema:
         decimal weeklyBudget,
         decimal householdFactor,
         bool preferQuickMeals,
-        int dayMultiplier)
+        int dayMultiplier,
+        bool allowAlreadyUsedMeals)
     {
         if (allCandidates.Count == 0)
         {
-            throw new InvalidOperationException("No meals are available for swap.");
+            return null;
         }
 
         var usedNames = selectedMeals
@@ -1158,15 +1176,24 @@ Return JSON only with this schema:
                 !usedNames.Contains(meal.Name))
             .ToList();
 
-        var fallbackPool = allCandidates
-            .Where(meal => !meal.Name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var fallbackPool = allowAlreadyUsedMeals
+            ? allCandidates
+                .Where(meal => !meal.Name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase))
+                .ToList()
+            : [];
 
         var candidatePool = preferredPool.Count > 0
             ? preferredPool
             : fallbackPool.Count > 0
                 ? fallbackPool
-                : allCandidates.ToList();
+                : allowAlreadyUsedMeals
+                    ? allCandidates.ToList()
+                    : [];
+
+        if (candidatePool.Count == 0)
+        {
+            return null;
+        }
 
         var normalizedDayMultiplier = Math.Max(1, dayMultiplier);
         var targetMealCost = (weeklyBudget / 7m) * normalizedDayMultiplier;
@@ -1190,6 +1217,22 @@ Return JSON only with this schema:
             .ThenBy(item => item.template.Name, StringComparer.OrdinalIgnoreCase)
             .First()
             .template;
+    }
+
+    private static bool HasUniqueMealNames(IReadOnlyList<MealTemplate> meals, int expectedMeals)
+    {
+        if (meals.Count < expectedMeals)
+        {
+            return false;
+        }
+
+        var uniqueCount = meals
+            .Take(expectedMeals)
+            .Select(meal => meal.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        return uniqueCount == expectedMeals;
     }
 
     private static decimal BuildMealSelectionScore(
