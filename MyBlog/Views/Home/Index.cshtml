@@ -8,7 +8,7 @@
     <div class="home-hero-grid">
         <div class="hero-copy">
             <p class="hero-kicker">C#/.NET + Python Engineer</p>
-            <h1 class="hero-title">Building maintainable systems that stay calm under production pressure.</h1>
+            <h1 class="hero-title">Building reliable software with clear architecture and practical delivery.</h1>
             <p class="hero-lead">
                 I write pragmatic, test-driven software and share what works: architecture decisions, delivery tradeoffs,
                 and practical lessons from real projects.
@@ -16,6 +16,7 @@
             <div class="hero-actions">
                 <a class="btn btn-primary" asp-controller="Contact" asp-action="Index">Start a conversation</a>
                 <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">Read latest posts</a>
+                <a class="btn btn-secondary" asp-controller="Projects" asp-action="Index">See my projects</a>
             </div>
             <div class="hero-metrics">
                 <article class="metric-card">
@@ -36,10 +37,63 @@
             <div class="hero-portrait-frame">
                 <img src="~/images/me.jpg" alt="Portrait of Mark" />
             </div>
-            <div class="hero-spotlight">
-                <p class="spotlight-title">Current focus</p>
-                <p>Designing clearer architecture boundaries, stronger test suites, and reliable cloud-ready deployments.</p>
-            </div>
+            <section class="hero-spotlight" aria-label="Focus timeline" data-focus-carousel>
+                <div class="hero-spotlight-head">
+                    <div>
+                        <p class="spotlight-eyebrow">What I'm focused on</p>
+                        <p class="spotlight-title" data-focus-label>Current focus</p>
+                    </div>
+                    <div class="hero-spotlight-controls" aria-label="Focus navigation">
+                        <button type="button" class="hero-spotlight-nav" data-focus-prev aria-label="Show previous focus">&#8249;</button>
+                        <button type="button" class="hero-spotlight-nav" data-focus-next aria-label="Show next focus">&#8250;</button>
+                    </div>
+                </div>
+
+                <div class="hero-focus-card" data-focus-panel>
+                    <p class="hero-focus-period" data-focus-period>Now</p>
+                    <p class="hero-focus-heading" data-focus-heading>Architecture, testing, and more deliberate project delivery.</p>
+                    <p class="hero-focus-copy" data-focus-copy>
+                        Right now I am concentrating on cleaner boundaries in my .NET work, stronger automated test coverage,
+                        and turning ideas on this site into projects with clearer proof of delivery.
+                    </p>
+                </div>
+
+                <div class="hero-focus-progress" role="tablist" aria-label="Focus timeline">
+                    <button type="button" class="hero-focus-dot is-active" data-focus-dot="0" aria-label="Show current focus" aria-selected="true"></button>
+                    <button type="button" class="hero-focus-dot" data-focus-dot="1" aria-label="Show cloud and deployment focus" aria-selected="false"></button>
+                    <button type="button" class="hero-focus-dot" data-focus-dot="2" aria-label="Show testing focus" aria-selected="false"></button>
+                    <button type="button" class="hero-focus-dot" data-focus-dot="3" aria-label="Show C# foundations focus" aria-selected="false"></button>
+                </div>
+
+                <script type="application/json" data-focus-items>
+                    [
+                      {
+                        "label": "Current focus",
+                        "period": "Now",
+                        "heading": "Architecture, testing, and more deliberate project delivery.",
+                        "copy": "Right now I am concentrating on cleaner boundaries in my .NET work, stronger automated test coverage, and turning ideas on this site into projects with clearer proof of delivery."
+                      },
+                      {
+                        "label": "Previous focus",
+                        "period": "Cloud and deployment",
+                        "heading": "Getting software live reliably, not just built locally.",
+                        "copy": "A big recent focus was deployment and operational confidence: hosting the site, working through cloud setup, and making releases feel repeatable instead of fragile."
+                      },
+                      {
+                        "label": "Previous focus",
+                        "period": "Testing and quality",
+                        "heading": "Building the habit of proving behaviour with tests first.",
+                        "copy": "A strong stretch of work went into xUnit, Moq, moderation checks, and comment workflows so the site could grow without guessing whether changes were safe."
+                      },
+                      {
+                        "label": "Previous focus",
+                        "period": "C# foundations",
+                        "heading": "Sharpening design patterns, SOLID, and code organisation.",
+                        "copy": "Earlier work centred on the fundamentals in your learning plan: class structure, object-oriented design, and the practical patterns that make code easier to extend."
+                      }
+                    ]
+                </script>
+            </section>
         </aside>
     </div>
 </section>
