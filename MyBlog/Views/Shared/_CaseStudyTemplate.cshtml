@@ -58,8 +58,9 @@
 
     @if (!string.IsNullOrWhiteSpace(Model.CtaText) && !string.IsNullOrWhiteSpace(Model.CtaController))
     {
+        var currentPathAndQuery = $"{Context.Request.Path}{Context.Request.QueryString}";
         <div class="case-template-actions">
-            <a class="btn btn-primary" asp-controller="@Model.CtaController" asp-action="@Model.CtaAction">
+            <a class="btn btn-primary" asp-controller="@Model.CtaController" asp-action="@Model.CtaAction" asp-route-returnUrl="@currentPathAndQuery">
                 @if (!string.IsNullOrWhiteSpace(Model.CtaIconPath))
                 {
                     <img class="btn-logo-icon" src="@Url.Content(Model.CtaIconPath)" alt="" aria-hidden="true" />

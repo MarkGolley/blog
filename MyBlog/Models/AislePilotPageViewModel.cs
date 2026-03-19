@@ -5,6 +5,7 @@ namespace MyBlog.Models;
 public sealed class AislePilotPageViewModel
 {
     public AislePilotRequestModel Request { get; set; } = new();
+    public string ReturnUrl { get; set; } = string.Empty;
     public AislePilotPlanResultViewModel? Result { get; set; }
     public IReadOnlyList<AislePilotPantrySuggestionViewModel> PantrySuggestions { get; set; } =
         Array.Empty<AislePilotPantrySuggestionViewModel>();

@@ -1,6 +1,8 @@
 @using System.Globalization
 @model AislePilotPageViewModel
 @{
+    Layout = "_AislePilotLayout";
+    ViewData["ReturnUrl"] = Model.ReturnUrl;
     ViewData["Title"] = "AislePilot";
     ViewData["MetaDescription"] =
         "AislePilot prototype: generate a weekly meal plan, track budget, and create a supermarket-ordered shopping list.";
@@ -25,13 +27,12 @@
                 Mobile-first weekly planning with supermarket-aware shopping order, recipes, and exports for real in-store use.
             </p>
         }
-        <div class="hero-actions">
-            <a class="btn btn-secondary" asp-controller="Projects" asp-action="Index">Back to projects</a>
-            @if (hasResult)
-            {
+        @if (hasResult)
+        {
+            <div class="hero-actions">
                 <a class="btn btn-primary" href="#aislepilot-shop">Jump to shop mode</a>
-            }
-        </div>
+            </div>
+        }
     </section>
 
     <section id="aislepilot-setup" aria-labelledby="aislepilot-form-title" class="aislepilot-shell" data-reveal data-setup-panel @setupHiddenAttribute>
@@ -39,6 +40,7 @@
 
         <form method="post" asp-action="Index" class="contact-form aislepilot-form">
             @Html.AntiForgeryToken()
+            <input asp-for="ReturnUrl" type="hidden" />
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
             <div class="aislepilot-setup-strip">
@@ -198,6 +200,7 @@
             <div class="aislepilot-overview-actions">
                 <form method="post" action="@Url.Action("Index", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
                     @Html.AntiForgeryToken()
+                    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
                     <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                     <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                     <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
@@ -293,6 +296,7 @@
                                       data-leftover-rebalance-form
                                       data-preserve-scroll-form>
                                     @Html.AntiForgeryToken()
+                                    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
                                     <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                                     <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                                     <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
@@ -372,6 +376,7 @@
                                           class="aislepilot-swap-form aislepilot-swap-in-details"
                                           data-preserve-scroll-form>
                                         @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
                                         <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                                         <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                                         <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
@@ -425,6 +430,7 @@
                     <div class="aislepilot-export-actions">
                         <form method="post" asp-action="ExportPlanPack">
                             @Html.AntiForgeryToken()
+                            <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
                             <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                             <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                             <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
@@ -443,6 +449,7 @@
 
                         <form method="post" asp-action="ExportChecklist">
                             @Html.AntiForgeryToken()
+                            <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
                             <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                             <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                             <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />

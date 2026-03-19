@@ -28,10 +28,11 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         """;
 
     [HttpGet("")]
-    public IActionResult Index()
+    public IActionResult Index(string? returnUrl = null)
     {
         var request = new AislePilotRequestModel();
-        return View(BuildPageModel(request));
+        var resolvedReturnUrl = ResolveReturnUrl(returnUrl);
+        return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
     }
 
     [HttpPost("")]
@@ -39,15 +40,16 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     public IActionResult Index(AislePilotPageViewModel pageModel)
     {
         var request = NormalizeRequest(pageModel.Request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequest(request);
 
         if (!ModelState.IsValid)
         {
-            return View(BuildPageModel(request));
+            return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
         var result = aislePilotService.BuildPlan(request);
-        return View(BuildPageModel(request, result));
+        return View(BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
     }
 
     [HttpPost("suggest-from-pantry")]
@@ -55,21 +57,22 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     public IActionResult SuggestFromPantry(AislePilotPageViewModel pageModel)
     {
         var request = NormalizeRequest(pageModel.Request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequestForSuggestions(request);
 
         if (!ModelState.IsValid)
         {
-            return View("Index", BuildPageModel(request));
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
         var suggestions = aislePilotService.SuggestMealsFromPantry(request, 6);
         if (suggestions.Count == 0)
         {
             ModelState.AddModelError("Request.PantryItems", "No full meals found from your current pantry items. Add more ingredients or generate a full weekly plan.");
-            return View("Index", BuildPageModel(request));
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
-        return View("Index", BuildPageModel(request, pantrySuggestions: suggestions));
+        return View("Index", BuildPageModel(request, pantrySuggestions: suggestions, returnUrl: resolvedReturnUrl));
     }
 
     [HttpPost("swap-meal")]
@@ -77,6 +80,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     public IActionResult SwapMeal(AislePilotPageViewModel pageModel, int dayIndex, string? currentMealName)
     {
         var request = NormalizeRequest(pageModel.Request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequest(request);
         var cookDays = Math.Clamp(request.CookDays, 1, 7);
 
@@ -87,11 +91,11 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
 
         if (!ModelState.IsValid)
         {
-            return View("Index", BuildPageModel(request));
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
         var result = aislePilotService.SwapMealForDay(request, dayIndex, currentMealName);
-        return View("Index", BuildPageModel(request, result));
+        return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
     }
 
     [HttpPost("export/plan-pack")]
@@ -133,16 +137,54 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     private AislePilotPageViewModel BuildPageModel(
         AislePilotRequestModel request,
         AislePilotPlanResultViewModel? result = null,
-        IReadOnlyList<AislePilotPantrySuggestionViewModel>? pantrySuggestions = null)
+        IReadOnlyList<AislePilotPantrySuggestionViewModel>? pantrySuggestions = null,
+        string returnUrl = "")
     {
         return new AislePilotPageViewModel
         {
             Request = request,
+            ReturnUrl = returnUrl,
             Result = result,
             PantrySuggestions = pantrySuggestions ?? [],
             SupermarketOptions = aislePilotService.GetSupportedSupermarkets(),
             DietaryOptions = aislePilotService.GetSupportedDietaryModes()
         };
+    }
+
+    private string ResolveReturnUrl(string? returnUrl)
+    {
+        var fallbackReturnUrl = Url.Action("Index", "Projects") ?? "/projects";
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) &&
+            Url.IsLocalUrl(returnUrl) &&
+            !IsAislePilotPath(returnUrl))
+        {
+            return returnUrl;
+        }
+
+        var referer = Request.Headers["Referer"].FirstOrDefault();
+        if (Uri.TryCreate(referer, UriKind.Absolute, out var refererUri) &&
+            string.Equals(refererUri.Host, Request.Host.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            var candidate = $"{refererUri.AbsolutePath}{refererUri.Query}";
+            if (Url.IsLocalUrl(candidate) && !IsAislePilotPath(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return fallbackReturnUrl;
+    }
+
+    private static bool IsAislePilotPath(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return false;
+        }
+
+        var path = url.Split('?', '#')[0];
+        return path.StartsWith("/projects/aisle-pilot", StringComparison.OrdinalIgnoreCase);
     }
 
     private AislePilotRequestModel NormalizeRequest(AislePilotRequestModel? request)
