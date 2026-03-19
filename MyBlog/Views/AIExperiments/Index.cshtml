@@ -1,160 +1,114 @@
-@model ModerationPlaygroundViewModel
 @{
     ViewData["Title"] = "AI Experiments";
     ViewData["MetaDescription"] =
-        "Applied AI experiments from Mark Golley focused on practical safety checks and real-world behavior.";
+        "Interactive AI playgrounds from Mark Golley for retrieval, chunking, and prompt design experiments.";
     ViewData["CanonicalPath"] = "/ai-experiments";
 }
 
 <section aria-labelledby="ai-experiments-title" class="portfolio-hero" data-reveal>
-    <p class="hero-kicker">Applied AI</p>
-    <h1 id="ai-experiments-title">Small AI experiments you can run directly.</h1>
+    <p class="hero-kicker">AI Playground</p>
+    <h1 id="ai-experiments-title">Interactive experiments to test ideas quickly.</h1>
     <p class="section-intro">
-        These are lightweight checks from the same stack used on this site.
+        This page is for hands-on AI exploration. Project roadmap and delivery status live on the Projects page.
     </p>
     <div class="hero-actions">
         <a class="btn btn-primary" asp-controller="Projects" asp-action="Index">View projects</a>
-        <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">Read blog</a>
+        <a class="btn btn-secondary" href="#query-lab">Open playground</a>
     </div>
 </section>
 
-<section aria-labelledby="moderation-playground-title" data-reveal>
-    <h2 id="moderation-playground-title">Moderation playground</h2>
-    <p class="section-intro">
-        Paste sample comment text to see <code>Allow</code>, <code>Block</code>, or <code>ManualReview</code>.
-    </p>
-    <p class="policy-note">Manual review is the safe fallback when no confident automated decision is available.</p>
+<section aria-labelledby="query-lab" class="ai-lab-shell" data-ai-lab data-reveal>
+    <h2 id="query-lab">Query and citation lab</h2>
+    <p class="section-intro">Try a question and see a lightweight retrieval simulation with source picks.</p>
 
-    <form method="post" asp-action="RunModeration" class="contact-form">
-        @Html.AntiForgeryToken()
-        <label asp-for="InputText">Comment text</label>
-        <textarea asp-for="InputText" rows="4" maxlength="2000" placeholder="Type or paste a comment sample..."></textarea>
-        <span asp-validation-for="InputText" class="text-danger"></span>
-        <input type="hidden" asp-for="PromptRiskInput" />
-
-        <button type="submit">Run moderation check</button>
-    </form>
-
-    @if (Model.HasModerationResult)
-    {
-        var resultClass = Model.Decision == ModerationDecision.Allow
-            ? "moderation-demo-result safe"
-            : Model.Decision == ModerationDecision.Block
-                ? "moderation-demo-result blocked"
-                : "moderation-demo-result neutral";
-
-        <div class="@resultClass">
-            <p class="moderation-demo-title">@Model.ResultTitle</p>
-            <p>@Model.ResultMessage</p>
-            <p class="moderation-demo-meta">Reason: @Model.ReasonCode</p>
-            @if (Model.FlaggedByModel.HasValue)
-            {
-                <p class="moderation-demo-meta">Model flagged: @(Model.FlaggedByModel.Value ? "Yes" : "No")</p>
-            }
-            @if (Model.LatencyMs.HasValue)
-            {
-                <p class="moderation-demo-meta">Latency: @Model.LatencyMs.Value ms</p>
-            }
+    <div class="ai-lab-controls">
+        <label for="lab-query-input">Question</label>
+        <textarea id="lab-query-input" rows="3" maxlength="400">How would you explain reliability checks before deploying an ASP.NET app?</textarea>
+        <div class="ai-lab-control-row">
+            <label for="lab-query-mode">Retrieval mode</label>
+            <select id="lab-query-mode">
+                <option value="balanced">Balanced</option>
+                <option value="precise">Precise</option>
+                <option value="broad">Broad</option>
+            </select>
+            <button type="button" id="lab-query-run">Run retrieval</button>
+            <button type="button" id="lab-query-random" class="btn btn-secondary ai-mini-btn">Surprise me</button>
         </div>
-    }
-</section>
+    </div>
 
-<section aria-labelledby="prompt-risk-scanner-title" data-reveal>
-    <h2 id="prompt-risk-scanner-title">Prompt risk scanner</h2>
-    <p class="section-intro">
-        Fast heuristic scan for common injection and exfiltration patterns.
-    </p>
-
-    <form method="post" asp-action="RunPromptRisk" class="contact-form">
-        @Html.AntiForgeryToken()
-        <label asp-for="PromptRiskInput">Prompt text</label>
-        <textarea asp-for="PromptRiskInput" rows="4" maxlength="2000" placeholder="Type or paste a prompt..."></textarea>
-        <span asp-validation-for="PromptRiskInput" class="text-danger"></span>
-        <input type="hidden" asp-for="InputText" />
-        <button type="submit">Scan prompt risk</button>
-    </form>
-
-    @if (Model.HasPromptRiskResult)
-    {
-        var riskClass = Model.PromptRiskLevel switch
-        {
-            "Critical" => "prompt-risk-result risk-critical",
-            "High" => "prompt-risk-result risk-high",
-            "Medium" => "prompt-risk-result risk-medium",
-            _ => "prompt-risk-result risk-low"
-        };
-
-        <div class="@riskClass">
-            <p class="moderation-demo-title">@Model.PromptRiskLevel risk (@Model.PromptRiskScore/100)</p>
-            <p>@Model.PromptRiskSummary</p>
-            <p class="moderation-demo-meta">Recommendation: @Model.PromptRiskRecommendation</p>
-
-            @if (Model.PromptRiskMatchedRules.Count > 0)
-            {
-                <ul class="case-list prompt-risk-rules">
-                    @foreach (var rule in Model.PromptRiskMatchedRules)
-                    {
-                        <li>@rule</li>
-                    }
-                </ul>
-            }
-        </div>
-    }
-</section>
-
-<section aria-labelledby="experiment-roadmap-title" data-reveal>
-    <h2 id="experiment-roadmap-title">Experiment roadmap</h2>
-    <p class="section-intro">Current direction and next implementation steps.</p>
-
-    <div class="case-template-grid">
-        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
-        {
-            Title = "Prompt Injection Defense Bench",
-            Status = "In progress",
-            OneLiner = "Run attack prompts against current safeguards and track escapes.",
-            WhyItMatters = "Makes prompt hardening measurable instead of guesswork.",
-            TechnicalScope = new[]
-            {
-                "Maintain a compact attack suite with realistic misuse patterns.",
-                "Compare current defenses against previous run output.",
-                "Track escaped prompts and categorize failure type.",
-                "Document one mitigation per escaped case."
-            },
-            ProofChecklist = new[]
-            {
-                "Run report with escaped count and risk level.",
-                "Examples of escaped prompts with mitigation notes.",
-                "Regression tests for fixed cases."
-            },
-            WhatItShows = "Practical safety iteration with visible before/after behavior.",
-            NextMilestone = "Publish first escaped-prompt review and mitigation patch."
-        }' />
-
-        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
-        {
-            Title = "Prompt Repair Assistant",
-            Status = "Planned",
-            OneLiner = "Suggest safer rewrites when prompt risk is medium/high.",
-            WhyItMatters = "Turns risk detection into an actionable UX loop people can actually use.",
-            TechnicalScope = new[]
-            {
-                "Map risky phrases to safe rewrite templates.",
-                "Preserve user intent while removing attack patterns.",
-                "Attach short explanation of what was changed.",
-                "Measure drop in risk score after rewrite."
-            },
-            ProofChecklist = new[]
-            {
-                "Before/after prompt pairs with risk deltas.",
-                "Automated tests for rewrite stability.",
-                "False-positive review notes."
-            },
-            WhatItShows = "Ability to build user-facing safety tooling, not just backend checks.",
-            NextMilestone = "Implement initial rewrite rules and validation tests."
-        }' />
+    <div class="ai-lab-result-grid">
+        <article class="ai-lab-panel">
+            <h3>Top sources</h3>
+            <ol id="lab-query-sources" class="ai-source-list"></ol>
+        </article>
+        <article class="ai-lab-panel">
+            <h3>Synthesized answer</h3>
+            <p id="lab-query-answer" class="ai-answer-copy"></p>
+            <p class="ai-footnote">Demo output only. Final answers in Ask Mark will be grounded by real retrieval data.</p>
+        </article>
     </div>
 </section>
+
+<section aria-labelledby="chunk-lab" class="ai-lab-shell" data-ai-lab-chunks data-reveal>
+    <h2 id="chunk-lab">Chunk strategy lab</h2>
+    <p class="section-intro">See how chunk size and overlap change document splits used for retrieval.</p>
+
+    <label for="lab-chunk-input">Sample document</label>
+    <textarea id="lab-chunk-input" rows="5" maxlength="2000">Before deployment, run automated tests, mobile end-to-end checks, and smoke probes against critical flows. Use measurable thresholds so releases are blocked when latency, error rate, or functional behavior regress beyond accepted limits.</textarea>
+
+    <div class="ai-lab-slider-grid">
+        <label for="lab-chunk-size">Chunk size
+            <span id="lab-chunk-size-value">220</span>
+        </label>
+        <input id="lab-chunk-size" type="range" min="120" max="420" step="20" value="220" />
+
+        <label for="lab-chunk-overlap">Overlap
+            <span id="lab-chunk-overlap-value">40</span>
+        </label>
+        <input id="lab-chunk-overlap" type="range" min="0" max="120" step="10" value="40" />
+    </div>
+
+    <p id="lab-chunk-summary" class="policy-note"></p>
+    <div id="lab-chunk-results" class="ai-chunk-grid"></div>
+</section>
+
+<section aria-labelledby="prompt-remix-lab" class="ai-lab-shell" data-ai-lab-remix data-reveal>
+    <h2 id="prompt-remix-lab">Prompt remix lab</h2>
+    <p class="section-intro">Generate multiple prompt styles from one intent to compare framing.</p>
+
+    <div class="ai-lab-controls">
+        <label for="lab-remix-intent">Base intent</label>
+        <input id="lab-remix-intent" type="text" maxlength="240" value="Explain why integration tests matter in ASP.NET Core." />
+
+        <div class="ai-lab-control-row">
+            <label for="lab-remix-audience">Audience</label>
+            <select id="lab-remix-audience">
+                <option value="recruiter">Recruiter</option>
+                <option value="junior">Junior developer</option>
+                <option value="lead">Tech lead</option>
+            </select>
+            <label for="lab-remix-tone">Tone</label>
+            <select id="lab-remix-tone">
+                <option value="direct">Direct</option>
+                <option value="playful">Playful</option>
+                <option value="analytical">Analytical</option>
+            </select>
+            <button type="button" id="lab-remix-generate">Generate prompts</button>
+        </div>
+
+        <label class="ai-inline-toggle">
+            <input id="lab-remix-constraint" type="checkbox" checked />
+            Include a hard constraint
+        </label>
+    </div>
+
+    <div id="lab-remix-results" class="ai-remix-list"></div>
+</section>
+
+@section Head {
+    <link rel="stylesheet" href="~/css/ai-experiments.css" asp-append-version="true" />
+}
 
 @section Scripts {
-    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/ai-experiments.js" asp-append-version="true"></script>
 }

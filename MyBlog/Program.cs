@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.WebUtilities;
 using MyBlog.Services;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+QuestPDF.Settings.License = LicenseType.Community;
 var secureCookiePolicy = builder.Environment.IsDevelopment()
     ? CookieSecurePolicy.SameAsRequest
     : CookieSecurePolicy.Always;
@@ -127,7 +129,7 @@ builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SubscriptionEmailService>();
-builder.Services.AddScoped<PromptRiskScannerService>();
+builder.Services.AddScoped<IAislePilotService, AislePilotService>();
 builder.Services.AddHttpClient<AIModerationService>();
 builder.Services.AddHttpClient<DailyCodingCapsuleService>();
 builder.Services.AddTransient<IDailyCodingCapsuleProvider>(sp => sp.GetRequiredService<DailyCodingCapsuleService>());
@@ -210,30 +212,6 @@ builder.Services.AddRateLimiter(options =>
             {
                 PermitLimit = 5,
                 Window = TimeSpan.FromMinutes(10),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-
-    options.AddPolicy("moderationChecks", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetRateLimitPartitionKey(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 20,
-                Window = TimeSpan.FromMinutes(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-
-    options.AddPolicy("promptRiskChecks", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetRateLimitPartitionKey(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 40,
-                Window = TimeSpan.FromMinutes(1),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,
                 AutoReplenishment = true
@@ -403,9 +381,7 @@ static bool ShouldRecoverFromBadRequest(string requestPath)
            || requestPath.Equals("/Blog/AddComment", StringComparison.OrdinalIgnoreCase)
            || requestPath.Equals("/Blog/TogglePostLike", StringComparison.OrdinalIgnoreCase)
            || requestPath.Equals("/Blog/ToggleCommentLike", StringComparison.OrdinalIgnoreCase)
-           || requestPath.Equals("/Subscribe", StringComparison.OrdinalIgnoreCase)
-           || requestPath.Equals("/ai-experiments/moderation", StringComparison.OrdinalIgnoreCase)
-           || requestPath.Equals("/ai-experiments/prompt-risk", StringComparison.OrdinalIgnoreCase);
+           || requestPath.Equals("/Subscribe", StringComparison.OrdinalIgnoreCase);
 }
 
 static string? ResolveBadRequestReturnPath(HttpRequest request, string requestPath)

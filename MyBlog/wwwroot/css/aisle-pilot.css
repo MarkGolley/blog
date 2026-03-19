@@ -1,0 +1,920 @@
+.aislepilot-app {
+    width: min(100%, 52rem);
+    margin-inline: auto;
+    display: grid;
+    gap: 0.85rem;
+    padding-bottom: 1.25rem;
+}
+
+.aislepilot-app-head {
+    border: 1px solid rgba(16, 63, 101, 0.22);
+    border-radius: calc(var(--radius-md) + 4px);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(240, 246, 255, 0.95));
+    padding: 1rem;
+    box-shadow: 0 14px 28px rgba(11, 24, 42, 0.1);
+}
+
+.aislepilot-app-badge {
+    display: inline-flex;
+    margin: 0;
+    padding: 0.18rem 0.62rem;
+    border-radius: 999px;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    background: rgba(16, 63, 101, 0.08);
+    color: var(--brand-deep);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.aislepilot-app-title {
+    margin-top: 0.48rem;
+    margin-bottom: 0;
+    font-size: clamp(1.35rem, 2.8vw, 1.95rem);
+}
+
+.aislepilot-app-subtitle {
+    margin-top: 0.45rem;
+    margin-bottom: 0;
+    color: var(--ink-soft);
+}
+
+.aislepilot-app-head .hero-actions {
+    margin-top: 0.68rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.48rem;
+}
+
+.aislepilot-shell {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--panel-strong);
+    padding: 0.92rem;
+    box-shadow: 0 12px 24px rgba(11, 24, 42, 0.08);
+}
+
+.aislepilot-window-shell {
+    display: grid;
+    gap: 0.62rem;
+}
+
+.aislepilot-window-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.72rem;
+}
+
+.aislepilot-window-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.36rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.aislepilot-window-tab {
+    flex: 0 0 auto;
+    min-height: 2.1rem !important;
+    border: none !important;
+    border-radius: 999px !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
+    padding: 0.36rem 0.72rem !important;
+    font-size: 0.84rem !important;
+    font-weight: 700 !important;
+    opacity: 0.88;
+    transition: transform 0.16s ease, opacity 0.16s ease, filter 0.16s ease;
+}
+
+.aislepilot-window-tab:hover {
+    opacity: 1;
+}
+
+.aislepilot-window-tab.is-active {
+    opacity: 1;
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+}
+
+.aislepilot-window-viewport {
+    overflow: hidden;
+    border-radius: 12px;
+    touch-action: pan-y;
+    transition: height 0.26s ease;
+}
+
+.aislepilot-window-track {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    transition: transform 0.26s ease;
+}
+
+.aislepilot-window-panel {
+    flex: 0 0 100%;
+    min-width: 100%;
+}
+
+.aislepilot-window-meta {
+    margin: 0 0 0.55rem;
+    color: var(--ink-soft);
+    font-size: 0.86rem;
+}
+
+.aislepilot-leftover-editor {
+    margin-bottom: 0.46rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 12px;
+    padding: 0.44rem 0.52rem;
+    background: rgba(248, 251, 255, 0.92);
+}
+
+.aislepilot-leftover-editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem;
+}
+
+.aislepilot-leftover-editor .aislepilot-window-meta {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+.aislepilot-leftover-toggle {
+    min-height: 1.95rem !important;
+    border: 1px solid rgba(16, 63, 101, 0.24) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.97) !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+    padding: 0.2rem 0.56rem !important;
+    font-size: 0.76rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap;
+}
+
+.aislepilot-leftover-planner-shell {
+    margin-top: 0.42rem;
+    border-top: 1px solid rgba(16, 63, 101, 0.12);
+    padding-top: 0.42rem;
+}
+
+.aislepilot-leftover-helper {
+    margin: 0 0 0.34rem;
+    font-size: 0.76rem;
+    color: var(--ink-soft);
+}
+
+.aislepilot-leftover-planner {
+    display: grid;
+    gap: 0.34rem;
+    grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+}
+
+.aislepilot-leftover-day-chip {
+    min-height: 2.45rem !important;
+    border: 1px solid rgba(16, 63, 101, 0.22) !important;
+    border-radius: 11px !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    color: var(--ink) !important;
+    box-shadow: none !important;
+    padding: 0.28rem 0.4rem !important;
+    display: grid;
+    gap: 0.14rem;
+    justify-items: center;
+    align-content: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.aislepilot-leftover-day-chip:hover {
+    border-color: rgba(16, 63, 101, 0.34) !important;
+}
+
+.aislepilot-leftover-day-chip.is-leftover-source {
+    border: none !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
+}
+
+.aislepilot-leftover-day-chip.is-leftover-source .aislepilot-leftover-day-name {
+    color: #fff;
+}
+
+.aislepilot-leftover-day-chip.is-source-selected {
+    border-color: rgba(15, 109, 120, 0.65) !important;
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.14) !important;
+    background: rgba(233, 246, 248, 0.9) !important;
+}
+
+.aislepilot-leftover-day-chip.is-drop-ready {
+    border-style: dashed !important;
+    border-color: rgba(16, 63, 101, 0.4) !important;
+    background: rgba(244, 249, 255, 0.95) !important;
+}
+
+.aislepilot-leftover-day-name {
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 700;
+}
+
+#aislepilot-overview,
+#aislepilot-meals,
+#aislepilot-shop,
+#aislepilot-export {
+    scroll-margin-top: clamp(7rem, 12vh, 9rem);
+}
+
+.aislepilot-section-title {
+    margin-top: 0;
+    margin-bottom: 0.36rem;
+}
+
+.aislepilot-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.62rem;
+}
+
+.aislepilot-overview-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.38rem;
+}
+
+.aislepilot-overview-regenerate-form {
+    margin: 0;
+}
+
+.aislepilot-overview-regenerate-btn {
+    min-height: 2.1rem !important;
+    border: none !important;
+    border-radius: 999px !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
+    padding: 0.36rem 0.64rem !important;
+    font-size: 0.84rem !important;
+    font-weight: 700 !important;
+}
+
+.aislepilot-edit-setup-btn {
+    min-height: 2.1rem !important;
+    border: none !important;
+    border-radius: 999px !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
+    padding: 0.36rem 0.64rem !important;
+    font-size: 0.84rem !important;
+    font-weight: 700 !important;
+}
+
+.aislepilot-form {
+    display: grid;
+    gap: 0.58rem;
+}
+
+.aislepilot-inline-fields {
+    display: grid;
+    gap: 0.38rem;
+}
+
+.aislepilot-setup-strip {
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 12px;
+    padding: 0.52rem;
+    background: rgba(255, 255, 255, 0.94);
+}
+
+.aislepilot-setup-columns {
+    display: grid;
+    gap: 0.62rem;
+}
+
+.aislepilot-setup-panel {
+    display: grid;
+    gap: 0.48rem;
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 12px;
+    padding: 0.52rem;
+    background: rgba(255, 255, 255, 0.94);
+}
+
+.aislepilot-field {
+    display: grid;
+    gap: 0.26rem;
+}
+
+.aislepilot-field-optional {
+    border: 1px dashed rgba(16, 63, 101, 0.24);
+    border-radius: 12px;
+    padding: 0.42rem 0.5rem 0.48rem;
+    background: rgba(245, 249, 255, 0.6);
+}
+
+.aislepilot-field-optional label {
+    color: var(--ink-soft);
+    font-weight: 600;
+}
+
+.aislepilot-field-optional input {
+    border-style: dashed;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.aislepilot-form label {
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.aislepilot-form input,
+.aislepilot-form select,
+.aislepilot-form textarea {
+    width: 100%;
+    min-height: 2.55rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 0.52rem 0.66rem;
+    background: rgba(255, 255, 255, 0.98);
+    color: var(--ink);
+    font: inherit;
+}
+
+.aislepilot-form input:focus,
+.aislepilot-form select:focus,
+.aislepilot-form textarea:focus {
+    outline: none;
+    border-color: rgba(15, 109, 120, 0.55);
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.18);
+}
+
+.aislepilot-form button {
+    min-height: 2.65rem;
+    border: none;
+    border-radius: 12px;
+    padding: 0.62rem 0.8rem;
+    font: inherit;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+    cursor: pointer;
+}
+
+.aislepilot-submit-actions {
+    display: grid;
+    gap: 0.42rem;
+    max-width: 22rem;
+    margin-inline: auto;
+    width: 100%;
+}
+
+.aislepilot-secondary-submit {
+    border: 1px solid rgba(16, 63, 101, 0.22) !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+}
+
+.aislepilot-pantry-inline-action {
+    min-height: auto !important;
+    border: none !important;
+    background: transparent !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    padding: 0 !important;
+    text-decoration: underline;
+    text-underline-offset: 0.12rem;
+    white-space: nowrap;
+    justify-self: start;
+}
+
+.aislepilot-field-chip {
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 14px;
+    padding: 0.2rem 0.5rem 0.24rem;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.aislepilot-field-chip label {
+    margin: 0;
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+}
+
+.aislepilot-field-chip input,
+.aislepilot-field-chip select {
+    min-height: 1rem;
+    border: none;
+    border-radius: 0;
+    padding: 0.02rem 0 0;
+    background: transparent;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    font-weight: 600;
+}
+
+.aislepilot-field-chip input:focus,
+.aislepilot-field-chip select:focus {
+    box-shadow: none;
+}
+
+.aislepilot-field-chip:focus-within {
+    border-color: rgba(15, 109, 120, 0.58);
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.16);
+}
+
+.aislepilot-field-chip-inline {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.2rem 0.5rem;
+}
+
+.aislepilot-field-chip-inline label {
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+}
+
+.aislepilot-field-chip-inline input,
+.aislepilot-field-chip-inline select {
+    font-size: 0.94rem;
+}
+
+.aislepilot-field-chip-inline input {
+    text-align: right;
+}
+
+.aislepilot-field-chip-inline .text-danger {
+    grid-column: 1 / -1;
+}
+
+.aislepilot-checkboxes {
+    margin: 0;
+    padding: 0.62rem 0.68rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+}
+
+.aislepilot-checkboxes legend {
+    grid-column: 1 / -1;
+    padding: 0 0.3rem;
+    font-weight: 700;
+    color: var(--brand-deep);
+}
+
+.aislepilot-checkbox-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    line-height: 1.35;
+}
+
+.aislepilot-checkbox-item input[type="checkbox"] {
+    width: 1.08rem;
+    height: 1.08rem;
+    margin: 0;
+}
+
+.aislepilot-mode-option {
+    position: relative;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.aislepilot-mode-option input[type="checkbox"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.aislepilot-mode-option span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.44rem;
+    width: 100%;
+    min-height: 2.35rem;
+    padding: 0.42rem 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.95);
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+
+.aislepilot-mode-option span::before {
+    content: "";
+    width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(16, 63, 101, 0.32);
+    background: #fff;
+    color: transparent;
+    font-size: 0.74rem;
+    line-height: 1rem;
+    text-align: center;
+    flex: 0 0 auto;
+}
+
+.aislepilot-mode-option input[type="checkbox"]:checked + span {
+    border-color: rgba(16, 63, 101, 0.4);
+    background: rgba(16, 63, 101, 0.1);
+    color: var(--brand-deep);
+}
+
+.aislepilot-mode-option input[type="checkbox"]:checked + span::before {
+    content: "\2713";
+    border-color: var(--brand-deep);
+    background: var(--brand-deep);
+    color: #fff;
+}
+
+.aislepilot-mode-option input[type="checkbox"]:focus-visible + span {
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.18);
+}
+
+.aislepilot-toggle-chip {
+    position: relative;
+}
+
+.aislepilot-toggle-chip input[type="checkbox"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.aislepilot-toggle-chip span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    width: 100%;
+    min-height: 2.35rem;
+    padding: 0.45rem 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.95);
+    font-weight: 600;
+}
+
+.aislepilot-toggle-chip span::before {
+    content: "";
+    width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(16, 63, 101, 0.32);
+    background: #fff;
+    color: transparent;
+    font-size: 0.74rem;
+    line-height: 1rem;
+    text-align: center;
+    flex: 0 0 auto;
+}
+
+.aislepilot-toggle-chip input[type="checkbox"]:checked + span {
+    border-color: rgba(16, 63, 101, 0.4);
+    background: rgba(16, 63, 101, 0.1);
+    color: var(--brand-deep);
+}
+
+.aislepilot-toggle-chip input[type="checkbox"]:checked + span::before {
+    content: "\2713";
+    border-color: var(--brand-deep);
+    background: var(--brand-deep);
+    color: #fff;
+}
+
+.aislepilot-toggle-chip input[type="checkbox"]:focus-visible + span {
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.18);
+}
+
+.aislepilot-budget-grid {
+    display: grid;
+    gap: 0.42rem;
+    grid-template-columns: 1fr;
+}
+
+.aislepilot-stat-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.2rem 0.5rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 14px;
+    padding: 0.24rem 0.5rem 0.28rem;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.aislepilot-stat-label {
+    margin: 0;
+    font-size: 0.66rem;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+}
+
+.aislepilot-stat-value {
+    margin: 0;
+    text-align: right;
+    font-size: 0.94rem;
+    line-height: 1.2;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.aislepilot-stat-value.is-over-budget {
+    color: #92261f;
+}
+
+.aislepilot-stat-value.is-on-budget {
+    color: #166247;
+}
+
+.aislepilot-meal-grid,
+.aislepilot-shopping-grid {
+    display: grid;
+    gap: 0.62rem;
+    grid-template-columns: 1fr;
+}
+
+.aislepilot-card {
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 12px;
+    padding: 0.72rem;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.aislepilot-card.is-leftover-source {
+    border-color: rgba(16, 63, 101, 0.34);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(240, 246, 255, 0.88));
+}
+
+.aislepilot-card h3 {
+    margin: 0.2rem 0 0.35rem;
+    font-size: 1rem;
+}
+
+.aislepilot-card-head h3 {
+    margin: 0;
+}
+
+.aislepilot-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.aislepilot-card-kicker {
+    margin: 0;
+    font-size: 0.76rem;
+    color: var(--brand-deep);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.aislepilot-card-meta {
+    margin-top: 0.3rem;
+    margin-bottom: 0;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+}
+
+.aislepilot-cost {
+    margin: 0;
+    font-weight: 700;
+    color: var(--brand-deep);
+    white-space: nowrap;
+}
+
+.aislepilot-swap-form {
+    margin-top: 0;
+    align-self: end;
+}
+
+.aislepilot-swap-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 0.28rem 0.62rem;
+    min-height: 1.85rem;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14);
+}
+
+.aislepilot-swap-btn:hover {
+    filter: brightness(1.04);
+}
+
+.aislepilot-recipe-shell {
+    margin-top: 0.58rem;
+    position: relative;
+}
+
+.aislepilot-recipe-details {
+    margin-top: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.48rem 0.56rem;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.aislepilot-recipe-details > summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--brand-deep);
+    padding-right: 6.4rem;
+}
+
+.aislepilot-swap-in-details {
+    position: absolute;
+    top: 0.34rem;
+    right: 0.48rem;
+}
+
+.aislepilot-shop-list {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.28rem;
+}
+
+.aislepilot-shop-list .aislepilot-checkbox-item {
+    width: 100%;
+    border: 1px solid rgba(16, 63, 101, 0.18);
+    border-radius: 10px;
+    padding: 0.48rem 0.54rem;
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.aislepilot-export-actions {
+    display: grid;
+    gap: 0.52rem;
+}
+
+.aislepilot-export-actions form {
+    margin: 0;
+}
+
+.aislepilot-export-btn {
+    width: 100%;
+    min-height: 2.8rem;
+    border: none;
+    border-radius: 12px;
+    padding: 0.62rem 0.75rem;
+    font: inherit;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+    cursor: pointer;
+}
+
+.aislepilot-pantry-grid {
+    display: grid;
+    gap: 0.62rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+    .aislepilot-inline-fields {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .aislepilot-budget-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-setup-columns {
+        grid-template-columns: 1.08fr 0.92fr;
+    }
+
+    .aislepilot-export-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-export-actions > .aislepilot-export-btn {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-submit-actions {
+        max-width: 24rem;
+    }
+}
+
+@media (max-width: 520px) {
+    .aislepilot-window-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .aislepilot-window-tabs {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .aislepilot-section-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .aislepilot-overview-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.34rem;
+    }
+
+    .aislepilot-overview-regenerate-form {
+        width: 100%;
+    }
+
+    .aislepilot-overview-regenerate-btn,
+    .aislepilot-edit-setup-btn {
+        width: 100%;
+    }
+
+    .aislepilot-leftover-editor-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (min-width: 880px) {
+    .aislepilot-meal-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-shopping-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-pantry-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media print {
+    .hero-actions,
+    .aislepilot-export-actions,
+    .aislepilot-window-tabs {
+        display: none !important;
+    }
+
+    .aislepilot-window-viewport {
+        overflow: visible;
+    }
+
+    .aislepilot-window-track {
+        display: block;
+        transform: none !important;
+    }
+
+    .aislepilot-window-panel {
+        min-width: 100%;
+        margin-bottom: 0.8rem;
+    }
+
+    .aislepilot-app {
+        width: 100%;
+        max-width: none;
+    }
+
+    .aislepilot-shell,
+    .aislepilot-app-head,
+    .aislepilot-card {
+        box-shadow: none;
+    }
+}

@@ -49,7 +49,17 @@
         </div>
     </details>
 
-    <div class="case-next-milestone">
-        <strong>Next:</strong> @Model.NextMilestone
-    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.NextMilestone))
+    {
+        <div class="case-next-milestone">
+            <strong>Next:</strong> @Model.NextMilestone
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.CtaText) && !string.IsNullOrWhiteSpace(Model.CtaController))
+    {
+        <div class="case-template-actions">
+            <a class="btn btn-primary" asp-controller="@Model.CtaController" asp-action="@Model.CtaAction">@Model.CtaText</a>
+        </div>
+    }
 </article>

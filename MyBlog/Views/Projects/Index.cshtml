@@ -1,97 +1,73 @@
 @{
     ViewData["Title"] = "Projects";
     ViewData["MetaDescription"] =
-        "Build-focused engineering projects from Mark Golley with implementation notes, testing evidence, and measurable outcomes.";
+        "Focused engineering roadmap from Mark Golley with active builds and clear delivery milestones.";
     ViewData["CanonicalPath"] = "/projects";
 }
 
-<section aria-labelledby="projects-title" class="portfolio-hero" data-reveal>
-    <p class="hero-kicker">Build Log</p>
-    <h1 id="projects-title">Projects with clear scope, tradeoffs, and proof.</h1>
-    <p class="section-intro">
-        Active builds that move from idea to working implementation. Kept concise, with detail on demand.
-    </p>
-    <div class="hero-actions">
-        <a class="btn btn-primary" asp-controller="Blog" asp-action="Index">Read implementation notes</a>
-        <a class="btn btn-secondary" asp-controller="AIExperiments" asp-action="Index">Try AI experiments</a>
+<section aria-labelledby="active-projects-title" data-reveal>
+    <h2 id="active-projects-title">Active projects</h2>
+    <p class="section-intro">Current delivery and upcoming work.</p>
+
+    <div class="case-template-grid">
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "AislePilot (Meal Planning + Shopping Flow)",
+            Status = "In progress",
+            OneLiner = "Turn weekly meal planning into an aisle-ordered shopping flow tailored to each supermarket.",
+            WhyItMatters = "Targets a real user pain point with a tangible mobile workflow and practical AI convenience.",
+            TechnicalScope = new[]
+            {
+                "Collect plan constraints: supermarket, budget, dietary mode, and dislikes/allergens.",
+                "Generate weekly meals with convenience-aware heuristics and budget checks.",
+                "Consolidate ingredients and sort shopping items by supermarket aisle order.",
+                "Provide a mobile-friendly shop mode checklist."
+            },
+            ProofChecklist = new[]
+            {
+                "End-to-end prototype page with real form submission and generated output.",
+                "Service tests for dietary filters, budget fit, and aisle ordering.",
+                "Demo recording of plan generation and in-store checklist flow.",
+                "Architecture note on AI usage, fallbacks, and scaling plan."
+            },
+            WhatItShows = "Can build a useful AI-assisted product workflow, not just isolated model demos.",
+            NextMilestone = "Add pricing provider integration and meal-swap regeneration.",
+            CtaText = "Try AislePilot prototype",
+            CtaController = "AislePilot",
+            CtaAction = "Index"
+        }' />
+
+        <article class="case-template case-template-placeholder" aria-hidden="true"></article>
+        <article class="case-template case-template-placeholder" aria-hidden="true"></article>
     </div>
 </section>
 
-<section aria-labelledby="project-templates-title" data-reveal>
-    <h2 id="project-templates-title">Current projects</h2>
-    <p class="section-intro">Each project follows the same shape so updates stay practical and comparable.</p>
+<section aria-labelledby="completed-projects-title" data-reveal>
+    <h2 id="completed-projects-title">Completed</h2>
 
     <div class="case-template-grid">
         <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
         {
             Title = "AI Moderation v2 for Blog Comments",
-            Status = "In progress",
-            OneLiner = "Move moderation from pass/fail to explicit decisions with reason codes and a repeatable smoke check.",
-            WhyItMatters = "Low-volume comments still need safe defaults and clear behavior when model calls fail or are unavailable.",
+            Status = "Shipped",
+            OneLiner = "Implemented explicit moderation decisions with repeatable diagnostics and safe fallbacks.",
+            WhyItMatters = "Delivered a real user safety workflow with test coverage and operational checks.",
             TechnicalScope = new[]
             {
-                "Introduce `Allow`, `Block`, and `ManualReview` decisions with stable reason codes.",
-                "Keep a small smoke dataset for regression checks while comment volume is low.",
-                "Run moderation diagnostics from the repo with report output.",
-                "Use safe fallback behavior when API key or provider response is missing."
+                "Allow/Block/ManualReview decision mapping with reason codes.",
+                "Smoke evaluation dataset and CLI report flow.",
+                "Service and integration tests for core moderation paths.",
+                "Fallback behavior for missing API key or uncertain responses."
             },
             ProofChecklist = new[]
             {
-                "Service tests for decision mapping and fallback paths.",
-                "CLI eval report generated from the smoke dataset.",
-                "Live moderation playground wired to production service path.",
-                "Documented reason-code behavior."
+                "Automated tests for decision mapping and fallback behavior.",
+                "Checked-in diagnostics report output.",
+                "Live playground integrated into site workflow.",
+                "Documented moderation reason-code behavior."
             },
-            WhatItShows = "Pragmatic safety engineering for a small real site, not a synthetic benchmark-only demo.",
-            NextMilestone = "Add moderation category details to diagnostics output."
-        }' />
-
-        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
-        {
-            Title = "Operational Reliability Dashboard",
-            Status = "Planned",
-            OneLiner = "Track core site workflows with clear health signals and actionable failures.",
-            WhyItMatters = "Small projects still benefit from a lightweight reliability loop before issues compound.",
-            TechnicalScope = new[]
-            {
-                "Add structured events for comments, likes, and subscriptions.",
-                "Define lightweight SLIs for write success and latency.",
-                "Create one dashboard view with top errors and throughput trends.",
-                "Document a short incident-response checklist."
-            },
-            ProofChecklist = new[]
-            {
-                "Telemetry event map and sample logs.",
-                "Dashboard screenshot from real data.",
-                "One load-test snapshot with bottleneck notes.",
-                "Runbook section in docs."
-            },
-            WhatItShows = "Can keep operations understandable without overbuilding observability.",
-            NextMilestone = "Ship first telemetry events and dashboard skeleton."
-        }' />
-
-        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
-        {
-            Title = "Subscriber Digest Pipeline",
-            Status = "Planned",
-            OneLiner = "Generate a weekly digest with ranking, dedupe, and delivery safeguards.",
-            WhyItMatters = "Turns content into a reliable user-facing workflow with measurable output quality.",
-            TechnicalScope = new[]
-            {
-                "Define ranking rules based on recency and engagement.",
-                "Implement idempotent generation and retry-safe sends.",
-                "Apply unsubscribe-safe filtering and per-user dedupe.",
-                "Capture delivery success and bounce metrics."
-            },
-            ProofChecklist = new[]
-            {
-                "Integration tests for ranking and dedupe rules.",
-                "Dry-run output preview for sample subscribers.",
-                "Retry behavior test for transient send failure.",
-                "Delivery metrics snapshot from staging."
-            },
-            WhatItShows = "Workflow automation with correctness and operational safety in the loop.",
-            NextMilestone = "Implement digest generator and fixture-backed tests."
+            WhatItShows = "Can turn applied AI into deterministic product behavior with guardrails.",
+            NextMilestone = string.Empty
         }' />
     </div>
 </section>

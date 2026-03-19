@@ -1579,6 +1579,13 @@ thead th {
     box-shadow: 0 10px 22px rgba(11, 24, 42, 0.08);
 }
 
+.case-template-placeholder {
+    min-height: 420px;
+    border: 2px dashed rgba(16, 63, 101, 0.22);
+    background: linear-gradient(140deg, rgba(255, 255, 255, 0.62), rgba(244, 248, 255, 0.72));
+    box-shadow: none;
+}
+
 .case-template-header {
     display: flex;
     align-items: flex-start;
@@ -1660,6 +1667,10 @@ thead th {
     border: 1px solid rgba(15, 109, 120, 0.28);
     background: linear-gradient(136deg, rgba(15, 109, 120, 0.09), rgba(255, 255, 255, 0.96));
     color: var(--ink);
+}
+
+.case-template-actions {
+    margin-top: 0.8rem;
 }
 
 @media (max-width: 980px) {

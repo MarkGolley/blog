@@ -10,4 +10,7 @@ public class CaseStudyTemplateViewModel
     public IReadOnlyList<string> ProofChecklist { get; init; } = Array.Empty<string>();
     public string WhatItShows { get; init; } = string.Empty;
     public string NextMilestone { get; init; } = string.Empty;
+    public string CtaText { get; init; } = string.Empty;
+    public string CtaController { get; init; } = string.Empty;
+    public string CtaAction { get; init; } = "Index";
 }

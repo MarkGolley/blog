@@ -1,0 +1,482 @@
+@using System.Globalization
+@model AislePilotPageViewModel
+@{
+    ViewData["Title"] = "AislePilot";
+    ViewData["MetaDescription"] =
+        "AislePilot prototype: generate a weekly meal plan, track budget, and create a supermarket-ordered shopping list.";
+    ViewData["CanonicalPath"] = "/projects/aisle-pilot";
+    var ukCulture = CultureInfo.GetCultureInfo("en-GB");
+    var selectedDietary = Model.Request.DietaryModes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var hasResult = Model.HasResult && Model.Result is not null;
+    var setupHiddenAttribute = hasResult ? "hidden" : null;
+}
+
+<div class="aislepilot-app">
+    <section aria-labelledby="aislepilot-title" class="aislepilot-app-head" data-reveal>
+        <p class="aislepilot-app-badge">AislePilot Beta</p>
+        <h1 id="aislepilot-title" class="aislepilot-app-title">Plan meals like an app, shop by aisle.</h1>
+        <p class="aislepilot-app-subtitle">
+            Mobile-first weekly planning with supermarket-aware shopping order, recipes, and exports for real in-store use.
+        </p>
+        <div class="hero-actions">
+            <a class="btn btn-secondary" asp-controller="Projects" asp-action="Index">Back to projects</a>
+            @if (hasResult)
+            {
+                <a class="btn btn-primary" href="#aislepilot-shop">Jump to shop mode</a>
+            }
+        </div>
+    </section>
+
+    <section id="aislepilot-setup" aria-labelledby="aislepilot-form-title" class="aislepilot-shell" data-reveal data-setup-panel @setupHiddenAttribute>
+        <h2 id="aislepilot-form-title" class="aislepilot-section-title">Setup</h2>
+
+        <form method="post" asp-action="Index" class="contact-form aislepilot-form">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="aislepilot-setup-strip">
+                <div class="aislepilot-inline-fields">
+                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
+                        <label asp-for="Request.Supermarket">Supermarket</label>
+                        <select asp-for="Request.Supermarket">
+                            @foreach (var store in Model.SupermarketOptions)
+                            {
+                                <option value="@store">@store</option>
+                            }
+                        </select>
+                        <span asp-validation-for="Request.Supermarket" class="text-danger"></span>
+                    </div>
+
+                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
+                        <label asp-for="Request.WeeklyBudget">Weekly budget</label>
+                        <input asp-for="Request.WeeklyBudget" type="number" min="15" max="600" step="any" inputmode="decimal" />
+                        <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
+                    </div>
+
+                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
+                        <label asp-for="Request.HouseholdSize">People</label>
+                        <input asp-for="Request.HouseholdSize" type="number" min="1" max="8" step="1" />
+                        <span asp-validation-for="Request.HouseholdSize" class="text-danger"></span>
+                    </div>
+
+                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
+                        <label asp-for="Request.CookDays">Cook days</label>
+                        <input asp-for="Request.CookDays" type="number" min="1" max="7" step="1" />
+                        <span asp-validation-for="Request.CookDays" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="aislepilot-setup-columns">
+                <div class="aislepilot-setup-panel">
+                    <div class="aislepilot-field">
+                        <label asp-for="Request.CustomAisleOrder">Custom aisle order (only for Custom supermarket)</label>
+                        <input asp-for="Request.CustomAisleOrder" placeholder="Produce, Bakery, Dairy & Eggs, Frozen, Tins & Dry Goods..." />
+                        <span asp-validation-for="Request.CustomAisleOrder" class="text-danger"></span>
+                    </div>
+
+                    <div class="aislepilot-field aislepilot-field-optional">
+                        <label asp-for="Request.DislikesOrAllergens">Dislikes/allergens</label>
+                        <input asp-for="Request.DislikesOrAllergens" placeholder="Example: peanuts, mushrooms, shellfish" />
+                        <span asp-validation-for="Request.DislikesOrAllergens" class="text-danger"></span>
+                    </div>
+
+                    <div class="aislepilot-field aislepilot-field-optional">
+                        <label asp-for="Request.PantryItems">What do you already have?</label>
+                        <input asp-for="Request.PantryItems" placeholder="Example: rice, eggs, frozen peas, olive oil" />
+                        <button
+                            type="submit"
+                            class="aislepilot-pantry-inline-action"
+                            formaction="@Url.Action("SuggestFromPantry", "AislePilot")">
+                            Generate a dish to eat now
+                        </button>
+                        <span asp-validation-for="Request.PantryItems" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="aislepilot-setup-panel">
+                    <fieldset class="aislepilot-checkboxes">
+                        <legend>Dietary requirements</legend>
+                        @foreach (var mode in Model.DietaryOptions)
+                        {
+                            var isChecked = selectedDietary.Contains(mode);
+                            <label class="aislepilot-checkbox-item aislepilot-mode-option">
+                                @if (isChecked)
+                                {
+                                    <input type="checkbox" name="Request.DietaryModes" value="@mode" checked />
+                                }
+                                else
+                                {
+                                    <input type="checkbox" name="Request.DietaryModes" value="@mode" />
+                                }
+                                <span>@mode</span>
+                            </label>
+                        }
+                    </fieldset>
+                    <span asp-validation-for="Request.DietaryModes" class="text-danger"></span>
+
+                    <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                        <input asp-for="Request.PreferQuickMeals" type="checkbox" />
+                        <span>Prioritise quick meals where possible</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="aislepilot-submit-actions">
+                <button type="submit">Generate weekly plan</button>
+            </div>
+        </form>
+    </section>
+
+@if (Model.PantrySuggestions.Count > 0)
+{
+    <section aria-labelledby="aislepilot-pantry-title" class="aislepilot-shell" data-reveal>
+        <h2 id="aislepilot-pantry-title" class="aislepilot-section-title">Can make now</h2>
+        <p class="section-intro">These meals can be made immediately from what you already have.</p>
+        <div class="aislepilot-pantry-grid">
+            @foreach (var suggestion in Model.PantrySuggestions)
+            {
+                <article class="aislepilot-card">
+                    <div class="aislepilot-card-head">
+                        <h3>@suggestion.MealName</h3>
+                        <p class="aislepilot-cost">Ready now</p>
+                    </div>
+                    <p class="aislepilot-card-kicker">Have now</p>
+                    <ul class="case-list">
+                        @foreach (var item in suggestion.MatchedIngredients)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (hasResult)
+{
+    var result = Model.Result!;
+    var aisleRank = result.AisleOrderUsed
+        .Select((department, index) => new { department, index })
+        .ToDictionary(x => x.department, x => x.index, StringComparer.OrdinalIgnoreCase);
+    var groupedItems = result.ShoppingItems
+        .GroupBy(item => item.Department)
+        .OrderBy(group => aisleRank.GetValueOrDefault(group.Key, int.MaxValue))
+        .ToList();
+    var weekDayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+    var weekDayShortLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
+    var weekDayLookup = weekDayNames
+        .Select((name, index) => new { name, index })
+        .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
+    var leftoverSourceWeekDayIndexes = result.MealPlan
+        .SelectMany(meal =>
+        {
+            if (!weekDayLookup.TryGetValue(meal.Day, out var weekDayIndex))
+            {
+                return Enumerable.Empty<int>();
+            }
+
+            return Enumerable.Repeat(weekDayIndex, meal.LeftoverDaysCovered);
+        })
+        .ToList();
+    var leftoverSourceDayIndexesCsv = string.Join(",", leftoverSourceWeekDayIndexes);
+    var mealCount = result.MealPlan.Count;
+    var totalShopItems = result.ShoppingItems.Count;
+    var departmentCount = groupedItems.Count;
+
+    <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-reveal>
+        <div class="aislepilot-section-head">
+            <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Overview</h2>
+            <div class="aislepilot-overview-actions">
+                <form method="post" action="@Url.Action("Index", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
+                    <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
+                    <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                    <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
+                    <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
+                    <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
+                    <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
+                    <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                    <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
+                    @foreach (var mode in Model.Request.DietaryModes)
+                    {
+                        <input type="hidden" name="Request.DietaryModes" value="@mode" />
+                    }
+                    <button type="submit" class="aislepilot-overview-regenerate-btn">Regenerate plan</button>
+                </form>
+                <button
+                    type="button"
+                    class="aislepilot-edit-setup-btn"
+                    data-setup-toggle
+                    aria-controls="aislepilot-setup"
+                    aria-expanded="false">
+                    Edit setup
+                </button>
+            </div>
+        </div>
+        <div class="aislepilot-budget-grid">
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Supermarket</p>
+                <p class="aislepilot-stat-value">@result.Supermarket</p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Budget</p>
+                <p class="aislepilot-stat-value">@result.WeeklyBudget.ToString("C", ukCulture)</p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Estimated total</p>
+                <p class="aislepilot-stat-value">@result.EstimatedTotalCost.ToString("C", ukCulture)</p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Budget delta</p>
+                <p class="aislepilot-stat-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
+                    @result.BudgetDelta.ToString("C", ukCulture)
+                </p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Cook days</p>
+                <p class="aislepilot-stat-value">@result.CookDays</p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Leftovers</p>
+                <p class="aislepilot-stat-value">@result.LeftoverDays day(s)</p>
+            </article>
+        </div>
+
+        <ul class="case-list">
+            @foreach (var tip in result.BudgetTips)
+            {
+                <li>@tip</li>
+            }
+        </ul>
+    </section>
+
+    <section class="aislepilot-shell aislepilot-window-shell" aria-labelledby="aislepilot-window-title" data-aislepilot-window data-reveal>
+        <div class="aislepilot-window-head">
+            <h2 id="aislepilot-window-title" class="aislepilot-section-title">Plan Views</h2>
+            <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot result views">
+                <button type="button" class="aislepilot-window-tab" data-window-tab="aislepilot-meals" role="tab" aria-selected="true">Meals</button>
+                <button type="button" class="aislepilot-window-tab" data-window-tab="aislepilot-shop" role="tab" aria-selected="false">Shop</button>
+                <button type="button" class="aislepilot-window-tab" data-window-tab="aislepilot-export" role="tab" aria-selected="false">Export</button>
+            </div>
+        </div>
+        <div class="aislepilot-window-viewport" data-window-viewport>
+            <div class="aislepilot-window-track" data-window-track>
+                <section id="aislepilot-meals" aria-label="Meals" class="aislepilot-window-panel" data-window-name="Meals">
+                    <p class="aislepilot-window-meta">@mealCount meals generated for this week.</p>
+                    @if (result.LeftoverDays > 0)
+                    {
+                        <div class="aislepilot-leftover-editor">
+                            <div class="aislepilot-leftover-editor-head">
+                                <p class="aislepilot-window-meta">@result.LeftoverDays leftover day(s) are allocated. Green days are double-cook days.</p>
+                                <button type="button"
+                                        class="aislepilot-leftover-toggle"
+                                        data-leftover-toggle
+                                        aria-expanded="false">
+                                    Rebalance leftovers
+                                </button>
+                            </div>
+                            <div class="aislepilot-leftover-planner-shell" data-leftover-planner hidden>
+                                <p class="aislepilot-leftover-helper">Tap a day with leftovers, then tap another day to move one leftover.</p>
+                                <form method="post"
+                                      action="@Url.Action("Index", "AislePilot")#aislepilot-meals"
+                                      class="aislepilot-leftover-rebalance-form"
+                                      data-leftover-rebalance-form
+                                      data-preserve-scroll-form>
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
+                                    <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
+                                    <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                                    <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
+                                    <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
+                                    <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
+                                    <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
+                                    <input type="hidden"
+                                           name="Request.LeftoverCookDayIndexesCsv"
+                                           value="@leftoverSourceDayIndexesCsv"
+                                           data-leftover-csv />
+                                    <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
+                                    @foreach (var mode in Model.Request.DietaryModes)
+                                    {
+                                        <input type="hidden" name="Request.DietaryModes" value="@mode" />
+                                    }
+                                </form>
+                                <div class="aislepilot-leftover-planner" role="list" aria-label="Leftover day allocation">
+                                    @for (var dayIndex = 0; dayIndex < weekDayNames.Length; dayIndex++)
+                                    {
+                                        var dayLeftoverCount = leftoverSourceWeekDayIndexes.Count(index => index == dayIndex);
+                                        var dayChipClass = dayLeftoverCount > 0
+                                            ? "aislepilot-leftover-day-chip is-leftover-source"
+                                            : "aislepilot-leftover-day-chip";
+                                        <button type="button"
+                                                class="@dayChipClass"
+                                                data-leftover-day-zone
+                                                data-day-index="@dayIndex"
+                                                data-leftover-count="@dayLeftoverCount"
+                                                aria-label="Leftover allocation for @weekDayNames[dayIndex]"
+                                                role="listitem">
+                                            <span class="aislepilot-leftover-day-name">@weekDayShortLabels[dayIndex]</span>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    <div class="aislepilot-meal-grid">
+                        @for (var mealIndex = 0; mealIndex < result.MealPlan.Count; mealIndex++)
+                        {
+                            var meal = result.MealPlan[mealIndex];
+                            var mealCardClass = meal.LeftoverDaysCovered > 0 ? "aislepilot-card is-leftover-source" : "aislepilot-card";
+                            <article class="@mealCardClass" data-leftover-day-card data-day-index="@mealIndex">
+                                <div class="aislepilot-card-head">
+                                    <p class="aislepilot-card-kicker">@meal.Day</p>
+                                    <p class="aislepilot-cost">@meal.EstimatedCost.ToString("C", ukCulture)</p>
+                                </div>
+                                <h3>@meal.MealName</h3>
+                                <p>@meal.MealReason</p>
+                                <p class="aislepilot-card-meta">Prep + cook time: @meal.EstimatedPrepMinutes mins</p>
+                                @if (meal.LeftoverDaysCovered > 0)
+                                {
+                                    <p class="aislepilot-card-meta">Makes extra for @meal.LeftoverDaysCovered leftover day(s)</p>
+                                }
+                                <div class="aislepilot-recipe-shell">
+                                    <details class="aislepilot-recipe-details">
+                                        <summary>Recipe + ingredients</summary>
+                                        <p class="aislepilot-card-kicker">Ingredients</p>
+                                        <ul class="case-list">
+                                            @foreach (var ingredientLine in meal.IngredientLines)
+                                            {
+                                                <li>@ingredientLine</li>
+                                            }
+                                        </ul>
+                                        <p class="aislepilot-card-kicker">Method</p>
+                                        <ol class="case-list">
+                                            @foreach (var step in meal.RecipeSteps)
+                                            {
+                                                <li>@step</li>
+                                            }
+                                        </ol>
+                                    </details>
+
+                                    <form method="post"
+                                          action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
+                                          class="aislepilot-swap-form aislepilot-swap-in-details"
+                                          data-preserve-scroll-form>
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
+                                        <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
+                                        <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                                        <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
+                                        <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
+                                        <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
+                                        <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
+                                        <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                                        <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
+                                        @foreach (var mode in Model.Request.DietaryModes)
+                                        {
+                                            <input type="hidden" name="Request.DietaryModes" value="@mode" />
+                                        }
+                                        <input type="hidden" name="dayIndex" value="@mealIndex" />
+                                        <input type="hidden" name="currentMealName" value="@meal.MealName" />
+                                        <button type="submit" class="aislepilot-swap-btn">Swap meal</button>
+                                    </form>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </section>
+
+                <section id="aislepilot-shop" aria-label="Shop" class="aislepilot-window-panel" data-window-name="Shop">
+                    <div class="aislepilot-shopping-grid">
+                        @foreach (var department in groupedItems)
+                        {
+                            <article class="aislepilot-card">
+                                <h3>@department.Key</h3>
+                                <ul class="aislepilot-shop-list">
+                                    @foreach (var item in department)
+                                    {
+                                        <li>
+                                            <label class="aislepilot-checkbox-item">
+                                                <input type="checkbox" />
+                                                <span>@item.Name (@item.QuantityDisplay) - @item.EstimatedCost.ToString("C", ukCulture)</span>
+                                            </label>
+                                        </li>
+                                    }
+                                </ul>
+                            </article>
+                        }
+                    </div>
+                </section>
+
+                <section id="aislepilot-export" aria-label="Export" class="aislepilot-window-panel" data-window-name="Export">
+                    <p class="aislepilot-window-meta">3 export options ready for in-store use.</p>
+                    <p class="section-intro">
+                        Download a full plan pack PDF (with quick jump links), or a lightweight checklist for your phone notes app.
+                    </p>
+                    <div class="aislepilot-export-actions">
+                        <form method="post" asp-action="ExportPlanPack">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
+                            <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
+                            <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                            <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
+                            <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
+                            <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
+                            <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
+                            <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                            <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
+                            @foreach (var mode in Model.Request.DietaryModes)
+                            {
+                                <input type="hidden" name="Request.DietaryModes" value="@mode" />
+                            }
+                            <button type="submit" class="aislepilot-export-btn">Download full plan pack (.pdf)</button>
+                        </form>
+
+                        <form method="post" asp-action="ExportChecklist">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
+                            <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
+                            <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                            <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
+                            <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
+                            <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
+                            <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
+                            <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                            <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
+                            @foreach (var mode in Model.Request.DietaryModes)
+                            {
+                                <input type="hidden" name="Request.DietaryModes" value="@mode" />
+                            }
+                            <button type="submit" class="aislepilot-export-btn">Download shopping checklist (.txt)</button>
+                        </form>
+
+                        <button type="button" class="aislepilot-export-btn" onclick="window.print()">Print current view</button>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </section>
+}
+</div>
+
+@section Head {
+    <link rel="stylesheet" href="~/css/aisle-pilot.css" asp-append-version="true" />
+    <noscript>
+        <style>
+            [data-setup-panel][hidden] { display: block !important; }
+            [data-setup-toggle] { display: none !important; }
+            [data-aislepilot-window] .aislepilot-window-controls,
+            [data-aislepilot-window] .aislepilot-window-tabs { display: none !important; }
+            [data-aislepilot-window] .aislepilot-window-viewport { overflow: visible !important; height: auto !important; }
+            [data-aislepilot-window] .aislepilot-window-track { display: block !important; transform: none !important; }
+            [data-aislepilot-window] .aislepilot-window-panel { min-width: 100% !important; margin-bottom: 0.75rem; }
+        </style>
+    </noscript>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/aisle-pilot.js" asp-append-version="true"></script>
+}
