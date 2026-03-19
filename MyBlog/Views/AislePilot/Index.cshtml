@@ -27,12 +27,6 @@
                 Mobile-first weekly planning with supermarket-aware shopping order, recipes, and exports for real in-store use.
             </p>
         }
-        @if (hasResult)
-        {
-            <div class="hero-actions">
-                <a class="btn btn-primary" href="#aislepilot-shop">Jump to shop mode</a>
-            </div>
-        }
     </section>
 
     <section id="aislepilot-setup" aria-labelledby="aislepilot-form-title" class="aislepilot-shell" data-reveal data-setup-panel @setupHiddenAttribute>
@@ -240,7 +234,7 @@
                 <p class="aislepilot-stat-value">@result.EstimatedTotalCost.ToString("C", ukCulture)</p>
             </article>
             <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Budget delta</p>
+                <p class="aislepilot-stat-label">Budget difference</p>
                 <p class="aislepilot-stat-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                     @result.BudgetDelta.ToString("C", ukCulture)
                 </p>
@@ -255,12 +249,6 @@
             </article>
         </div>
 
-        <ul class="case-list">
-            @foreach (var tip in result.BudgetTips)
-            {
-                <li>@tip</li>
-            }
-        </ul>
     </section>
 
     <section class="aislepilot-shell aislepilot-window-shell" aria-labelledby="aislepilot-window-title" data-aislepilot-window data-reveal>

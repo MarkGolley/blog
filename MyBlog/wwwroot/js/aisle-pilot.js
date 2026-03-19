@@ -1,4 +1,36 @@
 (() => {
+    const quickReplaceInputs = Array.from(
+        document.querySelectorAll(
+            ".aislepilot-inline-fields input:not([type='hidden']):not([type='checkbox']):not([type='radio'])"
+        )
+    );
+
+    const selectInputValue = input => {
+        if (!(input instanceof HTMLInputElement)) {
+            return;
+        }
+
+        requestAnimationFrame(() => {
+            try {
+                input.select();
+            } catch {
+                // Some input types may not support selection.
+            }
+        });
+    };
+
+    quickReplaceInputs.forEach(input => {
+        input.addEventListener("focus", () => {
+            selectInputValue(input);
+        });
+
+        input.addEventListener("click", () => {
+            if (document.activeElement === input) {
+                selectInputValue(input);
+            }
+        });
+    });
+
     const swapScrollKey = "aislepilot:swap-scroll";
     const root = document.querySelector("[data-aislepilot-window]");
     if (!root) {
