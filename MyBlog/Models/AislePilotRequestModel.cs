@@ -30,5 +30,8 @@ public sealed class AislePilotRequestModel
     [StringLength(140, ErrorMessage = "Leftover day mapping is too long.")]
     public string? LeftoverCookDayIndexesCsv { get; set; } = string.Empty;
 
+    [StringLength(2000, ErrorMessage = "Swap history is too long.")]
+    public string? SwapHistoryState { get; set; } = string.Empty;
+
     public bool PreferQuickMeals { get; set; } = true;
 }

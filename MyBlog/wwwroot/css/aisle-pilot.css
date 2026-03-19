@@ -401,6 +401,31 @@
     cursor: pointer;
 }
 
+.aislepilot-app button.is-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.92;
+}
+
+.aislepilot-app button.is-loading::after {
+    content: "";
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-left: 0.5rem;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    display: inline-block;
+    vertical-align: -0.12rem;
+    animation: aislepilot-spin 0.65s linear infinite;
+}
+
+@keyframes aislepilot-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .aislepilot-submit-actions {
     display: grid;
     gap: 0.42rem;

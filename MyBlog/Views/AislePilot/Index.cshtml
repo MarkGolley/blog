@@ -90,6 +90,7 @@
                         <button
                             type="submit"
                             class="aislepilot-pantry-inline-action"
+                            data-loading-label="Finding meals..."
                             formaction="@Url.Action("SuggestFromPantry", "AislePilot")">
                             Generate a dish to eat now
                         </button>
@@ -126,7 +127,7 @@
             </div>
 
             <div class="aislepilot-submit-actions">
-                <button type="submit">Generate weekly plan</button>
+                <button type="submit" data-loading-label="Generating plan...">Generate weekly plan</button>
             </div>
         </form>
     </section>
@@ -203,12 +204,13 @@
                     <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
                     <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
                     <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                    <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
                     <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
                     @foreach (var mode in Model.Request.DietaryModes)
                     {
                         <input type="hidden" name="Request.DietaryModes" value="@mode" />
                     }
-                    <button type="submit" class="aislepilot-overview-regenerate-btn">Regenerate plan</button>
+                    <button type="submit" class="aislepilot-overview-regenerate-btn" data-loading-label="Regenerating...">Regenerate plan</button>
                 </form>
                 <button
                     type="button"
@@ -224,6 +226,10 @@
             <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Supermarket</p>
                 <p class="aislepilot-stat-value">@result.Supermarket</p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Meal source</p>
+                <p class="aislepilot-stat-value">@result.PlanSourceLabel</p>
             </article>
             <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Budget</p>
@@ -263,7 +269,12 @@
         <div class="aislepilot-window-viewport" data-window-viewport>
             <div class="aislepilot-window-track" data-window-track>
                 <section id="aislepilot-meals" aria-label="Meals" class="aislepilot-window-panel" data-window-name="Meals">
-                    <p class="aislepilot-window-meta">@mealCount meals generated for this week.</p>
+                    <p class="aislepilot-window-meta">
+                        @mealCount meals generated for this week.
+                        @(result.UsedAiGeneratedMeals
+                            ? $" This plan came from {result.PlanSourceLabel.ToLowerInvariant()}."
+                            : string.Empty)
+                    </p>
                     @if (result.LeftoverDays > 0)
                     {
                         <div class="aislepilot-leftover-editor">
@@ -296,6 +307,7 @@
                                            name="Request.LeftoverCookDayIndexesCsv"
                                            value="@leftoverSourceDayIndexesCsv"
                                            data-leftover-csv />
+                                    <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
                                     <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
                                     @foreach (var mode in Model.Request.DietaryModes)
                                     {
@@ -373,14 +385,19 @@
                                         <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
                                         <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
                                         <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                                        <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
                                         <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
                                         @foreach (var mode in Model.Request.DietaryModes)
                                         {
                                             <input type="hidden" name="Request.DietaryModes" value="@mode" />
                                         }
+                                        @foreach (var existingMeal in result.MealPlan)
+                                        {
+                                            <input type="hidden" name="currentPlanMealNames" value="@existingMeal.MealName" />
+                                        }
                                         <input type="hidden" name="dayIndex" value="@mealIndex" />
                                         <input type="hidden" name="currentMealName" value="@meal.MealName" />
-                                        <button type="submit" class="aislepilot-swap-btn">Swap meal</button>
+                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping...">Swap meal</button>
                                     </form>
                                 </div>
                             </article>
@@ -427,12 +444,13 @@
                             <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
                             <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
                             <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                            <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
                             <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
                             @foreach (var mode in Model.Request.DietaryModes)
                             {
                                 <input type="hidden" name="Request.DietaryModes" value="@mode" />
                             }
-                            <button type="submit" class="aislepilot-export-btn">Download full plan pack (.pdf)</button>
+                            <button type="submit" class="aislepilot-export-btn" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
                         </form>
 
                         <form method="post" asp-action="ExportChecklist">
@@ -446,12 +464,13 @@
                             <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
                             <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
                             <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                            <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
                             <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
                             @foreach (var mode in Model.Request.DietaryModes)
                             {
                                 <input type="hidden" name="Request.DietaryModes" value="@mode" />
                             }
-                            <button type="submit" class="aislepilot-export-btn">Download shopping checklist (.txt)</button>
+                            <button type="submit" class="aislepilot-export-btn" data-loading-label="Building checklist...">Download shopping checklist (.txt)</button>
                         </form>
 
                         <button type="button" class="aislepilot-export-btn" onclick="window.print()">Print current view</button>

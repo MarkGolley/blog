@@ -14,5 +14,7 @@ public interface IAislePilotService
     AislePilotPlanResultViewModel SwapMealForDay(
         AislePilotRequestModel request,
         int dayIndex,
-        string? currentMealName);
+        string? currentMealName,
+        IReadOnlyList<string>? currentPlanMealNames,
+        IReadOnlyList<string>? seenMealNames);
 }

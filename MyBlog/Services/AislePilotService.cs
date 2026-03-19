@@ -1,12 +1,35 @@
+using Google.Cloud.Firestore;
 using MyBlog.Models;
 using MyBlog.Utilities;
+using System.Collections.Concurrent;
 using System.Globalization;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 
 namespace MyBlog.Services;
 
 public sealed class AislePilotService : IAislePilotService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private const int MaxAiMealNameLength = 90;
+    private const int MaxAiIngredientNameLength = 60;
+    private const int MaxAiDepartmentLength = 32;
+    private const int MaxAiUnitLength = 18;
+    private const int ExtraAiMealCount = 0;
+    private const int PrimaryAiMealPlanMaxTokens = 3200;
+    private const int RetryAiMealPlanMaxTokens = 2200;
+    private const string AiMealsCollection = "aislePilotAiMeals";
+    private const string AiUnavailableMessage = "Sorry, AI is broken right now. Please try again shortly.";
+
+    private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
+    private static DateTime? _lastAiMealPoolRefreshUtc;
+
     private static readonly HashSet<string> GenericPantryTokens = new(StringComparer.OrdinalIgnoreCase)
     {
         "rice",
@@ -245,6 +268,50 @@ public sealed class AislePilotService : IAislePilotService
                 new IngredientTemplate("Soy sauce", "Spices & Sauces", 0.10m, "bottle", 0.40m)
             ]),
         new(
+            "Black bean sweet potato chilli",
+            5.60m,
+            IsQuick: false,
+            ["Balanced", "Vegetarian", "Vegan", "Gluten-Free"],
+            [
+                new IngredientTemplate("Black beans", "Tins & Dry Goods", 2m, "tins", 1.20m),
+                new IngredientTemplate("Sweet potatoes", "Produce", 0.90m, "kg", 1.55m),
+                new IngredientTemplate("Chopped tomatoes", "Tins & Dry Goods", 2m, "tins", 1.00m),
+                new IngredientTemplate("Chilli seasoning", "Spices & Sauces", 1m, "pack", 0.55m)
+            ]),
+        new(
+            "Halloumi couscous bowls",
+            6.30m,
+            IsQuick: true,
+            ["Balanced", "Vegetarian"],
+            [
+                new IngredientTemplate("Halloumi", "Dairy & Eggs", 0.30m, "kg", 2.40m),
+                new IngredientTemplate("Couscous", "Tins & Dry Goods", 0.30m, "kg", 0.90m),
+                new IngredientTemplate("Courgettes", "Produce", 2m, "pcs", 1.20m),
+                new IngredientTemplate("Cherry tomatoes", "Produce", 0.25m, "kg", 0.90m)
+            ]),
+        new(
+            "Mushroom spinach risotto",
+            6.10m,
+            IsQuick: false,
+            ["Balanced", "Vegetarian", "Gluten-Free"],
+            [
+                new IngredientTemplate("Risotto rice", "Tins & Dry Goods", 0.40m, "kg", 1.30m),
+                new IngredientTemplate("Chestnut mushrooms", "Produce", 0.40m, "kg", 1.45m),
+                new IngredientTemplate("Spinach", "Produce", 0.25m, "kg", 1.00m),
+                new IngredientTemplate("Parmesan", "Dairy & Eggs", 0.10m, "kg", 1.00m)
+            ]),
+        new(
+            "Pesto mozzarella pasta bake",
+            6.40m,
+            IsQuick: false,
+            ["Balanced", "Vegetarian"],
+            [
+                new IngredientTemplate("Pasta", "Tins & Dry Goods", 0.45m, "kg", 0.90m),
+                new IngredientTemplate("Pesto", "Spices & Sauces", 1m, "jar", 1.35m),
+                new IngredientTemplate("Mozzarella", "Dairy & Eggs", 2m, "balls", 1.70m),
+                new IngredientTemplate("Cherry tomatoes", "Produce", 0.30m, "kg", 1.00m)
+            ]),
+        new(
             "Baked cod with sweet potato wedges",
             7.90m,
             IsQuick: false,
@@ -256,6 +323,27 @@ public sealed class AislePilotService : IAislePilotService
                 new IngredientTemplate("Paprika", "Spices & Sauces", 0.06m, "jar", 0.55m)
             ])
     ];
+
+    private readonly HttpClient? _httpClient;
+    private readonly ILogger<AislePilotService>? _logger;
+    private readonly string? _apiKey;
+    private readonly string _model;
+    private readonly bool _enableAiGeneration;
+    private readonly FirestoreDb? _db;
+
+    public AislePilotService(
+        HttpClient? httpClient = null,
+        IConfiguration? configuration = null,
+        ILogger<AislePilotService>? logger = null,
+        FirestoreDb? db = null)
+    {
+        _httpClient = httpClient;
+        _logger = logger;
+        _db = db;
+        _apiKey = configuration?["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        _model = configuration?["AislePilot:Model"] ?? "gpt-4.1-mini";
+        _enableAiGeneration = !bool.TryParse(configuration?["AislePilot:EnableAiGeneration"], out var parsed) || parsed;
+    }
 
     public IReadOnlyList<string> GetSupportedSupermarkets()
     {
@@ -311,20 +399,229 @@ public sealed class AislePilotService : IAislePilotService
     {
         var context = BuildPlanContext(request);
         var cookDays = NormalizeCookDays(request.CookDays);
+        var pooledAiPlan = TryBuildPlanFromAiPool(request, context, cookDays);
+        if (pooledAiPlan is not null)
+        {
+            return pooledAiPlan;
+        }
+
+        var aiPlan = TryBuildPlanWithAi(request, context, cookDays);
+        if (aiPlan is not null)
+        {
+            return aiPlan;
+        }
+
+        throw new InvalidOperationException(AiUnavailableMessage);
+    }
+
+    private AislePilotPlanResultViewModel? TryBuildPlanWithAi(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays)
+    {
+        try
+        {
+            return TryBuildPlanWithAiAsync(request, context, cookDays).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "AislePilot AI meal generation failed.");
+            return null;
+        }
+    }
+
+    private async Task<AislePilotPlanResultViewModel?> TryBuildPlanWithAiAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_enableAiGeneration || _httpClient is null)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            _logger?.LogInformation("OPENAI_API_KEY is missing. AislePilot will only use the AI meal pool if compatible meals are already cached.");
+            return null;
+        }
+
+        var requestedMealCount = GetRequestedAiMealCount(cookDays);
+        var aiBatch = await TryRequestAiMealBatchAsync(
+            request,
+            context,
+            cookDays,
+            requestedMealCount,
+            PrimaryAiMealPlanMaxTokens,
+            compactJson: false,
+            cancellationToken);
+
+        if (aiBatch is null)
+        {
+            _logger?.LogWarning(
+                "AislePilot AI generation returned invalid or truncated JSON. Retrying with a compact {MealCount}-meal payload.",
+                cookDays);
+
+            aiBatch = await TryRequestAiMealBatchAsync(
+                request,
+                context,
+                cookDays,
+                cookDays,
+                RetryAiMealPlanMaxTokens,
+                compactJson: true,
+                cancellationToken);
+        }
+
+        if (aiBatch is null)
+        {
+            _logger?.LogWarning("AislePilot AI generation returned content that did not pass validation.");
+            return null;
+        }
+
+        var aiMeals = aiBatch.Meals;
+
         var selectedMeals = SelectMeals(
+            aiMeals,
             context.DietaryModes,
             request.WeeklyBudget,
             context.HouseholdFactor,
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             cookDays);
-        return BuildPlanFromMeals(request, context, selectedMeals, cookDays);
+
+        _logger?.LogInformation(
+            "AislePilot generated {MealCount} meals via AI and selected {SelectedMealCount} for the visible plan. OpenAIRequestId={OpenAIRequestId}",
+            aiMeals.Count,
+            selectedMeals.Count,
+            aiBatch.OpenAiRequestId ?? "n/a");
+
+        AddMealsToAiPool(aiMeals);
+        await PersistAiMealsAsync(aiMeals, cancellationToken);
+        return BuildPlanFromMeals(request, context, selectedMeals, cookDays, usedAiGeneratedMeals: true);
+    }
+
+    private async Task<AiMealBatchResult?> TryRequestAiMealBatchAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays,
+        int requestedMealCount,
+        int maxTokens,
+        bool compactJson,
+        CancellationToken cancellationToken)
+    {
+        var prompt = BuildAiMealPlanPrompt(request, context, cookDays, requestedMealCount, compactJson);
+        var requestBody = new
+        {
+            model = _model,
+            temperature = compactJson ? 0.6 : 0.9,
+            max_tokens = maxTokens,
+            response_format = new { type = "json_object" },
+            messages = new object[]
+            {
+                new
+                {
+                    role = "system",
+                    content = "You generate practical weekly meal plans for a UK grocery-planning app. Always return valid JSON only. Use UK English. Prioritise variety and never repeat the same dinner in a single week unless explicitly impossible."
+                },
+                new
+                {
+                    role = "user",
+                    content = prompt
+                }
+            }
+        };
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(requestBody),
+                Encoding.UTF8,
+                "application/json")
+        };
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey!);
+
+        using var response = await _httpClient!.SendAsync(requestMessage, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
+        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            var normalizedJson = NormalizeModelJson(rawJson);
+            var aiPayload = ParseAiPlanPayload(normalizedJson);
+            var aiMeals = ValidateAndMapAiMeals(
+                aiPayload,
+                context.DietaryModes,
+                cookDays,
+                requestedMealCount,
+                out var validationReason);
+            if (aiMeals is null)
+            {
+                var sample = normalizedJson.Length <= 280 ? normalizedJson : normalizedJson[..280];
+                _logger?.LogWarning(
+                    "AislePilot AI payload validation failed. Reason={Reason}. PayloadSample={PayloadSample}",
+                    validationReason ?? "unknown",
+                    sample);
+                return null;
+            }
+
+            var requestId = response.Headers.TryGetValues("x-request-id", out var values)
+                ? values.FirstOrDefault()
+                : null;
+
+            return new AiMealBatchResult(aiMeals, requestId);
+        }
+        catch (JsonException ex)
+        {
+            _logger?.LogWarning(ex, "AislePilot AI generation returned malformed JSON.");
+            return null;
+        }
+    }
+
+    private AislePilotPlanResultViewModel? TryBuildPlanFromAiPool(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays)
+    {
+        EnsureAiMealPoolHydrated();
+        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        if (pooledMeals.Count == 0)
+        {
+            _logger?.LogWarning("AislePilot AI meal pool did not contain compatible meals for the current request.");
+            return null;
+        }
+
+        var selectedMeals = SelectMeals(
+            pooledMeals,
+            context.DietaryModes,
+            request.WeeklyBudget,
+            context.HouseholdFactor,
+            request.PreferQuickMeals,
+            context.DislikesOrAllergens,
+            cookDays);
+
+        return BuildPlanFromMeals(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: true,
+            planSourceLabel: "AI meal pool");
     }
 
     public AislePilotPlanResultViewModel SwapMealForDay(
         AislePilotRequestModel request,
         int dayIndex,
-        string? currentMealName)
+        string? currentMealName,
+        IReadOnlyList<string>? currentPlanMealNames,
+        IReadOnlyList<string>? seenMealNames)
     {
         var cookDays = NormalizeCookDays(request.CookDays);
         if (dayIndex < 0 || dayIndex >= cookDays)
@@ -335,13 +632,13 @@ public sealed class AislePilotService : IAislePilotService
         }
 
         var context = BuildPlanContext(request);
-        var selectedMeals = SelectMeals(
-            context.DietaryModes,
-            request.WeeklyBudget,
-            context.HouseholdFactor,
-            request.PreferQuickMeals,
-            context.DislikesOrAllergens,
-            cookDays).ToList();
+        EnsureAiMealPoolHydrated();
+        var availableAiMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(currentPlanMealNames, cookDays);
+        if (selectedMeals is null)
+        {
+            throw new InvalidOperationException("Could not resolve the current plan for swapping. Generate a fresh AI plan and try again.");
+        }
 
         var currentName = string.IsNullOrWhiteSpace(currentMealName)
             ? selectedMeals[dayIndex].Name
@@ -356,20 +653,354 @@ public sealed class AislePilotService : IAislePilotService
             leftoverDays,
             requestedLeftoverSourceDays);
         var dayMultiplier = mealPortionMultipliers[dayIndex];
+        var normalizedSeenMealNames = (seenMealNames ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
-        var candidates = FilterMeals(context.DietaryModes, context.DislikesOrAllergens);
-        var replacement = SelectSwapCandidate(
-            candidates,
-            selectedMeals,
-            dayIndex,
-            currentName,
-            request.WeeklyBudget,
-            context.HouseholdFactor,
-            request.PreferQuickMeals,
-            dayMultiplier);
+        MealTemplate? replacement = null;
+        var shouldForceFreshAiSwap = normalizedSeenMealNames.Length >= 3;
+        if (!shouldForceFreshAiSwap && availableAiMeals.Count > 0)
+        {
+            var unseenPoolMeals = availableAiMeals
+                .Where(meal => !normalizedSeenMealNames.Contains(meal.Name, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            if (unseenPoolMeals.Count == 0)
+            {
+                shouldForceFreshAiSwap = true;
+            }
+            else
+            {
+                replacement = SelectSwapCandidate(
+                    unseenPoolMeals,
+                    selectedMeals,
+                    dayIndex,
+                    currentName,
+                    request.WeeklyBudget,
+                    context.HouseholdFactor,
+                    request.PreferQuickMeals,
+                    dayMultiplier);
+            }
+        }
+
+        if (shouldForceFreshAiSwap || replacement is null)
+        {
+            replacement = TryBuildReplacementMealWithAi(
+                request,
+                context,
+                selectedMeals,
+                dayIndex,
+                currentName,
+                dayMultiplier,
+                normalizedSeenMealNames);
+        }
+
+        if (replacement is null)
+        {
+            throw new InvalidOperationException(AiUnavailableMessage);
+        }
 
         selectedMeals[dayIndex] = replacement;
-        return BuildPlanFromMeals(request, context, selectedMeals, cookDays);
+        return BuildPlanFromMeals(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: true,
+            planSourceLabel: availableAiMeals.Any(meal => meal.Name.Equals(replacement.Name, StringComparison.OrdinalIgnoreCase))
+                ? "AI meal pool"
+                : "OpenAI swap");
+    }
+
+    private MealTemplate? TryBuildReplacementMealWithAi(
+        AislePilotRequestModel request,
+        PlanContext context,
+        IReadOnlyList<MealTemplate> selectedMeals,
+        int dayIndex,
+        string currentMealName,
+        int dayMultiplier,
+        IReadOnlyList<string> seenMealNames)
+    {
+        try
+        {
+            return TryBuildReplacementMealWithAiAsync(
+                request,
+                context,
+                selectedMeals,
+                dayIndex,
+                currentMealName,
+                dayMultiplier,
+                seenMealNames).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "AislePilot AI meal swap failed.");
+            return null;
+        }
+    }
+
+    private async Task<MealTemplate?> TryBuildReplacementMealWithAiAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        IReadOnlyList<MealTemplate> selectedMeals,
+        int dayIndex,
+        string currentMealName,
+        int dayMultiplier,
+        IReadOnlyList<string> seenMealNames,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_enableAiGeneration || _httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
+        {
+            return null;
+        }
+
+        var excludedMealNames = selectedMeals
+            .Where((_, index) => index != dayIndex)
+            .Select(meal => meal.Name)
+            .Concat(seenMealNames)
+            .ToArray();
+        var prompt = BuildAiMealSwapPrompt(request, context, currentMealName, excludedMealNames, dayMultiplier);
+        var requestBody = new
+        {
+            model = _model,
+            temperature = 0.9,
+            max_tokens = 1000,
+            response_format = new { type = "json_object" },
+            messages = new object[]
+            {
+                new
+                {
+                    role = "system",
+                    content = "You generate one practical replacement dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English."
+                },
+                new
+                {
+                    role = "user",
+                    content = prompt
+                }
+            }
+        };
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(requestBody),
+                Encoding.UTF8,
+                "application/json")
+        };
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+
+        using var response = await _httpClient.SendAsync(requestMessage, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
+        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return null;
+        }
+
+        var aiPayload = JsonSerializer.Deserialize<AislePilotAiMealPayload>(rawJson, JsonOptions);
+        var strictModes = context.DietaryModes
+            .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var replacement = ValidateAndMapAiMeal(aiPayload, strictModes, out _);
+        if (replacement is null)
+        {
+            return null;
+        }
+
+        if (replacement.Name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase) ||
+            excludedMealNames.Contains(replacement.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        AddMealsToAiPool([replacement]);
+        await PersistAiMealsAsync([replacement], cancellationToken);
+        return replacement;
+    }
+
+    private void EnsureAiMealPoolHydrated()
+    {
+        try
+        {
+            EnsureAiMealPoolHydratedAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Unable to hydrate AislePilot AI meal pool from Firestore.");
+        }
+    }
+
+    private async Task EnsureAiMealPoolHydratedAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db is null)
+        {
+            return;
+        }
+
+        var shouldRefresh =
+            AiMealPool.IsEmpty ||
+            !_lastAiMealPoolRefreshUtc.HasValue ||
+            DateTime.UtcNow - _lastAiMealPoolRefreshUtc.Value > TimeSpan.FromMinutes(10);
+
+        if (!shouldRefresh)
+        {
+            return;
+        }
+
+        await AiMealPoolRefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            shouldRefresh =
+                AiMealPool.IsEmpty ||
+                !_lastAiMealPoolRefreshUtc.HasValue ||
+                DateTime.UtcNow - _lastAiMealPoolRefreshUtc.Value > TimeSpan.FromMinutes(10);
+
+            if (!shouldRefresh)
+            {
+                return;
+            }
+
+            var snapshot = await _db.Collection(AiMealsCollection)
+                .OrderByDescending(nameof(FirestoreAislePilotMeal.CreatedAtUtc))
+                .Limit(150)
+                .GetSnapshotAsync(cancellationToken);
+
+            foreach (var doc in snapshot.Documents)
+            {
+                if (!doc.Exists)
+                {
+                    continue;
+                }
+
+                var firestoreMeal = doc.ConvertTo<FirestoreAislePilotMeal>();
+                var mappedMeal = FromFirestoreDocument(firestoreMeal);
+                if (mappedMeal is not null)
+                {
+                    AiMealPool[mappedMeal.Name] = mappedMeal;
+                }
+            }
+
+            _lastAiMealPoolRefreshUtc = DateTime.UtcNow;
+        }
+        finally
+        {
+            AiMealPoolRefreshLock.Release();
+        }
+    }
+
+    private async Task PersistAiMealsAsync(
+        IReadOnlyList<MealTemplate> meals,
+        CancellationToken cancellationToken = default)
+    {
+        if (_db is null || meals.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var meal in meals)
+        {
+            try
+            {
+                var docRef = _db.Collection(AiMealsCollection).Document(ToAiMealDocumentId(meal.Name));
+                await docRef.SetAsync(ToFirestoreDocument(meal), cancellationToken: cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Unable to persist AislePilot AI meal '{MealName}'.", meal.Name);
+            }
+        }
+    }
+
+    private static string BuildAiMealSwapPrompt(
+        AislePilotRequestModel request,
+        PlanContext context,
+        string currentMealName,
+        IReadOnlyList<string> excludedMealNames,
+        int dayMultiplier)
+    {
+        var strictModes = context.DietaryModes
+            .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var strictModeText = strictModes.Length == 0 ? "Balanced" : string.Join(", ", strictModes);
+        var excludedText = excludedMealNames.Count == 0 ? "none" : string.Join(", ", excludedMealNames);
+        var dislikesText = string.IsNullOrWhiteSpace(context.DislikesOrAllergens) ? "none" : context.DislikesOrAllergens;
+        var targetMealBudget = decimal.Round((request.WeeklyBudget / 7m) * Math.Max(1, dayMultiplier), 2, MidpointRounding.AwayFromZero);
+
+        return $$"""
+Generate one replacement dinner for a UK grocery-planning app.
+
+Planner inputs:
+- Replace this meal: {{currentMealName}}
+- Supermarket: {{context.Supermarket}}
+- Target meal budget: {{targetMealBudget.ToString("0.##", CultureInfo.InvariantCulture)}} GBP
+- Household size: {{request.HouseholdSize}}
+- Prefer quick meals: {{(request.PreferQuickMeals ? "yes" : "no")}}
+- Dietary requirements: {{strictModeText}}
+- Dislikes or allergens: {{dislikesText}}
+- Avoid these other meals already in the week: {{excludedText}}
+
+Rules:
+- Return exactly one dinner object.
+- It must be different from the current meal and different from the excluded meals.
+- Use UK English.
+- Keep it realistic for a UK supermarket shop.
+- Respect dietary requirements and dislikes/allergens strictly.
+- If quick meals are preferred, target 30 minutes or less.
+- Every meal must include 3-7 ingredients only.
+- Department must be one of: Produce, Bakery, Meat & Fish, Dairy & Eggs, Frozen, Tins & Dry Goods, Spices & Sauces, Snacks, Drinks, Household, Other
+- Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
+- `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
+- `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
+- `quantityForTwo` must be a positive number.
+- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
+
+Return JSON only with this schema:
+{
+  "name": "",
+  "baseCostForTwo": 0,
+  "isQuick": true,
+  "tags": ["Balanced"],
+  "ingredients": [
+    {
+      "name": "",
+      "department": "",
+      "quantityForTwo": 0,
+      "unit": "",
+      "estimatedCostForTwo": 0
+    }
+  ]
+}
+""";
+    }
+
+    private static List<MealTemplate>? BuildSelectedMealsFromCurrentPlanNames(
+        IReadOnlyList<string>? currentPlanMealNames,
+        int cookDays)
+    {
+        if (currentPlanMealNames is null || currentPlanMealNames.Count != cookDays)
+        {
+            return null;
+        }
+
+        var selectedMeals = new List<MealTemplate>(cookDays);
+        foreach (var mealName in currentPlanMealNames)
+        {
+            if (string.IsNullOrWhiteSpace(mealName) ||
+                !AiMealPool.TryGetValue(mealName.Trim(), out var meal))
+            {
+                return null;
+            }
+
+            selectedMeals.Add(meal);
+        }
+
+        return selectedMeals;
     }
 
     private static PlanContext BuildPlanContext(AislePilotRequestModel request)
@@ -393,7 +1024,9 @@ public sealed class AislePilotService : IAislePilotService
         AislePilotRequestModel request,
         PlanContext context,
         IReadOnlyList<MealTemplate> selectedMeals,
-        int cookDays)
+        int cookDays,
+        bool usedAiGeneratedMeals = false,
+        string? planSourceLabel = null)
     {
         var leftoverDays = Math.Max(0, 7 - cookDays);
         var requestedLeftoverSourceDays = ParseRequestedLeftoverSourceDays(
@@ -423,6 +1056,10 @@ public sealed class AislePilotService : IAislePilotService
         {
             Supermarket = context.Supermarket,
             AppliedDietaryModes = context.DietaryModes,
+            UsedAiGeneratedMeals = usedAiGeneratedMeals,
+            PlanSourceLabel = string.IsNullOrWhiteSpace(planSourceLabel)
+                ? usedAiGeneratedMeals ? "OpenAI generated" : string.Empty
+                : planSourceLabel,
             CookDays = cookDays,
             LeftoverDays = leftoverDays,
             WeeklyBudget = request.WeeklyBudget,
@@ -799,6 +1436,7 @@ public sealed class AislePilotService : IAislePilotService
     }
 
     private static IReadOnlyList<MealTemplate> SelectMeals(
+        IReadOnlyList<MealTemplate> mealSource,
         IReadOnlyList<string> dietaryModes,
         decimal weeklyBudget,
         decimal householdFactor,
@@ -806,7 +1444,7 @@ public sealed class AislePilotService : IAislePilotService
         string dislikesOrAllergens,
         int cookDays)
     {
-        var candidates = FilterMeals(dietaryModes, dislikesOrAllergens);
+        var candidates = FilterMeals(dietaryModes, dislikesOrAllergens, mealSource);
         if (candidates.Count == 0)
         {
             throw new InvalidOperationException(
@@ -830,12 +1468,30 @@ public sealed class AislePilotService : IAislePilotService
         var normalizedCookDays = NormalizeCookDays(cookDays);
         var selected = new List<MealTemplate>(normalizedCookDays);
         var startIndex = Math.Abs(DateOnly.FromDateTime(DateTime.UtcNow).DayNumber) % scoredCandidates.Count;
+        var rotatedCandidates = scoredCandidates
+            .Skip(startIndex)
+            .Concat(scoredCandidates.Take(startIndex))
+            .ToList();
+
         for (var i = 0; i < normalizedCookDays; i++)
         {
-            var candidate = scoredCandidates[(startIndex + i) % scoredCandidates.Count];
-            if (selected.Count > 0 && selected[^1].Name == candidate.Name && scoredCandidates.Count > 1)
+            var usedMealNames = selected
+                .Select(meal => meal.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var candidate = rotatedCandidates
+                .FirstOrDefault(meal => !usedMealNames.Contains(meal.Name));
+
+            if (candidate is null)
             {
-                candidate = scoredCandidates[(startIndex + i + 1) % scoredCandidates.Count];
+                candidate = rotatedCandidates[i % rotatedCandidates.Count];
+                if (selected.Count > 0 &&
+                    selected[^1].Name.Equals(candidate.Name, StringComparison.OrdinalIgnoreCase) &&
+                    rotatedCandidates.Count > 1)
+                {
+                    candidate = rotatedCandidates
+                        .First(meal => !meal.Name.Equals(selected[^1].Name, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             selected.Add(candidate);
@@ -844,7 +1500,10 @@ public sealed class AislePilotService : IAislePilotService
         return selected;
     }
 
-    private static List<MealTemplate> FilterMeals(IReadOnlyList<string> dietaryModes, string dislikesOrAllergens)
+    private static List<MealTemplate> FilterMeals(
+        IReadOnlyList<string> dietaryModes,
+        string dislikesOrAllergens,
+        IReadOnlyList<MealTemplate>? mealSource = null)
     {
         var disallowedTokens = dislikesOrAllergens
             .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries)
@@ -856,7 +1515,9 @@ public sealed class AislePilotService : IAislePilotService
             .Where(x => !x.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        var baseFiltered = MealTemplates
+        var source = mealSource ?? MealTemplates;
+
+        var baseFiltered = source
             .Where(meal => disallowedTokens.All(token => !ContainsToken(meal, token)))
             .ToList();
 
@@ -871,6 +1532,85 @@ public sealed class AislePilotService : IAislePilotService
             .ToList();
 
         return strictFiltered;
+    }
+
+    private static IReadOnlyList<MealTemplate> GetCompatibleAiPoolMeals(
+        IReadOnlyList<string> dietaryModes,
+        string dislikesOrAllergens)
+    {
+        return FilterMeals(dietaryModes, dislikesOrAllergens, AiMealPool.Values.ToList());
+    }
+
+    private static void AddMealsToAiPool(IReadOnlyList<MealTemplate> meals)
+    {
+        foreach (var meal in meals)
+        {
+            AiMealPool[meal.Name] = meal;
+        }
+    }
+
+    private static string ToAiMealDocumentId(string mealName)
+    {
+        var normalized = NormalizePantryText(mealName);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            normalized = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
+        }
+
+        return normalized.Replace(' ', '-');
+    }
+
+    private static FirestoreAislePilotMeal ToFirestoreDocument(MealTemplate meal)
+    {
+        return new FirestoreAislePilotMeal
+        {
+            Name = meal.Name,
+            BaseCostForTwo = meal.BaseCostForTwo,
+            IsQuick = meal.IsQuick,
+            Tags = meal.Tags.ToList(),
+            Ingredients = meal.Ingredients
+                .Select(ingredient => new FirestoreAislePilotIngredient
+                {
+                    Name = ingredient.Name,
+                    Department = ingredient.Department,
+                    QuantityForTwo = ingredient.QuantityForTwo,
+                    Unit = ingredient.Unit,
+                    EstimatedCostForTwo = ingredient.EstimatedCostForTwo
+                })
+                .ToList(),
+            CreatedAtUtc = DateTime.UtcNow,
+            Source = "openai"
+        };
+    }
+
+    private static MealTemplate? FromFirestoreDocument(FirestoreAislePilotMeal? doc)
+    {
+        if (doc is null)
+        {
+            return null;
+        }
+
+        var payload = new AislePilotAiMealPayload
+        {
+            Name = doc.Name,
+            BaseCostForTwo = doc.BaseCostForTwo,
+            IsQuick = doc.IsQuick,
+            Tags = doc.Tags,
+            Ingredients = doc.Ingredients?
+                .Select(ingredient => new AislePilotAiIngredientPayload
+                {
+                    Name = ingredient.Name,
+                    Department = ingredient.Department,
+                    QuantityForTwo = ingredient.QuantityForTwo,
+                    Unit = ingredient.Unit,
+                    EstimatedCostForTwo = ingredient.EstimatedCostForTwo
+                })
+                .ToList()
+        };
+
+        return ValidateAndMapAiMeal(payload, doc.Tags?
+            .Where(mode => !string.Equals(mode, "Balanced", StringComparison.OrdinalIgnoreCase))
+            .ToArray() ?? [], out _);
     }
 
     private static bool ContainsToken(MealTemplate meal, string token)
@@ -1113,6 +1853,341 @@ public sealed class AislePilotService : IAislePilotService
     {
         var safeMinutes = Math.Max(5, minutes);
         return (int)(Math.Round(safeMinutes / 5m, MidpointRounding.AwayFromZero) * 5m);
+    }
+
+    private static string BuildAiMealPlanPrompt(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays,
+        int requestedMealCount,
+        bool compactJson = false)
+    {
+        var strictModes = context.DietaryModes
+            .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var strictModeText = strictModes.Length == 0
+            ? "Balanced"
+            : string.Join(", ", strictModes);
+        var dislikesText = string.IsNullOrWhiteSpace(context.DislikesOrAllergens)
+            ? "none"
+            : context.DislikesOrAllergens;
+        var pantryText = string.IsNullOrWhiteSpace(request.PantryItems)
+            ? "none supplied"
+            : request.PantryItems!;
+
+        return $$"""
+Generate a weekly dinner plan for a UK grocery-planning app.
+
+Planner inputs:
+- Supermarket: {{context.Supermarket}}
+- Weekly budget: {{request.WeeklyBudget.ToString("0.##", CultureInfo.InvariantCulture)}} GBP
+- Household size: {{request.HouseholdSize}}
+- Cook days this week: {{cookDays}}
+- Prefer quick meals: {{(request.PreferQuickMeals ? "yes" : "no")}}
+- Dietary requirements: {{strictModeText}}
+- Dislikes or allergens: {{dislikesText}}
+- Pantry items already available: {{pantryText}}
+
+Rules:
+- Return exactly {{requestedMealCount}} dinners in `meals`.
+{{(requestedMealCount > cookDays ? $"- The app will display {cookDays} meals and keep the rest as spare alternatives, so include a little variety across the batch." : string.Empty)}}
+- Use UK English.
+- Meals must be realistic for a UK supermarket shop.
+- Keep the full week roughly within the stated budget.
+- Avoid repeating the same dinner in the same week.
+- Respect dietary requirements and dislikes/allergens strictly.
+- If quick meals are preferred, most dinners should be 30 minutes or less.
+- Every meal must include 3-7 ingredients only.
+- Department must be one of: Produce, Bakery, Meat & Fish, Dairy & Eggs, Frozen, Tins & Dry Goods, Spices & Sauces, Snacks, Drinks, Household, Other
+- Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
+- `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
+- `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
+- `quantityForTwo` must be a positive number.
+- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
+- Include all requested dietary modes in each meal's tags, except Balanced is optional.
+{{(compactJson ? "- Keep ingredient names short and return compact JSON with no markdown, no comments, and no unnecessary whitespace." : string.Empty)}}
+
+Return JSON only with this schema:
+{
+  "meals": [
+    {
+      "name": "",
+      "baseCostForTwo": 0,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "ingredients": [
+        {
+          "name": "",
+          "department": "",
+          "quantityForTwo": 0,
+          "unit": "",
+          "estimatedCostForTwo": 0
+        }
+      ]
+    }
+  ]
+}
+""";
+    }
+
+    private static IReadOnlyList<MealTemplate>? ValidateAndMapAiMeals(
+        AislePilotAiPlanPayload? payload,
+        IReadOnlyList<string> dietaryModes,
+        int cookDays,
+        int requestedMealCount,
+        out string? validationReason)
+    {
+        validationReason = null;
+        var rawMeals = payload?.Meals;
+        if (rawMeals is null || rawMeals.Count < cookDays || rawMeals.Count > requestedMealCount)
+        {
+            validationReason = $"meal_count_out_of_range(count={rawMeals?.Count ?? 0},min={cookDays},max={requestedMealCount})";
+            return null;
+        }
+
+        var strictModes = dietaryModes
+            .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var meals = new List<MealTemplate>(cookDays);
+
+        for (var i = 0; i < rawMeals.Count; i++)
+        {
+            var rawMeal = rawMeals[i];
+            var meal = ValidateAndMapAiMeal(rawMeal, strictModes, out var mealReason);
+            if (meal is null)
+            {
+                validationReason = $"invalid_meal_at_index_{i}:{mealReason ?? "unknown"}";
+                return null;
+            }
+
+            if (!usedNames.Add(meal.Name))
+            {
+                validationReason = $"duplicate_meal_name:{meal.Name}";
+                return null;
+            }
+
+            meals.Add(meal);
+        }
+
+        return meals;
+    }
+
+    private static int GetRequestedAiMealCount(int cookDays)
+    {
+        var normalizedCookDays = NormalizeCookDays(cookDays);
+        return Math.Min(12, normalizedCookDays + ExtraAiMealCount);
+    }
+
+    private static MealTemplate? ValidateAndMapAiMeal(
+        AislePilotAiMealPayload? payload,
+        IReadOnlyList<string> strictModes,
+        out string? validationReason)
+    {
+        validationReason = null;
+        if (payload is null)
+        {
+            validationReason = "meal_payload_null";
+            return null;
+        }
+
+        var name = ClampAndNormalize(payload.Name, MaxAiMealNameLength);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            validationReason = "meal_name_missing";
+            return null;
+        }
+
+        var baseCostForTwo = payload.BaseCostForTwo ?? 0m;
+        if (baseCostForTwo <= 0m || baseCostForTwo > 30m)
+        {
+            validationReason = $"meal_cost_invalid:{baseCostForTwo.ToString(CultureInfo.InvariantCulture)}";
+            return null;
+        }
+
+        var ingredients = payload.Ingredients?
+            .Select((ingredient, index) =>
+            {
+                var mapped = ValidateAndMapAiIngredient(ingredient, out var ingredientReason);
+                return new
+                {
+                    mapped,
+                    ingredientReason,
+                    index
+                };
+            })
+            .ToList();
+
+        if (ingredients is null || ingredients.Count < 3 || ingredients.Count > 7)
+        {
+            validationReason = $"ingredient_count_invalid:{ingredients?.Count ?? 0}";
+            return null;
+        }
+
+        var invalidIngredient = ingredients.FirstOrDefault(item => item.mapped is null);
+        if (invalidIngredient is not null)
+        {
+            validationReason = $"invalid_ingredient_at_index_{invalidIngredient.index}:{invalidIngredient.ingredientReason ?? "unknown"}";
+            return null;
+        }
+
+        var tags = payload.Tags?
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => SupportedDietaryModes.FirstOrDefault(mode => mode.Equals(tag.Trim(), StringComparison.OrdinalIgnoreCase)))
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Cast<string>()
+            .ToList() ?? [];
+
+        if (tags.Count == 0)
+        {
+            tags.Add("Balanced");
+        }
+
+        if (!strictModes.All(mode => tags.Contains(mode, StringComparer.OrdinalIgnoreCase)))
+        {
+            validationReason = "strict_modes_not_satisfied";
+            return null;
+        }
+
+        return new MealTemplate(
+            name,
+            decimal.Round(baseCostForTwo, 2, MidpointRounding.AwayFromZero),
+            payload.IsQuick ?? false,
+            tags,
+            ingredients.Select(item => item.mapped!).ToList());
+    }
+
+    private static IngredientTemplate? ValidateAndMapAiIngredient(
+        AislePilotAiIngredientPayload? payload,
+        out string? validationReason)
+    {
+        validationReason = null;
+        if (payload is null)
+        {
+            validationReason = "ingredient_payload_null";
+            return null;
+        }
+
+        var name = ClampAndNormalize(payload.Name, MaxAiIngredientNameLength);
+        var department = NormalizeAiDepartment(payload.Department);
+        var unit = ClampAndNormalize(payload.Unit, MaxAiUnitLength);
+        var quantityForTwo = payload.QuantityForTwo ?? 0m;
+        var estimatedCostForTwo = payload.EstimatedCostForTwo ?? 0m;
+
+        if (string.IsNullOrWhiteSpace(name) ||
+            string.IsNullOrWhiteSpace(department) ||
+            string.IsNullOrWhiteSpace(unit) ||
+            quantityForTwo <= 0m ||
+            quantityForTwo > 20m ||
+            estimatedCostForTwo <= 0m ||
+            estimatedCostForTwo > 20m)
+        {
+            validationReason =
+                $"ingredient_fields_invalid(name='{name}',department='{department}',unit='{unit}',qty={quantityForTwo.ToString(CultureInfo.InvariantCulture)},cost={estimatedCostForTwo.ToString(CultureInfo.InvariantCulture)})";
+            return null;
+        }
+
+        return new IngredientTemplate(
+            name,
+            department,
+            decimal.Round(quantityForTwo, 2, MidpointRounding.AwayFromZero),
+            unit,
+            decimal.Round(estimatedCostForTwo, 2, MidpointRounding.AwayFromZero));
+    }
+
+    private static string NormalizeModelJson(string rawJson)
+    {
+        var trimmed = rawJson.Trim();
+        if (trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            var firstNewline = trimmed.IndexOf('\n');
+            if (firstNewline >= 0)
+            {
+                trimmed = trimmed[(firstNewline + 1)..];
+            }
+
+            var fenceEnd = trimmed.LastIndexOf("```", StringComparison.Ordinal);
+            if (fenceEnd >= 0)
+            {
+                trimmed = trimmed[..fenceEnd];
+            }
+        }
+
+        return trimmed.Trim();
+    }
+
+    private static AislePilotAiPlanPayload? ParseAiPlanPayload(string normalizedJson)
+    {
+        using var doc = JsonDocument.Parse(normalizedJson);
+        var root = doc.RootElement;
+
+        if (root.ValueKind == JsonValueKind.Object &&
+            root.TryGetProperty("meals", out var mealsElement) &&
+            mealsElement.ValueKind == JsonValueKind.Array)
+        {
+            return JsonSerializer.Deserialize<AislePilotAiPlanPayload>(normalizedJson, JsonOptions);
+        }
+
+        if (root.ValueKind == JsonValueKind.Object &&
+            root.TryGetProperty("meal", out var mealElement) &&
+            mealElement.ValueKind == JsonValueKind.Object)
+        {
+            var meal = JsonSerializer.Deserialize<AislePilotAiMealPayload>(mealElement.GetRawText(), JsonOptions);
+            if (meal is null)
+            {
+                return null;
+            }
+
+            return new AislePilotAiPlanPayload
+            {
+                Meals = [meal]
+            };
+        }
+
+        if (root.ValueKind == JsonValueKind.Object &&
+            (root.TryGetProperty("name", out _) || root.TryGetProperty("ingredients", out _)))
+        {
+            var meal = JsonSerializer.Deserialize<AislePilotAiMealPayload>(normalizedJson, JsonOptions);
+            if (meal is null)
+            {
+                return null;
+            }
+
+            return new AislePilotAiPlanPayload
+            {
+                Meals = [meal]
+            };
+        }
+
+        return JsonSerializer.Deserialize<AislePilotAiPlanPayload>(normalizedJson, JsonOptions);
+    }
+
+    private static string NormalizeAiDepartment(string? department)
+    {
+        var normalized = ClampAndNormalize(department, MaxAiDepartmentLength);
+        return DefaultAisleOrder.FirstOrDefault(item =>
+                   item.Equals(normalized, StringComparison.OrdinalIgnoreCase))
+               ?? string.Empty;
+    }
+
+    private static string ClampAndNormalize(string? input, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return string.Empty;
+        }
+
+        var normalized = string.Join(
+            ' ',
+            input.Trim().Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+
+        if (normalized.Length <= maxLength)
+        {
+            return normalized;
+        }
+
+        return normalized[..maxLength].TrimEnd();
     }
 
     private static IReadOnlyList<int> BuildMealPortionMultipliers(
@@ -1400,4 +2475,90 @@ public sealed class AislePilotService : IAislePilotService
         decimal QuantityForTwo,
         string Unit,
         decimal EstimatedCostForTwo);
+
+    private sealed class ChatCompletionResponse
+    {
+        public List<Choice>? Choices { get; set; }
+    }
+
+    private sealed class Choice
+    {
+        public ChatMessage? Message { get; set; }
+    }
+
+    private sealed class ChatMessage
+    {
+        public string? Content { get; set; }
+    }
+
+    private sealed class AislePilotAiPlanPayload
+    {
+        public List<AislePilotAiMealPayload>? Meals { get; set; }
+    }
+
+    private sealed class AislePilotAiMealPayload
+    {
+        public string? Name { get; set; }
+        public decimal? BaseCostForTwo { get; set; }
+        public bool? IsQuick { get; set; }
+        public List<string>? Tags { get; set; }
+        public List<AislePilotAiIngredientPayload>? Ingredients { get; set; }
+    }
+
+    private sealed class AislePilotAiIngredientPayload
+    {
+        public string? Name { get; set; }
+        public string? Department { get; set; }
+        public decimal? QuantityForTwo { get; set; }
+        public string? Unit { get; set; }
+        public decimal? EstimatedCostForTwo { get; set; }
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreAislePilotMeal
+    {
+        [FirestoreProperty]
+        public string Name { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public decimal BaseCostForTwo { get; set; }
+
+        [FirestoreProperty]
+        public bool IsQuick { get; set; }
+
+        [FirestoreProperty]
+        public List<string> Tags { get; set; } = [];
+
+        [FirestoreProperty]
+        public List<FirestoreAislePilotIngredient> Ingredients { get; set; } = [];
+
+        [FirestoreProperty]
+        public DateTime CreatedAtUtc { get; set; }
+
+        [FirestoreProperty]
+        public string Source { get; set; } = string.Empty;
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreAislePilotIngredient
+    {
+        [FirestoreProperty]
+        public string Name { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public string Department { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public decimal QuantityForTwo { get; set; }
+
+        [FirestoreProperty]
+        public string Unit { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public decimal EstimatedCostForTwo { get; set; }
+    }
+
+    private sealed record AiMealBatchResult(
+        IReadOnlyList<MealTemplate> Meals,
+        string? OpenAiRequestId);
 }

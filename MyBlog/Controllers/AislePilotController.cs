@@ -48,8 +48,16 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
-        var result = aislePilotService.BuildPlan(request);
-        return View(BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+        try
+        {
+            var result = aislePilotService.BuildPlan(request);
+            return View(BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
     }
 
     [HttpPost("suggest-from-pantry")]
@@ -77,7 +85,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
 
     [HttpPost("swap-meal")]
     [ValidateAntiForgeryToken]
-    public IActionResult SwapMeal(AislePilotPageViewModel pageModel, int dayIndex, string? currentMealName)
+    public IActionResult SwapMeal(AislePilotPageViewModel pageModel, int dayIndex, string? currentMealName, List<string>? currentPlanMealNames)
     {
         var request = NormalizeRequest(pageModel.Request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
@@ -94,8 +102,23 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
-        var result = aislePilotService.SwapMealForDay(request, dayIndex, currentMealName);
-        return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+        var seenMealNames = GetSeenMealsForDay(request.SwapHistoryState, dayIndex, currentMealName);
+
+        try
+        {
+            var result = aislePilotService.SwapMealForDay(request, dayIndex, currentMealName, currentPlanMealNames, seenMealNames);
+            request.SwapHistoryState = UpdateSwapHistoryState(
+                request.SwapHistoryState,
+                dayIndex,
+                currentMealName,
+                result.MealPlan.ElementAtOrDefault(dayIndex)?.MealName);
+            return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
     }
 
     [HttpPost("export/plan-pack")]
@@ -109,11 +132,18 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             return ValidationProblem(ModelState);
         }
 
-        var result = aislePilotService.BuildPlan(request);
-        var bytes = BuildPlanPackPdf(request, result);
-        var fileName = $"aislepilot-plan-pack-{DateTime.UtcNow:yyyyMMdd}.pdf";
-        Response.Headers.ContentDisposition = $"inline; filename=\"{fileName}\"";
-        return File(bytes, "application/pdf");
+        try
+        {
+            var result = aislePilotService.BuildPlan(request);
+            var bytes = BuildPlanPackPdf(request, result);
+            var fileName = $"aislepilot-plan-pack-{DateTime.UtcNow:yyyyMMdd}.pdf";
+            Response.Headers.ContentDisposition = $"inline; filename=\"{fileName}\"";
+            return File(bytes, "application/pdf");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(title: "AislePilot AI unavailable", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     [HttpPost("export/checklist")]
@@ -127,11 +157,18 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             return ValidationProblem(ModelState);
         }
 
-        var result = aislePilotService.BuildPlan(request);
-        var content = BuildChecklistText(result);
-        var bytes = Encoding.UTF8.GetBytes(content);
-        var fileName = $"aislepilot-checklist-{DateTime.UtcNow:yyyyMMdd}.txt";
-        return File(bytes, "text/plain; charset=utf-8", fileName);
+        try
+        {
+            var result = aislePilotService.BuildPlan(request);
+            var content = BuildChecklistText(result);
+            var bytes = Encoding.UTF8.GetBytes(content);
+            var fileName = $"aislepilot-checklist-{DateTime.UtcNow:yyyyMMdd}.txt";
+            return File(bytes, "text/plain; charset=utf-8", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(title: "AislePilot AI unavailable", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     private AislePilotPageViewModel BuildPageModel(
@@ -195,12 +232,101 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         normalized.DislikesOrAllergens = normalized.DislikesOrAllergens?.Trim() ?? string.Empty;
         normalized.PantryItems = normalized.PantryItems?.Trim() ?? string.Empty;
         normalized.LeftoverCookDayIndexesCsv = normalized.LeftoverCookDayIndexesCsv?.Trim() ?? string.Empty;
+        normalized.SwapHistoryState = normalized.SwapHistoryState?.Trim() ?? string.Empty;
         normalized.DietaryModes = normalized.DietaryModes?
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList() ?? [];
         return normalized;
+    }
+
+    private static IReadOnlyList<string> GetSeenMealsForDay(string? swapHistoryState, int dayIndex, string? currentMealName)
+    {
+        var history = ParseSwapHistoryState(swapHistoryState);
+        var seenMeals = history.TryGetValue(dayIndex, out var names)
+            ? names
+            : [];
+
+        if (string.IsNullOrWhiteSpace(currentMealName))
+        {
+            return seenMeals;
+        }
+
+        return seenMeals
+            .Append(currentMealName.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string UpdateSwapHistoryState(
+        string? currentState,
+        int dayIndex,
+        string? previousMealName,
+        string? nextMealName)
+    {
+        var history = ParseSwapHistoryState(currentState);
+        if (!history.TryGetValue(dayIndex, out var meals))
+        {
+            meals = [];
+            history[dayIndex] = meals;
+        }
+
+        if (!string.IsNullOrWhiteSpace(previousMealName) &&
+            !meals.Contains(previousMealName.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            meals.Add(previousMealName.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(nextMealName) &&
+            !meals.Contains(nextMealName.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            meals.Add(nextMealName.Trim());
+        }
+
+        return SerializeSwapHistoryState(history);
+    }
+
+    private static Dictionary<int, List<string>> ParseSwapHistoryState(string? swapHistoryState)
+    {
+        var result = new Dictionary<int, List<string>>();
+        if (string.IsNullOrWhiteSpace(swapHistoryState))
+        {
+            return result;
+        }
+
+        var dayEntries = swapHistoryState.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var entry in dayEntries)
+        {
+            var segments = entry.Split(':', 2, StringSplitOptions.TrimEntries);
+            if (segments.Length != 2 || !int.TryParse(segments[0], out var dayIndex) || dayIndex < 0 || dayIndex > 6)
+            {
+                continue;
+            }
+
+            var meals = segments[1]
+                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(meal => !string.IsNullOrWhiteSpace(meal))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (meals.Count > 0)
+            {
+                result[dayIndex] = meals;
+            }
+        }
+
+        return result;
+    }
+
+    private static string SerializeSwapHistoryState(Dictionary<int, List<string>> history)
+    {
+        return string.Join(
+            ';',
+            history
+                .OrderBy(pair => pair.Key)
+                .Where(pair => pair.Value.Count > 0)
+                .Select(pair => $"{pair.Key}:{string.Join('|', pair.Value.Distinct(StringComparer.OrdinalIgnoreCase))}"));
     }
 
     private void ValidateRequest(AislePilotRequestModel request)

@@ -98,11 +98,55 @@ public class AislePilotServiceTests
         {
             "Veggie lentil curry",
             "Paneer tikka tray bake",
-            "Chickpea quinoa salad bowls"
+            "Chickpea quinoa salad bowls",
+            "Black bean sweet potato chilli",
+            "Mushroom spinach risotto"
         };
 
         Assert.Equal(7, result.MealPlan.Count);
         Assert.All(result.MealPlan, meal => Assert.Contains(meal.MealName, allowedMeals));
+    }
+
+    [Fact]
+    public void BuildPlan_VegetarianWithSevenCookDays_DoesNotRepeatMealsWithinTheWeek()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegetarian"],
+            WeeklyBudget = 70m,
+            HouseholdSize = 2,
+            CookDays = 7
+        };
+
+        var result = _service.BuildPlan(request);
+        var distinctMealCount = result.MealPlan
+            .Select(meal => meal.MealName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        Assert.Equal(7, result.MealPlan.Count);
+        Assert.Equal(result.MealPlan.Count, distinctMealCount);
+    }
+
+    [Fact]
+    public void BuildPlan_WhenUniqueMealsAreInsufficient_ReusesMealsOnlyAfterUsingAllAvailableOptions()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegetarian", "Gluten-Free"],
+            WeeklyBudget = 70m,
+            HouseholdSize = 2,
+            CookDays = 7
+        };
+
+        var result = _service.BuildPlan(request);
+        var distinctMealCount = result.MealPlan
+            .Select(meal => meal.MealName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        Assert.Equal(7, result.MealPlan.Count);
+        Assert.Equal(5, distinctMealCount);
     }
 
     [Fact]
@@ -191,7 +235,7 @@ public class AislePilotServiceTests
         var baseRequest = new AislePilotRequestModel
         {
             DietaryModes = ["Vegetarian", "Gluten-Free"],
-            DislikesOrAllergens = "paneer, chickpea, quinoa",
+            DislikesOrAllergens = "lentils, coconut milk, chickpea, quinoa, black beans, sweet potatoes, mushrooms, risotto rice, spinach",
             WeeklyBudget = 70m,
             HouseholdSize = 2
         };
@@ -371,8 +415,9 @@ public class AislePilotServiceTests
 
         var initialPlan = _service.BuildPlan(request);
         var currentMealName = initialPlan.MealPlan[0].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan.Select(meal => meal.MealName).ToList();
 
-        var swappedPlan = _service.SwapMealForDay(request, 0, currentMealName);
+        var swappedPlan = _service.SwapMealForDay(request, 0, currentMealName, currentPlanMealNames, [currentMealName]);
 
         Assert.Equal(7, swappedPlan.MealPlan.Count);
         Assert.NotEqual(currentMealName, swappedPlan.MealPlan[0].MealName);
@@ -386,8 +431,8 @@ public class AislePilotServiceTests
             DietaryModes = ["Balanced"]
         };
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => _service.SwapMealForDay(request, -1, null));
-        Assert.Throws<ArgumentOutOfRangeException>(() => _service.SwapMealForDay(request, 7, null));
+        Assert.Throws<ArgumentOutOfRangeException>(() => _service.SwapMealForDay(request, -1, null, null, null));
+        Assert.Throws<ArgumentOutOfRangeException>(() => _service.SwapMealForDay(request, 7, null, null, null));
     }
 
     [Fact]
@@ -399,7 +444,7 @@ public class AislePilotServiceTests
             CookDays = 5
         };
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => _service.SwapMealForDay(request, 5, null));
+        Assert.Throws<ArgumentOutOfRangeException>(() => _service.SwapMealForDay(request, 5, null, null, null));
     }
 
     [Fact]
@@ -414,12 +459,15 @@ public class AislePilotServiceTests
 
         var initialPlan = _service.BuildPlan(request);
         var currentMealName = initialPlan.MealPlan[2].MealName;
-        var swappedPlan = _service.SwapMealForDay(request, 2, currentMealName);
+        var currentPlanMealNames = initialPlan.MealPlan.Select(meal => meal.MealName).ToList();
+        var swappedPlan = _service.SwapMealForDay(request, 2, currentMealName, currentPlanMealNames, [currentMealName]);
         var allowedMeals = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "Veggie lentil curry",
             "Paneer tikka tray bake",
-            "Chickpea quinoa salad bowls"
+            "Chickpea quinoa salad bowls",
+            "Black bean sweet potato chilli",
+            "Mushroom spinach risotto"
         };
 
         Assert.All(swappedPlan.MealPlan, meal => Assert.Contains(meal.MealName, allowedMeals));

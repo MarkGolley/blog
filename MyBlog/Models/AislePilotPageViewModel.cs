@@ -18,6 +18,8 @@ public sealed class AislePilotPlanResultViewModel
 {
     public string Supermarket { get; set; } = string.Empty;
     public IReadOnlyList<string> AppliedDietaryModes { get; set; } = Array.Empty<string>();
+    public bool UsedAiGeneratedMeals { get; set; }
+    public string PlanSourceLabel { get; set; } = string.Empty;
     public int CookDays { get; set; } = 7;
     public int LeftoverDays { get; set; }
     public decimal WeeklyBudget { get; set; }

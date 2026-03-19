@@ -4,6 +4,7 @@
             ".aislepilot-inline-fields input:not([type='hidden']):not([type='checkbox']):not([type='radio'])"
         )
     );
+    const aislePilotForms = Array.from(document.querySelectorAll(".aislepilot-app form"));
 
     const selectInputValue = input => {
         if (!(input instanceof HTMLInputElement)) {
@@ -28,6 +29,53 @@
             if (document.activeElement === input) {
                 selectInputValue(input);
             }
+        });
+    });
+
+    const getSubmitButton = submitEvent => {
+        const submitter = submitEvent.submitter;
+        if (submitter instanceof HTMLButtonElement) {
+            return submitter;
+        }
+
+        const form = submitEvent.currentTarget;
+        if (!(form instanceof HTMLFormElement)) {
+            return null;
+        }
+
+        return form.querySelector("button[type='submit']");
+    };
+
+    aislePilotForms.forEach(form => {
+        form.addEventListener("submit", event => {
+            if (!(event.currentTarget instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const submitButton = getSubmitButton(event);
+            if (!(submitButton instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            if (submitButton.classList.contains("is-loading")) {
+                event.preventDefault();
+                return;
+            }
+
+            const originalLabel = submitButton.dataset.originalLabel ?? submitButton.textContent ?? "";
+            submitButton.dataset.originalLabel = originalLabel.trim();
+
+            const loadingLabel = submitButton.dataset.loadingLabel?.trim();
+            if (loadingLabel && loadingLabel.length > 0) {
+                submitButton.textContent = loadingLabel;
+            } else {
+                submitButton.textContent = "Loading...";
+            }
+
+            submitButton.classList.add("is-loading");
+            submitButton.disabled = true;
+            submitButton.setAttribute("aria-busy", "true");
+            event.currentTarget.setAttribute("data-is-submitting", "true");
         });
     });
 
