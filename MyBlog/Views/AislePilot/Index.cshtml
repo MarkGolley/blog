@@ -365,7 +365,8 @@
                                     <form method="post"
                                           action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
                                           class="aislepilot-swap-form aislepilot-swap-in-details"
-                                          data-preserve-scroll-form>
+                                          data-preserve-scroll-form
+                                          data-ajax-swap-form>
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
                                         <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
@@ -388,7 +389,7 @@
                                         }
                                         <input type="hidden" name="dayIndex" value="@mealIndex" />
                                         <input type="hidden" name="currentMealName" value="@meal.MealName" />
-                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping...">Swap meal</button>
+                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping..." data-loading-delay-ms="220">Swap meal</button>
                                     </form>
                                 </div>
                             </article>
