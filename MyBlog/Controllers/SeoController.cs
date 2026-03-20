@@ -26,6 +26,8 @@ public class SeoController : Controller
         {
             BuildSitemapUrlElement($"{baseUrl}/", now, "weekly", "1.0"),
             BuildSitemapUrlElement($"{baseUrl}/blog", now, "daily", "0.9"),
+            BuildSitemapUrlElement($"{baseUrl}/projects", now, "weekly", "0.9"),
+            BuildSitemapUrlElement($"{baseUrl}/ai-experiments", now, "weekly", "0.9"),
             BuildSitemapUrlElement($"{baseUrl}/about", now, "monthly", "0.7"),
             BuildSitemapUrlElement($"{baseUrl}/learning", now, "weekly", "0.7"),
             BuildSitemapUrlElement($"{baseUrl}/contact", now, "monthly", "0.6")

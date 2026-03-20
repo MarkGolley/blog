@@ -1,0 +1,78 @@
+@{
+    ViewData["Title"] = "Projects";
+    ViewData["MetaDescription"] =
+        "Focused engineering roadmap from Mark Golley with active builds and clear delivery milestones.";
+    ViewData["CanonicalPath"] = "/projects";
+}
+
+<section aria-labelledby="active-projects-title" data-reveal>
+    <h2 id="active-projects-title">Active projects</h2>
+    <p class="section-intro">Current delivery and upcoming work.</p>
+
+    <div class="case-template-grid">
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "AislePilot (Meal Planning + Shopping Flow)",
+            Status = "In progress",
+            OneLiner = "Turn weekly meal planning into an aisle-ordered shopping flow tailored to each supermarket.",
+            WhyItMatters = "Targets a real user pain point with a tangible mobile workflow and practical AI convenience.",
+            TechnicalScope = new[]
+            {
+                "Collect plan constraints: supermarket, budget, dietary mode, and dislikes/allergens.",
+                "Generate weekly meals with convenience-aware heuristics and budget checks.",
+                "Consolidate ingredients and sort shopping items by supermarket aisle order.",
+                "Provide a mobile-friendly shop mode checklist."
+            },
+            ProofChecklist = new[]
+            {
+                "End-to-end prototype page with real form submission and generated output.",
+                "Service tests for dietary filters, budget fit, and aisle ordering.",
+                "Demo recording of plan generation and in-store checklist flow.",
+                "Architecture note on AI usage, fallbacks, and scaling plan."
+            },
+            WhatItShows = "Can build a useful AI-assisted product workflow, not just isolated model demos.",
+            NextMilestone = "Add pricing provider integration and smarter pantry-aware substitutions.",
+            CtaText = "Try AislePilot",
+            CtaController = "AislePilot",
+            CtaAction = "Index",
+            CtaIconPath = "~/images/aislepilot-icon.svg"
+        }' />
+
+        <article class="case-template case-template-placeholder" aria-label="Future project slot">
+            <span class="case-template-placeholder-label">TBC</span>
+        </article>
+        <article class="case-template case-template-placeholder" aria-label="Future project slot">
+            <span class="case-template-placeholder-label">TBC</span>
+        </article>
+    </div>
+</section>
+
+<section aria-labelledby="completed-projects-title" data-reveal>
+    <h2 id="completed-projects-title">Completed</h2>
+
+    <div class="case-template-grid">
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "AI Moderation v2 for Blog Comments",
+            Status = "Shipped",
+            OneLiner = "Implemented explicit moderation decisions with repeatable diagnostics and safe fallbacks.",
+            WhyItMatters = "Delivered a real user safety workflow with test coverage and operational checks.",
+            TechnicalScope = new[]
+            {
+                "Allow/Block/ManualReview decision mapping with reason codes.",
+                "Smoke evaluation dataset and CLI report flow.",
+                "Service and integration tests for core moderation paths.",
+                "Fallback behavior for missing API key or uncertain responses."
+            },
+            ProofChecklist = new[]
+            {
+                "Automated tests for decision mapping and fallback behavior.",
+                "Checked-in diagnostics report output.",
+                "Live playground integrated into site workflow.",
+                "Documented moderation reason-code behavior."
+            },
+            WhatItShows = "Can turn applied AI into deterministic product behavior with guardrails.",
+            NextMilestone = string.Empty
+        }' />
+    </div>
+</section>

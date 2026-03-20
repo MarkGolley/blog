@@ -7,6 +7,7 @@
     <ItemGroup>
       <PackageReference Include="Google.Cloud.Firestore" Version="4.2.0" />
       <PackageReference Include="MailKit" Version="4.15.1" />
+      <PackageReference Include="QuestPDF" Version="2024.12.1" />
     </ItemGroup>
     <ItemGroup>
       <_ContentIncludedByDefault Remove="wwwroot\BlogStorage\PostsText\AddingCommentsToBlogs.txt" />
@@ -14,5 +15,8 @@
       <_ContentIncludedByDefault Remove="wwwroot\BlogStorage\PostsText\moving_to_gcp.txt" />
       <_ContentIncludedByDefault Remove="wwwroot\BlogStorage\PostsText\pi_hole.txt" />
       <_ContentIncludedByDefault Remove="wwwroot\BlogStorage\PostsText\testing.txt" />
+      <_ContentIncludedByDefault Remove="artifacts\**" />
+      <Content Remove="artifacts\**" />
+      <None Remove="artifacts\**" />
     </ItemGroup>
 </Project>

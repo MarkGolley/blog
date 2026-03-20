@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using MyBlog.Models;
 
 namespace MyBlog.Services;
 
@@ -23,17 +24,25 @@ public class AIModerationService
         _logger = logger;
     }
 
-    public async Task<bool> IsCommentSafeAsync(string content)
+    public async Task<ModerationEvaluationResult> EvaluateCommentAsync(string content)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            return true;
+            return new ModerationEvaluationResult
+            {
+                Decision = ModerationDecision.Allow,
+                ReasonCode = "empty_input"
+            };
         }
 
         if (string.IsNullOrWhiteSpace(_apiKey))
         {
             _logger.LogWarning("OPENAI_API_KEY is missing. Comment will require manual review.");
-            return false;
+            return new ModerationEvaluationResult
+            {
+                Decision = ModerationDecision.ManualReview,
+                ReasonCode = "missing_api_key"
+            };
         }
 
         try
@@ -60,7 +69,11 @@ public class AIModerationService
             {
                 _logger.LogWarning(
                     "OpenAI moderation response did not include a usable flagged decision. Comment will require manual review.");
-                return false;
+                return new ModerationEvaluationResult
+                {
+                    Decision = ModerationDecision.ManualReview,
+                    ReasonCode = "invalid_response_payload"
+                };
             }
 
             var requestId = response.Headers.TryGetValues("x-request-id", out var values)
@@ -72,15 +85,29 @@ public class AIModerationService
                 flagged,
                 requestId ?? "n/a");
 
-            // If any category is flagged, consider unsafe
-            return !flagged;
+            return new ModerationEvaluationResult
+            {
+                Decision = flagged ? ModerationDecision.Block : ModerationDecision.Allow,
+                ReasonCode = flagged ? "openai_flagged" : "openai_clear",
+                FlaggedByModel = flagged,
+                OpenAiRequestId = requestId
+            };
         }
         catch (Exception ex)
         {
-            // Log error and fallback to manual review
             _logger.LogError(ex, "AI moderation request failed. Comment will require manual review.");
-            return false; // Err on side of caution
+            return new ModerationEvaluationResult
+            {
+                Decision = ModerationDecision.ManualReview,
+                ReasonCode = "request_failed"
+            };
         }
+    }
+
+    public async Task<bool> IsCommentSafeAsync(string content)
+    {
+        var result = await EvaluateCommentAsync(content);
+        return result.IsSafe;
     }
 
     private class OpenAIModerationResponse

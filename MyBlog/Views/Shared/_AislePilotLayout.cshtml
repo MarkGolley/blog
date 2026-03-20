@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    @{
+        var siteName = "MyBlog";
+        var pageTitle = ViewData["Title"]?.ToString();
+        var metaTitle = string.IsNullOrWhiteSpace(pageTitle) ? siteName : $"{pageTitle} - {siteName}";
+        var metaDescription = ViewData["MetaDescription"]?.ToString()
+                              ?? "Engineering posts on C#, .NET, Python, testing, and software design.";
+    }
+    <title>@metaTitle</title>
+    <meta name="description" content="@metaDescription" />
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/MyBlog.styles.css" asp-append-version="true" />
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body>
+@{
+    var fallbackReturnUrl = Url.Action("Index", "Projects") ?? "/projects";
+    var requestedReturnUrl = ViewData["ReturnUrl"]?.ToString();
+    var returnUrl = !string.IsNullOrWhiteSpace(requestedReturnUrl) &&
+                    Url.IsLocalUrl(requestedReturnUrl) &&
+                    !requestedReturnUrl.StartsWith("/projects/aisle-pilot", StringComparison.OrdinalIgnoreCase)
+        ? requestedReturnUrl
+        : fallbackReturnUrl;
+}
+<a class="skip-link" href="#main-content">Skip to content</a>
+<div class="page-aurora" aria-hidden="true">
+    <span class="orb orb-a"></span>
+    <span class="orb orb-b"></span>
+    <span class="orb orb-c"></span>
+</div>
+<div class="scroll-progress" aria-hidden="true" data-scroll-progress></div>
+
+<header class="app-shell-header">
+    <div class="container app-shell-nav">
+        <a class="btn btn-secondary app-shell-back" href="@returnUrl">Back</a>
+    </div>
+</header>
+
+<main id="main-content" role="main" class="container page-main app-shell-main" data-page-main>
+    @RenderBody()
+</main>
+
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -106,6 +106,71 @@ document.addEventListener("DOMContentLoaded", () => {
         updateProgress();
     }
 
+    const focusCarousel = document.querySelector("[data-focus-carousel]");
+    if (focusCarousel instanceof HTMLElement) {
+        const itemsScript = focusCarousel.querySelector("[data-focus-items]");
+        const label = focusCarousel.querySelector("[data-focus-label]");
+        const period = focusCarousel.querySelector("[data-focus-period]");
+        const heading = focusCarousel.querySelector("[data-focus-heading]");
+        const copy = focusCarousel.querySelector("[data-focus-copy]");
+        const prevButton = focusCarousel.querySelector("[data-focus-prev]");
+        const nextButton = focusCarousel.querySelector("[data-focus-next]");
+        const dots = Array.from(focusCarousel.querySelectorAll("[data-focus-dot]"));
+
+        if (
+            itemsScript instanceof HTMLScriptElement
+            && label instanceof HTMLElement
+            && period instanceof HTMLElement
+            && heading instanceof HTMLElement
+            && copy instanceof HTMLElement
+            && prevButton instanceof HTMLButtonElement
+            && nextButton instanceof HTMLButtonElement
+        ) {
+            try {
+                const items = JSON.parse(itemsScript.textContent ?? "[]");
+                if (Array.isArray(items) && items.length > 0) {
+                    let activeIndex = 0;
+
+                    const renderFocus = (index) => {
+                        const safeIndex = ((index % items.length) + items.length) % items.length;
+                        const activeItem = items[safeIndex];
+                        activeIndex = safeIndex;
+
+                        label.textContent = typeof activeItem.label === "string" ? activeItem.label : "";
+                        period.textContent = typeof activeItem.period === "string" ? activeItem.period : "";
+                        heading.textContent = typeof activeItem.heading === "string" ? activeItem.heading : "";
+                        copy.textContent = typeof activeItem.copy === "string" ? activeItem.copy : "";
+
+                        dots.forEach((dot, dotIndex) => {
+                            if (!(dot instanceof HTMLButtonElement)) {
+                                return;
+                            }
+
+                            const isActive = dotIndex === safeIndex;
+                            dot.classList.toggle("is-active", isActive);
+                            dot.setAttribute("aria-selected", String(isActive));
+                        });
+                    };
+
+                    prevButton.addEventListener("click", () => renderFocus(activeIndex - 1));
+                    nextButton.addEventListener("click", () => renderFocus(activeIndex + 1));
+
+                    dots.forEach((dot, dotIndex) => {
+                        if (!(dot instanceof HTMLButtonElement)) {
+                            return;
+                        }
+
+                        dot.addEventListener("click", () => renderFocus(dotIndex));
+                    });
+
+                    renderFocus(0);
+                }
+            } catch {
+                // Leave the initial server-rendered content in place if parsing fails.
+            }
+        }
+    }
+
     const revealItems = Array.from(document.querySelectorAll("[data-reveal]"));
     if (revealItems.length > 0) {
         const reducedMotion =

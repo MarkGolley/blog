@@ -1,0 +1,17 @@
+namespace MyBlog.Models;
+
+public class CaseStudyTemplateViewModel
+{
+    public string Title { get; init; } = string.Empty;
+    public string Status { get; init; } = "Planned";
+    public string OneLiner { get; init; } = string.Empty;
+    public string WhyItMatters { get; init; } = string.Empty;
+    public IReadOnlyList<string> TechnicalScope { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> ProofChecklist { get; init; } = Array.Empty<string>();
+    public string WhatItShows { get; init; } = string.Empty;
+    public string NextMilestone { get; init; } = string.Empty;
+    public string CtaText { get; init; } = string.Empty;
+    public string CtaController { get; init; } = string.Empty;
+    public string CtaAction { get; init; } = "Index";
+    public string CtaIconPath { get; init; } = string.Empty;
+}

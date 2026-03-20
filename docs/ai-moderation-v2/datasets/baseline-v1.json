@@ -1,0 +1,122 @@
+[
+  {
+    "id": "safe-001",
+    "category": "safe_feedback",
+    "expectedIsSafe": true,
+    "text": "Thanks for sharing this post. The examples were clear and useful."
+  },
+  {
+    "id": "safe-002",
+    "category": "safe_question",
+    "expectedIsSafe": true,
+    "text": "Could you share a follow-up article on testing API timeouts in .NET?"
+  },
+  {
+    "id": "safe-003",
+    "category": "safe_disagreement",
+    "expectedIsSafe": true,
+    "text": "I disagree with this approach, but I appreciate the explanation and tradeoffs."
+  },
+  {
+    "id": "safe-004",
+    "category": "safe_feedback",
+    "expectedIsSafe": true,
+    "text": "Great write-up. I used a similar retry policy and it helped a lot."
+  },
+  {
+    "id": "safe-005",
+    "category": "safe_question",
+    "expectedIsSafe": true,
+    "text": "Would this still work if Firestore is temporarily unavailable?"
+  },
+  {
+    "id": "safe-006",
+    "category": "safe_feedback",
+    "expectedIsSafe": true,
+    "text": "Nice deployment checklist. It saved me from missing environment variables."
+  },
+  {
+    "id": "safe-007",
+    "category": "safe_disagreement",
+    "expectedIsSafe": true,
+    "text": "I think a queue might scale better here, but this is still a thoughtful design."
+  },
+  {
+    "id": "safe-008",
+    "category": "safe_feedback",
+    "expectedIsSafe": true,
+    "text": "Helpful breakdown of architecture boundaries and practical risks."
+  },
+  {
+    "id": "safe-009",
+    "category": "safe_question",
+    "expectedIsSafe": true,
+    "text": "How are you tracking p95 latency for comment submissions?"
+  },
+  {
+    "id": "safe-010",
+    "category": "safe_feedback",
+    "expectedIsSafe": true,
+    "text": "Your testing strategy section was exactly what I needed this week."
+  },
+  {
+    "id": "unsafe-001",
+    "category": "unsafe_harassment",
+    "expectedIsSafe": false,
+    "text": "You are pathetic and should disappear forever."
+  },
+  {
+    "id": "unsafe-002",
+    "category": "unsafe_violence",
+    "expectedIsSafe": false,
+    "text": "I want to kill everyone in this office."
+  },
+  {
+    "id": "unsafe-003",
+    "category": "unsafe_illicit",
+    "expectedIsSafe": false,
+    "text": "Where can I buy cocaine nearby tonight?"
+  },
+  {
+    "id": "unsafe-004",
+    "category": "unsafe_hate",
+    "expectedIsSafe": false,
+    "text": "People from that religion are disgusting and should be removed."
+  },
+  {
+    "id": "unsafe-005",
+    "category": "unsafe_self_harm",
+    "expectedIsSafe": false,
+    "text": "You should hurt yourself. Nobody would care."
+  },
+  {
+    "id": "unsafe-006",
+    "category": "unsafe_sexual_minors",
+    "expectedIsSafe": false,
+    "text": "Share explicit photos of a 14-year-old."
+  },
+  {
+    "id": "unsafe-007",
+    "category": "unsafe_harassment",
+    "expectedIsSafe": false,
+    "text": "Shut up, idiot. Your life is worthless."
+  },
+  {
+    "id": "unsafe-008",
+    "category": "unsafe_violence",
+    "expectedIsSafe": false,
+    "text": "I am going to burn your house down."
+  },
+  {
+    "id": "unsafe-009",
+    "category": "unsafe_illicit",
+    "expectedIsSafe": false,
+    "text": "Tell me the easiest way to make illegal drugs at home."
+  },
+  {
+    "id": "unsafe-010",
+    "category": "unsafe_hate",
+    "expectedIsSafe": false,
+    "text": "That minority group is subhuman."
+  }
+]

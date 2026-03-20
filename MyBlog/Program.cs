@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.WebUtilities;
 using MyBlog.Services;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+QuestPDF.Settings.License = LicenseType.Community;
 var secureCookiePolicy = builder.Environment.IsDevelopment()
     ? CookieSecurePolicy.SameAsRequest
     : CookieSecurePolicy.Always;
@@ -127,6 +129,8 @@ builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SubscriptionEmailService>();
+builder.Services.AddHttpClient<AislePilotService>();
+builder.Services.AddScoped<IAislePilotService>(sp => sp.GetRequiredService<AislePilotService>());
 builder.Services.AddHttpClient<AIModerationService>();
 builder.Services.AddHttpClient<DailyCodingCapsuleService>();
 builder.Services.AddTransient<IDailyCodingCapsuleProvider>(sp => sp.GetRequiredService<DailyCodingCapsuleService>());
@@ -209,6 +213,18 @@ builder.Services.AddRateLimiter(options =>
             {
                 PermitLimit = 5,
                 Window = TimeSpan.FromMinutes(10),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("aislePilotWrites", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5000,
+                Window = TimeSpan.FromMinutes(1),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,
                 AutoReplenishment = true
@@ -331,17 +347,24 @@ app.Run();
 
 static string GetRateLimitPartitionKey(HttpContext context)
 {
-    var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-    if (!string.IsNullOrWhiteSpace(forwardedFor))
+    var ip = context.Connection.RemoteIpAddress?.ToString();
+    var userAgent = context.Request.Headers.UserAgent.ToString();
+
+    if (string.IsNullOrWhiteSpace(ip))
     {
-        var firstForwarded = forwardedFor.Split(',')[0].Trim();
-        if (!string.IsNullOrWhiteSpace(firstForwarded))
-        {
-            return firstForwarded;
-        }
+        ip = "unknown-ip";
     }
 
-    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    if (string.IsNullOrWhiteSpace(userAgent))
+    {
+        userAgent = "unknown-ua";
+    }
+    else if (userAgent.Length > 120)
+    {
+        userAgent = userAgent[..120];
+    }
+
+    return $"{ip}|{userAgent}";
 }
 
 static bool ShouldDisableCaching(HttpContext context)
@@ -399,6 +422,11 @@ static string? ResolveBadRequestReturnPath(HttpRequest request, string requestPa
     if (requestPath.StartsWith("/Blog", StringComparison.OrdinalIgnoreCase))
     {
         return "/blog";
+    }
+
+    if (requestPath.StartsWith("/ai-experiments", StringComparison.OrdinalIgnoreCase))
+    {
+        return "/ai-experiments";
     }
 
     if (requestPath.Equals("/Subscribe", StringComparison.OrdinalIgnoreCase))

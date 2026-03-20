@@ -15,7 +15,9 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
             {
                 ["Subscriptions:NotifyAdminKey"] = "integration-notify-key",
                 ["DailyCapsule:EnableAiGeneration"] = "false",
-                ["DailyCapsule:WarmupAdminKey"] = "integration-daily-capsule-key"
+                ["DailyCapsule:WarmupAdminKey"] = "integration-daily-capsule-key",
+                ["AislePilot:EnableAiGeneration"] = "false",
+                ["AislePilot:AllowTemplateFallback"] = "true"
             });
         });
 

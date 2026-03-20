@@ -1,0 +1,114 @@
+@{
+    ViewData["Title"] = "AI Experiments";
+    ViewData["MetaDescription"] =
+        "Interactive AI playgrounds from Mark Golley for retrieval, chunking, and prompt design experiments.";
+    ViewData["CanonicalPath"] = "/ai-experiments";
+}
+
+<section aria-labelledby="ai-experiments-title" class="portfolio-hero" data-reveal>
+    <p class="hero-kicker">AI Playground</p>
+    <h1 id="ai-experiments-title">Interactive experiments to test ideas quickly.</h1>
+    <p class="section-intro">
+        This page is for hands-on AI exploration. Project roadmap and delivery status live on the Projects page.
+    </p>
+    <div class="hero-actions">
+        <a class="btn btn-primary" asp-controller="Projects" asp-action="Index">View projects</a>
+        <a class="btn btn-secondary" href="#query-lab">Open playground</a>
+    </div>
+</section>
+
+<section aria-labelledby="query-lab" class="ai-lab-shell" data-ai-lab data-reveal>
+    <h2 id="query-lab">Query and citation lab</h2>
+    <p class="section-intro">Try a question and see a lightweight retrieval simulation with source picks.</p>
+
+    <div class="ai-lab-controls">
+        <label for="lab-query-input">Question</label>
+        <textarea id="lab-query-input" rows="3" maxlength="400">How would you explain reliability checks before deploying an ASP.NET app?</textarea>
+        <div class="ai-lab-control-row">
+            <label for="lab-query-mode">Retrieval mode</label>
+            <select id="lab-query-mode">
+                <option value="balanced">Balanced</option>
+                <option value="precise">Precise</option>
+                <option value="broad">Broad</option>
+            </select>
+            <button type="button" id="lab-query-run">Run retrieval</button>
+            <button type="button" id="lab-query-random" class="btn btn-secondary ai-mini-btn">Surprise me</button>
+        </div>
+    </div>
+
+    <div class="ai-lab-result-grid">
+        <article class="ai-lab-panel">
+            <h3>Top sources</h3>
+            <ol id="lab-query-sources" class="ai-source-list"></ol>
+        </article>
+        <article class="ai-lab-panel">
+            <h3>Synthesized answer</h3>
+            <p id="lab-query-answer" class="ai-answer-copy"></p>
+            <p class="ai-footnote">Demo output only. Final answers in Ask Mark will be grounded by real retrieval data.</p>
+        </article>
+    </div>
+</section>
+
+<section aria-labelledby="chunk-lab" class="ai-lab-shell" data-ai-lab-chunks data-reveal>
+    <h2 id="chunk-lab">Chunk strategy lab</h2>
+    <p class="section-intro">See how chunk size and overlap change document splits used for retrieval.</p>
+
+    <label for="lab-chunk-input">Sample document</label>
+    <textarea id="lab-chunk-input" rows="5" maxlength="2000">Before deployment, run automated tests, mobile end-to-end checks, and smoke probes against critical flows. Use measurable thresholds so releases are blocked when latency, error rate, or functional behavior regress beyond accepted limits.</textarea>
+
+    <div class="ai-lab-slider-grid">
+        <label for="lab-chunk-size">Chunk size
+            <span id="lab-chunk-size-value">220</span>
+        </label>
+        <input id="lab-chunk-size" type="range" min="120" max="420" step="20" value="220" />
+
+        <label for="lab-chunk-overlap">Overlap
+            <span id="lab-chunk-overlap-value">40</span>
+        </label>
+        <input id="lab-chunk-overlap" type="range" min="0" max="120" step="10" value="40" />
+    </div>
+
+    <p id="lab-chunk-summary" class="policy-note"></p>
+    <div id="lab-chunk-results" class="ai-chunk-grid"></div>
+</section>
+
+<section aria-labelledby="prompt-remix-lab" class="ai-lab-shell" data-ai-lab-remix data-reveal>
+    <h2 id="prompt-remix-lab">Prompt remix lab</h2>
+    <p class="section-intro">Generate multiple prompt styles from one intent to compare framing.</p>
+
+    <div class="ai-lab-controls">
+        <label for="lab-remix-intent">Base intent</label>
+        <input id="lab-remix-intent" type="text" maxlength="240" value="Explain why integration tests matter in ASP.NET Core." />
+
+        <div class="ai-lab-control-row">
+            <label for="lab-remix-audience">Audience</label>
+            <select id="lab-remix-audience">
+                <option value="recruiter">Recruiter</option>
+                <option value="junior">Junior developer</option>
+                <option value="lead">Tech lead</option>
+            </select>
+            <label for="lab-remix-tone">Tone</label>
+            <select id="lab-remix-tone">
+                <option value="direct">Direct</option>
+                <option value="playful">Playful</option>
+                <option value="analytical">Analytical</option>
+            </select>
+            <button type="button" id="lab-remix-generate">Generate prompts</button>
+        </div>
+
+        <label class="ai-inline-toggle">
+            <input id="lab-remix-constraint" type="checkbox" checked />
+            Include a hard constraint
+        </label>
+    </div>
+
+    <div id="lab-remix-results" class="ai-remix-list"></div>
+</section>
+
+@section Head {
+    <link rel="stylesheet" href="~/css/ai-experiments.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script src="~/js/ai-experiments.js" asp-append-version="true"></script>
+}

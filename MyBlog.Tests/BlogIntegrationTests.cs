@@ -352,6 +352,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         var checks = root.GetProperty("checks");
         Assert.True(checks.TryGetProperty("blogStorage", out _), "Expected blogStorage check in health payload.");
         Assert.True(checks.TryGetProperty("firestore", out _), "Expected firestore check in health payload.");
+        Assert.True(checks.TryGetProperty("aislePilotMealCache", out _), "Expected aislePilotMealCache check in health payload.");
         Assert.True(checks.TryGetProperty("dailyCapsule", out _), "Expected dailyCapsule check in health payload.");
     }
 

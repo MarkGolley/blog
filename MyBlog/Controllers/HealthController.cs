@@ -26,6 +26,14 @@ public class HealthController : Controller
     {
         var checks = new Dictionary<string, object>();
         var isHealthy = true;
+        var minimumAislePilotCacheCount =
+            int.TryParse(Environment.GetEnvironmentVariable("AISLEPILOT_MIN_CACHE_COUNT"), out var envMinCacheCount)
+                ? Math.Max(0, envMinCacheCount)
+                : Math.Max(0, int.TryParse(HttpContext.RequestServices.GetService<IConfiguration>()?["AislePilot:MinCacheCountForHealth"], out var configMinCacheCount) ? configMinCacheCount : 0);
+        var failIfAislePilotCacheLow =
+            bool.TryParse(Environment.GetEnvironmentVariable("AISLEPILOT_FAIL_HEALTH_ON_LOW_CACHE"), out var envFailOnLowCache)
+                ? envFailOnLowCache
+                : bool.TryParse(HttpContext.RequestServices.GetService<IConfiguration>()?["AislePilot:FailHealthOnLowCache"], out var configFailOnLowCache) && configFailOnLowCache;
 
         var blogStoragePath = Path.Combine(_env.WebRootPath, "BlogStorage");
         var blogStorageExists = Directory.Exists(blogStoragePath);
@@ -60,6 +68,13 @@ public class HealthController : Controller
             {
                 isHealthy = false;
             }
+
+            checks["aislePilotMealCache"] = new
+            {
+                status = fallbackStatus,
+                count = 0,
+                minimumExpected = minimumAislePilotCacheCount
+            };
         }
         else
         {
@@ -70,6 +85,21 @@ public class HealthController : Controller
 
                 await firestore.Collection("meta").Limit(1).GetSnapshotAsync(timeoutCts.Token);
                 checks["firestore"] = new { status = "ok" };
+
+                var aiMealSnapshot = await firestore.Collection("aislePilotAiMeals").GetSnapshotAsync(timeoutCts.Token);
+                var aiMealCount = aiMealSnapshot.Documents.Count;
+                var cacheStatus = aiMealCount >= minimumAislePilotCacheCount ? "ok" : "warning";
+                checks["aislePilotMealCache"] = new
+                {
+                    status = cacheStatus,
+                    count = aiMealCount,
+                    minimumExpected = minimumAislePilotCacheCount
+                };
+
+                if (failIfAislePilotCacheLow && cacheStatus == "warning")
+                {
+                    isHealthy = false;
+                }
             }
             catch (Exception ex)
             {
@@ -78,6 +108,12 @@ public class HealthController : Controller
                 checks["firestore"] = new
                 {
                     status = "error"
+                };
+                checks["aislePilotMealCache"] = new
+                {
+                    status = "error",
+                    count = 0,
+                    minimumExpected = minimumAislePilotCacheCount
                 };
             }
         }
