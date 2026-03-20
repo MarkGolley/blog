@@ -87,6 +87,55 @@ html.aislepilot-restore-pending .aislepilot-app {
     box-shadow: 0 12px 24px rgba(11, 24, 42, 0.08);
 }
 
+.aislepilot-alert-shell {
+    border-color: rgba(176, 116, 22, 0.42);
+    background: linear-gradient(150deg, rgba(255, 249, 238, 0.98), rgba(255, 255, 255, 0.98));
+}
+
+.aislepilot-alert-guidance {
+    margin: 0.26rem 0 0;
+    color: var(--ink-soft);
+}
+
+.aislepilot-alert-list {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.2rem;
+    color: var(--ink);
+    font-size: 0.9rem;
+}
+
+.aislepilot-alert-actions {
+    margin-top: 0.58rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.42rem;
+}
+
+.aislepilot-alert-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.1rem;
+    padding: 0.34rem 0.72rem;
+    border: none !important;
+    border-radius: 999px !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
+    text-decoration: none;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.aislepilot-alert-btn.is-secondary {
+    border: 1px solid rgba(16, 63, 101, 0.24) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+}
+
 .aislepilot-window-shell {
     display: grid;
     gap: 0.62rem;
@@ -97,6 +146,13 @@ html.aislepilot-restore-pending .aislepilot-app {
     align-items: center;
     justify-content: space-between;
     gap: 0.72rem;
+}
+
+.aislepilot-window-title-meta {
+    margin-left: 0.44rem;
+    color: var(--ink-soft);
+    font-size: 0.84rem;
+    font-weight: 600;
 }
 
 .aislepilot-window-nav {
@@ -174,6 +230,10 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-window-panel {
     flex: 0 0 100%;
     min-width: 100%;
+}
+
+.aislepilot-mobile-jumpbar {
+    display: none;
 }
 
 .aislepilot-window-meta {
@@ -471,18 +531,23 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-pantry-inline-action {
-    min-height: auto !important;
+    min-height: 2rem !important;
     border: none !important;
-    background: transparent !important;
-    color: var(--brand-deep) !important;
-    box-shadow: none !important;
-    font-size: 0.82rem !important;
+    border-radius: 999px !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14) !important;
+    font-size: 0.78rem !important;
     font-weight: 700 !important;
-    padding: 0 !important;
-    text-decoration: underline;
-    text-underline-offset: 0.12rem;
+    letter-spacing: 0.01em;
+    padding: 0.22rem 0.62rem !important;
     white-space: nowrap;
     justify-self: start;
+    margin-top: 0.16rem;
+}
+
+.aislepilot-pantry-inline-action:hover {
+    filter: brightness(1.04);
 }
 
 .aislepilot-field-chip {
@@ -806,11 +871,47 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-radius: 12px;
     padding: 0.72rem;
     background: rgba(255, 255, 255, 0.95);
+    transition: opacity 0.16s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .aislepilot-card.is-leftover-source {
     border-color: rgba(16, 63, 101, 0.34);
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(240, 246, 255, 0.88));
+}
+
+.aislepilot-card.is-swap-fading-out {
+    opacity: 0.46;
+    transform: translateY(2px) scale(0.995);
+}
+
+.aislepilot-meal-grid.is-swap-fading-in {
+    animation: aislepilot-swap-grid-in 0.22s ease-out;
+}
+
+.aislepilot-card.is-swap-updated {
+    animation: aislepilot-swap-card-in 0.3s ease-out;
+}
+
+@keyframes aislepilot-swap-grid-in {
+    from {
+        opacity: 0.68;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes aislepilot-swap-card-in {
+    from {
+        opacity: 0.38;
+        transform: translateY(6px) scale(0.992);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .aislepilot-card h3 {
@@ -944,6 +1045,18 @@ html.aislepilot-restore-pending .aislepilot-app {
     grid-template-columns: 1fr;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .aislepilot-card.is-swap-fading-out {
+        opacity: 0.74;
+        transform: none;
+    }
+
+    .aislepilot-meal-grid.is-swap-fading-in,
+    .aislepilot-card.is-swap-updated {
+        animation: none;
+    }
+}
+
 @media (min-width: 640px) {
     .aislepilot-inline-fields {
         grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -980,6 +1093,11 @@ html.aislepilot-restore-pending .aislepilot-app {
         align-items: flex-start;
     }
 
+    .aislepilot-window-title-meta {
+        margin-left: 0.28rem;
+        font-size: 0.78rem;
+    }
+
     .aislepilot-window-nav {
         width: 100%;
         justify-items: stretch;
@@ -998,6 +1116,16 @@ html.aislepilot-restore-pending .aislepilot-app {
     .aislepilot-window-tab {
         min-height: 2.28rem !important;
         font-size: 0.79rem !important;
+    }
+
+    .aislepilot-alert-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-alert-btn {
+        width: 100%;
     }
 
     .aislepilot-section-head {
@@ -1033,6 +1161,48 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 }
 
+@media (max-width: 760px) {
+    .aislepilot-app.has-result {
+        padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .aislepilot-mobile-jumpbar {
+        position: fixed;
+        z-index: 78;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(0.54rem + env(safe-area-inset-bottom, 0px));
+        width: min(calc(100% - 0.8rem), 34rem);
+        display: grid;
+        padding: 0.34rem;
+        border: 1px solid rgba(16, 63, 101, 0.22);
+        border-radius: 13px;
+        background: rgba(245, 250, 255, 0.96);
+        box-shadow: 0 12px 24px rgba(11, 24, 42, 0.16);
+        backdrop-filter: blur(4px);
+        opacity: 1;
+        transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .aislepilot-mobile-jumpbar-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.26rem;
+    }
+
+    .aislepilot-mobile-jumpbar .aislepilot-mobile-jumpbar-tab {
+        min-height: 2.2rem !important;
+        padding: 0.28rem 0.4rem !important;
+        font-size: 0.75rem !important;
+    }
+
+    [data-aislepilot-window][data-active-panel="aislepilot-meals"] .aislepilot-mobile-jumpbar {
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, calc(100% + 1rem));
+    }
+}
+
 @media (min-width: 880px) {
     .aislepilot-meal-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1060,7 +1230,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     .hero-actions,
     .aislepilot-export-actions,
     .aislepilot-window-nav-hint,
-    .aislepilot-window-tabs {
+    .aislepilot-window-tabs,
+    .aislepilot-mobile-jumpbar {
         display: none !important;
     }
 

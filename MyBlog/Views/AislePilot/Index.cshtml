@@ -13,9 +13,32 @@
     var hasResult = Model.HasResult && Model.Result is not null;
     var setupHiddenAttribute = hasResult ? "hidden" : null;
     var appHeadClass = hasResult ? "aislepilot-app-head is-compact" : "aislepilot-app-head";
+    var appClass = hasResult ? "aislepilot-app has-result" : "aislepilot-app";
+    var modelErrors = ViewData.ModelState.Values
+        .SelectMany(state => state.Errors)
+        .Select(error => error.ErrorMessage?.Trim())
+        .Where(message => !string.IsNullOrWhiteSpace(message))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    var hasModelErrors = modelErrors.Count > 0;
+    var joinedErrorText = string.Join(" ", modelErrors).ToLowerInvariant();
+    var looksLikeSwapIssue =
+        joinedErrorText.Contains("swap", StringComparison.Ordinal) ||
+        joinedErrorText.Contains("selected day was out of range", StringComparison.Ordinal) ||
+        joinedErrorText.Contains("current plan", StringComparison.Ordinal);
+    var looksLikeConstraintIssue =
+        joinedErrorText.Contains("no meals match", StringComparison.Ordinal) ||
+        joinedErrorText.Contains("dietary", StringComparison.Ordinal) ||
+        joinedErrorText.Contains("allergen", StringComparison.Ordinal);
+    var looksLikeAiIssue =
+        joinedErrorText.Contains("ai", StringComparison.Ordinal) ||
+        joinedErrorText.Contains("rate", StringComparison.Ordinal) ||
+        joinedErrorText.Contains("timeout", StringComparison.Ordinal) ||
+        joinedErrorText.Contains("temporarily", StringComparison.Ordinal) ||
+        joinedErrorText.Contains("unavailable", StringComparison.Ordinal);
 }
 
-<div class="aislepilot-app">
+<div class="@appClass">
     <section aria-label="AislePilot header" class="@appHeadClass" data-reveal>
         <div class="aislepilot-brand-lockup" aria-label="AislePilot brand">
             <img class="aislepilot-brand-logo" src="~/images/aislepilot-logo-horizontal.svg" alt="AislePilot" />
@@ -29,13 +52,67 @@
         }
     </section>
 
+    @if (hasModelErrors)
+    {
+        var alertTitle = looksLikeSwapIssue
+            ? "Could not swap that meal"
+            : looksLikeConstraintIssue
+                ? "Constraints are too strict for this plan"
+                : looksLikeAiIssue
+                    ? "Meal generation is temporarily unavailable"
+                    : "Something needs attention";
+        var alertGuidance = looksLikeSwapIssue
+            ? "Try swapping again, or regenerate your plan to refresh all meals."
+            : looksLikeConstraintIssue
+                ? "Remove one dietary constraint or allergen, then generate again."
+                : looksLikeAiIssue
+                    ? "Wait 15-30 seconds and retry. If it still fails, regenerate with fewer strict constraints."
+                    : "Review the message below and try again.";
+
+        <section aria-labelledby="aislepilot-alert-title" class="aislepilot-shell aislepilot-alert-shell" data-reveal>
+            <h2 id="aislepilot-alert-title" class="aislepilot-section-title">@alertTitle</h2>
+            <p class="aislepilot-alert-guidance">@alertGuidance</p>
+            <ul class="aislepilot-alert-list">
+                @foreach (var errorMessage in modelErrors.Take(3))
+                {
+                    <li>@errorMessage</li>
+                }
+            </ul>
+            <div class="aislepilot-alert-actions">
+                <button type="submit"
+                        class="aislepilot-alert-btn"
+                        form="aislepilot-setup-form"
+                        data-loading-label="Generating plan...">
+                    Try generating again
+                </button>
+                @if (hasResult)
+                {
+                    <button type="button"
+                            class="aislepilot-alert-btn is-secondary"
+                            data-setup-toggle
+                            aria-controls="aislepilot-setup"
+                            aria-expanded="false">
+                        Edit setup first
+                    </button>
+                }
+                else
+                {
+                    <a href="#aislepilot-setup" class="aislepilot-alert-btn is-secondary">Review setup</a>
+                }
+            </div>
+        </section>
+    }
+
     <section id="aislepilot-setup" aria-labelledby="aislepilot-form-title" class="aislepilot-shell" data-reveal data-setup-panel @setupHiddenAttribute>
         <h2 id="aislepilot-form-title" class="aislepilot-section-title">Setup</h2>
 
-        <form method="post" asp-action="Index" class="contact-form aislepilot-form">
+        <form method="post" asp-action="Index" id="aislepilot-setup-form" class="contact-form aislepilot-form">
             @Html.AntiForgeryToken()
             <input asp-for="ReturnUrl" type="hidden" />
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            @if (!hasModelErrors)
+            {
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            }
 
             <div class="aislepilot-setup-strip">
                 <div class="aislepilot-inline-fields">
@@ -186,6 +263,7 @@
         .ToList();
     var leftoverSourceDayIndexesCsv = string.Join(",", leftoverSourceWeekDayIndexes);
     var mealCount = result.MealPlan.Count;
+    var mealLabel = mealCount == 1 ? "meal" : "meals";
     var totalShopItems = result.ShoppingItems.Count;
     var departmentCount = groupedItems.Count;
 
@@ -255,7 +333,10 @@
 
     <section class="aislepilot-shell aislepilot-window-shell" aria-labelledby="aislepilot-window-title" data-aislepilot-window data-reveal>
         <div class="aislepilot-window-head">
-            <h2 id="aislepilot-window-title" class="aislepilot-section-title">Weekly plan</h2>
+            <h2 id="aislepilot-window-title" class="aislepilot-section-title">
+                Weekly plan
+                <span class="aislepilot-window-title-meta">@mealCount @mealLabel generated</span>
+            </h2>
             <div class="aislepilot-window-nav">
                 <p class="aislepilot-window-nav-hint" data-window-hint>Tap a tab to switch between meals, shopping list, and exports.</p>
                 <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
@@ -268,7 +349,6 @@
         <div class="aislepilot-window-viewport" data-window-viewport>
             <div class="aislepilot-window-track" data-window-track>
                 <section id="aislepilot-meals" aria-label="Meals" role="tabpanel" aria-labelledby="aislepilot-tab-meals" class="aislepilot-window-panel" data-window-name="Meals">
-                    <p class="aislepilot-window-meta">@mealCount meals generated for this week.</p>
                     @if (result.LeftoverDays > 0)
                     {
                         <div class="aislepilot-leftover-editor">
@@ -473,6 +553,13 @@
                 </section>
             </div>
         </div>
+        <div class="aislepilot-mobile-jumpbar" data-mobile-jumpbar aria-label="Quick section switcher">
+            <div class="aislepilot-mobile-jumpbar-tabs">
+                <button type="button" class="aislepilot-window-tab aislepilot-mobile-jumpbar-tab" data-window-tab="aislepilot-meals">Meals</button>
+                <button type="button" class="aislepilot-window-tab aislepilot-mobile-jumpbar-tab" data-window-tab="aislepilot-shop">Shopping list</button>
+                <button type="button" class="aislepilot-window-tab aislepilot-mobile-jumpbar-tab" data-window-tab="aislepilot-export">Export files</button>
+            </div>
+        </div>
     </section>
 }
 </div>
@@ -514,6 +601,7 @@
             [data-setup-toggle] { display: none !important; }
             [data-aislepilot-window] .aislepilot-window-controls,
             [data-aislepilot-window] .aislepilot-window-tabs { display: none !important; }
+            [data-mobile-jumpbar] { display: none !important; }
             [data-aislepilot-window] .aislepilot-window-viewport { overflow: visible !important; height: auto !important; }
             [data-aislepilot-window] .aislepilot-window-track { display: block !important; transform: none !important; }
             [data-aislepilot-window] .aislepilot-window-panel { min-width: 100% !important; margin-bottom: 0.75rem; }

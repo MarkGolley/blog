@@ -465,6 +465,7 @@
     const syncUi = (nextIndex, updateHash) => {
         const panelCount = panels.length;
         currentIndex = ((nextIndex % panelCount) + panelCount) % panelCount;
+        root.setAttribute("data-active-panel", panels[currentIndex].id);
 
         track.style.transform = `translateX(-${currentIndex * 100}%)`;
 
@@ -837,6 +838,40 @@
         return true;
     };
 
+    const animateSwappedMeal = dayIndex => {
+        const mealsGrid = document.querySelector("#aislepilot-meals .aislepilot-meal-grid");
+        if (mealsGrid instanceof HTMLElement) {
+            mealsGrid.classList.remove("is-swap-fading-in");
+            mealsGrid.getBoundingClientRect();
+            mealsGrid.classList.add("is-swap-fading-in");
+            window.setTimeout(() => {
+                mealsGrid.classList.remove("is-swap-fading-in");
+            }, 260);
+        }
+
+        if (!Number.isInteger(dayIndex) || dayIndex < 0) {
+            return;
+        }
+
+        const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${dayIndex}']`;
+        const dayInput = document.querySelector(selector);
+        if (!(dayInput instanceof HTMLInputElement)) {
+            return;
+        }
+
+        const updatedCard = dayInput.closest(".aislepilot-card");
+        if (!(updatedCard instanceof HTMLElement)) {
+            return;
+        }
+
+        updatedCard.classList.remove("is-swap-updated");
+        updatedCard.getBoundingClientRect();
+        updatedCard.classList.add("is-swap-updated");
+        window.setTimeout(() => {
+            updatedCard.classList.remove("is-swap-updated");
+        }, 360);
+    };
+
     const wireAjaxSwapForm = form => {
         if (!(form instanceof HTMLFormElement) || form.dataset.ajaxSwapWired === "true") {
             return;
@@ -856,6 +891,13 @@
 
             swapForm.dataset.ajaxSwapSubmitting = "true";
             const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
+            const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
+                ? scrollSnapshot.anchorDayIndex
+                : null;
+            const currentCard = swapForm.closest(".aislepilot-card");
+            if (currentCard instanceof HTMLElement) {
+                currentCard.classList.add("is-swap-fading-out");
+            }
             const actionUrl = stripHashFromFormAction(swapForm);
             if (!actionUrl) {
                 persistSwapScrollPosition(swapForm);
@@ -888,6 +930,7 @@
                     }
 
                     restoreInlineSwapScroll(scrollSnapshot);
+                    animateSwappedMeal(swapDayIndex);
                     return;
                 }
 
@@ -903,6 +946,9 @@
                 HTMLFormElement.prototype.submit.call(swapForm);
                 return;
             } finally {
+                if (currentCard instanceof HTMLElement && currentCard.isConnected) {
+                    currentCard.classList.remove("is-swap-fading-out");
+                }
                 clearSubmitLoadingDelay(swapForm);
                 delete swapForm.dataset.ajaxSwapSubmitting;
             }
