@@ -256,15 +256,18 @@
     <section class="aislepilot-shell aislepilot-window-shell" aria-labelledby="aislepilot-window-title" data-aislepilot-window data-reveal>
         <div class="aislepilot-window-head">
             <h2 id="aislepilot-window-title" class="aislepilot-section-title">Weekly plan</h2>
-            <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
-                <button type="button" class="aislepilot-window-tab" data-window-tab="aislepilot-meals" role="tab" aria-selected="true">Meals</button>
-                <button type="button" class="aislepilot-window-tab" data-window-tab="aislepilot-shop" role="tab" aria-selected="false">Shop</button>
-                <button type="button" class="aislepilot-window-tab" data-window-tab="aislepilot-export" role="tab" aria-selected="false">Export</button>
+            <div class="aislepilot-window-nav">
+                <p class="aislepilot-window-nav-hint" data-window-hint>Tap a tab to switch between meals, shopping list, and exports.</p>
+                <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
+                    <button type="button" id="aislepilot-tab-meals" class="aislepilot-window-tab" data-window-tab="aislepilot-meals" role="tab" aria-controls="aislepilot-meals" aria-selected="true">Meals</button>
+                    <button type="button" id="aislepilot-tab-shop" class="aislepilot-window-tab" data-window-tab="aislepilot-shop" role="tab" aria-controls="aislepilot-shop" aria-selected="false">Shopping list</button>
+                    <button type="button" id="aislepilot-tab-export" class="aislepilot-window-tab" data-window-tab="aislepilot-export" role="tab" aria-controls="aislepilot-export" aria-selected="false">Export files</button>
+                </div>
             </div>
         </div>
         <div class="aislepilot-window-viewport" data-window-viewport>
             <div class="aislepilot-window-track" data-window-track>
-                <section id="aislepilot-meals" aria-label="Meals" class="aislepilot-window-panel" data-window-name="Meals">
+                <section id="aislepilot-meals" aria-label="Meals" role="tabpanel" aria-labelledby="aislepilot-tab-meals" class="aislepilot-window-panel" data-window-name="Meals">
                     <p class="aislepilot-window-meta">@mealCount meals generated for this week.</p>
                     @if (result.LeftoverDays > 0)
                     {
@@ -397,7 +400,7 @@
                     </div>
                 </section>
 
-                <section id="aislepilot-shop" aria-label="Shop" class="aislepilot-window-panel" data-window-name="Shop">
+                <section id="aislepilot-shop" aria-label="Shopping list" role="tabpanel" aria-labelledby="aislepilot-tab-shop" class="aislepilot-window-panel" data-window-name="Shopping list">
                     <div class="aislepilot-shopping-grid">
                         @foreach (var department in groupedItems)
                         {
@@ -419,7 +422,7 @@
                     </div>
                 </section>
 
-                <section id="aislepilot-export" aria-label="Export" class="aislepilot-window-panel" data-window-name="Export">
+                <section id="aislepilot-export" aria-label="Export files" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel" data-window-name="Export files">
                     <p class="aislepilot-window-meta">3 export options ready for in-store use.</p>
                     <p class="section-intro">
                         Download a full plan pack PDF (with quick jump links), or a lightweight checklist for your phone notes app.

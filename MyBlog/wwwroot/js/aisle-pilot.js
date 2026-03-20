@@ -182,6 +182,8 @@
     const track = root.querySelector("[data-window-track]");
     const tabs = Array.from(root.querySelectorAll("[data-window-tab]"));
     const panels = Array.from(root.querySelectorAll(".aislepilot-window-panel"));
+    const tabHint = root.querySelector("[data-window-hint]");
+    const tabHintSeenStorageKey = "aislepilot:tab-hint-seen";
 
     if (!viewport || !track || panels.length === 0) {
         return;
@@ -191,6 +193,35 @@
     let touchStartX = 0;
     let touchStartY = 0;
     let activePanelResizeObserver = null;
+
+    const hideTabHint = () => {
+        if (tabHint instanceof HTMLElement) {
+            tabHint.setAttribute("hidden", "hidden");
+        }
+    };
+
+    const applyTabHintVisibility = () => {
+        if (!(tabHint instanceof HTMLElement)) {
+            return;
+        }
+
+        try {
+            if (window.localStorage.getItem(tabHintSeenStorageKey) === "true") {
+                hideTabHint();
+            }
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
+
+    const markTabHintSeen = () => {
+        hideTabHint();
+        try {
+            window.localStorage.setItem(tabHintSeenStorageKey, "true");
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
 
     const scrollInstantly = (x, y) => {
         const rootElement = document.documentElement;
@@ -469,6 +500,7 @@
             const nextIndex = panels.findIndex(panel => panel.id === targetId);
             if (nextIndex >= 0) {
                 syncUi(nextIndex, true);
+                markTabHintSeen();
             }
         });
     });
@@ -909,6 +941,8 @@
         } else {
             syncUi(currentIndex - 1, true);
         }
+
+        markTabHintSeen();
     }, { passive: true });
 
     window.addEventListener("resize", () => {
@@ -934,6 +968,7 @@
     });
 
     const initialIndex = findIndexFromHash();
+    applyTabHintVisibility();
     syncUi(initialIndex >= 0 ? initialIndex : 0, false);
     updateViewportHeight(false);
     syncSetupToggleState();
