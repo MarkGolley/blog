@@ -4,7 +4,8 @@
             ".aislepilot-inline-fields input:not([type='hidden']):not([type='checkbox']):not([type='radio'])"
         )
     );
-    const aislePilotForms = Array.from(document.querySelectorAll(".aislepilot-app form"));
+    const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
+    const submitLoadingDelayTimers = new WeakMap();
 
     const selectInputValue = input => {
         if (!(input instanceof HTMLInputElement)) {
@@ -46,41 +47,88 @@
         return form.querySelector("button[type='submit']");
     };
 
-    aislePilotForms.forEach(form => {
+    const clearSubmitLoadingDelay = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const timerId = submitLoadingDelayTimers.get(form);
+        if (typeof timerId === "number") {
+            window.clearTimeout(timerId);
+        }
+
+        submitLoadingDelayTimers.delete(form);
+    };
+
+    const setSubmitButtonLoadingState = submitButton => {
+        const loadingLabel = submitButton.dataset.loadingLabel?.trim();
+        if (loadingLabel && loadingLabel.length > 0) {
+            submitButton.textContent = loadingLabel;
+        } else {
+            submitButton.textContent = "Loading...";
+        }
+
+        submitButton.classList.add("is-loading");
+    };
+
+    const wireSubmitLoading = form => {
+        if (!(form instanceof HTMLFormElement) || form.dataset.loadingWired === "true") {
+            return;
+        }
+
+        form.dataset.loadingWired = "true";
         form.addEventListener("submit", event => {
             if (!(event.currentTarget instanceof HTMLFormElement)) {
                 return;
             }
+            const targetForm = event.currentTarget;
 
             const submitButton = getSubmitButton(event);
             if (!(submitButton instanceof HTMLButtonElement)) {
                 return;
             }
 
-            if (submitButton.classList.contains("is-loading")) {
+            if (submitButton.classList.contains("is-loading") || targetForm.getAttribute("data-is-submitting") === "true") {
                 event.preventDefault();
                 return;
             }
 
             const originalLabel = submitButton.dataset.originalLabel ?? submitButton.textContent ?? "";
             submitButton.dataset.originalLabel = originalLabel.trim();
-
-            const loadingLabel = submitButton.dataset.loadingLabel?.trim();
-            if (loadingLabel && loadingLabel.length > 0) {
-                submitButton.textContent = loadingLabel;
-            } else {
-                submitButton.textContent = "Loading...";
-            }
-
-            submitButton.classList.add("is-loading");
+            targetForm.setAttribute("data-is-submitting", "true");
             submitButton.disabled = true;
             submitButton.setAttribute("aria-busy", "true");
-            event.currentTarget.setAttribute("data-is-submitting", "true");
+
+            const loadingDelayRaw = submitButton.dataset.loadingDelayMs ?? targetForm.dataset.loadingDelayMs ?? "";
+            const loadingDelayMs = Number.parseInt(loadingDelayRaw, 10);
+            if (Number.isInteger(loadingDelayMs) && loadingDelayMs > 0) {
+                clearSubmitLoadingDelay(targetForm);
+                const timerId = window.setTimeout(() => {
+                    if (targetForm.getAttribute("data-is-submitting") === "true") {
+                        setSubmitButtonLoadingState(submitButton);
+                    }
+                    submitLoadingDelayTimers.delete(targetForm);
+                }, loadingDelayMs);
+                submitLoadingDelayTimers.set(targetForm, timerId);
+                return;
+            }
+
+            setSubmitButtonLoadingState(submitButton);
         });
-    });
+    };
+
+    const wireSubmitLoadingHandlers = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+        forms.forEach(wireSubmitLoading);
+    };
+
+    wireSubmitLoadingHandlers(document);
 
     const resetSubmittingState = () => {
-        aislePilotForms.forEach(form => {
+        getAislePilotForms().forEach(form => {
+            clearSubmitLoadingDelay(form);
             form.removeAttribute("data-is-submitting");
 
             const buttons = Array.from(form.querySelectorAll("button[type='submit']"));
@@ -129,7 +177,6 @@
     }
 
     const setupPanel = document.querySelector("[data-setup-panel]");
-    const setupToggleButtons = Array.from(document.querySelectorAll("[data-setup-toggle]"));
 
     const viewport = root.querySelector("[data-window-viewport]");
     const track = root.querySelector("[data-window-track]");
@@ -286,8 +333,15 @@
         }
     };
 
+    const getSetupToggleButtons = () => Array.from(document.querySelectorAll("[data-setup-toggle]"));
+
     const syncSetupToggleState = () => {
-        if (!setupPanel || setupToggleButtons.length === 0) {
+        if (!setupPanel) {
+            return;
+        }
+
+        const setupToggleButtons = getSetupToggleButtons();
+        if (setupToggleButtons.length === 0) {
             return;
         }
 
@@ -298,22 +352,33 @@
         });
     };
 
-    setupToggleButtons.forEach(button => {
-        button.addEventListener("click", () => {
-            if (!setupPanel) {
+    const wireSetupToggleHandlers = scope => {
+        const setupToggleButtons = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-setup-toggle]"))
+            : getSetupToggleButtons();
+
+        setupToggleButtons.forEach(button => {
+            if (!(button instanceof HTMLButtonElement) || button.dataset.setupToggleWired === "true") {
                 return;
             }
 
-            if (setupPanel.hasAttribute("hidden")) {
-                setupPanel.removeAttribute("hidden");
-                setupPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-            } else {
-                setupPanel.setAttribute("hidden", "hidden");
-            }
+            button.dataset.setupToggleWired = "true";
+            button.addEventListener("click", () => {
+                if (!setupPanel) {
+                    return;
+                }
 
-            syncSetupToggleState();
+                if (setupPanel.hasAttribute("hidden")) {
+                    setupPanel.removeAttribute("hidden");
+                    setupPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else {
+                    setupPanel.setAttribute("hidden", "hidden");
+                }
+
+                syncSetupToggleState();
+            });
         });
-    });
+    };
 
     const findIndexFromHash = () => {
         if (!window.location.hash) {
@@ -408,8 +473,120 @@
         });
     });
 
-    const preserveScrollForms = Array.from(document.querySelectorAll("[data-preserve-scroll-form]"));
-    preserveScrollForms.forEach(form => {
+    const stripHashFromFormAction = form => {
+        const action = form.getAttribute("action");
+        if (typeof action !== "string" || action.length === 0) {
+            return "";
+        }
+
+        if (!action.includes("#")) {
+            return action;
+        }
+
+        const normalizedAction = action.split("#")[0];
+        form.setAttribute("action", normalizedAction);
+        return normalizedAction;
+    };
+
+    const buildSwapScrollSnapshot = form => {
+        let targetX = window.scrollX;
+        let targetY = window.scrollY;
+        let anchorDayIndex = null;
+        let anchorTop = null;
+
+        if (form instanceof HTMLFormElement) {
+            const capturedX = Number.parseFloat(form.dataset.swapScrollX ?? "");
+            const capturedY = Number.parseFloat(form.dataset.swapScrollY ?? "");
+            const capturedAt = Number.parseInt(form.dataset.swapScrollCapturedAt ?? "", 10);
+            const hasRecentCapture =
+                Number.isFinite(capturedX) &&
+                Number.isFinite(capturedY) &&
+                Number.isFinite(capturedAt) &&
+                Date.now() - capturedAt <= 1500;
+
+            if (hasRecentCapture) {
+                targetX = capturedX;
+                targetY = capturedY;
+            }
+
+            const dayInput = form.querySelector("input[name='dayIndex']");
+            const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
+            if (Number.isInteger(parsedDayIndex) && parsedDayIndex >= 0) {
+                anchorDayIndex = parsedDayIndex;
+                anchorTop = Math.round(form.getBoundingClientRect().top);
+            }
+        }
+
+        return {
+            x: targetX,
+            y: targetY,
+            anchorDayIndex,
+            anchorTop
+        };
+    };
+
+    const restoreInlineSwapScroll = snapshot => {
+        if (!snapshot || typeof snapshot.y !== "number") {
+            return;
+        }
+
+        const targetX = typeof snapshot.x === "number" ? snapshot.x : 0;
+        const fallbackTargetY = snapshot.y;
+        const anchorDayIndex = Number.isInteger(snapshot.anchorDayIndex)
+            ? snapshot.anchorDayIndex
+            : null;
+        const anchorTop = typeof snapshot.anchorTop === "number"
+            ? snapshot.anchorTop
+            : null;
+
+        const resolveTargetY = () => {
+            if (anchorDayIndex === null || typeof anchorTop !== "number") {
+                return fallbackTargetY;
+            }
+
+            const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${anchorDayIndex}']`;
+            const targetDayInput = document.querySelector(selector);
+            if (!(targetDayInput instanceof HTMLInputElement)) {
+                return fallbackTargetY;
+            }
+
+            const targetForm = targetDayInput.closest("form");
+            if (!(targetForm instanceof HTMLFormElement)) {
+                return fallbackTargetY;
+            }
+
+            return window.scrollY + (targetForm.getBoundingClientRect().top - anchorTop);
+        };
+
+        root.classList.add("is-restoring-scroll");
+        const restoreDeadline = Date.now() + 500;
+        const restoreLoop = () => {
+            const targetY = resolveTargetY();
+            const xDrift = Math.abs(window.scrollX - targetX);
+            const yDrift = Math.abs(window.scrollY - targetY);
+            if (xDrift > 2 || yDrift > 8) {
+                scrollInstantly(targetX, targetY);
+            }
+
+            if (Date.now() < restoreDeadline) {
+                requestAnimationFrame(restoreLoop);
+                return;
+            }
+
+            root.classList.remove("is-restoring-scroll");
+        };
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(restoreLoop);
+        });
+    };
+
+    const wirePreserveScrollForm = form => {
+        if (!(form instanceof HTMLFormElement) || form.dataset.preserveScrollWired === "true") {
+            return;
+        }
+
+        form.dataset.preserveScrollWired = "true";
         const captureScrollSnapshot = () => {
             form.dataset.swapScrollX = `${Math.round(window.scrollX)}`;
             form.dataset.swapScrollY = `${Math.round(window.scrollY)}`;
@@ -421,137 +598,296 @@
         form.addEventListener("click", captureScrollSnapshot);
 
         form.addEventListener("submit", () => {
-            // Avoid browser hash-anchor jump before our explicit scroll restoration runs.
-            const action = form.getAttribute("action");
-            if (typeof action === "string" && action.includes("#")) {
-                form.setAttribute("action", action.split("#")[0]);
+            stripHashFromFormAction(form);
+
+            if (form.hasAttribute("data-ajax-swap-form")) {
+                return;
             }
 
             persistSwapScrollPosition(form);
         });
-    });
+    };
 
-    const leftoverToggleButton = document.querySelector("[data-leftover-toggle]");
-    const leftoverPlannerShell = document.querySelector("[data-leftover-planner]");
-    if (leftoverToggleButton && leftoverPlannerShell) {
-        leftoverToggleButton.addEventListener("click", () => {
-            const isHidden = leftoverPlannerShell.hasAttribute("hidden");
-            if (isHidden) {
-                leftoverPlannerShell.removeAttribute("hidden");
-                leftoverToggleButton.setAttribute("aria-expanded", "true");
-                leftoverToggleButton.textContent = "Hide leftover rebalance";
-            } else {
-                leftoverPlannerShell.setAttribute("hidden", "hidden");
-                leftoverToggleButton.setAttribute("aria-expanded", "false");
-                leftoverToggleButton.textContent = "Rebalance leftovers";
-            }
+    const wirePreserveScrollHandlers = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-preserve-scroll-form]"))
+            : Array.from(document.querySelectorAll("[data-preserve-scroll-form]"));
+        forms.forEach(wirePreserveScrollForm);
+    };
 
-            updateViewportHeight(true);
-        });
-    }
+    const replaceSectionContent = (responseDocument, selector) => {
+        const currentSection = document.querySelector(selector);
+        const nextSection = responseDocument.querySelector(selector);
 
-    const leftoverRebalanceForm = document.querySelector("[data-leftover-rebalance-form]");
-    const leftoverCsvInput = leftoverRebalanceForm?.querySelector("[data-leftover-csv]");
-    const leftoverZones = Array.from(document.querySelectorAll("[data-leftover-day-zone]"));
-    let selectedSourceZone = null;
-
-    const submitLeftoverRebalance = () => {
-        if (!(leftoverRebalanceForm instanceof HTMLFormElement) || !(leftoverCsvInput instanceof HTMLInputElement)) {
-            return;
+        if (!(currentSection instanceof HTMLElement) || !(nextSection instanceof HTMLElement)) {
+            return false;
         }
 
-        const requestedDayIndexes = [];
-        leftoverZones.forEach(zone => {
-            const dayIndexRaw = zone.getAttribute("data-day-index");
-            const dayIndex = Number.parseInt(dayIndexRaw ?? "", 10);
-            if (!Number.isInteger(dayIndex) || dayIndex < 0) {
+        currentSection.innerHTML = nextSection.innerHTML;
+        return true;
+    };
+
+    const replaceDocumentWithHtml = html => {
+        document.open();
+        document.write(html);
+        document.close();
+    };
+
+    const wireLeftoverPlanner = scope => {
+        const plannerShells = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-leftover-planner]"))
+            : Array.from(document.querySelectorAll("[data-leftover-planner]"));
+
+        plannerShells.forEach(plannerShell => {
+            if (!(plannerShell instanceof HTMLElement) || plannerShell.dataset.leftoverPlannerWired === "true") {
                 return;
             }
 
-            const countRaw = zone.getAttribute("data-leftover-count");
-            const tokenCount = Number.parseInt(countRaw ?? "", 10);
-            const normalizedCount = Number.isInteger(tokenCount) && tokenCount > 0 ? tokenCount : 0;
-            for (let i = 0; i < normalizedCount; i++) {
-                requestedDayIndexes.push(dayIndex);
+            plannerShell.dataset.leftoverPlannerWired = "true";
+            const mealsPanel = plannerShell.closest("#aislepilot-meals");
+            const container = mealsPanel instanceof HTMLElement ? mealsPanel : plannerShell.parentElement;
+            if (!(container instanceof HTMLElement)) {
+                return;
             }
-        });
 
-        leftoverCsvInput.value = requestedDayIndexes.join(",");
-        persistSwapScrollPosition(leftoverRebalanceForm);
-        leftoverRebalanceForm.requestSubmit();
-    };
-
-    const getZoneCount = zone => {
-        const countRaw = zone.getAttribute("data-leftover-count");
-        const count = Number.parseInt(countRaw ?? "", 10);
-        return Number.isInteger(count) && count > 0 ? count : 0;
-    };
-
-    const setZoneCount = (zone, count) => {
-        const normalizedCount = Math.max(0, count);
-        zone.setAttribute("data-leftover-count", `${normalizedCount}`);
-        zone.classList.toggle("is-leftover-source", normalizedCount > 0);
-    };
-
-    const clearSourceSelection = () => {
-        if (!selectedSourceZone) {
-            return;
-        }
-
-        selectedSourceZone.classList.remove("is-source-selected");
-        selectedSourceZone = null;
-        leftoverZones.forEach(zone => zone.classList.remove("is-drop-ready"));
-    };
-
-    const selectSourceZone = zone => {
-        clearSourceSelection();
-        selectedSourceZone = zone;
-        zone.classList.add("is-source-selected");
-        leftoverZones.forEach(targetZone => {
-            if (targetZone !== zone) {
-                targetZone.classList.add("is-drop-ready");
-            }
-        });
-    };
-
-    const moveOneLeftover = targetZone => {
-        if (!selectedSourceZone || selectedSourceZone === targetZone) {
-            return;
-        }
-
-        const sourceCount = getZoneCount(selectedSourceZone);
-        if (sourceCount <= 0) {
-            clearSourceSelection();
-            return;
-        }
-
-        const targetCount = getZoneCount(targetZone);
-        setZoneCount(selectedSourceZone, sourceCount - 1);
-        setZoneCount(targetZone, targetCount + 1);
-        clearSourceSelection();
-        submitLeftoverRebalance();
-    };
-
-    if (leftoverZones.length > 0) {
-        leftoverZones.forEach(zone => {
-            zone.addEventListener("click", () => {
-                const zoneCount = getZoneCount(zone);
-                if (!selectedSourceZone) {
-                    if (zoneCount > 0) {
-                        selectSourceZone(zone);
+            const leftoverToggleButton = container.querySelector("[data-leftover-toggle]");
+            if (leftoverToggleButton instanceof HTMLButtonElement && leftoverToggleButton.dataset.leftoverToggleWired !== "true") {
+                leftoverToggleButton.dataset.leftoverToggleWired = "true";
+                leftoverToggleButton.addEventListener("click", () => {
+                    const isHidden = plannerShell.hasAttribute("hidden");
+                    if (isHidden) {
+                        plannerShell.removeAttribute("hidden");
+                        leftoverToggleButton.setAttribute("aria-expanded", "true");
+                        leftoverToggleButton.textContent = "Hide leftover rebalance";
+                    } else {
+                        plannerShell.setAttribute("hidden", "hidden");
+                        leftoverToggleButton.setAttribute("aria-expanded", "false");
+                        leftoverToggleButton.textContent = "Rebalance leftovers";
                     }
+
+                    updateViewportHeight(true);
+                });
+            }
+
+            const leftoverRebalanceForm = container.querySelector("[data-leftover-rebalance-form]");
+            const leftoverCsvInput = leftoverRebalanceForm?.querySelector("[data-leftover-csv]");
+            const leftoverZones = Array.from(plannerShell.querySelectorAll("[data-leftover-day-zone]"));
+            let selectedSourceZone = null;
+
+            const submitLeftoverRebalance = () => {
+                if (!(leftoverRebalanceForm instanceof HTMLFormElement) || !(leftoverCsvInput instanceof HTMLInputElement)) {
                     return;
                 }
 
-                if (selectedSourceZone === zone) {
+                const requestedDayIndexes = [];
+                leftoverZones.forEach(zone => {
+                    const dayIndexRaw = zone.getAttribute("data-day-index");
+                    const dayIndex = Number.parseInt(dayIndexRaw ?? "", 10);
+                    if (!Number.isInteger(dayIndex) || dayIndex < 0) {
+                        return;
+                    }
+
+                    const countRaw = zone.getAttribute("data-leftover-count");
+                    const tokenCount = Number.parseInt(countRaw ?? "", 10);
+                    const normalizedCount = Number.isInteger(tokenCount) && tokenCount > 0 ? tokenCount : 0;
+                    for (let i = 0; i < normalizedCount; i++) {
+                        requestedDayIndexes.push(dayIndex);
+                    }
+                });
+
+                leftoverCsvInput.value = requestedDayIndexes.join(",");
+                persistSwapScrollPosition(leftoverRebalanceForm);
+                leftoverRebalanceForm.requestSubmit();
+            };
+
+            const getZoneCount = zone => {
+                const countRaw = zone.getAttribute("data-leftover-count");
+                const count = Number.parseInt(countRaw ?? "", 10);
+                return Number.isInteger(count) && count > 0 ? count : 0;
+            };
+
+            const setZoneCount = (zone, count) => {
+                const normalizedCount = Math.max(0, count);
+                zone.setAttribute("data-leftover-count", `${normalizedCount}`);
+                zone.classList.toggle("is-leftover-source", normalizedCount > 0);
+            };
+
+            const clearSourceSelection = () => {
+                if (!selectedSourceZone) {
+                    return;
+                }
+
+                selectedSourceZone.classList.remove("is-source-selected");
+                selectedSourceZone = null;
+                leftoverZones.forEach(zone => zone.classList.remove("is-drop-ready"));
+            };
+
+            const selectSourceZone = zone => {
+                clearSourceSelection();
+                selectedSourceZone = zone;
+                zone.classList.add("is-source-selected");
+                leftoverZones.forEach(targetZone => {
+                    if (targetZone !== zone) {
+                        targetZone.classList.add("is-drop-ready");
+                    }
+                });
+            };
+
+            const moveOneLeftover = targetZone => {
+                if (!selectedSourceZone || selectedSourceZone === targetZone) {
+                    return;
+                }
+
+                const sourceCount = getZoneCount(selectedSourceZone);
+                if (sourceCount <= 0) {
                     clearSourceSelection();
                     return;
                 }
 
-                moveOneLeftover(zone);
-            });
+                const targetCount = getZoneCount(targetZone);
+                setZoneCount(selectedSourceZone, sourceCount - 1);
+                setZoneCount(targetZone, targetCount + 1);
+                clearSourceSelection();
+                submitLeftoverRebalance();
+            };
+
+            if (leftoverZones.length > 0) {
+                leftoverZones.forEach(zone => {
+                    if (!(zone instanceof HTMLButtonElement) || zone.dataset.leftoverZoneWired === "true") {
+                        return;
+                    }
+
+                    zone.dataset.leftoverZoneWired = "true";
+                    zone.addEventListener("click", () => {
+                        const zoneCount = getZoneCount(zone);
+                        if (!selectedSourceZone) {
+                            if (zoneCount > 0) {
+                                selectSourceZone(zone);
+                            }
+                            return;
+                        }
+
+                        if (selectedSourceZone === zone) {
+                            clearSourceSelection();
+                            return;
+                        }
+
+                        moveOneLeftover(zone);
+                    });
+                });
+            }
         });
-    }
+    };
+
+    const applyAjaxSwapResponse = responseText => {
+        if (typeof DOMParser === "undefined") {
+            return false;
+        }
+
+        const responseDocument = new DOMParser().parseFromString(responseText, "text/html");
+        const didReplaceMeals = replaceSectionContent(responseDocument, "#aislepilot-meals");
+        if (!didReplaceMeals) {
+            return false;
+        }
+
+        replaceSectionContent(responseDocument, "#aislepilot-overview");
+        replaceSectionContent(responseDocument, "#aislepilot-shop");
+        replaceSectionContent(responseDocument, "#aislepilot-export");
+
+        wireSubmitLoadingHandlers(document);
+        wirePreserveScrollHandlers(document);
+        wireSetupToggleHandlers(document);
+        wireLeftoverPlanner(document);
+        wireAjaxSwapHandlers(document);
+        syncSetupToggleState();
+        observeActivePanelHeight();
+        updateViewportHeight(true);
+        return true;
+    };
+
+    const wireAjaxSwapForm = form => {
+        if (!(form instanceof HTMLFormElement) || form.dataset.ajaxSwapWired === "true") {
+            return;
+        }
+
+        form.dataset.ajaxSwapWired = "true";
+        form.addEventListener("submit", async event => {
+            if (!(event.currentTarget instanceof HTMLFormElement) || typeof fetch !== "function") {
+                return;
+            }
+
+            event.preventDefault();
+            const swapForm = event.currentTarget;
+            if (swapForm.dataset.ajaxSwapSubmitting === "true") {
+                return;
+            }
+
+            swapForm.dataset.ajaxSwapSubmitting = "true";
+            const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
+            const actionUrl = stripHashFromFormAction(swapForm);
+            if (!actionUrl) {
+                persistSwapScrollPosition(swapForm);
+                HTMLFormElement.prototype.submit.call(swapForm);
+                return;
+            }
+
+            try {
+                const response = await fetch(actionUrl, {
+                    method: "POST",
+                    body: new FormData(swapForm),
+                    credentials: "same-origin",
+                    headers: {
+                        "Accept": "text/html,application/xhtml+xml",
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                });
+
+                const responseText = await response.text();
+                const contentType = response.headers.get("content-type") ?? "";
+                const isHtmlResponse =
+                    contentType.includes("text/html") ||
+                    responseText.includes("<html") ||
+                    responseText.includes("<!DOCTYPE html");
+
+                if (isHtmlResponse) {
+                    if (!applyAjaxSwapResponse(responseText)) {
+                        replaceDocumentWithHtml(responseText);
+                        return;
+                    }
+
+                    restoreInlineSwapScroll(scrollSnapshot);
+                    return;
+                }
+
+                if (response.ok) {
+                    window.location.reload();
+                    return;
+                }
+
+                resetSubmittingState();
+                return;
+            } catch {
+                persistSwapScrollPosition(swapForm);
+                HTMLFormElement.prototype.submit.call(swapForm);
+                return;
+            } finally {
+                clearSubmitLoadingDelay(swapForm);
+                delete swapForm.dataset.ajaxSwapSubmitting;
+            }
+        });
+    };
+
+    const wireAjaxSwapHandlers = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-ajax-swap-form]"))
+            : Array.from(document.querySelectorAll("[data-ajax-swap-form]"));
+        forms.forEach(wireAjaxSwapForm);
+    };
+
+    wireSetupToggleHandlers(document);
+    wirePreserveScrollHandlers(document);
+    wireLeftoverPlanner(document);
+    wireAjaxSwapHandlers(document);
 
     viewport.addEventListener("touchstart", event => {
         const touch = event.changedTouches[0];
