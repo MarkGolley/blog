@@ -24,16 +24,19 @@ public sealed class AislePilotService : IAislePilotService
     private const int MaxAiDepartmentLength = 32;
     private const int MaxAiUnitLength = 18;
     private const int MaxAiRecipeStepLength = 220;
-    private const int ExtraAiMealCount = 3;
-    private const int PrimaryAiMealPlanMaxTokens = 4600;
-    private const int RetryAiMealPlanMaxTokens = 3000;
+    private const int PrimaryAiMealPlanMaxTokens = 3400;
+    private const int RetryAiMealPlanMaxTokens = 2200;
+    private const int WarmupMealMaxTokens = 1000;
     private const string AiMealsCollection = "aislePilotAiMeals";
-    private const string AiUnavailableMessage = "Sorry, AI is broken right now. Please try again shortly.";
     private const string OpenAiChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
-    private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(45);
+    private const int OpenAiMaxAttempts = 1;
+    private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(22);
+    private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
+    private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);
 
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
+    private static readonly SemaphoreSlim AiMealWarmupLock = new(1, 1);
     private static DateTime? _lastAiMealPoolRefreshUtc;
 
     private static readonly HashSet<string> GenericPantryTokens = new(StringComparer.OrdinalIgnoreCase)
@@ -104,6 +107,23 @@ public sealed class AislePilotService : IAislePilotService
         "Vegan",
         "Pescatarian",
         "Gluten-Free"
+    ];
+
+    private static readonly WarmupProfile[] WarmupProfilesSingleMode =
+    [
+        new("High-Protein", ["High-Protein"]),
+        new("Vegetarian", ["Vegetarian"]),
+        new("Vegan", ["Vegan"]),
+        new("Pescatarian", ["Pescatarian"]),
+        new("Gluten-Free", ["Gluten-Free"])
+    ];
+
+    private static readonly WarmupProfile[] WarmupProfilesKeyPairs =
+    [
+        new("Vegetarian + Gluten-Free", ["Vegetarian", "Gluten-Free"]),
+        new("Vegan + Gluten-Free", ["Vegan", "Gluten-Free"]),
+        new("Pescatarian + Gluten-Free", ["Pescatarian", "Gluten-Free"]),
+        new("High-Protein + Gluten-Free", ["High-Protein", "Gluten-Free"])
     ];
 
     private static readonly string[] DefaultAisleOrder =
@@ -366,6 +386,95 @@ public sealed class AislePilotService : IAislePilotService
         return SupportedDietaryModes;
     }
 
+    public async Task<AislePilotWarmupResult> WarmupAiMealPoolAsync(
+        int minPerSingleMode = 8,
+        int minPerKeyPair = 6,
+        int maxMealsToGenerate = 2,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedMinSingleMode = Math.Clamp(minPerSingleMode, 0, 30);
+        var normalizedMinKeyPair = Math.Clamp(minPerKeyPair, 0, 30);
+        var normalizedMaxMeals = Math.Clamp(maxMealsToGenerate, 0, 3);
+        var profiles = BuildWarmupProfiles(normalizedMinSingleMode, normalizedMinKeyPair);
+
+        var result = new AislePilotWarmupResult
+        {
+            MinPerSingleMode = normalizedMinSingleMode,
+            MinPerKeyPair = normalizedMinKeyPair,
+            MaxMealsToGenerate = normalizedMaxMeals
+        };
+
+        await AiMealWarmupLock.WaitAsync(cancellationToken);
+        try
+        {
+            await EnsureAiMealPoolHydratedAsync(cancellationToken);
+            result.CoverageBefore = BuildWarmupCoverage(profiles);
+
+            if (normalizedMaxMeals == 0)
+            {
+                result.CoverageAfter = result.CoverageBefore;
+                return result;
+            }
+
+            var generatedMealNames = new List<string>(normalizedMaxMeals);
+            var maxAttempts = Math.Max(1, normalizedMaxMeals * 4);
+            for (var attempt = 0; attempt < maxAttempts && generatedMealNames.Count < normalizedMaxMeals; attempt++)
+            {
+                var coverageNow = BuildWarmupCoverage(profiles);
+                var nextProfile = coverageNow
+                    .Where(item => item.Deficit > 0)
+                    .OrderByDescending(item => item.Deficit)
+                    .ThenBy(item => item.Count)
+                    .FirstOrDefault();
+
+                if (nextProfile is null)
+                {
+                    break;
+                }
+
+                var excludedMealNames = GetCompatibleAiPoolMeals(nextProfile.Modes, string.Empty)
+                    .Select(meal => meal.Name)
+                    .Concat(generatedMealNames)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(40)
+                    .ToList();
+
+                var generatedMeal = await TryGenerateWarmupMealWithAiAsync(
+                    nextProfile.Modes,
+                    excludedMealNames,
+                    cancellationToken);
+                if (generatedMeal is null || generatedMealNames.Contains(generatedMeal.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var persistedMeals = await PersistAiMealsAsync([generatedMeal], cancellationToken);
+                if (persistedMeals.Count > 0)
+                {
+                    AddMealsToAiPool(persistedMeals);
+                }
+                else
+                {
+                    AddMealsToAiPool([generatedMeal]);
+                    _logger?.LogWarning(
+                        "AislePilot warm-up generated meal '{MealName}' but persistence failed. Keeping it in memory for this runtime.",
+                        generatedMeal.Name);
+                }
+
+                generatedMealNames.Add(generatedMeal.Name);
+            }
+
+            result.GeneratedMealNames = generatedMealNames;
+            result.GeneratedCount = generatedMealNames.Count;
+            result.CoverageAfter = BuildWarmupCoverage(profiles);
+            return result;
+        }
+        finally
+        {
+            AiMealWarmupLock.Release();
+        }
+    }
+
     public bool HasCompatibleMeals(AislePilotRequestModel request)
     {
         var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
@@ -428,7 +537,9 @@ public sealed class AislePilotService : IAislePilotService
             return aiPlan;
         }
 
-        throw new InvalidOperationException(AiUnavailableMessage);
+        _logger?.LogWarning(
+            "AislePilot AI generation was unavailable for this request. Serving template fallback instead.");
+        return BuildPlanFromTemplateCatalog(request, context, cookDays);
     }
 
     private bool ShouldUseTemplateFallback()
@@ -496,6 +607,10 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
+        using var generationBudgetCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        generationBudgetCts.CancelAfter(OpenAiGenerationBudget);
+        var generationToken = generationBudgetCts.Token;
+
         var requestedMealCount = GetRequestedAiMealCount(cookDays);
         var aiBatch = await TryRequestAiMealBatchAsync(
             request,
@@ -504,9 +619,9 @@ public sealed class AislePilotService : IAislePilotService
             requestedMealCount,
             PrimaryAiMealPlanMaxTokens,
             compactJson: false,
-            cancellationToken);
+            generationToken);
 
-        if (aiBatch is null)
+        if (aiBatch is null && ShouldRetryWithCompactPayload(cookDays))
         {
             _logger?.LogWarning(
                 "AislePilot AI generation returned invalid or truncated JSON. Retrying with a compact {MealCount}-meal payload.",
@@ -519,7 +634,7 @@ public sealed class AislePilotService : IAislePilotService
                 cookDays,
                 RetryAiMealPlanMaxTokens,
                 compactJson: true,
-                cancellationToken);
+                generationToken);
         }
 
         if (aiBatch is null)
@@ -553,7 +668,7 @@ public sealed class AislePilotService : IAislePilotService
             selectedMeals.Count,
             aiBatch.OpenAiRequestId ?? "n/a");
 
-        var persistedMeals = await PersistAiMealsAsync(aiMeals, cancellationToken);
+        var persistedMeals = await PersistAiMealsAsync(aiMeals, generationToken);
         if (persistedMeals.Count > 0)
         {
             AddMealsToAiPool(persistedMeals);
@@ -747,33 +862,26 @@ public sealed class AislePilotService : IAislePilotService
             .ToArray();
 
         MealTemplate? replacement = null;
-        var shouldForceFreshAiSwap = normalizedSeenMealNames.Length >= 3;
-        if (!shouldForceFreshAiSwap && availableAiMeals.Count > 0)
+        var planSourceLabel = "AI meal pool";
+        if (availableAiMeals.Count > 0)
         {
             var unseenPoolMeals = availableAiMeals
                 .Where(meal => !normalizedSeenMealNames.Contains(meal.Name, StringComparer.OrdinalIgnoreCase))
                 .ToList();
 
-            if (unseenPoolMeals.Count == 0)
-            {
-                shouldForceFreshAiSwap = true;
-            }
-            else
-            {
-                replacement = SelectSwapCandidate(
-                    unseenPoolMeals,
-                    selectedMeals,
-                    dayIndex,
-                    currentName,
-                    request.WeeklyBudget,
-                    context.HouseholdFactor,
-                    request.PreferQuickMeals,
-                    dayMultiplier,
-                    allowAlreadyUsedMeals: ShouldUseTemplateFallback());
-            }
+            replacement = SelectSwapCandidate(
+                unseenPoolMeals.Count > 0 ? unseenPoolMeals : availableAiMeals,
+                selectedMeals,
+                dayIndex,
+                currentName,
+                request.WeeklyBudget,
+                context.HouseholdFactor,
+                request.PreferQuickMeals,
+                dayMultiplier,
+                allowAlreadyUsedMeals: true);
         }
 
-        if (shouldForceFreshAiSwap || replacement is null)
+        if (replacement is null)
         {
             replacement = TryBuildReplacementMealWithAi(
                 request,
@@ -783,23 +891,44 @@ public sealed class AislePilotService : IAislePilotService
                 currentName,
                 dayMultiplier,
                 normalizedSeenMealNames);
+            if (replacement is not null)
+            {
+                planSourceLabel = "OpenAI swap";
+            }
         }
 
         if (replacement is null)
         {
-            throw new InvalidOperationException(AiUnavailableMessage);
+            replacement = TrySelectTemplateSwapCandidate(
+                context,
+                selectedMeals,
+                dayIndex,
+                currentName,
+                request.WeeklyBudget,
+                request.PreferQuickMeals,
+                dayMultiplier,
+                normalizedSeenMealNames);
+            if (replacement is not null)
+            {
+                planSourceLabel = "Template swap";
+            }
         }
 
+        if (replacement is null)
+        {
+            throw new InvalidOperationException(
+                "No compatible replacement meal is available right now. Try loosening dietary filters or regenerate your full plan.");
+        }
+
+        AddMealsToAiPool([replacement]);
         selectedMeals[dayIndex] = replacement;
         return BuildPlanFromMeals(
             request,
             context,
             selectedMeals,
             cookDays,
-            usedAiGeneratedMeals: true,
-            planSourceLabel: availableAiMeals.Any(meal => meal.Name.Equals(replacement.Name, StringComparison.OrdinalIgnoreCase))
-                ? "AI meal pool"
-                : "OpenAI swap");
+            usedAiGeneratedMeals: !planSourceLabel.Equals("Template swap", StringComparison.OrdinalIgnoreCase),
+            planSourceLabel: planSourceLabel);
     }
 
     private MealTemplate? TryBuildReplacementMealWithAi(
@@ -918,6 +1047,208 @@ public sealed class AislePilotService : IAislePilotService
         }
 
         return replacement;
+    }
+
+    private static MealTemplate? TrySelectTemplateSwapCandidate(
+        PlanContext context,
+        IReadOnlyList<MealTemplate> selectedMeals,
+        int dayIndex,
+        string currentMealName,
+        decimal weeklyBudget,
+        bool preferQuickMeals,
+        int dayMultiplier,
+        IReadOnlyList<string> seenMealNames)
+    {
+        var templateCandidates = FilterMeals(context.DietaryModes, context.DislikesOrAllergens);
+        if (templateCandidates.Count == 0)
+        {
+            return null;
+        }
+
+        var unseenTemplates = templateCandidates
+            .Where(meal => !seenMealNames.Contains(meal.Name, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        return SelectSwapCandidate(
+            unseenTemplates.Count > 0 ? unseenTemplates : templateCandidates,
+            selectedMeals,
+            dayIndex,
+            currentMealName,
+            weeklyBudget,
+            context.HouseholdFactor,
+            preferQuickMeals,
+            dayMultiplier,
+            allowAlreadyUsedMeals: true);
+    }
+
+    private static IReadOnlyList<WarmupProfileWithTarget> BuildWarmupProfiles(
+        int minPerSingleMode,
+        int minPerKeyPair)
+    {
+        var profiles = new List<WarmupProfileWithTarget>(WarmupProfilesSingleMode.Length + WarmupProfilesKeyPairs.Length);
+        if (minPerSingleMode > 0)
+        {
+            profiles.AddRange(WarmupProfilesSingleMode.Select(profile =>
+                new WarmupProfileWithTarget(profile.Name, profile.Modes, minPerSingleMode)));
+        }
+
+        if (minPerKeyPair > 0)
+        {
+            profiles.AddRange(WarmupProfilesKeyPairs.Select(profile =>
+                new WarmupProfileWithTarget(profile.Name, profile.Modes, minPerKeyPair)));
+        }
+
+        return profiles;
+    }
+
+    private static IReadOnlyList<AislePilotWarmupCoverageViewModel> BuildWarmupCoverage(
+        IReadOnlyList<WarmupProfileWithTarget> profiles)
+    {
+        return profiles
+            .Select(profile =>
+            {
+                var count = GetCompatibleAiPoolMeals(profile.Modes, string.Empty).Count;
+                return new AislePilotWarmupCoverageViewModel
+                {
+                    Profile = profile.Name,
+                    Modes = profile.Modes.ToArray(),
+                    Target = profile.Target,
+                    Count = count,
+                    Deficit = Math.Max(0, profile.Target - count)
+                };
+            })
+            .ToList();
+    }
+
+    private async Task<MealTemplate?> TryGenerateWarmupMealWithAiAsync(
+        IReadOnlyList<string> dietaryModes,
+        IReadOnlyList<string> excludedMealNames,
+        CancellationToken cancellationToken)
+    {
+        if (!_enableAiGeneration || _httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
+        {
+            return null;
+        }
+
+        var strictModes = dietaryModes
+            .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (strictModes.Length == 0)
+        {
+            return null;
+        }
+
+        var prompt = BuildAiWarmupMealPrompt(strictModes, excludedMealNames);
+        var requestBody = new
+        {
+            model = _model,
+            temperature = 0.75,
+            max_tokens = WarmupMealMaxTokens,
+            response_format = new { type = "json_object" },
+            messages = new object[]
+            {
+                new
+                {
+                    role = "system",
+                    content = "You generate one practical dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English."
+                },
+                new
+                {
+                    role = "user",
+                    content = prompt
+                }
+            }
+        };
+
+        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+        if (string.IsNullOrWhiteSpace(responseContent))
+        {
+            return null;
+        }
+
+        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
+        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return null;
+        }
+
+        var normalizedJson = NormalizeModelJson(rawJson);
+        if (!TryParseAiMealPayloadWithRecovery(normalizedJson, out var aiPayload))
+        {
+            return null;
+        }
+
+        var meal = ValidateAndMapAiMeal(aiPayload, strictModes, requireRecipeSteps: true, out _);
+        if (meal is null)
+        {
+            return null;
+        }
+
+        return excludedMealNames.Contains(meal.Name, StringComparer.OrdinalIgnoreCase)
+            ? null
+            : meal;
+    }
+
+    private static string BuildAiWarmupMealPrompt(
+        IReadOnlyList<string> strictModes,
+        IReadOnlyList<string> excludedMealNames)
+    {
+        var strictModeText = string.Join(", ", strictModes);
+        var excludedText = excludedMealNames.Count == 0
+            ? "none"
+            : string.Join(", ", excludedMealNames);
+
+        return $$"""
+Generate one dinner for a UK grocery-planning app to improve future cache coverage.
+
+Planner inputs:
+- Dietary requirements: {{strictModeText}}
+- Avoid these meal names: {{excludedText}}
+- Target budget: 4.5 to 9.5 GBP for serving 2
+
+Rules:
+- Return exactly one dinner object.
+- It must be different from all excluded meal names.
+- Use UK English.
+- Keep it realistic for a UK supermarket shop.
+- Respect dietary requirements strictly.
+- Keep it practical for a weekday dinner.
+- Every meal must include 3-7 ingredients only.
+- Department must be one of: Produce, Bakery, Meat & Fish, Dairy & Eggs, Frozen, Tins & Dry Goods, Spices & Sauces, Snacks, Drinks, Household, Other
+- Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
+- `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
+- `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
+- `quantityForTwo` must be a positive number.
+- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
+- `tags` must include every listed dietary requirement.
+- `recipeSteps` must contain 5-6 concrete, meal-specific cooking steps in order.
+- Keep each recipe step concise (ideally <= 140 characters).
+
+Return JSON only with this schema:
+{
+  "name": "",
+  "baseCostForTwo": 0,
+  "isQuick": true,
+  "tags": ["Balanced"],
+  "recipeSteps": [
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "ingredients": [
+    {
+      "name": "",
+      "department": "",
+      "quantityForTwo": 0,
+      "unit": "",
+      "estimatedCostForTwo": 0
+    }
+  ]
+}
+""";
     }
 
     private void EnsureAiMealPoolHydrated()
@@ -2066,8 +2397,9 @@ Rules:
 - `quantityForTwo` must be a positive number.
 - `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
 - Include all requested dietary modes in each meal's tags, except Balanced is optional.
-- `recipeSteps` must contain 5-8 concrete, meal-specific cooking steps in order.
+- `recipeSteps` must contain 5-6 concrete, meal-specific cooking steps in order.
 - Do not write generic filler; include relevant timings, heat levels, and ingredient usage.
+- Keep each recipe step concise (ideally <= 140 characters).
 {{(compactJson ? "- Keep ingredient names short and return compact JSON with no markdown, no comments, and no unnecessary whitespace." : string.Empty)}}
 
 Return JSON only with this schema:
@@ -2146,7 +2478,17 @@ Return JSON only with this schema:
     private static int GetRequestedAiMealCount(int cookDays)
     {
         var normalizedCookDays = NormalizeCookDays(cookDays);
-        return Math.Min(12, normalizedCookDays + ExtraAiMealCount);
+        return normalizedCookDays switch
+        {
+            >= 7 => 7,
+            >= 5 => normalizedCookDays + 1,
+            _ => Math.Min(8, normalizedCookDays + 2)
+        };
+    }
+
+    private static bool ShouldRetryWithCompactPayload(int cookDays)
+    {
+        return NormalizeCookDays(cookDays) <= 5;
     }
 
     private static MealTemplate? ValidateAndMapAiMeal(
@@ -2529,7 +2871,7 @@ Return JSON only with this schema:
         }
 
         var serializedBody = JsonSerializer.Serialize(requestBody);
-        var maxAttempts = 2;
+        var maxAttempts = OpenAiMaxAttempts;
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -2613,7 +2955,7 @@ Return JSON only with this schema:
         var retryAfter = response.Headers.RetryAfter;
         if (retryAfter?.Delta is TimeSpan delta && delta > TimeSpan.Zero)
         {
-            return delta <= TimeSpan.FromSeconds(10) ? delta : TimeSpan.FromSeconds(10);
+            return delta <= MaxOpenAiRetryAfterDelay ? delta : MaxOpenAiRetryAfterDelay;
         }
 
         if (retryAfter?.Date is DateTimeOffset date)
@@ -2621,7 +2963,7 @@ Return JSON only with this schema:
             var computed = date - DateTimeOffset.UtcNow;
             if (computed > TimeSpan.Zero)
             {
-                return computed <= TimeSpan.FromSeconds(10) ? computed : TimeSpan.FromSeconds(10);
+                return computed <= MaxOpenAiRetryAfterDelay ? computed : MaxOpenAiRetryAfterDelay;
             }
         }
 
@@ -3014,6 +3356,15 @@ Return JSON only with this schema:
 
         return DefaultAisleOrder;
     }
+
+    private sealed record WarmupProfile(
+        string Name,
+        IReadOnlyList<string> Modes);
+
+    private sealed record WarmupProfileWithTarget(
+        string Name,
+        IReadOnlyList<string> Modes,
+        int Target);
 
     private sealed record PlanContext(
         string Supermarket,

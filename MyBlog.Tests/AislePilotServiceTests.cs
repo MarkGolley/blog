@@ -1,4 +1,9 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using MyBlog.Models;
 using MyBlog.Services;
 using MyBlog.Utilities;
@@ -471,5 +476,145 @@ public class AislePilotServiceTests
         };
 
         Assert.All(swappedPlan.MealPlan, meal => Assert.Contains(meal.MealName, allowedMeals));
+    }
+
+    [Fact]
+    public void BuildPlan_WhenAiReturnsRateLimit_FallsBackToTemplatePlan()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.TooManyRequests, """{"error":"rate limit"}""");
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegan", "Gluten-Free"],
+            CookDays = 7,
+            WeeklyBudget = 70m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.False(result.UsedAiGeneratedMeals);
+        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal(7, result.MealPlan.Count);
+    }
+
+    [Fact]
+    public async Task WarmupAiMealPoolAsync_GeneratesAtMostConfiguredMeals()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var mealName = $"Warmup meal {Guid.NewGuid():N}";
+        var payloadContent = $$"""
+{
+  "name": "{{mealName}}",
+  "baseCostForTwo": 6.4,
+  "isQuick": true,
+  "tags": ["High-Protein", "Vegetarian", "Vegan", "Pescatarian", "Gluten-Free"],
+  "recipeSteps": [
+    "Heat a large non-stick pan over medium heat for 2 minutes.",
+    "Add oil, onions, and peppers; cook for 6 minutes until softened.",
+    "Stir in spices and tomatoes; simmer for 4 minutes.",
+    "Add chickpeas and spinach; cook for 5 minutes until hot and wilted.",
+    "Season and serve immediately with lemon and chopped herbs."
+  ],
+  "ingredients": [
+    { "name": "Chickpeas", "department": "Tins & Dry Goods", "quantityForTwo": 2, "unit": "tins", "estimatedCostForTwo": 1.4 },
+    { "name": "Spinach", "department": "Produce", "quantityForTwo": 0.25, "unit": "kg", "estimatedCostForTwo": 1.2 },
+    { "name": "Chopped tomatoes", "department": "Tins & Dry Goods", "quantityForTwo": 1, "unit": "tin", "estimatedCostForTwo": 0.7 }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        try
+        {
+            var warmup = await service.WarmupAiMealPoolAsync(
+                minPerSingleMode: 0,
+                minPerKeyPair: 500,
+                maxMealsToGenerate: 1);
+
+            Assert.Equal(1, handler.CallCount);
+            Assert.Equal(1, warmup.GeneratedCount);
+            Assert.Contains(mealName, warmup.GeneratedMealNames, StringComparer.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            RemoveAiPoolMeal(mealName);
+        }
+    }
+
+    private static void RemoveAiPoolMeal(string mealName)
+    {
+        var field = typeof(AislePilotService).GetField("AiMealPool", BindingFlags.NonPublic | BindingFlags.Static);
+        var pool = field?.GetValue(null);
+        if (pool is null)
+        {
+            return;
+        }
+
+        var tryRemove = pool.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(method =>
+                method.Name == "TryRemove" &&
+                method.GetParameters().Length == 2);
+        if (tryRemove is null)
+        {
+            return;
+        }
+
+        var args = new object?[] { mealName, null };
+        _ = tryRemove.Invoke(pool, args);
+    }
+
+    private sealed class StaticResponseHandler(HttpStatusCode statusCode, string responseBody) : HttpMessageHandler
+    {
+        private readonly HttpStatusCode _statusCode = statusCode;
+        private readonly string _responseBody = responseBody;
+
+        public int CallCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return Task.FromResult(new HttpResponseMessage(_statusCode)
+            {
+                Content = new StringContent(_responseBody)
+            });
+        }
     }
 }

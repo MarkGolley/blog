@@ -2,7 +2,8 @@
 param(
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
-    [switch]$SkipProductionSmokeCheck
+    [switch]$SkipProductionSmokeCheck,
+    [int]$DockerStartupTimeoutSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,6 +24,50 @@ function Invoke-External {
     if ($LASTEXITCODE -ne 0) {
         throw "$Label failed with exit code $LASTEXITCODE."
     }
+}
+
+function Test-DockerReady {
+    & docker info *> $null
+    return $LASTEXITCODE -eq 0
+}
+
+function Ensure-DockerRunning {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds
+    )
+
+    if (Test-DockerReady) {
+        return
+    }
+
+    Write-Host "Docker daemon is not ready. Attempting to start Docker Desktop..."
+
+    $dockerDesktopProcess = Get-Process -Name "Docker Desktop" -ErrorAction SilentlyContinue
+    if (-not $dockerDesktopProcess) {
+        $candidatePaths = @(
+            "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe",
+            "$env:ProgramFiles(x86)\Docker\Docker\Docker Desktop.exe",
+            "$env:LocalAppData\Docker\Docker Desktop.exe"
+        ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path $_) }
+
+        if ($candidatePaths.Count -eq 0) {
+            throw "Docker is not ready and Docker Desktop was not found. Start Docker Desktop manually, then rerun deploy."
+        }
+
+        Start-Process -FilePath $candidatePaths[0] | Out-Null
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 3
+        if (Test-DockerReady) {
+            Write-Host "Docker is ready."
+            return
+        }
+    }
+
+    throw "Docker did not become ready within $TimeoutSeconds seconds. Check Docker Desktop and rerun deploy."
 }
 
 $project = "my-blog-website-470819"
@@ -54,6 +99,8 @@ try {
     else {
         Write-Host "Skipping pre-deploy checks because -SkipPreDeployChecks was provided."
     }
+
+    Ensure-DockerRunning -TimeoutSeconds $DockerStartupTimeoutSeconds
 
     $previousBuildkit = $env:DOCKER_BUILDKIT
     $env:DOCKER_BUILDKIT = "0"

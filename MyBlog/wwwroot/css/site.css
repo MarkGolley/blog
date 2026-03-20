@@ -1045,6 +1045,17 @@ main > section.blog-page {
     margin-bottom: 1rem;
 }
 
+.blog-stat-inline {
+    display: none;
+    margin: 0.45rem 0 0.2rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    gap: 0.38rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
 .blog-filter-card {
     margin-bottom: 0.7rem;
 }
@@ -1922,11 +1933,18 @@ thead th {
     }
 
     .hero-metrics,
-    .blog-stat-grid,
     .credentials-grid,
     .focus-grid,
     .case-template-grid {
         grid-template-columns: 1fr;
+    }
+
+    .blog-page .blog-stat-grid {
+        display: none;
+    }
+
+    .blog-page .blog-stat-inline {
+        display: flex;
     }
 
     .blog-post-row {

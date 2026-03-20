@@ -222,3 +222,41 @@ Suggested scheduler setup:
 2. Call `POST https://your-domain/admin/daily-capsule/warmup`.
 3. Include header `X-Admin-Key: <warmup-key>`.
 4. Alert on non-2xx responses.
+
+## AislePilot Pool Warm-Up
+
+Purpose:
+
+- Gradually top up AI meals in cache so user-facing plan generation does not need large, slow AI calls during peak traffic.
+- Uses a low-intensity strategy by default (single-meal generation, capped meals per run).
+
+Endpoint:
+
+- `POST /admin/aisle-pilot/warmup`
+- Header: `X-Admin-Key`
+- Optional form fields:
+  - `minPerSingleMode` (default `8`)
+  - `minPerKeyPair` (default `6`)
+  - `maxMealsToGenerate` (default `2`, clamped low in app)
+
+Required secret:
+
+- `AISLEPILOT_WARMUP_KEY` (or `AislePilot:WarmupAdminKey` in config)
+
+Manual trigger:
+
+```powershell
+$env:AISLEPILOT_WARMUP_KEY = "your-aislepilot-warmup-key"
+.\Deployment\warm-aisle-pilot.ps1 `
+  -MinPerSingleMode 8 `
+  -MinPerKeyPair 6 `
+  -MaxMealsToGenerate 2
+```
+
+Suggested scheduler setup:
+
+1. Use Cloud Scheduler (or equivalent) with cron `*/15 * * * *` and timezone `Europe/London`.
+2. Call `POST https://your-domain/admin/aisle-pilot/warmup`.
+3. Include header `X-Admin-Key: <warmup-key>`.
+4. Keep `maxMealsToGenerate` at `1` or `2` to avoid bursty AI usage.
+5. Alert on non-2xx responses.
