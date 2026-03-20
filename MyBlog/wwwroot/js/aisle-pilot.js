@@ -119,8 +119,12 @@
     });
 
     const swapScrollKey = "aislepilot:swap-scroll";
+    const clearRestorePending = () => {
+        document.documentElement.classList.remove("aislepilot-restore-pending");
+    };
     const root = document.querySelector("[data-aislepilot-window]");
     if (!root) {
+        clearRestorePending();
         return;
     }
 
@@ -141,12 +145,53 @@
     let touchStartY = 0;
     let activePanelResizeObserver = null;
 
-    const persistSwapScrollPosition = () => {
+    const scrollInstantly = (x, y) => {
+        const rootElement = document.documentElement;
+        const previousInlineBehavior = rootElement.style.scrollBehavior;
+        rootElement.style.scrollBehavior = "auto";
+        window.scrollTo(x, y);
+
+        requestAnimationFrame(() => {
+            rootElement.style.scrollBehavior = previousInlineBehavior;
+        });
+    };
+
+    const persistSwapScrollPosition = form => {
+        let targetX = window.scrollX;
+        let targetY = window.scrollY;
+        let anchorDayIndex = null;
+        let anchorTop = null;
+
+        if (form instanceof HTMLFormElement) {
+            const capturedX = Number.parseFloat(form.dataset.swapScrollX ?? "");
+            const capturedY = Number.parseFloat(form.dataset.swapScrollY ?? "");
+            const capturedAt = Number.parseInt(form.dataset.swapScrollCapturedAt ?? "", 10);
+            const hasRecentCapture =
+                Number.isFinite(capturedX) &&
+                Number.isFinite(capturedY) &&
+                Number.isFinite(capturedAt) &&
+                Date.now() - capturedAt <= 1500;
+
+            if (hasRecentCapture) {
+                targetX = capturedX;
+                targetY = capturedY;
+            }
+
+            const dayInput = form.querySelector("input[name='dayIndex']");
+            const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
+            if (Number.isInteger(parsedDayIndex) && parsedDayIndex >= 0) {
+                anchorDayIndex = parsedDayIndex;
+                anchorTop = Math.round(form.getBoundingClientRect().top);
+            }
+        }
+
         const activePanelId = panels[currentIndex]?.id ?? null;
         const payload = {
-            x: window.scrollX,
-            y: window.scrollY,
+            x: targetX,
+            y: targetY,
             activePanelId,
+            anchorDayIndex,
+            anchorTop,
             at: Date.now()
         };
 
@@ -156,7 +201,8 @@
     const restoreSwapScrollPosition = () => {
         const raw = sessionStorage.getItem(swapScrollKey);
         if (!raw) {
-            return;
+            clearRestorePending();
+            return false;
         }
 
         sessionStorage.removeItem(swapScrollKey);
@@ -164,12 +210,14 @@
         try {
             const parsed = JSON.parse(raw);
             if (!parsed || typeof parsed.y !== "number") {
-                return;
+                clearRestorePending();
+                return false;
             }
 
             // Ignore stale restore requests.
             if (typeof parsed.at === "number" && Date.now() - parsed.at > 60_000) {
-                return;
+                clearRestorePending();
+                return false;
             }
 
             if (typeof parsed.activePanelId === "string" && parsed.activePanelId.length > 0) {
@@ -180,15 +228,61 @@
             }
 
             const targetX = typeof parsed.x === "number" ? parsed.x : 0;
-            const targetY = parsed.y;
+            const fallbackTargetY = parsed.y;
+            const anchorDayIndex = Number.isInteger(parsed.anchorDayIndex)
+                ? parsed.anchorDayIndex
+                : null;
+            const anchorTop = typeof parsed.anchorTop === "number"
+                ? parsed.anchorTop
+                : null;
+            const resolveTargetY = () => {
+                if (anchorDayIndex === null || typeof anchorTop !== "number") {
+                    return fallbackTargetY;
+                }
+
+                const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${anchorDayIndex}']`;
+                const targetDayInput = document.querySelector(selector);
+                if (!(targetDayInput instanceof HTMLInputElement)) {
+                    return fallbackTargetY;
+                }
+
+                const targetForm = targetDayInput.closest("form");
+                if (!(targetForm instanceof HTMLFormElement)) {
+                    return fallbackTargetY;
+                }
+
+                return window.scrollY + (targetForm.getBoundingClientRect().top - anchorTop);
+            };
+            const restoreIfDrifted = () => {
+                const targetY = resolveTargetY();
+                const xDrift = Math.abs(window.scrollX - targetX);
+                const yDrift = Math.abs(window.scrollY - targetY);
+                if (xDrift > 2 || yDrift > 8) {
+                    scrollInstantly(targetX, targetY);
+                }
+            };
+
+            root.classList.add("is-restoring-scroll");
+            const restoreDeadline = Date.now() + 700;
+            const restoreLoop = () => {
+                restoreIfDrifted();
+                if (Date.now() < restoreDeadline) {
+                    requestAnimationFrame(restoreLoop);
+                    return;
+                }
+
+                root.classList.remove("is-restoring-scroll");
+                clearRestorePending();
+            };
 
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    window.scrollTo(targetX, targetY);
-                });
+                requestAnimationFrame(restoreLoop);
             });
+            return true;
         } catch {
             // Ignore malformed session payloads.
+            clearRestorePending();
+            return false;
         }
     };
 
@@ -316,8 +410,24 @@
 
     const preserveScrollForms = Array.from(document.querySelectorAll("[data-preserve-scroll-form]"));
     preserveScrollForms.forEach(form => {
+        const captureScrollSnapshot = () => {
+            form.dataset.swapScrollX = `${Math.round(window.scrollX)}`;
+            form.dataset.swapScrollY = `${Math.round(window.scrollY)}`;
+            form.dataset.swapScrollCapturedAt = `${Date.now()}`;
+        };
+
+        form.addEventListener("pointerdown", captureScrollSnapshot, { passive: true });
+        form.addEventListener("touchstart", captureScrollSnapshot, { passive: true });
+        form.addEventListener("click", captureScrollSnapshot);
+
         form.addEventListener("submit", () => {
-            persistSwapScrollPosition();
+            // Avoid browser hash-anchor jump before our explicit scroll restoration runs.
+            const action = form.getAttribute("action");
+            if (typeof action === "string" && action.includes("#")) {
+                form.setAttribute("action", action.split("#")[0]);
+            }
+
+            persistSwapScrollPosition(form);
         });
     });
 
@@ -367,7 +477,7 @@
         });
 
         leftoverCsvInput.value = requestedDayIndexes.join(",");
-        persistSwapScrollPosition();
+        persistSwapScrollPosition(leftoverRebalanceForm);
         leftoverRebalanceForm.requestSubmit();
     };
 
@@ -491,5 +601,8 @@
     syncUi(initialIndex >= 0 ? initialIndex : 0, false);
     updateViewportHeight(false);
     syncSetupToggleState();
-    restoreSwapScrollPosition();
+    const restored = restoreSwapScrollPosition();
+    if (!restored) {
+        clearRestorePending();
+    }
 })();

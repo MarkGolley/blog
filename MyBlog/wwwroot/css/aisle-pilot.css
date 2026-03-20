@@ -6,6 +6,10 @@
     padding-bottom: 1.25rem;
 }
 
+html.aislepilot-restore-pending .aislepilot-app {
+    visibility: hidden;
+}
+
 .aislepilot-app-head {
     border: 1px solid rgba(16, 63, 101, 0.22);
     border-radius: calc(var(--radius-md) + 4px);
@@ -140,6 +144,11 @@
     width: 100%;
     align-items: flex-start;
     transition: transform 0.26s ease;
+}
+
+.aislepilot-window-shell.is-restoring-scroll .aislepilot-window-viewport,
+.aislepilot-window-shell.is-restoring-scroll .aislepilot-window-track {
+    transition: none !important;
 }
 
 .aislepilot-window-panel {

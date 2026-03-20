@@ -96,6 +96,54 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotSwap_PreservesScrollPosition()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var swapButtons = page.Locator(".aislepilot-swap-btn");
+        var swapButtonCount = await swapButtons.CountAsync();
+        Assert.True(swapButtonCount > 0, "Expected at least one swap meal button to be rendered.");
+
+        var targetIndex = Math.Min(3, swapButtonCount - 1);
+        var targetSwapButton = swapButtons.Nth(targetIndex);
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
+
+        var beforeScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
+        Assert.True(beforeScrollY > 100, $"Expected to scroll below hero before swap. Actual scrollY={beforeScrollY}.");
+
+        var swapResponseTask = page.WaitForResponseAsync(response =>
+            string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            response.Url.Contains("/projects/aisle-pilot/swap-meal", StringComparison.OrdinalIgnoreCase));
+
+        await targetSwapButton.ClickAsync();
+        _ = await swapResponseTask;
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.Locator(".aislepilot-swap-btn").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        // Allow delayed scroll-restore hooks to complete.
+        await page.WaitForTimeoutAsync(500);
+
+        var afterScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
+        var scrollDelta = Math.Abs(afterScrollY - beforeScrollY);
+
+        Assert.True(
+            scrollDelta <= 60,
+            $"Expected swap postback to keep viewport stable. Before={beforeScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
+    }
+
+    [Fact]
     public async Task Desktop_LoginLogoutLogin_DoesNotReturnBadRequest()
     {
         if (!IsE2EEnabled())
@@ -182,6 +230,26 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         var firstPostLink = page.Locator("main a[href^='/blog/']").First;
         await firstPostLink.ClickAsync();
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    }
+
+    private async Task GoToAislePilotAndGeneratePlanAsync(IPage page)
+    {
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var generateButton = page.Locator("form.aislepilot-form button[type='submit']:has-text('Generate weekly plan')");
+        await generateButton.ClickAsync();
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.Locator(".aislepilot-swap-btn").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
     }
 
     private async Task LoginAsync(IPage page, string username)

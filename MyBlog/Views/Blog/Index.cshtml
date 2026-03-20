@@ -11,6 +11,13 @@
         <p class="hero-kicker">Engineering Journal</p>
         <h1 id="blogs-title">My Blogs</h1>
         <p class="section-intro">Browse by topic, search by keyword, and surface the articles readers are pinning most.</p>
+        <p class="blog-stat-inline" aria-label="Post summary">
+            @Model.TotalPostCount posts
+            <span aria-hidden="true">•</span>
+            @Model.FilteredPostCount visible
+            <span aria-hidden="true">•</span>
+            @Model.AvailableTags.Count topics
+        </p>
         <div class="blog-stat-grid">
             <article class="metric-card">
                 <p class="metric-value">@Model.TotalPostCount</p>

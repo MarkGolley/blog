@@ -477,6 +477,32 @@
     <link rel="icon" type="image/svg+xml" href="~/images/aislepilot-favicon.svg" />
     <link rel="apple-touch-icon" href="~/images/aislepilot-icon.svg" />
     <meta name="theme-color" content="#103F65" />
+    <script>
+        (() => {
+            try {
+                const key = "aislepilot:swap-scroll";
+                const raw = sessionStorage.getItem(key);
+                if (!raw) {
+                    return;
+                }
+
+                const parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed.y !== "number") {
+                    sessionStorage.removeItem(key);
+                    return;
+                }
+
+                if (typeof parsed.at === "number" && Date.now() - parsed.at > 60_000) {
+                    sessionStorage.removeItem(key);
+                    return;
+                }
+
+                document.documentElement.classList.add("aislepilot-restore-pending");
+            } catch {
+                // Ignore storage parsing issues.
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="~/css/aisle-pilot.css" asp-append-version="true" />
     <noscript>
         <style>
