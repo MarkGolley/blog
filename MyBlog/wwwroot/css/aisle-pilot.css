@@ -6,6 +6,10 @@
     padding-bottom: 1.25rem;
 }
 
+.aislepilot-app [hidden] {
+    display: none !important;
+}
+
 html.aislepilot-restore-pending .aislepilot-app {
     visibility: hidden;
 }
@@ -87,6 +91,96 @@ html.aislepilot-restore-pending .aislepilot-app {
     box-shadow: 0 12px 24px rgba(11, 24, 42, 0.08);
 }
 
+.aislepilot-alert-shell {
+    border-color: rgba(176, 116, 22, 0.42);
+    background: linear-gradient(150deg, rgba(255, 249, 238, 0.98), rgba(255, 255, 255, 0.98));
+}
+
+.aislepilot-alert-guidance {
+    margin: 0.26rem 0 0;
+    color: var(--ink-soft);
+}
+
+.aislepilot-alert-list {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.2rem;
+    color: var(--ink);
+    font-size: 0.9rem;
+}
+
+.aislepilot-alert-actions {
+    margin-top: 0.58rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.42rem;
+}
+
+.aislepilot-alert-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.1rem;
+    padding: 0.34rem 0.72rem;
+    border: none !important;
+    border-radius: 999px !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
+    text-decoration: none;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.aislepilot-alert-btn.is-secondary {
+    border: 1px solid rgba(16, 63, 101, 0.24) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+}
+
+.aislepilot-symbol-label,
+.aislepilot-btn-label,
+.aislepilot-tab-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.34rem;
+}
+
+.aislepilot-btn-label,
+.aislepilot-tab-label {
+    justify-content: center;
+}
+
+.aislepilot-tab-label {
+    width: 100%;
+}
+
+.aislepilot-symbol-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid rgba(16, 63, 101, 0.22);
+    border-radius: 999px;
+    background: rgba(16, 63, 101, 0.08);
+    color: var(--brand-deep);
+    flex: 0 0 auto;
+}
+
+.aislepilot-symbol-glyph svg {
+    width: 0.64rem;
+    height: 0.64rem;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .aislepilot-window-shell {
     display: grid;
     gap: 0.62rem;
@@ -99,37 +193,70 @@ html.aislepilot-restore-pending .aislepilot-app {
     gap: 0.72rem;
 }
 
+.aislepilot-window-title-meta {
+    margin-left: 0.44rem;
+    color: var(--ink-soft);
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.aislepilot-window-nav {
+    display: grid;
+    gap: 0.2rem;
+    justify-items: end;
+}
+
+.aislepilot-window-nav-hint {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    line-height: 1.35;
+    max-width: 28ch;
+    text-align: right;
+}
+
 .aislepilot-window-tabs {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.36rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.28rem;
+    width: min(100%, 26rem);
+    padding: 0.22rem;
+    border: 1px solid rgba(16, 63, 101, 0.22);
+    border-radius: 999px;
+    background: rgba(16, 63, 101, 0.08);
 }
 
 .aislepilot-window-tab {
-    flex: 0 0 auto;
+    width: 100%;
     min-height: 2.1rem !important;
-    border: none !important;
+    border: 1px solid rgba(16, 63, 101, 0.16) !important;
     border-radius: 999px !important;
-    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
-    color: #fff !important;
-    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
-    padding: 0.36rem 0.72rem !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+    padding: 0.32rem 0.56rem !important;
     font-size: 0.84rem !important;
     font-weight: 700 !important;
-    opacity: 0.88;
-    transition: transform 0.16s ease, opacity 0.16s ease, filter 0.16s ease;
+    white-space: nowrap;
+    transition: transform 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
 }
 
 .aislepilot-window-tab:hover {
-    opacity: 1;
+    background: rgba(255, 255, 255, 1) !important;
 }
 
 .aislepilot-window-tab.is-active {
-    opacity: 1;
+    border: none !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14) !important;
     transform: translateY(-1px);
-    filter: brightness(1.04);
+}
+
+.aislepilot-window-tab.is-active .aislepilot-symbol-glyph {
+    border-color: rgba(255, 255, 255, 0.48);
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
 }
 
 .aislepilot-window-viewport {
@@ -295,6 +422,29 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin: 0;
 }
 
+.aislepilot-overbudget-flag {
+    margin: 0 0 0.56rem;
+    padding: 0.56rem 0.62rem;
+    border: 1px solid rgba(146, 38, 31, 0.34);
+    border-radius: 12px;
+    background: rgba(252, 237, 236, 0.85);
+    display: grid;
+    gap: 0.36rem;
+}
+
+.aislepilot-overbudget-title {
+    margin: 0;
+    color: #7b2119;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.aislepilot-overbudget-note {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+}
+
 .aislepilot-overview-regenerate-btn {
     min-height: 2.1rem !important;
     border: none !important;
@@ -324,16 +474,133 @@ html.aislepilot-restore-pending .aislepilot-app {
     gap: 0.58rem;
 }
 
+.aislepilot-setup-mode-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.26rem;
+    padding: 0.24rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 14px;
+    background: linear-gradient(150deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.97));
+}
+
+.aislepilot-setup-mode-toggle {
+    min-height: 2.48rem !important;
+    display: grid;
+    gap: 0.06rem;
+    align-content: center;
+    justify-items: start;
+    text-align: left;
+    border: 1px solid rgba(16, 63, 101, 0.16) !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.97) !important;
+    color: var(--ink) !important;
+    box-shadow: none !important;
+    padding: 0.32rem 0.58rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    transition: background 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.aislepilot-setup-mode-toggle:hover {
+    border-color: rgba(16, 63, 101, 0.28) !important;
+}
+
+.aislepilot-setup-mode-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.16) !important;
+}
+
+.aislepilot-setup-mode-toggle-title {
+    display: block;
+    color: inherit;
+    font-size: 0.79rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.aislepilot-setup-mode-toggle-note {
+    display: block;
+    color: var(--ink-soft);
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1.2;
+    opacity: 0.9;
+}
+
+.aislepilot-setup-mode-toggle.is-active {
+    border: none !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14) !important;
+}
+
+.aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-note {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.aislepilot-setup-mode {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 12px;
+    background: linear-gradient(150deg, rgba(247, 251, 255, 0.94), rgba(255, 255, 255, 0.97));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    animation: aislepilot-setup-mode-enter 0.2s ease;
+}
+
+.aislepilot-setup-mode.is-secondary {
+    border-color: rgba(16, 63, 101, 0.15);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.aislepilot-setup-mode-head {
+    display: grid;
+    gap: 0.08rem;
+}
+
+.aislepilot-setup-mode-copy {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 0.84rem;
+    line-height: 1.35;
+}
+
+@keyframes aislepilot-setup-mode-enter {
+    from {
+        opacity: 0.74;
+        transform: translateY(3px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.aislepilot-setup-sections {
+    display: grid;
+    gap: 0.62rem;
+}
+
+.aislepilot-setup-section {
+    margin: 0;
+    align-content: start;
+}
+
 .aislepilot-inline-fields {
     display: grid;
     gap: 0.38rem;
+    grid-template-columns: repeat(auto-fit, minmax(10.75rem, 1fr));
 }
 
 .aislepilot-setup-strip {
-    border: 1px solid rgba(16, 63, 101, 0.16);
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 0.52rem;
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(246, 250, 255, 0.9);
 }
 
 .aislepilot-setup-columns {
@@ -344,32 +611,56 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-setup-panel {
     display: grid;
     gap: 0.48rem;
-    border: 1px solid rgba(16, 63, 101, 0.16);
+    border: 1px solid var(--line);
     border-radius: 12px;
     padding: 0.52rem;
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(246, 250, 255, 0.9);
 }
 
 .aislepilot-field {
     display: grid;
     gap: 0.26rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 0.42rem 0.72rem;
 }
 
 .aislepilot-field-optional {
-    border: 1px dashed rgba(16, 63, 101, 0.24);
+    border: 1px solid rgba(16, 63, 101, 0.2);
     border-radius: 12px;
-    padding: 0.42rem 0.5rem 0.48rem;
-    background: rgba(245, 249, 255, 0.6);
+    background: rgba(248, 252, 255, 0.96);
+    padding: 0.46rem 0.62rem 0.52rem;
 }
 
-.aislepilot-field-optional label {
+.aislepilot-setup-section .aislepilot-field label {
     color: var(--ink-soft);
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.aislepilot-setup-section .aislepilot-field input,
+.aislepilot-setup-section .aislepilot-field select {
+    min-height: 1.05rem;
+    border: none;
+    border-radius: 0;
+    padding: 0.02rem 0 0;
+    background: transparent;
+    font-size: 0.94rem;
+    line-height: 1.2;
     font-weight: 600;
 }
 
-.aislepilot-field-optional input {
-    border-style: dashed;
-    background: rgba(255, 255, 255, 0.9);
+.aislepilot-setup-section .aislepilot-field input:focus,
+.aislepilot-setup-section .aislepilot-field select:focus {
+    box-shadow: none;
+}
+
+.aislepilot-setup-section .aislepilot-field:focus-within {
+    border-color: rgba(15, 109, 120, 0.58);
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.16);
 }
 
 .aislepilot-form label {
@@ -439,40 +730,18 @@ html.aislepilot-restore-pending .aislepilot-app {
     display: grid;
     gap: 0.42rem;
     max-width: 22rem;
-    margin-inline: auto;
+    margin-inline: 0;
     width: 100%;
-}
-
-.aislepilot-secondary-submit {
-    border: 1px solid rgba(16, 63, 101, 0.22) !important;
-    background: rgba(255, 255, 255, 0.96) !important;
-    color: var(--brand-deep) !important;
-    box-shadow: none !important;
-}
-
-.aislepilot-pantry-inline-action {
-    min-height: auto !important;
-    border: none !important;
-    background: transparent !important;
-    color: var(--brand-deep) !important;
-    box-shadow: none !important;
-    font-size: 0.82rem !important;
-    font-weight: 700 !important;
-    padding: 0 !important;
-    text-decoration: underline;
-    text-underline-offset: 0.12rem;
-    white-space: nowrap;
-    justify-self: start;
 }
 
 .aislepilot-field-chip {
     border: 1px solid rgba(16, 63, 101, 0.24);
-    border-radius: 14px;
-    padding: 0.2rem 0.5rem 0.24rem;
+    border-radius: 999px;
+    padding: 0.38rem 0.72rem 0.42rem;
     background: rgba(255, 255, 255, 0.95);
 }
 
-.aislepilot-field-chip label {
+.aislepilot-field-chip > label {
     margin: 0;
     font-size: 0.66rem;
     letter-spacing: 0.04em;
@@ -500,6 +769,176 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-field-chip:focus-within {
     border-color: rgba(15, 109, 120, 0.58);
     box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.16);
+}
+
+.aislepilot-slider-field {
+    gap: 0.24rem;
+}
+
+.aislepilot-plan-basics .aislepilot-slider-field {
+    padding: 0.28rem 0.56rem 0.3rem;
+}
+
+.aislepilot-plan-basics .aislepilot-field,
+.aislepilot-plan-basics .aislepilot-field-chip {
+    border-radius: 12px;
+}
+
+.aislepilot-field--full {
+    grid-column: 1 / -1;
+}
+
+.aislepilot-supermarket-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.8rem, 1fr));
+    gap: 0.26rem;
+}
+
+.aislepilot-supermarket-option {
+    position: relative;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.aislepilot-supermarket-option input[type="radio"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.aislepilot-supermarket-option span,
+.aislepilot-mode-option span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 1.72rem;
+    padding: 0.28rem 0.52rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    text-align: center;
+}
+
+.aislepilot-supermarket-option input[type="radio"]:checked + span,
+.aislepilot-mode-option input[type="checkbox"]:checked + span {
+    border-color: rgba(16, 63, 101, 0.5);
+    background: rgba(16, 63, 101, 0.1);
+    color: var(--brand-deep);
+}
+
+.aislepilot-supermarket-option input[type="radio"]:focus-visible + span,
+.aislepilot-mode-option input[type="checkbox"]:focus-visible + span {
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.18);
+}
+
+.aislepilot-slider-input {
+    --slider-progress: 50%;
+    width: 100%;
+    min-height: 0.72rem !important;
+    margin: 0;
+    padding: 0;
+    border: none !important;
+    border-radius: 999px;
+    background: transparent !important;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.aislepilot-slider-input::-webkit-slider-runnable-track {
+    height: 0.3rem;
+    border-radius: 999px;
+    background:
+        linear-gradient(
+            90deg,
+            rgba(16, 63, 101, 0.76) 0%,
+            rgba(16, 63, 101, 0.58) var(--slider-progress),
+            rgba(16, 63, 101, 0.14) var(--slider-progress),
+            rgba(16, 63, 101, 0.14) 100%
+        );
+}
+
+.aislepilot-slider-input::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 0.94rem;
+    height: 0.94rem;
+    margin-top: -0.34rem;
+    border-radius: 999px;
+    border: 1px solid rgba(16, 63, 101, 0.62);
+    background: #fff;
+    box-shadow: 0 3px 9px rgba(11, 24, 42, 0.2);
+}
+
+.aislepilot-slider-input::-moz-range-track {
+    height: 0.3rem;
+    border-radius: 999px;
+    border: none;
+    background: rgba(16, 63, 101, 0.14);
+}
+
+.aislepilot-slider-input::-moz-range-progress {
+    height: 0.3rem;
+    border-radius: 999px;
+    background: rgba(16, 63, 101, 0.7);
+}
+
+.aislepilot-slider-input::-moz-range-thumb {
+    width: 0.94rem;
+    height: 0.94rem;
+    border-radius: 999px;
+    border: 1px solid rgba(16, 63, 101, 0.62);
+    background: #fff;
+    box-shadow: 0 3px 9px rgba(11, 24, 42, 0.2);
+}
+
+.aislepilot-slider-input:hover::-webkit-slider-thumb,
+.aislepilot-slider-input:active::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(16, 63, 101, 0.1);
+}
+
+.aislepilot-slider-input:hover::-moz-range-thumb,
+.aislepilot-slider-input:active::-moz-range-thumb {
+    box-shadow: 0 0 0 4px rgba(16, 63, 101, 0.1);
+}
+
+.aislepilot-slider-input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.14);
+}
+
+.aislepilot-slider-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.36rem;
+    padding-top: 0.02rem;
+}
+
+.aislepilot-slider-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+}
+
+.aislepilot-slider-hint {
+    font-size: 0.66rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    opacity: 0.9;
 }
 
 .aislepilot-field-chip-inline {
@@ -606,6 +1045,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     padding: 0;
     border: none;
     background: transparent;
+    width: 100%;
 }
 
 .aislepilot-mode-option input[type="checkbox"] {
@@ -618,49 +1058,13 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: 0;
 }
 
-.aislepilot-mode-option span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.44rem;
-    width: 100%;
-    min-height: 2.35rem;
-    padding: 0.42rem 0.72rem;
-    border: 1px solid rgba(16, 63, 101, 0.24);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.95);
-    font-weight: 600;
-    font-size: 0.92rem;
+.aislepilot-dietary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.26rem;
 }
 
-.aislepilot-mode-option span::before {
-    content: "";
-    width: 1rem;
-    height: 1rem;
-    border-radius: 999px;
-    border: 1px solid rgba(16, 63, 101, 0.32);
-    background: #fff;
-    color: transparent;
-    font-size: 0.74rem;
-    line-height: 1rem;
-    text-align: center;
-    flex: 0 0 auto;
-}
-
-.aislepilot-mode-option input[type="checkbox"]:checked + span {
-    border-color: rgba(16, 63, 101, 0.4);
-    background: rgba(16, 63, 101, 0.1);
-    color: var(--brand-deep);
-}
-
-.aislepilot-mode-option input[type="checkbox"]:checked + span::before {
-    content: "\2713";
-    border-color: var(--brand-deep);
-    background: var(--brand-deep);
-    color: #fff;
-}
-
-.aislepilot-mode-option input[type="checkbox"]:focus-visible + span {
-    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.18);
+.aislepilot-dietary-grid > .text-danger {
+    grid-column: 1 / -1;
 }
 
 .aislepilot-toggle-chip {
@@ -786,6 +1190,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-radius: 12px;
     padding: 0.72rem;
     background: rgba(255, 255, 255, 0.95);
+    transition: opacity 0.16s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .aislepilot-card.is-leftover-source {
@@ -793,8 +1198,43 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(240, 246, 255, 0.88));
 }
 
+.aislepilot-card.is-swap-fading-out {
+    opacity: 0.46;
+    transform: translateY(2px) scale(0.995);
+}
+
+.aislepilot-meal-grid.is-swap-fading-in {
+    animation: aislepilot-swap-grid-in 0.22s ease-out;
+}
+
+.aislepilot-card.is-swap-updated {
+    animation: aislepilot-swap-card-in 0.3s ease-out;
+}
+
+@keyframes aislepilot-swap-grid-in {
+    from {
+        opacity: 0.68;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes aislepilot-swap-card-in {
+    from {
+        opacity: 0.38;
+        transform: translateY(6px) scale(0.992);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 .aislepilot-card h3 {
-    margin: 0.2rem 0 0.35rem;
+    margin: 0.18rem 0 0.28rem;
     font-size: 1rem;
 }
 
@@ -822,7 +1262,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin-top: 0.3rem;
     margin-bottom: 0;
     color: var(--ink-soft);
-    font-size: 0.9rem;
+    font-size: 0.84rem;
 }
 
 .aislepilot-cost {
@@ -835,6 +1275,88 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-swap-form {
     margin-top: 0;
     align-self: end;
+}
+
+.aislepilot-card-compact-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.24rem;
+}
+
+.aislepilot-card-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.34rem;
+    padding: 0.14rem 0.46rem;
+    border: 1px solid rgba(16, 63, 101, 0.18);
+    border-radius: 999px;
+    background: rgba(248, 251, 255, 0.96);
+    color: var(--ink-soft);
+    font-size: 0.73rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.aislepilot-card-meta-pill .aislepilot-symbol-glyph {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+
+.aislepilot-card-meta-pill .aislepilot-symbol-glyph svg {
+    width: 0.54rem;
+    height: 0.54rem;
+}
+
+.aislepilot-card-action-row {
+    margin-top: 0.46rem;
+    position: relative;
+}
+
+.aislepilot-meal-details {
+    margin: 0;
+    border: none;
+    padding: 0;
+    background: transparent;
+}
+
+.aislepilot-meal-details > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.85rem;
+    padding: 0.24rem 0.62rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--brand-deep) !important;
+    list-style: none;
+    margin-right: 6.2rem;
+}
+
+.aislepilot-meal-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-card-reason {
+    margin-top: 0.34rem;
+}
+
+.aislepilot-meal-details-panel {
+    margin-top: 0.44rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.42rem 0.56rem;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.aislepilot-meal-details-grid {
+    margin-top: 0.34rem;
+    display: grid;
+    gap: 0.48rem;
 }
 
 .aislepilot-swap-btn {
@@ -850,13 +1372,38 @@ html.aislepilot-restore-pending .aislepilot-app {
     box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14);
 }
 
+.aislepilot-form button .aislepilot-symbol-glyph,
+.aislepilot-swap-btn .aislepilot-symbol-glyph {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
 .aislepilot-swap-btn:hover {
     filter: brightness(1.04);
 }
 
-.aislepilot-recipe-shell {
-    margin-top: 0.58rem;
-    position: relative;
+.aislepilot-nutrition-details {
+    margin-top: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.42rem 0.56rem;
+    background: rgba(248, 251, 255, 0.92);
+}
+
+.aislepilot-nutrition-list {
+    margin: 0.2rem 0 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.16rem;
+    color: var(--ink-soft);
+    font-size: 0.84rem;
+}
+
+.aislepilot-nutrition-note {
+    margin: 0.32rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.72rem;
 }
 
 .aislepilot-recipe-details {
@@ -867,17 +1414,10 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: rgba(255, 255, 255, 0.9);
 }
 
-.aislepilot-recipe-details > summary {
-    cursor: pointer;
-    font-weight: 700;
-    color: var(--brand-deep);
-    padding-right: 6.4rem;
-}
-
-.aislepilot-swap-in-details {
+.aislepilot-card-action-inline {
     position: absolute;
-    top: 0.34rem;
-    right: 0.48rem;
+    top: 0;
+    right: 0;
 }
 
 .aislepilot-shop-list {
@@ -924,17 +1464,34 @@ html.aislepilot-restore-pending .aislepilot-app {
     grid-template-columns: 1fr;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .aislepilot-card.is-swap-fading-out {
+        opacity: 0.74;
+        transform: none;
+    }
+
+    .aislepilot-meal-grid.is-swap-fading-in,
+    .aislepilot-card.is-swap-updated {
+        animation: none;
+    }
+
+    .aislepilot-setup-mode {
+        animation: none;
+    }
+}
+
 @media (min-width: 640px) {
-    .aislepilot-inline-fields {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+    .aislepilot-setup-sections {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
     }
 
     .aislepilot-budget-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .aislepilot-setup-columns {
-        grid-template-columns: 1.08fr 0.92fr;
+    .aislepilot-setup-section:first-child {
+        grid-column: 1 / -1;
     }
 
     .aislepilot-export-actions {
@@ -960,9 +1517,49 @@ html.aislepilot-restore-pending .aislepilot-app {
         align-items: flex-start;
     }
 
+    .aislepilot-window-title-meta {
+        margin-left: 0.28rem;
+        font-size: 0.78rem;
+    }
+
+    .aislepilot-window-nav {
+        width: 100%;
+        justify-items: stretch;
+    }
+
+    .aislepilot-window-nav-hint {
+        max-width: none;
+        text-align: left;
+        font-size: 0.72rem;
+    }
+
     .aislepilot-window-tabs {
         width: 100%;
-        justify-content: flex-start;
+    }
+
+    .aislepilot-window-tab {
+        min-height: 2.28rem !important;
+        font-size: 0.79rem !important;
+    }
+
+    .aislepilot-alert-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-alert-btn {
+        width: 100%;
+    }
+
+    .aislepilot-setup-mode-toggle {
+        justify-items: center;
+        text-align: center;
+        min-height: 2.05rem !important;
+    }
+
+    .aislepilot-setup-mode-toggle-note {
+        display: none;
     }
 
     .aislepilot-section-head {
@@ -996,6 +1593,26 @@ html.aislepilot-restore-pending .aislepilot-app {
         background-size: 0.78rem;
         padding-right: 1rem !important;
     }
+
+    .aislepilot-card-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.32rem;
+    }
+
+    .aislepilot-meal-details {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .aislepilot-meal-details > summary {
+        margin-right: 0;
+    }
+
+    .aislepilot-card-action-inline {
+        position: static;
+        margin-left: auto;
+    }
 }
 
 @media (min-width: 880px) {
@@ -1024,6 +1641,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 @media print {
     .hero-actions,
     .aislepilot-export-actions,
+    .aislepilot-window-nav-hint,
     .aislepilot-window-tabs {
         display: none !important;
     }

@@ -126,6 +126,559 @@
 
     wireSubmitLoadingHandlers(document);
 
+    const wirePlanBasicsSliders = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        const syncSliderProgress = rangeInput => {
+            if (!(rangeInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const min = Number.parseFloat(rangeInput.min ?? "0");
+            const max = Number.parseFloat(rangeInput.max ?? "100");
+            const value = Number.parseFloat(rangeInput.value ?? "0");
+            const span = max - min;
+            if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(value) || span <= 0) {
+                rangeInput.style.setProperty("--slider-progress", "0%");
+                return;
+            }
+
+            const clamped = Math.min(max, Math.max(min, value));
+            const progressPercent = ((clamped - min) / span) * 100;
+            rangeInput.style.setProperty("--slider-progress", `${progressPercent}%`);
+        };
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const optionSliders = Array.from(form.querySelectorAll("[data-option-slider]"));
+            optionSliders.forEach(sliderField => {
+                if (!(sliderField instanceof HTMLElement) || sliderField.dataset.sliderWired === "true") {
+                    return;
+                }
+
+                const rangeInput = sliderField.querySelector("[data-option-slider-range]");
+                const hiddenInput = sliderField.querySelector("[data-option-slider-hidden]");
+                const valueOutput = sliderField.querySelector("[data-option-slider-value]");
+
+                if (!(rangeInput instanceof HTMLInputElement) || !(hiddenInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                const optionValues = (rangeInput.dataset.optionSliderValues ?? "")
+                    .split("|")
+                    .map(value => value.trim())
+                    .filter(value => value.length > 0);
+                if (optionValues.length === 0) {
+                    return;
+                }
+
+                const applyOptionValue = shouldNotify => {
+                    const rawIndex = Number.parseInt(rangeInput.value ?? "0", 10);
+                    const safeIndex = Number.isInteger(rawIndex)
+                        ? Math.max(0, Math.min(optionValues.length - 1, rawIndex))
+                        : 0;
+                    const selectedValue = optionValues[safeIndex];
+
+                    rangeInput.value = `${safeIndex}`;
+                    syncSliderProgress(rangeInput);
+                    rangeInput.setAttribute("aria-valuetext", selectedValue);
+                    if (valueOutput instanceof HTMLElement) {
+                        valueOutput.textContent = selectedValue;
+                    }
+
+                    const previousValue = hiddenInput.value;
+                    hiddenInput.value = selectedValue;
+                    if (shouldNotify && previousValue !== selectedValue) {
+                        hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                };
+
+                const existingHiddenIndex = optionValues.findIndex(option =>
+                    option.toLowerCase() === (hiddenInput.value ?? "").trim().toLowerCase());
+                if (existingHiddenIndex >= 0) {
+                    rangeInput.value = `${existingHiddenIndex}`;
+                }
+
+                sliderField.dataset.sliderWired = "true";
+                rangeInput.addEventListener("input", () => {
+                    applyOptionValue(true);
+                });
+                rangeInput.addEventListener("change", () => {
+                    applyOptionValue(true);
+                });
+
+                applyOptionValue(false);
+            });
+
+            const numberSliders = Array.from(form.querySelectorAll("[data-number-slider-range]"));
+            numberSliders.forEach(rangeInput => {
+                if (!(rangeInput instanceof HTMLInputElement) || rangeInput.dataset.sliderWired === "true") {
+                    return;
+                }
+
+                const sliderField = rangeInput.closest(".aislepilot-slider-field");
+                const valueOutput = sliderField?.querySelector("[data-number-slider-value]");
+                const prefix = rangeInput.dataset.numberSliderPrefix ?? "";
+                const suffix = rangeInput.dataset.numberSliderSuffix ?? "";
+                const parsedDecimals = Number.parseInt(rangeInput.dataset.numberSliderDecimals ?? "0", 10);
+                const decimals = Number.isInteger(parsedDecimals) ? Math.max(0, Math.min(2, parsedDecimals)) : 0;
+
+                const applyNumberValue = () => {
+                    const parsed = Number.parseFloat(rangeInput.value ?? "0");
+                    const normalized = Number.isFinite(parsed) ? parsed : 0;
+                    const roundedValue = normalized.toFixed(decimals);
+                    const displayText = `${prefix}${roundedValue}${suffix}`;
+
+                    syncSliderProgress(rangeInput);
+                    rangeInput.setAttribute("aria-valuetext", displayText);
+                    if (valueOutput instanceof HTMLElement) {
+                        valueOutput.textContent = displayText;
+                    }
+                };
+
+                rangeInput.dataset.sliderWired = "true";
+                rangeInput.addEventListener("input", applyNumberValue);
+                rangeInput.addEventListener("change", applyNumberValue);
+                applyNumberValue();
+            });
+        });
+    };
+
+    wirePlanBasicsSliders(document);
+
+    const getSelectedSupermarket = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return "";
+        }
+
+        const supermarketRadioOptions = Array.from(form.querySelectorAll("[data-supermarket-option]"))
+            .filter(input => input instanceof HTMLInputElement);
+        if (supermarketRadioOptions.length > 0) {
+            const selectedOption = supermarketRadioOptions.find(input => input.checked);
+            return selectedOption instanceof HTMLInputElement ? selectedOption.value : "";
+        }
+
+        const supermarketSelect = form.querySelector("[data-supermarket-select]");
+        if (supermarketSelect instanceof HTMLSelectElement || supermarketSelect instanceof HTMLInputElement) {
+            return supermarketSelect.value;
+        }
+
+        return "";
+    };
+
+    const syncCustomAisleFieldVisibility = (selectedSupermarket, customAisleField, storeLayoutSection) => {
+        if (!(customAisleField instanceof HTMLElement) && !(storeLayoutSection instanceof HTMLElement)) {
+            return;
+        }
+
+        const isCustomSupermarket = selectedSupermarket.trim().toLowerCase() === "custom";
+        if (isCustomSupermarket) {
+            if (storeLayoutSection instanceof HTMLElement) {
+                storeLayoutSection.removeAttribute("hidden");
+                storeLayoutSection.setAttribute("aria-hidden", "false");
+            }
+            if (customAisleField instanceof HTMLElement) {
+                customAisleField.removeAttribute("hidden");
+                customAisleField.setAttribute("aria-hidden", "false");
+            }
+            return;
+        }
+
+        if (storeLayoutSection instanceof HTMLElement) {
+            storeLayoutSection.setAttribute("hidden", "hidden");
+            storeLayoutSection.setAttribute("aria-hidden", "true");
+        }
+        if (customAisleField instanceof HTMLElement) {
+            customAisleField.setAttribute("hidden", "hidden");
+            customAisleField.setAttribute("aria-hidden", "true");
+        }
+    };
+
+    const wireCustomAisleFieldVisibility = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const customAisleField = form.querySelector("[data-custom-aisle-field]");
+            const storeLayoutSection = form.querySelector("[data-store-layout-section]");
+            if (!(customAisleField instanceof HTMLElement) && !(storeLayoutSection instanceof HTMLElement)) {
+                return;
+            }
+
+            const supermarketControls = Array.from(
+                form.querySelectorAll("[data-supermarket-option], [data-supermarket-select]"));
+            if (supermarketControls.length === 0) {
+                return;
+            }
+
+            supermarketControls.forEach(control => {
+                if (!(control instanceof HTMLInputElement) && !(control instanceof HTMLSelectElement)) {
+                    return;
+                }
+
+                if (control.dataset.customAisleVisibilityWired === "true") {
+                    return;
+                }
+
+                control.dataset.customAisleVisibilityWired = "true";
+                const syncVisibility = () => {
+                    syncCustomAisleFieldVisibility(
+                        getSelectedSupermarket(form),
+                        customAisleField,
+                        storeLayoutSection);
+                };
+
+                control.addEventListener("change", syncVisibility);
+                if (control instanceof HTMLInputElement) {
+                    control.addEventListener("input", syncVisibility);
+                }
+            });
+
+            syncCustomAisleFieldVisibility(
+                getSelectedSupermarket(form),
+                customAisleField,
+                storeLayoutSection);
+        });
+    };
+
+    wireCustomAisleFieldVisibility(document);
+
+    const wireNotesExportButtons = scope => {
+        const shells = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-notes-export-shell]"))
+            : Array.from(document.querySelectorAll("[data-notes-export-shell]"));
+
+        const setTemporaryButtonLabel = (button, label) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            const defaultLabel = button.dataset.notesDefaultLabel?.trim()
+                || button.dataset.originalLabel?.trim()
+                || button.textContent?.trim()
+                || "Share shopping list to iPhone Notes";
+            button.textContent = label;
+
+            const timeoutRaw = button.dataset.notesLabelTimeoutMs ?? "2400";
+            const timeoutMs = Number.parseInt(timeoutRaw, 10);
+            const safeTimeout = Number.isInteger(timeoutMs) ? Math.max(800, Math.min(6000, timeoutMs)) : 2400;
+
+            window.setTimeout(() => {
+                if (button.isConnected) {
+                    button.textContent = defaultLabel;
+                }
+            }, safeTimeout);
+        };
+
+        const copyTextToClipboard = async text => {
+            if (typeof text !== "string" || text.length === 0) {
+                return false;
+            }
+
+            if (navigator.clipboard?.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch {
+                    // Fallback below.
+                }
+            }
+
+            if (typeof document.execCommand !== "function") {
+                return false;
+            }
+
+            const tempInput = document.createElement("textarea");
+            tempInput.value = text;
+            tempInput.setAttribute("readonly", "readonly");
+            tempInput.style.position = "fixed";
+            tempInput.style.left = "-9999px";
+            tempInput.style.top = "0";
+            document.body.appendChild(tempInput);
+            tempInput.focus({ preventScroll: true });
+            tempInput.select();
+            const copied = document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            return copied;
+        };
+
+        shells.forEach(shell => {
+            if (!(shell instanceof HTMLElement)) {
+                return;
+            }
+
+            const trigger = shell.querySelector("[data-notes-export-trigger]");
+            const contentField = shell.querySelector("[data-notes-export-content]");
+            if (!(trigger instanceof HTMLButtonElement) || !(contentField instanceof HTMLTextAreaElement)) {
+                return;
+            }
+
+            if (trigger.dataset.notesExportWired === "true") {
+                return;
+            }
+
+            trigger.dataset.notesExportWired = "true";
+            const defaultLabel = trigger.dataset.notesDefaultLabel?.trim()
+                || trigger.textContent?.trim()
+                || "Share shopping list to iPhone Notes";
+            trigger.dataset.originalLabel = defaultLabel;
+            trigger.textContent = defaultLabel;
+
+            trigger.addEventListener("click", async () => {
+                const notesText = contentField.value?.trim() ?? "";
+                if (notesText.length === 0) {
+                    const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not prepare shopping list.";
+                    setTemporaryButtonLabel(trigger, failedLabel);
+                    return;
+                }
+
+                if (typeof navigator.share === "function") {
+                    try {
+                        await navigator.share({
+                            title: "AislePilot Shopping List",
+                            text: notesText
+                        });
+                        const sharedLabel = trigger.dataset.notesSharedLabel?.trim() || "Share sheet opened. Choose Notes.";
+                        setTemporaryButtonLabel(trigger, sharedLabel);
+                        return;
+                    } catch (error) {
+                        if (error instanceof DOMException && error.name === "AbortError") {
+                            return;
+                        }
+                    }
+                }
+
+                const copied = await copyTextToClipboard(notesText);
+                if (copied) {
+                    const copiedLabel = trigger.dataset.notesCopiedLabel?.trim() || "Shopping list copied. Paste into Notes.";
+                    setTemporaryButtonLabel(trigger, copiedLabel);
+                    return;
+                }
+
+                const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not share. Try again.";
+                setTemporaryButtonLabel(trigger, failedLabel);
+            });
+        });
+    };
+
+    wireNotesExportButtons(document);
+
+    const setupModeStorageKey = "aislepilot:setup-mode";
+
+    const wireSetupModeSwitches = scope => {
+        const switches = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-setup-mode-switch]"))
+            : Array.from(document.querySelectorAll("[data-setup-mode-switch]"));
+
+        switches.forEach(modeSwitch => {
+            if (!(modeSwitch instanceof HTMLElement) || modeSwitch.dataset.setupModeWired === "true") {
+                return;
+            }
+
+            const buttons = Array.from(modeSwitch.querySelectorAll("[data-setup-mode-toggle]"))
+                .filter(button => button instanceof HTMLButtonElement);
+            if (buttons.length === 0) {
+                return;
+            }
+
+            const ownerForm = modeSwitch.closest("form");
+            const panelScope = ownerForm instanceof HTMLFormElement ? ownerForm : document;
+            const panels = Array.from(panelScope.querySelectorAll("[data-setup-mode-panel]"))
+                .filter(panel => panel instanceof HTMLElement);
+            if (panels.length === 0) {
+                return;
+            }
+            const modeSubmitButtons = Array.from(panelScope.querySelectorAll("button[type='submit'][data-setup-mode-submit]"))
+                .filter(button => button instanceof HTMLButtonElement);
+            const modeValueInput = panelScope.querySelector("[data-setup-mode-value]");
+            const modeIds = buttons
+                .map(button => button.dataset.setupModeToggle?.trim() ?? "")
+                .filter(mode => mode.length > 0);
+
+            const resolveMode = mode => {
+                const normalizedMode = typeof mode === "string" ? mode.trim() : "";
+                if (normalizedMode.length > 0 && panels.some(panel => panel.dataset.setupModePanel === normalizedMode)) {
+                    return normalizedMode;
+                }
+
+                const fallbackMode = buttons[0]?.dataset.setupModeToggle?.trim() ?? "";
+                return fallbackMode;
+            };
+
+            const applyMode = (mode, options = {}) => {
+                const nextMode = resolveMode(mode);
+                if (!nextMode) {
+                    return;
+                }
+                const shouldPersist = options.persist !== false;
+
+                buttons.forEach(button => {
+                    if (!(button instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    const isActive = button.dataset.setupModeToggle === nextMode;
+                    button.classList.toggle("is-active", isActive);
+                    button.setAttribute("aria-selected", isActive ? "true" : "false");
+                    button.setAttribute("tabindex", isActive ? "0" : "-1");
+                });
+
+                panels.forEach(panel => {
+                    if (!(panel instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const isActive = panel.dataset.setupModePanel === nextMode;
+                    if (isActive) {
+                        panel.removeAttribute("hidden");
+                        panel.setAttribute("aria-hidden", "false");
+                    } else {
+                        panel.setAttribute("hidden", "hidden");
+                        panel.setAttribute("aria-hidden", "true");
+                    }
+                });
+
+                if (modeValueInput instanceof HTMLInputElement) {
+                    modeValueInput.value = nextMode;
+                }
+
+                if (shouldPersist) {
+                    try {
+                        window.localStorage.setItem(setupModeStorageKey, nextMode);
+                    } catch {
+                        // Ignore storage failures in private modes.
+                    }
+                }
+            };
+
+            buttons.forEach(button => {
+                if (!(button instanceof HTMLButtonElement) || button.dataset.setupModeToggleWired === "true") {
+                    return;
+                }
+
+                button.dataset.setupModeToggleWired = "true";
+                button.addEventListener("click", () => {
+                    applyMode(button.dataset.setupModeToggle);
+                });
+                button.addEventListener("keydown", event => {
+                    const currentIndex = modeIds.findIndex(mode => mode === button.dataset.setupModeToggle);
+                    if (currentIndex < 0) {
+                        return;
+                    }
+
+                    let targetIndex = -1;
+                    switch (event.key) {
+                        case "ArrowLeft":
+                        case "ArrowUp":
+                            targetIndex = (currentIndex - 1 + modeIds.length) % modeIds.length;
+                            break;
+                        case "ArrowRight":
+                        case "ArrowDown":
+                            targetIndex = (currentIndex + 1) % modeIds.length;
+                            break;
+                        case "Home":
+                            targetIndex = 0;
+                            break;
+                        case "End":
+                            targetIndex = modeIds.length - 1;
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (targetIndex < 0 || targetIndex === currentIndex) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const targetMode = modeIds[targetIndex];
+                    const targetButton = buttons.find(candidate => candidate.dataset.setupModeToggle === targetMode);
+                    applyMode(targetMode);
+                    if (targetButton instanceof HTMLButtonElement) {
+                        targetButton.focus();
+                    }
+                });
+            });
+
+            if (ownerForm instanceof HTMLFormElement && ownerForm.dataset.setupModeSubmitWired !== "true") {
+                ownerForm.dataset.setupModeSubmitWired = "true";
+                const skippedInputTypes = new Set(["submit", "button", "checkbox", "radio", "range", "file"]);
+                ownerForm.addEventListener("keydown", event => {
+                    if (event.defaultPrevented || event.key !== "Enter") {
+                        return;
+                    }
+
+                    const target = event.target;
+                    if (!(target instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    if (
+                        target instanceof HTMLTextAreaElement ||
+                        target instanceof HTMLButtonElement ||
+                        target instanceof HTMLSelectElement
+                    ) {
+                        return;
+                    }
+
+                    if (target instanceof HTMLInputElement) {
+                        if (skippedInputTypes.has(target.type.toLowerCase())) {
+                            return;
+                        }
+                    }
+
+                    const activePanel = panels.find(panel => !panel.hasAttribute("hidden"));
+                    if (!(activePanel instanceof HTMLElement) || !activePanel.contains(target)) {
+                        return;
+                    }
+
+                    const activeMode = activePanel.dataset.setupModePanel?.trim();
+                    if (!activeMode) {
+                        return;
+                    }
+
+                    const activeSubmitButton = modeSubmitButtons.find(button =>
+                        button.dataset.setupModeSubmit?.trim() === activeMode);
+                    if (!(activeSubmitButton instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    activeSubmitButton.click();
+                });
+            }
+
+            const visibleMode = panels
+                .find(panel => panel instanceof HTMLElement && !panel.hasAttribute("hidden"))
+                ?.dataset.setupModePanel;
+            const defaultMode = modeSwitch.dataset.setupModeDefault;
+            const shouldForceDefaultMode = modeSwitch.dataset.setupModeForceDefault === "true";
+            let storedMode = null;
+            if (!shouldForceDefaultMode) {
+                try {
+                    storedMode = window.localStorage.getItem(setupModeStorageKey);
+                } catch {
+                    storedMode = null;
+                }
+            }
+
+            applyMode(visibleMode ?? storedMode ?? defaultMode, { persist: false });
+            modeSwitch.dataset.setupModeWired = "true";
+        });
+    };
+
+    wireSetupModeSwitches(document);
+
     const resetSubmittingState = () => {
         getAislePilotForms().forEach(form => {
             clearSubmitLoadingDelay(form);
@@ -182,6 +735,8 @@
     const track = root.querySelector("[data-window-track]");
     const tabs = Array.from(root.querySelectorAll("[data-window-tab]"));
     const panels = Array.from(root.querySelectorAll(".aislepilot-window-panel"));
+    const tabHint = root.querySelector("[data-window-hint]");
+    const tabHintSeenStorageKey = "aislepilot:tab-hint-seen";
 
     if (!viewport || !track || panels.length === 0) {
         return;
@@ -191,6 +746,35 @@
     let touchStartX = 0;
     let touchStartY = 0;
     let activePanelResizeObserver = null;
+
+    const hideTabHint = () => {
+        if (tabHint instanceof HTMLElement) {
+            tabHint.setAttribute("hidden", "hidden");
+        }
+    };
+
+    const applyTabHintVisibility = () => {
+        if (!(tabHint instanceof HTMLElement)) {
+            return;
+        }
+
+        try {
+            if (window.localStorage.getItem(tabHintSeenStorageKey) === "true") {
+                hideTabHint();
+            }
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
+
+    const markTabHintSeen = () => {
+        hideTabHint();
+        try {
+            window.localStorage.setItem(tabHintSeenStorageKey, "true");
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
 
     const scrollInstantly = (x, y) => {
         const rootElement = document.documentElement;
@@ -469,6 +1053,7 @@
             const nextIndex = panels.findIndex(panel => panel.id === targetId);
             if (nextIndex >= 0) {
                 syncUi(nextIndex, true);
+                markTabHintSeen();
             }
         });
     });
@@ -795,14 +1380,51 @@
         replaceSectionContent(responseDocument, "#aislepilot-export");
 
         wireSubmitLoadingHandlers(document);
+        wirePlanBasicsSliders(document);
+        wireCustomAisleFieldVisibility(document);
         wirePreserveScrollHandlers(document);
         wireSetupToggleHandlers(document);
         wireLeftoverPlanner(document);
         wireAjaxSwapHandlers(document);
+        wireNotesExportButtons(document);
         syncSetupToggleState();
         observeActivePanelHeight();
         updateViewportHeight(true);
         return true;
+    };
+
+    const animateSwappedMeal = dayIndex => {
+        const mealsGrid = document.querySelector("#aislepilot-meals .aislepilot-meal-grid");
+        if (mealsGrid instanceof HTMLElement) {
+            mealsGrid.classList.remove("is-swap-fading-in");
+            mealsGrid.getBoundingClientRect();
+            mealsGrid.classList.add("is-swap-fading-in");
+            window.setTimeout(() => {
+                mealsGrid.classList.remove("is-swap-fading-in");
+            }, 260);
+        }
+
+        if (!Number.isInteger(dayIndex) || dayIndex < 0) {
+            return;
+        }
+
+        const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${dayIndex}']`;
+        const dayInput = document.querySelector(selector);
+        if (!(dayInput instanceof HTMLInputElement)) {
+            return;
+        }
+
+        const updatedCard = dayInput.closest(".aislepilot-card");
+        if (!(updatedCard instanceof HTMLElement)) {
+            return;
+        }
+
+        updatedCard.classList.remove("is-swap-updated");
+        updatedCard.getBoundingClientRect();
+        updatedCard.classList.add("is-swap-updated");
+        window.setTimeout(() => {
+            updatedCard.classList.remove("is-swap-updated");
+        }, 360);
     };
 
     const wireAjaxSwapForm = form => {
@@ -824,6 +1446,13 @@
 
             swapForm.dataset.ajaxSwapSubmitting = "true";
             const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
+            const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
+                ? scrollSnapshot.anchorDayIndex
+                : null;
+            const currentCard = swapForm.closest(".aislepilot-card");
+            if (currentCard instanceof HTMLElement) {
+                currentCard.classList.add("is-swap-fading-out");
+            }
             const actionUrl = stripHashFromFormAction(swapForm);
             if (!actionUrl) {
                 persistSwapScrollPosition(swapForm);
@@ -856,6 +1485,7 @@
                     }
 
                     restoreInlineSwapScroll(scrollSnapshot);
+                    animateSwappedMeal(swapDayIndex);
                     return;
                 }
 
@@ -871,6 +1501,9 @@
                 HTMLFormElement.prototype.submit.call(swapForm);
                 return;
             } finally {
+                if (currentCard instanceof HTMLElement && currentCard.isConnected) {
+                    currentCard.classList.remove("is-swap-fading-out");
+                }
                 clearSubmitLoadingDelay(swapForm);
                 delete swapForm.dataset.ajaxSwapSubmitting;
             }
@@ -909,6 +1542,8 @@
         } else {
             syncUi(currentIndex - 1, true);
         }
+
+        markTabHintSeen();
     }, { passive: true });
 
     window.addEventListener("resize", () => {
@@ -934,6 +1569,7 @@
     });
 
     const initialIndex = findIndexFromHash();
+    applyTabHintVisibility();
     syncUi(initialIndex >= 0 ? initialIndex : 0, false);
     updateViewportHeight(false);
     syncSetupToggleState();

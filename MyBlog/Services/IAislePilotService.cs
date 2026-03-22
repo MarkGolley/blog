@@ -5,12 +5,17 @@ namespace MyBlog.Services;
 public interface IAislePilotService
 {
     IReadOnlyList<string> GetSupportedSupermarkets();
+    IReadOnlyList<string> GetSupportedPortionSizes();
     IReadOnlyList<string> GetSupportedDietaryModes();
     bool HasCompatibleMeals(AislePilotRequestModel request);
     IReadOnlyList<AislePilotPantrySuggestionViewModel> SuggestMealsFromPantry(
         AislePilotRequestModel request,
         int maxResults = 5);
     AislePilotPlanResultViewModel BuildPlan(AislePilotRequestModel request);
+    AislePilotPlanResultViewModel BuildPlanWithBudgetRebalance(
+        AislePilotRequestModel request,
+        int maxAttempts = 4,
+        IReadOnlyList<string>? currentPlanMealNames = null);
     AislePilotPlanResultViewModel SwapMealForDay(
         AislePilotRequestModel request,
         int dayIndex,

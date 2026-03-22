@@ -2,12 +2,16 @@ namespace MyBlog.Utilities;
 
 public static class QuantityDisplayFormatter
 {
-    private static readonly HashSet<string> WholePurchaseUnits = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> FractionalContainerUnits = new(StringComparer.OrdinalIgnoreCase)
     {
         "bottle",
         "bottles",
         "jar",
-        "jars",
+        "jars"
+    };
+
+    private static readonly HashSet<string> WholePurchaseUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
         "pack",
         "packs",
         "tin",
@@ -37,6 +41,12 @@ public static class QuantityDisplayFormatter
         if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
         {
             return FormatKg(quantity);
+        }
+
+        if (FractionalContainerUnits.Contains(normalizedUnit))
+        {
+            var roundedContainerQuantity = decimal.Round(quantity, 2, MidpointRounding.AwayFromZero);
+            return $"{roundedContainerQuantity:0.##} {ToDisplayUnit(normalizedUnit, roundedContainerQuantity)}";
         }
 
         if (WholePurchaseUnits.Contains(normalizedUnit))
@@ -88,17 +98,23 @@ public static class QuantityDisplayFormatter
         return $"{grams:0} g";
     }
 
-    private static string ToDisplayUnit(string normalizedUnit, int quantity)
+    private static string ToDisplayUnit(string normalizedUnit, decimal quantity)
     {
+        var isSingle = quantity <= 1m;
         return normalizedUnit switch
         {
-            "bottle" or "bottles" => quantity == 1 ? "bottle" : "bottles",
-            "jar" or "jars" => quantity == 1 ? "jar" : "jars",
-            "pack" or "packs" => quantity == 1 ? "pack" : "packs",
-            "tin" or "tins" => quantity == 1 ? "tin" : "tins",
-            "head" or "heads" => quantity == 1 ? "head" : "heads",
-            "pc" or "pcs" or "piece" or "pieces" => quantity == 1 ? "pc" : "pcs",
+            "bottle" or "bottles" => isSingle ? "bottle" : "bottles",
+            "jar" or "jars" => isSingle ? "jar" : "jars",
+            "pack" or "packs" => isSingle ? "pack" : "packs",
+            "tin" or "tins" => isSingle ? "tin" : "tins",
+            "head" or "heads" => isSingle ? "head" : "heads",
+            "pc" or "pcs" or "piece" or "pieces" => isSingle ? "pc" : "pcs",
             _ => normalizedUnit
         };
+    }
+
+    private static string ToDisplayUnit(string normalizedUnit, int quantity)
+    {
+        return ToDisplayUnit(normalizedUnit, (decimal)quantity);
     }
 }
