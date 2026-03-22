@@ -568,7 +568,9 @@
                     This plan is @Math.Abs(result.BudgetDelta).ToString("C", ukCulture) over your weekly budget.
                 </p>
                 <p class="aislepilot-overbudget-note">
-                    Keep this plan if you are happy to spend more, or refresh with a lower-cost mix.
+                    @(string.IsNullOrWhiteSpace(result.BudgetRebalanceStatusMessage)
+                        ? "Keep this plan if you are happy to spend more, or refresh with a lower-cost mix."
+                        : result.BudgetRebalanceStatusMessage)
                 </p>
                 <form method="post"
                       action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"

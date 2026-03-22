@@ -514,6 +514,8 @@ public class AislePilotServiceTests
 
         Assert.Equal(overBudgetRequest!.WeeklyBudget, rebalanced.WeeklyBudget);
         Assert.True(rebalanced.EstimatedTotalCost <= baseline!.EstimatedTotalCost);
+        Assert.True(rebalanced.BudgetRebalanceAttempted);
+        Assert.False(string.IsNullOrWhiteSpace(rebalanced.BudgetRebalanceStatusMessage));
     }
 
     [Fact]
@@ -567,6 +569,63 @@ public class AislePilotServiceTests
         {
             Assert.True(rebalanced.EstimatedTotalCost < baseline.EstimatedTotalCost);
         }
+    }
+
+    [Fact]
+    public void BuildPlanWithBudgetRebalance_WhenNoCheaperCompatibleMealsExist_ReturnsNoCheaperMessage()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 12m,
+            HouseholdSize = 8,
+            CookDays = 7,
+            DietaryModes = ["Vegetarian", "Gluten-Free"],
+            DislikesOrAllergens = "lentil, paneer, chickpea, black bean, sweet potato"
+        };
+
+        var baseline = _service.BuildPlan(request);
+        Assert.True(baseline.IsOverBudget);
+
+        var rebalanced = _service.BuildPlanWithBudgetRebalance(
+            request,
+            currentPlanMealNames: baseline.MealPlan.Select(meal => meal.MealName).ToList());
+
+        Assert.True(rebalanced.BudgetRebalanceAttempted);
+        Assert.False(rebalanced.BudgetRebalanceReducedCost);
+        Assert.Equal(baseline.EstimatedTotalCost, rebalanced.EstimatedTotalCost);
+        Assert.Contains("do not currently have compatible recipes", rebalanced.BudgetRebalanceStatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildPlanWithBudgetRebalance_WithCurrentPlanMealNames_PreservesThatSequenceWhenAlreadyWithinBudget()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 200m,
+            HouseholdSize = 2,
+            CookDays = 7,
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Chicken stir fry with rice",
+            "Salmon, potatoes, and broccoli",
+            "Turkey chilli with beans",
+            "Veggie lentil curry",
+            "Tofu noodle bowls",
+            "Greek yogurt chicken wraps",
+            "Egg fried rice"
+        };
+
+        var result = _service.BuildPlanWithBudgetRebalance(
+            request,
+            currentPlanMealNames: currentPlanMealNames);
+        var resultMealNames = result.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(currentPlanMealNames.Count, resultMealNames.Count);
+        Assert.True(resultMealNames.SequenceEqual(currentPlanMealNames, StringComparer.OrdinalIgnoreCase));
     }
 
     [Fact]

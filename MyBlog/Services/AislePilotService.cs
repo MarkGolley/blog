@@ -35,6 +35,7 @@ public sealed class AislePilotService : IAislePilotService
     private const string OpenAiImageGenerationsEndpoint = "https://api.openai.com/v1/images/generations";
     private const int OpenAiMaxAttempts = 1;
     private const int OpenAiImageMaxAttempts = 1;
+    private const int MaxMealImageBytesForFirestore = 700_000;
     private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(22);
     private static readonly TimeSpan OpenAiImageRequestTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
@@ -663,7 +664,19 @@ public sealed class AislePilotService : IAislePilotService
         IReadOnlyList<string>? currentPlanMealNames = null)
     {
         var normalizedMaxAttempts = Math.Clamp(maxAttempts, 1, 8);
-        var baselinePlan = BuildPlan(request);
+        var context = BuildPlanContext(request);
+        var cookDays = NormalizeCookDays(request.CookDays);
+
+        var selectedMealsFromCurrentPlan = BuildSelectedMealsFromCurrentPlanNames(currentPlanMealNames, cookDays);
+        var baselinePlan = selectedMealsFromCurrentPlan is not null
+            ? BuildPlanFromMeals(
+                request,
+                context,
+                selectedMealsFromCurrentPlan,
+                cookDays,
+                usedAiGeneratedMeals: true,
+                planSourceLabel: "Current plan")
+            : BuildPlan(request);
         if (!baselinePlan.IsOverBudget)
         {
             return baselinePlan;
@@ -680,8 +693,57 @@ public sealed class AislePilotService : IAislePilotService
                 .ToList();
         }
 
+        selectedMealsFromCurrentPlan ??= BuildSelectedMealsFromCurrentPlanNames(baselineMealNames, cookDays);
         var cheapestPlan = baselinePlan;
         AislePilotPlanResultViewModel? cheapestChangedPlan = null;
+
+        void ConsiderCandidate(AislePilotPlanResultViewModel candidatePlan)
+        {
+            if (candidatePlan.EstimatedTotalCost < cheapestPlan.EstimatedTotalCost)
+            {
+                cheapestPlan = candidatePlan;
+            }
+
+            if (!HasSameMealSequence(candidatePlan, baselineMealNames) &&
+                (cheapestChangedPlan is null ||
+                 candidatePlan.EstimatedTotalCost < cheapestChangedPlan.EstimatedTotalCost))
+            {
+                cheapestChangedPlan = candidatePlan;
+            }
+        }
+
+        if (selectedMealsFromCurrentPlan is not null)
+        {
+            var targetedSwapPlan = TryBuildTargetedLowerCostPlan(
+                request,
+                context,
+                selectedMealsFromCurrentPlan,
+                cookDays);
+            if (targetedSwapPlan is not null)
+            {
+                ConsiderCandidate(targetedSwapPlan);
+                if (!targetedSwapPlan.IsOverBudget)
+                {
+                    return ApplyBudgetRebalanceStatus(targetedSwapPlan, baselinePlan, baselineMealNames);
+                }
+            }
+        }
+
+        try
+        {
+            var lowestCostPlan = BuildLowestCostRebalancePlan(request, context, cookDays);
+            lowestCostPlan = RebasePlanToOriginalBudget(lowestCostPlan, request.WeeklyBudget);
+            ConsiderCandidate(lowestCostPlan);
+            if (!lowestCostPlan.IsOverBudget)
+            {
+                return ApplyBudgetRebalanceStatus(lowestCostPlan, baselinePlan, baselineMealNames);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignore; fallback target-based passes below will handle this.
+        }
+
         var rebalanceTargets = BuildBudgetRebalanceTargets(
             request.WeeklyBudget,
             baselinePlan.EstimatedTotalCost,
@@ -702,32 +764,22 @@ public sealed class AislePilotService : IAislePilotService
             }
 
             candidatePlan = RebasePlanToOriginalBudget(candidatePlan, request.WeeklyBudget);
-
-            if (candidatePlan.EstimatedTotalCost < cheapestPlan.EstimatedTotalCost)
-            {
-                cheapestPlan = candidatePlan;
-            }
-
-            if (!HasSameMealSequence(candidatePlan, baselineMealNames) &&
-                (cheapestChangedPlan is null ||
-                 candidatePlan.EstimatedTotalCost < cheapestChangedPlan.EstimatedTotalCost))
-            {
-                cheapestChangedPlan = candidatePlan;
-            }
+            ConsiderCandidate(candidatePlan);
 
             if (!candidatePlan.IsOverBudget)
             {
-                return candidatePlan;
+                return ApplyBudgetRebalanceStatus(candidatePlan, baselinePlan, baselineMealNames);
             }
         }
 
+        var finalPlan = cheapestPlan;
         if (cheapestChangedPlan is not null &&
             cheapestChangedPlan.EstimatedTotalCost < baselinePlan.EstimatedTotalCost)
         {
-            return cheapestChangedPlan;
+            finalPlan = cheapestChangedPlan;
         }
 
-        return cheapestPlan;
+        return ApplyBudgetRebalanceStatus(finalPlan, baselinePlan, baselineMealNames);
     }
 
     private bool ShouldUseTemplateFallback()
@@ -1653,8 +1705,19 @@ Return JSON only with this schema:
         var selectedMeals = new List<MealTemplate>(cookDays);
         foreach (var mealName in currentPlanMealNames)
         {
-            if (string.IsNullOrWhiteSpace(mealName) ||
-                !AiMealPool.TryGetValue(mealName.Trim(), out var meal))
+            if (string.IsNullOrWhiteSpace(mealName))
+            {
+                return null;
+            }
+
+            var normalizedName = mealName.Trim();
+            if (!AiMealPool.TryGetValue(normalizedName, out var meal))
+            {
+                meal = MealTemplates.FirstOrDefault(template =>
+                    template.Name.Equals(normalizedName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (meal is null)
             {
                 return null;
             }
@@ -1753,6 +1816,308 @@ Return JSON only with this schema:
         return dedupedTargets
             .Take(maxTargets)
             .ToList();
+    }
+
+    private AislePilotPlanResultViewModel? TryBuildTargetedLowerCostPlan(
+        AislePilotRequestModel request,
+        PlanContext context,
+        IReadOnlyList<MealTemplate> baselineMeals,
+        int cookDays)
+    {
+        if (baselineMeals.Count != cookDays)
+        {
+            return null;
+        }
+
+        EnsureAiMealPoolHydrated();
+        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        var templateMeals = FilterMeals(context.DietaryModes, context.DislikesOrAllergens, MealTemplates);
+        var compatiblePool = pooledMeals
+            .Concat(templateMeals)
+            .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderBy(meal => meal.BaseCostForTwo).First())
+            .ToList();
+        if (compatiblePool.Count == 0)
+        {
+            return null;
+        }
+
+        var selectedMeals = baselineMeals.ToList();
+        var leftoverDays = Math.Max(0, 7 - cookDays);
+        var requestedLeftoverSourceDays = ParseRequestedLeftoverSourceDays(
+            request.LeftoverCookDayIndexesCsv,
+            cookDays,
+            leftoverDays);
+        var dayMultipliers = BuildMealPortionMultipliers(
+            cookDays,
+            leftoverDays,
+            requestedLeftoverSourceDays);
+
+        var currentTotal = CalculatePlanCost(selectedMeals, context.HouseholdFactor, dayMultipliers);
+        var maxIterations = Math.Max(4, cookDays * 2);
+        var hasChanges = false;
+
+        for (var iteration = 0; iteration < maxIterations && currentTotal > request.WeeklyBudget; iteration++)
+        {
+            var orderedDayIndexes = Enumerable.Range(0, cookDays)
+                .OrderByDescending(index => CalculateScaledMealCost(
+                    selectedMeals[index],
+                    context.HouseholdFactor,
+                    dayMultipliers[index]))
+                .ToList();
+
+            var swappedThisIteration = false;
+            foreach (var dayIndex in orderedDayIndexes)
+            {
+                var replacement = SelectLowerCostSwapCandidateForDay(
+                    compatiblePool,
+                    selectedMeals,
+                    dayIndex,
+                    context.HouseholdFactor,
+                    dayMultipliers[dayIndex],
+                    request.PreferQuickMeals);
+                if (replacement is null)
+                {
+                    continue;
+                }
+
+                var currentMealCost = CalculateScaledMealCost(
+                    selectedMeals[dayIndex],
+                    context.HouseholdFactor,
+                    dayMultipliers[dayIndex]);
+                var replacementMealCost = CalculateScaledMealCost(
+                    replacement,
+                    context.HouseholdFactor,
+                    dayMultipliers[dayIndex]);
+
+                if (replacementMealCost >= currentMealCost)
+                {
+                    continue;
+                }
+
+                selectedMeals[dayIndex] = replacement;
+                currentTotal = decimal.Round(
+                    currentTotal - currentMealCost + replacementMealCost,
+                    2,
+                    MidpointRounding.AwayFromZero);
+                hasChanges = true;
+                swappedThisIteration = true;
+                break;
+            }
+
+            if (!swappedThisIteration)
+            {
+                break;
+            }
+        }
+
+        if (!hasChanges)
+        {
+            return null;
+        }
+
+        AddMealsToAiPool(selectedMeals);
+        return BuildPlanFromMeals(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: pooledMeals.Count > 0,
+            planSourceLabel: "Budget trim swaps");
+    }
+
+    private static MealTemplate? SelectLowerCostSwapCandidateForDay(
+        IReadOnlyList<MealTemplate> compatiblePool,
+        IReadOnlyList<MealTemplate> selectedMeals,
+        int dayIndex,
+        decimal householdFactor,
+        int dayMultiplier,
+        bool preferQuickMeals)
+    {
+        if (compatiblePool.Count == 0 || dayIndex < 0 || dayIndex >= selectedMeals.Count)
+        {
+            return null;
+        }
+
+        var currentMeal = selectedMeals[dayIndex];
+        var currentMealCost = CalculateScaledMealCost(currentMeal, householdFactor, dayMultiplier);
+        var usedNames = selectedMeals
+            .Where((_, index) => index != dayIndex)
+            .Select(meal => meal.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return compatiblePool
+            .Where(meal =>
+                !meal.Name.Equals(currentMeal.Name, StringComparison.OrdinalIgnoreCase) &&
+                !usedNames.Contains(meal.Name))
+            .Select(meal => new
+            {
+                Meal = meal,
+                Cost = CalculateScaledMealCost(meal, householdFactor, dayMultiplier)
+            })
+            .Where(x => x.Cost < currentMealCost)
+            .OrderBy(x => x.Cost)
+            .ThenBy(x => preferQuickMeals && !x.Meal.IsQuick ? 1 : 0)
+            .ThenBy(x => x.Meal.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.Meal)
+            .FirstOrDefault();
+    }
+
+    private static decimal CalculatePlanCost(
+        IReadOnlyList<MealTemplate> meals,
+        decimal householdFactor,
+        IReadOnlyList<int> dayMultipliers)
+    {
+        if (meals.Count == 0)
+        {
+            return 0m;
+        }
+
+        var normalizedCount = Math.Min(meals.Count, dayMultipliers.Count);
+        var total = 0m;
+        for (var i = 0; i < normalizedCount; i++)
+        {
+            total += CalculateScaledMealCost(meals[i], householdFactor, dayMultipliers[i]);
+        }
+
+        return decimal.Round(total, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static decimal CalculateScaledMealCost(
+        MealTemplate meal,
+        decimal householdFactor,
+        int dayMultiplier)
+    {
+        var normalizedMultiplier = Math.Max(1, dayMultiplier);
+        return decimal.Round(
+            meal.BaseCostForTwo * householdFactor * normalizedMultiplier,
+            4,
+            MidpointRounding.AwayFromZero);
+    }
+
+    private AislePilotPlanResultViewModel BuildLowestCostRebalancePlan(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays)
+    {
+        EnsureAiMealPoolHydrated();
+
+        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        var templateMeals = FilterMeals(context.DietaryModes, context.DislikesOrAllergens, MealTemplates);
+
+        var combinedSource = pooledMeals
+            .Concat(templateMeals)
+            .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderBy(meal => meal.BaseCostForTwo).First())
+            .ToList();
+        if (combinedSource.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "No meals match the selected dietary modes and dislikes/allergens.");
+        }
+
+        var selectedMeals = SelectLowestCostMeals(
+            combinedSource,
+            context.HouseholdFactor,
+            request.PreferQuickMeals,
+            cookDays);
+
+        return BuildPlanFromMeals(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: pooledMeals.Count > 0,
+            planSourceLabel: "Budget floor");
+    }
+
+    private static IReadOnlyList<MealTemplate> SelectLowestCostMeals(
+        IReadOnlyList<MealTemplate> mealSource,
+        decimal householdFactor,
+        bool preferQuickMeals,
+        int cookDays)
+    {
+        if (mealSource.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "No meals match the selected dietary modes and dislikes/allergens.");
+        }
+
+        var normalizedCookDays = NormalizeCookDays(cookDays);
+        var orderedCandidates = mealSource
+            .OrderBy(meal => decimal.Round(meal.BaseCostForTwo * householdFactor, 4, MidpointRounding.AwayFromZero))
+            .ThenBy(meal => preferQuickMeals && !meal.IsQuick ? 1 : 0)
+            .ThenBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var selected = new List<MealTemplate>(normalizedCookDays);
+        for (var i = 0; i < normalizedCookDays; i++)
+        {
+            var usedMealNames = selected
+                .Select(meal => meal.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var candidate = orderedCandidates
+                .FirstOrDefault(meal => !usedMealNames.Contains(meal.Name));
+
+            if (candidate is null)
+            {
+                candidate = orderedCandidates[i % orderedCandidates.Count];
+                if (selected.Count > 0 &&
+                    selected[^1].Name.Equals(candidate.Name, StringComparison.OrdinalIgnoreCase) &&
+                    orderedCandidates.Count > 1)
+                {
+                    candidate = orderedCandidates
+                        .First(meal => !meal.Name.Equals(selected[^1].Name, StringComparison.OrdinalIgnoreCase));
+                }
+            }
+
+            selected.Add(candidate);
+        }
+
+        return selected;
+    }
+
+    private static AislePilotPlanResultViewModel ApplyBudgetRebalanceStatus(
+        AislePilotPlanResultViewModel result,
+        AislePilotPlanResultViewModel baselinePlan,
+        IReadOnlyList<string> baselineMealNames)
+    {
+        var ukCulture = CultureInfo.GetCultureInfo("en-GB");
+        var costDrop = decimal.Round(
+            baselinePlan.EstimatedTotalCost - result.EstimatedTotalCost,
+            2,
+            MidpointRounding.AwayFromZero);
+        var hasMealChanges = !HasSameMealSequence(result, baselineMealNames);
+        var changedMealCount = CountChangedMealDays(result, baselineMealNames);
+        var usedTargetedTrim = result.PlanSourceLabel.Contains("Budget trim swaps", StringComparison.OrdinalIgnoreCase);
+
+        result.BudgetRebalanceAttempted = true;
+        result.BudgetRebalanceReducedCost = costDrop > 0m;
+
+        if (!result.IsOverBudget)
+        {
+            result.BudgetRebalanceStatusMessage = costDrop > 0m && usedTargetedTrim
+                ? $"Swapped {changedMealCount} higher-cost meal(s) for lower-cost options. Estimated spend reduced by {costDrop.ToString("C", ukCulture)}."
+                : costDrop > 0m
+                    ? $"Lower-cost mix found. Estimated spend reduced by {costDrop.ToString("C", ukCulture)}."
+                : "Plan already sits within your budget.";
+            return result;
+        }
+
+        if (costDrop > 0m)
+        {
+            result.BudgetRebalanceStatusMessage = usedTargetedTrim
+                ? $"Swapped {changedMealCount} higher-cost meal(s) for lower-cost options and reduced spend by {costDrop.ToString("C", ukCulture)}, but this plan is still {Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over budget."
+                : hasMealChanges
+                    ? $"Lowest-cost compatible mix found right now. Estimated spend reduced by {costDrop.ToString("C", ukCulture)}, but this plan is still {Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over budget."
+                : $"Estimated spend reduced by {costDrop.ToString("C", ukCulture)}, but this plan is still {Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over budget.";
+            return result;
+        }
+
+        result.BudgetRebalanceStatusMessage =
+            "Sorry, we do not currently have compatible recipes that come in cheaper than this right now.";
+        return result;
     }
 
     private static AislePilotPlanResultViewModel RebasePlanToOriginalBudget(
@@ -1890,14 +2255,38 @@ Return JSON only with this schema:
             return true;
         }
 
+        if (!TryResolveMealImageDiskPath(imageUrl, out var fullPath))
+        {
+            return false;
+        }
+
+        return File.Exists(fullPath);
+    }
+
+    private bool TryResolveMealImageDiskPath(string imageUrl, out string fullPath)
+    {
+        fullPath = string.Empty;
         if (_webHostEnvironment is null || string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath))
         {
             return false;
         }
 
-        var relativePath = imageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-        var fullPath = Path.Combine(_webHostEnvironment.WebRootPath, relativePath);
-        return File.Exists(fullPath);
+        var normalized = NormalizeImageUrl(imageUrl);
+        if (!normalized.StartsWith("/images/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var relativePath = normalized.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var rootFullPath = Path.GetFullPath(_webHostEnvironment.WebRootPath);
+        var combinedPath = Path.GetFullPath(Path.Combine(rootFullPath, relativePath));
+        if (!combinedPath.StartsWith(rootFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        fullPath = combinedPath;
+        return true;
     }
 
     private void EnsureMealImagePoolHydrated()
@@ -1964,12 +2353,27 @@ Return JSON only with this schema:
                 }
 
                 var normalizedUrl = NormalizeImageUrl(mapped.ImageUrl);
-                if (string.IsNullOrWhiteSpace(normalizedUrl) || !IsMealImageUrlUsable(normalizedUrl))
+                if (string.IsNullOrWhiteSpace(normalizedUrl))
                 {
                     continue;
                 }
 
-                MealImagePool[mapped.Name.Trim()] = normalizedUrl;
+                if (!await EnsureMealImageAvailableAsync(normalizedUrl, mapped.ImageBase64, cancellationToken))
+                {
+                    continue;
+                }
+
+                var normalizedName = mapped.Name.Trim();
+                MealImagePool[normalizedName] = normalizedUrl;
+
+                if (string.IsNullOrWhiteSpace(mapped.ImageBase64))
+                {
+                    var diskBytes = await TryReadMealImageBytesFromDiskAsync(normalizedUrl, cancellationToken);
+                    if (diskBytes is { Length: > 0 and <= MaxMealImageBytesForFirestore })
+                    {
+                        await PersistMealImageAsync(normalizedName, normalizedUrl, diskBytes, cancellationToken);
+                    }
+                }
             }
 
             _lastMealImagePoolRefreshUtc = DateTime.UtcNow;
@@ -1977,6 +2381,93 @@ Return JSON only with this schema:
         finally
         {
             MealImagePoolRefreshLock.Release();
+        }
+    }
+
+    private async Task<bool> EnsureMealImageAvailableAsync(
+        string imageUrl,
+        string? imageBase64,
+        CancellationToken cancellationToken)
+    {
+        if (!imageUrl.StartsWith("/images/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (IsMealImageUrlUsable(imageUrl))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(imageBase64))
+        {
+            return false;
+        }
+
+        return await TryRestoreMealImageFromBase64Async(imageUrl, imageBase64, cancellationToken);
+    }
+
+    private async Task<bool> TryRestoreMealImageFromBase64Async(
+        string imageUrl,
+        string imageBase64,
+        CancellationToken cancellationToken)
+    {
+        if (!TryResolveMealImageDiskPath(imageUrl, out var fullPath))
+        {
+            return false;
+        }
+
+        byte[] imageBytes;
+        try
+        {
+            imageBytes = Convert.FromBase64String(imageBase64);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
+        if (imageBytes.Length == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var directoryPath = Path.GetDirectoryName(fullPath);
+            if (string.IsNullOrWhiteSpace(directoryPath))
+            {
+                return false;
+            }
+
+            Directory.CreateDirectory(directoryPath);
+            await File.WriteAllBytesAsync(fullPath, imageBytes, cancellationToken);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Unable to restore AislePilot meal image file for url '{ImageUrl}'.", imageUrl);
+            return false;
+        }
+    }
+
+    private async Task<byte[]?> TryReadMealImageBytesFromDiskAsync(
+        string imageUrl,
+        CancellationToken cancellationToken)
+    {
+        if (!TryResolveMealImageDiskPath(imageUrl, out var fullPath) || !File.Exists(fullPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var bytes = await File.ReadAllBytesAsync(fullPath, cancellationToken);
+            return bytes.Length == 0 ? null : bytes;
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -2026,7 +2517,7 @@ Return JSON only with this schema:
                     AiMealPool[meal.Name] = existingMeal with { ImageUrl = imageUrl };
                 }
 
-                await PersistMealImageAsync(meal.Name, imageUrl, CancellationToken.None);
+                await PersistMealImageAsync(meal.Name, imageUrl, imageBytes, CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -2165,11 +2656,26 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
     private async Task PersistMealImageAsync(
         string mealName,
         string imageUrl,
+        byte[]? imageBytes,
         CancellationToken cancellationToken)
     {
         if (_db is null || string.IsNullOrWhiteSpace(mealName) || string.IsNullOrWhiteSpace(imageUrl))
         {
             return;
+        }
+
+        var imageBase64 = string.Empty;
+        if (imageBytes is { Length: > 0 and <= MaxMealImageBytesForFirestore })
+        {
+            imageBase64 = Convert.ToBase64String(imageBytes);
+        }
+        else if (imageBytes is { Length: > MaxMealImageBytesForFirestore })
+        {
+            _logger?.LogWarning(
+                "Skipping Firestore image byte backup for '{MealName}' because payload size {ByteLength} exceeds cap {MaxByteLength}.",
+                mealName,
+                imageBytes.Length,
+                MaxMealImageBytesForFirestore);
         }
 
         try
@@ -2180,6 +2686,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                 {
                     Name = mealName,
                     ImageUrl = imageUrl,
+                    ImageBase64 = imageBase64,
                     UpdatedAtUtc = DateTime.UtcNow,
                     Source = "openai-image"
                 },
@@ -2287,6 +2794,23 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         }
 
         return true;
+    }
+
+    private static int CountChangedMealDays(
+        AislePilotPlanResultViewModel plan,
+        IReadOnlyList<string> baselineMealNames)
+    {
+        var comparedCount = Math.Min(plan.MealPlan.Count, baselineMealNames.Count);
+        var changedCount = 0;
+        for (var i = 0; i < comparedCount; i++)
+        {
+            if (!plan.MealPlan[i].MealName.Equals(baselineMealNames[i], StringComparison.OrdinalIgnoreCase))
+            {
+                changedCount++;
+            }
+        }
+
+        return Math.Max(1, changedCount);
     }
 
     private static decimal BuildMealSelectionScore(
@@ -4719,6 +5243,9 @@ Return JSON only with this schema:
 
         [FirestoreProperty]
         public string ImageUrl { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public string ImageBase64 { get; set; } = string.Empty;
 
         [FirestoreProperty]
         public DateTime UpdatedAtUtc { get; set; }
