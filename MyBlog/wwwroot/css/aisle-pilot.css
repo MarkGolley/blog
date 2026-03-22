@@ -694,7 +694,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: rgba(255, 255, 255, 0.95);
 }
 
-.aislepilot-field-chip label {
+.aislepilot-field-chip > label {
     margin: 0;
     font-size: 0.66rem;
     letter-spacing: 0.04em;
@@ -737,10 +737,6 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-radius: 12px;
 }
 
-.aislepilot-plan-basics .aislepilot-supermarket-option span {
-    border-radius: 10px;
-}
-
 .aislepilot-field--full {
     grid-column: 1 / -1;
 }
@@ -768,7 +764,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: 0;
 }
 
-.aislepilot-supermarket-option span {
+.aislepilot-supermarket-option span,
+.aislepilot-mode-option span {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -776,21 +773,26 @@ html.aislepilot-restore-pending .aislepilot-app {
     min-height: 1.72rem;
     padding: 0.28rem 0.52rem;
     border: 1px solid rgba(16, 63, 101, 0.24);
-    border-radius: 999px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.95);
     font-size: 0.8rem;
     font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
     color: var(--ink);
     text-align: center;
 }
 
-.aislepilot-supermarket-option input[type="radio"]:checked + span {
+.aislepilot-supermarket-option input[type="radio"]:checked + span,
+.aislepilot-mode-option input[type="checkbox"]:checked + span {
     border-color: rgba(16, 63, 101, 0.5);
     background: rgba(16, 63, 101, 0.1);
     color: var(--brand-deep);
 }
 
-.aislepilot-supermarket-option input[type="radio"]:focus-visible + span {
+.aislepilot-supermarket-option input[type="radio"]:focus-visible + span,
+.aislepilot-mode-option input[type="checkbox"]:focus-visible + span {
     box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.18);
 }
 
@@ -996,6 +998,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     padding: 0;
     border: none;
     background: transparent;
+    width: 100%;
 }
 
 .aislepilot-mode-option input[type="checkbox"] {
@@ -1008,49 +1011,13 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: 0;
 }
 
-.aislepilot-mode-option span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.44rem;
-    width: 100%;
-    min-height: 2.35rem;
-    padding: 0.42rem 0.72rem;
-    border: 1px solid rgba(16, 63, 101, 0.24);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.95);
-    font-weight: 600;
-    font-size: 0.92rem;
+.aislepilot-dietary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.26rem;
 }
 
-.aislepilot-mode-option span::before {
-    content: "";
-    width: 1rem;
-    height: 1rem;
-    border-radius: 999px;
-    border: 1px solid rgba(16, 63, 101, 0.32);
-    background: #fff;
-    color: transparent;
-    font-size: 0.74rem;
-    line-height: 1rem;
-    text-align: center;
-    flex: 0 0 auto;
-}
-
-.aislepilot-mode-option input[type="checkbox"]:checked + span {
-    border-color: rgba(16, 63, 101, 0.4);
-    background: rgba(16, 63, 101, 0.1);
-    color: var(--brand-deep);
-}
-
-.aislepilot-mode-option input[type="checkbox"]:checked + span::before {
-    content: "\2713";
-    border-color: var(--brand-deep);
-    background: var(--brand-deep);
-    color: #fff;
-}
-
-.aislepilot-mode-option input[type="checkbox"]:focus-visible + span {
-    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.18);
+.aislepilot-dietary-grid > .text-danger {
+    grid-column: 1 / -1;
 }
 
 .aislepilot-toggle-chip {
@@ -1220,7 +1187,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-card h3 {
-    margin: 0.2rem 0 0.35rem;
+    margin: 0.18rem 0 0.28rem;
     font-size: 1rem;
 }
 
@@ -1248,7 +1215,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin-top: 0.3rem;
     margin-bottom: 0;
     color: var(--ink-soft);
-    font-size: 0.9rem;
+    font-size: 0.84rem;
 }
 
 .aislepilot-cost {
@@ -1261,6 +1228,78 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-swap-form {
     margin-top: 0;
     align-self: end;
+}
+
+.aislepilot-card-compact-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.24rem;
+}
+
+.aislepilot-card-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.34rem;
+    padding: 0.14rem 0.46rem;
+    border: 1px solid rgba(16, 63, 101, 0.18);
+    border-radius: 999px;
+    background: rgba(248, 251, 255, 0.96);
+    color: var(--ink-soft);
+    font-size: 0.73rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.aislepilot-card-action-row {
+    margin-top: 0.46rem;
+    position: relative;
+}
+
+.aislepilot-meal-details {
+    margin: 0;
+    border: none;
+    padding: 0;
+    background: transparent;
+}
+
+.aislepilot-meal-details > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.85rem;
+    padding: 0.24rem 0.62rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--brand-deep) !important;
+    list-style: none;
+    margin-right: 6.2rem;
+}
+
+.aislepilot-meal-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-card-reason {
+    margin-top: 0.34rem;
+}
+
+.aislepilot-meal-details-panel {
+    margin-top: 0.44rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.42rem 0.56rem;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.aislepilot-meal-details-grid {
+    margin-top: 0.34rem;
+    display: grid;
+    gap: 0.48rem;
 }
 
 .aislepilot-swap-btn {
@@ -1280,27 +1319,16 @@ html.aislepilot-restore-pending .aislepilot-app {
     filter: brightness(1.04);
 }
 
-.aislepilot-recipe-shell {
-    margin-top: 0.58rem;
-    position: relative;
-}
-
 .aislepilot-nutrition-details {
-    margin-top: 0.44rem;
+    margin-top: 0;
     border: 1px solid var(--line);
     border-radius: 10px;
     padding: 0.42rem 0.56rem;
     background: rgba(248, 251, 255, 0.92);
 }
 
-.aislepilot-nutrition-details > summary {
-    cursor: pointer;
-    font-weight: 700;
-    color: var(--brand-deep);
-}
-
 .aislepilot-nutrition-list {
-    margin: 0.36rem 0 0;
+    margin: 0.2rem 0 0;
     padding-left: 1rem;
     display: grid;
     gap: 0.16rem;
@@ -1322,17 +1350,10 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: rgba(255, 255, 255, 0.9);
 }
 
-.aislepilot-recipe-details > summary {
-    cursor: pointer;
-    font-weight: 700;
-    color: var(--brand-deep);
-    padding-right: 6.4rem;
-}
-
-.aislepilot-swap-in-details {
+.aislepilot-card-action-inline {
     position: absolute;
-    top: 0.34rem;
-    right: 0.48rem;
+    top: 0;
+    right: 0;
 }
 
 .aislepilot-shop-list {
@@ -1507,6 +1528,26 @@ html.aislepilot-restore-pending .aislepilot-app {
         font-size: 0.9rem !important;
         background-size: 0.78rem;
         padding-right: 1rem !important;
+    }
+
+    .aislepilot-card-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.32rem;
+    }
+
+    .aislepilot-meal-details {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .aislepilot-meal-details > summary {
+        margin-right: 0;
+    }
+
+    .aislepilot-card-action-inline {
+        position: static;
+        margin-left: auto;
     }
 }
 

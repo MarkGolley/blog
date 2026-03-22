@@ -55,6 +55,15 @@
         .ToList();
     var hasModelErrors = modelErrors.Count > 0;
     var joinedErrorText = string.Join(" ", modelErrors).ToLowerInvariant();
+    string FormatSetupOptionLabel(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        return value.Trim().ToUpperInvariant();
+    }
     var looksLikeSwapIssue =
         joinedErrorText.Contains("swap", StringComparison.Ordinal) ||
         joinedErrorText.Contains("selected day was out of range", StringComparison.Ordinal) ||
@@ -200,10 +209,10 @@
                                             <input type="radio" name="Request.Supermarket" value="@store" checked data-supermarket-option />
                                         }
                                         else
-                                        {
-                                            <input type="radio" name="Request.Supermarket" value="@store" data-supermarket-option />
-                                        }
-                                        <span>@store</span>
+                                    {
+                                        <input type="radio" name="Request.Supermarket" value="@store" data-supermarket-option />
+                                    }
+                                        <span>@FormatSetupOptionLabel(store)</span>
                                     </label>
                                 }
                             </div>
@@ -282,32 +291,12 @@
                     </div>
                     </fieldset>
 
-                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section"
-                              data-store-layout-section
-                              @storeLayoutSectionHiddenAttribute>
-                        <legend>Store layout</legend>
-                        <div class="aislepilot-field" data-custom-aisle-field @customAisleFieldHiddenAttribute>
-                            <label asp-for="Request.CustomAisleOrder">Custom aisle order (only for Custom supermarket)</label>
-                            <input asp-for="Request.CustomAisleOrder" placeholder="Produce, Bakery, Dairy & Eggs, Frozen, Tins & Dry Goods..." />
-                            <span asp-validation-for="Request.CustomAisleOrder" class="text-danger"></span>
-                        </div>
-                    </fieldset>
-
-                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                        <legend>Exclusions</legend>
-                        <div class="aislepilot-field aislepilot-field-optional">
-                            <label asp-for="Request.DislikesOrAllergens">Dislikes/allergens</label>
-                            <input asp-for="Request.DislikesOrAllergens" placeholder="Example: peanuts, mushrooms, shellfish" />
-                            <span asp-validation-for="Request.DislikesOrAllergens" class="text-danger"></span>
-                        </div>
-                    </fieldset>
-
-                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-dietary-grid">
                         <legend>Dietary requirements</legend>
                         @foreach (var mode in Model.DietaryOptions)
                         {
                             var isChecked = selectedDietary.Contains(mode);
-                            <label class="aislepilot-checkbox-item aislepilot-mode-option">
+                            <label class="aislepilot-mode-option">
                                 @if (isChecked)
                                 {
                                     <input type="checkbox" name="Request.DietaryModes" value="@mode" checked />
@@ -316,7 +305,7 @@
                                 {
                                     <input type="checkbox" name="Request.DietaryModes" value="@mode" />
                                 }
-                                <span>@mode</span>
+                                <span>@FormatSetupOptionLabel(mode)</span>
                             </label>
                         }
                         <span asp-validation-for="Request.DietaryModes" class="text-danger"></span>
@@ -328,6 +317,26 @@
                             <input asp-for="Request.PreferQuickMeals" type="checkbox" />
                             <span>Prioritise quick meals</span>
                         </label>
+                    </fieldset>
+
+                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                        <legend>Exclusions</legend>
+                        <div class="aislepilot-field aislepilot-field-optional">
+                            <label asp-for="Request.DislikesOrAllergens">Dislikes/allergens</label>
+                            <input asp-for="Request.DislikesOrAllergens" placeholder="Example: peanuts, mushrooms, shellfish" />
+                            <span asp-validation-for="Request.DislikesOrAllergens" class="text-danger"></span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section"
+                              data-store-layout-section
+                              @storeLayoutSectionHiddenAttribute>
+                        <legend>Store layout</legend>
+                        <div class="aislepilot-field" data-custom-aisle-field @customAisleFieldHiddenAttribute>
+                            <label asp-for="Request.CustomAisleOrder">Custom aisle order (only for Custom supermarket)</label>
+                            <input asp-for="Request.CustomAisleOrder" placeholder="Produce, Bakery, Dairy & Eggs, Frozen, Tins & Dry Goods..." />
+                            <span asp-validation-for="Request.CustomAisleOrder" class="text-danger"></span>
+                        </div>
                     </fieldset>
                 </div>
 
@@ -636,44 +645,51 @@
                                     <p class="aislepilot-cost">@meal.EstimatedCost.ToString("C", ukCulture)</p>
                                 </div>
                                 <h3>@meal.MealName</h3>
-                                <p>@meal.MealReason</p>
-                                <p class="aislepilot-card-meta">Prep + cook time: @meal.EstimatedPrepMinutes mins</p>
-                                @if (meal.LeftoverDaysCovered > 0)
-                                {
-                                    <p class="aislepilot-card-meta">Makes extra for @meal.LeftoverDaysCovered leftover day(s)</p>
-                                }
-                                <details class="aislepilot-nutrition-details">
-                                    <summary>Est. calories + macros</summary>
-                                    <ul class="aislepilot-nutrition-list">
-                                        <li>@meal.CaloriesPerServing kcal per serving</li>
-                                        <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                        <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                        <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                    </ul>
-                                    <p class="aislepilot-nutrition-note">Estimated from ingredient maths and AI nutrition signals when available.</p>
-                                </details>
-                                <div class="aislepilot-recipe-shell">
-                                    <details class="aislepilot-recipe-details">
-                                        <summary>Recipe + ingredients</summary>
-                                        <p class="aislepilot-card-kicker">Ingredients</p>
-                                        <ul class="case-list">
-                                            @foreach (var ingredientLine in meal.IngredientLines)
-                                            {
-                                                <li>@ingredientLine</li>
-                                            }
-                                        </ul>
-                                        <p class="aislepilot-card-kicker">Method</p>
-                                        <ol class="case-list">
-                                            @foreach (var step in meal.RecipeSteps)
-                                            {
-                                                <li>@step</li>
-                                            }
-                                        </ol>
+                                <div class="aislepilot-card-compact-meta">
+                                    <span class="aislepilot-card-meta-pill">Prep @meal.EstimatedPrepMinutes mins</span>
+                                    @if (meal.LeftoverDaysCovered > 0)
+                                    {
+                                        <span class="aislepilot-card-meta-pill">Makes extra for @meal.LeftoverDaysCovered leftover day(s)</span>
+                                    }
+                                </div>
+                                <div class="aislepilot-card-action-row">
+                                    <details class="aislepilot-meal-details">
+                                        <summary>View details</summary>
+                                        <div class="aislepilot-meal-details-panel">
+                                            <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
+                                            <div class="aislepilot-meal-details-grid">
+                                                <div class="aislepilot-nutrition-details">
+                                                    <p class="aislepilot-card-kicker">Est. calories + macros</p>
+                                                    <ul class="aislepilot-nutrition-list">
+                                                        <li>@meal.CaloriesPerServing kcal per serving</li>
+                                                        <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                                        <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                                        <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                                    </ul>
+                                                </div>
+                                                <div class="aislepilot-recipe-details">
+                                                    <p class="aislepilot-card-kicker">Ingredients</p>
+                                                    <ul class="case-list">
+                                                        @foreach (var ingredientLine in meal.IngredientLines)
+                                                        {
+                                                            <li>@ingredientLine</li>
+                                                        }
+                                                    </ul>
+                                                    <p class="aislepilot-card-kicker">Method</p>
+                                                    <ol class="case-list">
+                                                        @foreach (var step in meal.RecipeSteps)
+                                                        {
+                                                            <li>@step</li>
+                                                        }
+                                                    </ol>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </details>
 
                                     <form method="post"
                                           action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
-                                          class="aislepilot-swap-form aislepilot-swap-in-details"
+                                          class="aislepilot-swap-form aislepilot-card-action-inline"
                                           data-preserve-scroll-form
                                           data-ajax-swap-form>
                                         @Html.AntiForgeryToken()
