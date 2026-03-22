@@ -32,6 +32,17 @@
     var setupHiddenAttribute = hasResult ? "hidden" : null;
     var storeLayoutSectionHiddenAttribute = isCustomSupermarketSelected ? null : "hidden";
     var customAisleFieldHiddenAttribute = isCustomSupermarketSelected ? null : "hidden";
+    var hasPantryValidationErrors = ViewData.ModelState.TryGetValue("Request.PantryItems", out var pantryFieldState) &&
+        pantryFieldState.Errors.Count > 0;
+    var shouldShowGeneratorMode = Model.PantrySuggestions.Count > 0 || hasPantryValidationErrors;
+    var plannerModeHiddenAttribute = shouldShowGeneratorMode ? "hidden" : null;
+    var generatorModeHiddenAttribute = shouldShowGeneratorMode ? null : "hidden";
+    var plannerToggleClass = shouldShowGeneratorMode
+        ? "aislepilot-setup-mode-toggle"
+        : "aislepilot-setup-mode-toggle is-active";
+    var generatorToggleClass = shouldShowGeneratorMode
+        ? "aislepilot-setup-mode-toggle is-active"
+        : "aislepilot-setup-mode-toggle";
     var appHeadClass = hasResult ? "aislepilot-app-head is-compact" : "aislepilot-app-head";
     var modelErrors = ViewData.ModelState.Values
         .SelectMany(state => state.Errors)
@@ -133,8 +144,40 @@
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             }
 
-            <div class="aislepilot-setup-sections">
-                <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
+            <div class="aislepilot-setup-mode-switch"
+                 role="tablist"
+                 aria-label="Setup mode"
+                 data-setup-mode-switch
+                 data-setup-mode-default="@(shouldShowGeneratorMode ? "generator" : "planner")">
+                <button type="button"
+                        class="@plannerToggleClass"
+                        role="tab"
+                        aria-controls="aislepilot-planner-mode"
+                        aria-selected="@(shouldShowGeneratorMode ? "false" : "true")"
+                        data-setup-mode-toggle="planner">
+                    Meal planner
+                </button>
+                <button type="button"
+                        class="@generatorToggleClass"
+                        role="tab"
+                        aria-controls="aislepilot-generator-mode"
+                        aria-selected="@(shouldShowGeneratorMode ? "true" : "false")"
+                        data-setup-mode-toggle="generator">
+                    Meal generator
+                </button>
+            </div>
+
+            <section id="aislepilot-planner-mode"
+                     class="aislepilot-setup-mode"
+                     aria-labelledby="aislepilot-planner-title"
+                     role="tabpanel"
+                     data-setup-mode-panel="planner"
+                     @plannerModeHiddenAttribute>
+                <h3 id="aislepilot-planner-title" class="aislepilot-setup-mode-title">Meal planner</h3>
+                <p class="aislepilot-setup-mode-copy">Build your weekly plan and shopping list.</p>
+
+                <div class="aislepilot-setup-sections">
+                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
                     <legend>Plan basics</legend>
                     <div class="aislepilot-inline-fields">
                         <div class="aislepilot-field aislepilot-field-chip aislepilot-field--full">
@@ -229,70 +272,84 @@
                             <span asp-validation-for="Request.CookDays" class="text-danger"></span>
                         </div>
                     </div>
-                </fieldset>
+                    </fieldset>
 
-                <fieldset class="aislepilot-checkboxes aislepilot-setup-section"
-                          data-store-layout-section
-                          @storeLayoutSectionHiddenAttribute>
-                    <legend>Store layout</legend>
-                    <div class="aislepilot-field" data-custom-aisle-field @customAisleFieldHiddenAttribute>
-                        <label asp-for="Request.CustomAisleOrder">Custom aisle order (only for Custom supermarket)</label>
-                        <input asp-for="Request.CustomAisleOrder" placeholder="Produce, Bakery, Dairy & Eggs, Frozen, Tins & Dry Goods..." />
-                        <span asp-validation-for="Request.CustomAisleOrder" class="text-danger"></span>
-                    </div>
-                </fieldset>
+                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section"
+                              data-store-layout-section
+                              @storeLayoutSectionHiddenAttribute>
+                        <legend>Store layout</legend>
+                        <div class="aislepilot-field" data-custom-aisle-field @customAisleFieldHiddenAttribute>
+                            <label asp-for="Request.CustomAisleOrder">Custom aisle order (only for Custom supermarket)</label>
+                            <input asp-for="Request.CustomAisleOrder" placeholder="Produce, Bakery, Dairy & Eggs, Frozen, Tins & Dry Goods..." />
+                            <span asp-validation-for="Request.CustomAisleOrder" class="text-danger"></span>
+                        </div>
+                    </fieldset>
 
+                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                        <legend>Exclusions</legend>
+                        <div class="aislepilot-field aislepilot-field-optional">
+                            <label asp-for="Request.DislikesOrAllergens">Dislikes/allergens</label>
+                            <input asp-for="Request.DislikesOrAllergens" placeholder="Example: peanuts, mushrooms, shellfish" />
+                            <span asp-validation-for="Request.DislikesOrAllergens" class="text-danger"></span>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                        <legend>Dietary requirements</legend>
+                        @foreach (var mode in Model.DietaryOptions)
+                        {
+                            var isChecked = selectedDietary.Contains(mode);
+                            <label class="aislepilot-checkbox-item aislepilot-mode-option">
+                                @if (isChecked)
+                                {
+                                    <input type="checkbox" name="Request.DietaryModes" value="@mode" checked />
+                                }
+                                else
+                                {
+                                    <input type="checkbox" name="Request.DietaryModes" value="@mode" />
+                                }
+                                <span>@mode</span>
+                            </label>
+                        }
+                        <span asp-validation-for="Request.DietaryModes" class="text-danger"></span>
+
+                        <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                            <input asp-for="Request.PreferQuickMeals" type="checkbox" />
+                            <span>Prioritise quick meals</span>
+                        </label>
+                    </fieldset>
+                </div>
+
+                <div class="aislepilot-submit-actions">
+                    <button type="submit" data-loading-label="Generating plan...">Generate weekly plan</button>
+                </div>
+            </section>
+
+            <section id="aislepilot-generator-mode"
+                     class="aislepilot-setup-mode is-secondary"
+                     aria-labelledby="aislepilot-generator-title"
+                     role="tabpanel"
+                     data-setup-mode-panel="generator"
+                     @generatorModeHiddenAttribute>
+                <h3 id="aislepilot-generator-title" class="aislepilot-setup-mode-title">Meal generator</h3>
+                <p class="aislepilot-setup-mode-copy">Generate one quick dish from what is already in your pantry.</p>
                 <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                    <legend>Pantry and exclusions</legend>
-                    <div class="aislepilot-field aislepilot-field-optional">
-                        <label asp-for="Request.DislikesOrAllergens">Dislikes/allergens</label>
-                        <input asp-for="Request.DislikesOrAllergens" placeholder="Example: peanuts, mushrooms, shellfish" />
-                        <span asp-validation-for="Request.DislikesOrAllergens" class="text-danger"></span>
-                    </div>
-
+                    <legend>Pantry items</legend>
                     <div class="aislepilot-field aislepilot-field-optional">
                         <label asp-for="Request.PantryItems">What do you already have?</label>
                         <input asp-for="Request.PantryItems" placeholder="Example: rice, eggs, frozen peas, olive oil" />
-                        <button
-                            type="submit"
-                            class="aislepilot-pantry-inline-action"
-                            data-loading-label="Finding meals..."
-                            formaction="@Url.Action("SuggestFromPantry", "AislePilot")">
-                            Generate a dish to eat now
-                        </button>
                         <span asp-validation-for="Request.PantryItems" class="text-danger"></span>
                     </div>
                 </fieldset>
-
-                <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                    <legend>Dietary requirements</legend>
-                    @foreach (var mode in Model.DietaryOptions)
-                    {
-                        var isChecked = selectedDietary.Contains(mode);
-                        <label class="aislepilot-checkbox-item aislepilot-mode-option">
-                            @if (isChecked)
-                            {
-                                <input type="checkbox" name="Request.DietaryModes" value="@mode" checked />
-                            }
-                            else
-                            {
-                                <input type="checkbox" name="Request.DietaryModes" value="@mode" />
-                            }
-                            <span>@mode</span>
-                        </label>
-                    }
-                    <span asp-validation-for="Request.DietaryModes" class="text-danger"></span>
-
-                    <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
-                        <input asp-for="Request.PreferQuickMeals" type="checkbox" />
-                        <span>Prioritise quick meals</span>
-                    </label>
-                </fieldset>
-            </div>
-
-            <div class="aislepilot-submit-actions">
-                <button type="submit" data-loading-label="Generating plan...">Generate weekly plan</button>
-            </div>
+                <div class="aislepilot-submit-actions">
+                    <button
+                        type="submit"
+                        data-loading-label="Finding meals..."
+                        formaction="@Url.Action("SuggestFromPantry", "AislePilot")">
+                        Generate dish now
+                    </button>
+                </div>
+            </section>
         </form>
     </section>
 

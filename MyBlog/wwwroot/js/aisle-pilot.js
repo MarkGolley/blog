@@ -353,6 +353,95 @@
 
     wireCustomAisleFieldVisibility(document);
 
+    const wireSetupModeSwitches = scope => {
+        const switches = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-setup-mode-switch]"))
+            : Array.from(document.querySelectorAll("[data-setup-mode-switch]"));
+
+        switches.forEach(modeSwitch => {
+            if (!(modeSwitch instanceof HTMLElement) || modeSwitch.dataset.setupModeWired === "true") {
+                return;
+            }
+
+            const buttons = Array.from(modeSwitch.querySelectorAll("[data-setup-mode-toggle]"))
+                .filter(button => button instanceof HTMLButtonElement);
+            if (buttons.length === 0) {
+                return;
+            }
+
+            const ownerForm = modeSwitch.closest("form");
+            const panelScope = ownerForm instanceof HTMLFormElement ? ownerForm : document;
+            const panels = Array.from(panelScope.querySelectorAll("[data-setup-mode-panel]"))
+                .filter(panel => panel instanceof HTMLElement);
+            if (panels.length === 0) {
+                return;
+            }
+
+            const resolveMode = mode => {
+                const normalizedMode = typeof mode === "string" ? mode.trim() : "";
+                if (normalizedMode.length > 0 && panels.some(panel => panel.dataset.setupModePanel === normalizedMode)) {
+                    return normalizedMode;
+                }
+
+                const fallbackMode = buttons[0]?.dataset.setupModeToggle?.trim() ?? "";
+                return fallbackMode;
+            };
+
+            const applyMode = mode => {
+                const nextMode = resolveMode(mode);
+                if (!nextMode) {
+                    return;
+                }
+
+                buttons.forEach(button => {
+                    if (!(button instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    const isActive = button.dataset.setupModeToggle === nextMode;
+                    button.classList.toggle("is-active", isActive);
+                    button.setAttribute("aria-selected", isActive ? "true" : "false");
+                    button.setAttribute("tabindex", isActive ? "0" : "-1");
+                });
+
+                panels.forEach(panel => {
+                    if (!(panel instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const isActive = panel.dataset.setupModePanel === nextMode;
+                    if (isActive) {
+                        panel.removeAttribute("hidden");
+                        panel.setAttribute("aria-hidden", "false");
+                    } else {
+                        panel.setAttribute("hidden", "hidden");
+                        panel.setAttribute("aria-hidden", "true");
+                    }
+                });
+            };
+
+            buttons.forEach(button => {
+                if (!(button instanceof HTMLButtonElement) || button.dataset.setupModeToggleWired === "true") {
+                    return;
+                }
+
+                button.dataset.setupModeToggleWired = "true";
+                button.addEventListener("click", () => {
+                    applyMode(button.dataset.setupModeToggle);
+                });
+            });
+
+            const visibleMode = panels
+                .find(panel => panel instanceof HTMLElement && !panel.hasAttribute("hidden"))
+                ?.dataset.setupModePanel;
+            const defaultMode = modeSwitch.dataset.setupModeDefault;
+            applyMode(visibleMode ?? defaultMode);
+            modeSwitch.dataset.setupModeWired = "true";
+        });
+    };
+
+    wireSetupModeSwitches(document);
+
     const resetSubmittingState = () => {
         getAislePilotForms().forEach(form => {
             clearSubmitLoadingDelay(form);

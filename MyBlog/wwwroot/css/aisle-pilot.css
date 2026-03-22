@@ -404,6 +404,64 @@ html.aislepilot-restore-pending .aislepilot-app {
     gap: 0.58rem;
 }
 
+.aislepilot-setup-mode-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.24rem;
+    padding: 0.2rem;
+    border: 1px solid rgba(16, 63, 101, 0.22);
+    border-radius: 999px;
+    background: rgba(16, 63, 101, 0.08);
+}
+
+.aislepilot-setup-mode-toggle {
+    min-height: 2rem !important;
+    border: 1px solid rgba(16, 63, 101, 0.16) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.97) !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+    padding: 0.3rem 0.56rem !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+}
+
+.aislepilot-setup-mode-toggle.is-active {
+    border: none !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14) !important;
+}
+
+.aislepilot-setup-mode {
+    display: grid;
+    gap: 0.52rem;
+    margin: 0;
+    padding: 0.66rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 14px;
+    background: linear-gradient(150deg, rgba(247, 251, 255, 0.94), rgba(255, 255, 255, 0.97));
+}
+
+.aislepilot-setup-mode.is-secondary {
+    border-color: rgba(16, 63, 101, 0.15);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.aislepilot-setup-mode-title {
+    margin: 0;
+    color: var(--brand-deep);
+    font-size: 0.98rem;
+    line-height: 1.25;
+}
+
+.aislepilot-setup-mode-copy {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 0.84rem;
+    line-height: 1.35;
+}
+
 .aislepilot-setup-sections {
     display: grid;
     gap: 0.62rem;
@@ -556,33 +614,6 @@ html.aislepilot-restore-pending .aislepilot-app {
     max-width: 22rem;
     margin-inline: auto;
     width: 100%;
-}
-
-.aislepilot-secondary-submit {
-    border: 1px solid rgba(16, 63, 101, 0.22) !important;
-    background: rgba(255, 255, 255, 0.96) !important;
-    color: var(--brand-deep) !important;
-    box-shadow: none !important;
-}
-
-.aislepilot-pantry-inline-action {
-    min-height: 2rem !important;
-    border: none !important;
-    border-radius: 999px !important;
-    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
-    color: #fff !important;
-    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14) !important;
-    font-size: 0.78rem !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.01em;
-    padding: 0.22rem 0.62rem !important;
-    white-space: nowrap;
-    justify-self: start;
-    margin-top: 0.16rem;
-}
-
-.aislepilot-pantry-inline-action:hover {
-    filter: brightness(1.04);
 }
 
 .aislepilot-field-chip {
