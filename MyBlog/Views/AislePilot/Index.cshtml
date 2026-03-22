@@ -195,7 +195,17 @@
 
                 <div class="aislepilot-setup-sections">
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
-                    <legend>Plan basics</legend>
+                    <legend>
+                        <span class="aislepilot-symbol-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect>
+                                    <path d="M3.5 10h17M9 4.5v15M15 4.5v15"></path>
+                                </svg>
+                            </span>
+                            Plan basics
+                        </span>
+                    </legend>
                     <div class="aislepilot-inline-fields">
                         <div class="aislepilot-field aislepilot-field-chip aislepilot-field--full">
                             <label asp-for="Request.Supermarket">Supermarket</label>
@@ -292,7 +302,17 @@
                     </fieldset>
 
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-dietary-grid">
-                        <legend>Dietary requirements</legend>
+                        <legend>
+                            <span class="aislepilot-symbol-label">
+                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M6 14c0-5 4-8 12-8-1 8-4 12-9 12-2 0-3-2-3-4z"></path>
+                                        <path d="M9 15c2-2 4-4 8-6"></path>
+                                    </svg>
+                                </span>
+                                Dietary requirements
+                            </span>
+                        </legend>
                         @foreach (var mode in Model.DietaryOptions)
                         {
                             var isChecked = selectedDietary.Contains(mode);
@@ -312,7 +332,17 @@
                     </fieldset>
 
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                        <legend>Cooking preferences</legend>
+                        <legend>
+                            <span class="aislepilot-symbol-label">
+                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <circle cx="12" cy="13" r="7"></circle>
+                                        <path d="M12 13V9M9 3h6"></path>
+                                    </svg>
+                                </span>
+                                Cooking preferences
+                            </span>
+                        </legend>
                         <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
                             <input asp-for="Request.PreferQuickMeals" type="checkbox" />
                             <span>Prioritise quick meals</span>
@@ -320,7 +350,17 @@
                     </fieldset>
 
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                        <legend>Exclusions</legend>
+                        <legend>
+                            <span class="aislepilot-symbol-label">
+                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <circle cx="12" cy="12" r="8"></circle>
+                                        <path d="M8 8l8 8"></path>
+                                    </svg>
+                                </span>
+                                Exclusions
+                            </span>
+                        </legend>
                         <div class="aislepilot-field aislepilot-field-optional">
                             <label asp-for="Request.DislikesOrAllergens">Dislikes/allergens</label>
                             <input asp-for="Request.DislikesOrAllergens" placeholder="Example: peanuts, mushrooms, shellfish" />
@@ -331,7 +371,17 @@
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section"
                               data-store-layout-section
                               @storeLayoutSectionHiddenAttribute>
-                        <legend>Store layout</legend>
+                        <legend>
+                            <span class="aislepilot-symbol-label">
+                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M12 21s6-5.5 6-10a6 6 0 1 0-12 0c0 4.5 6 10 6 10Z"></path>
+                                        <circle cx="12" cy="11" r="2.2"></circle>
+                                    </svg>
+                                </span>
+                                Store layout
+                            </span>
+                        </legend>
                         <div class="aislepilot-field" data-custom-aisle-field @customAisleFieldHiddenAttribute>
                             <label asp-for="Request.CustomAisleOrder">Custom aisle order (only for Custom supermarket)</label>
                             <input asp-for="Request.CustomAisleOrder" placeholder="Produce, Bakery, Dairy & Eggs, Frozen, Tins & Dry Goods..." />
@@ -341,7 +391,17 @@
                 </div>
 
                 <div class="aislepilot-submit-actions">
-                    <button type="submit" data-loading-label="Generating plan..." data-setup-mode-submit="planner">Generate weekly plan</button>
+                    <button type="submit" data-loading-label="Generating plan..." data-setup-mode-submit="planner">
+                        <span class="aislepilot-btn-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <path d="M7 17 17 7"></path>
+                                    <path d="M8 7h9v9"></path>
+                                </svg>
+                            </span>
+                            Generate weekly plan
+                        </span>
+                    </button>
                 </div>
             </section>
 
@@ -355,7 +415,18 @@
                     <p class="aislepilot-setup-mode-copy">Generate one quick dish from pantry items using your dietary requirements.</p>
                 </div>
                 <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                    <legend>Pantry items</legend>
+                    <legend>
+                        <span class="aislepilot-symbol-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"></path>
+                                    <path d="M12 21v-9"></path>
+                                    <path d="M3 7.5 12 12l9-4.5"></path>
+                                </svg>
+                            </span>
+                            Pantry items
+                        </span>
+                    </legend>
                     <div class="aislepilot-field aislepilot-field-optional">
                         <label asp-for="Request.PantryItems">What do you already have?</label>
                         <input asp-for="Request.PantryItems" placeholder="Example: rice, eggs, frozen peas, olive oil" />
@@ -368,7 +439,14 @@
                         data-loading-label="Finding meals..."
                         data-setup-mode-submit="generator"
                         formaction="@Url.Action("SuggestFromPantry", "AislePilot")">
-                        Generate dish now
+                        <span class="aislepilot-btn-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <path d="M13 2 5 13h6l-1 9 8-11h-6z"></path>
+                                </svg>
+                            </span>
+                            Generate dish now
+                        </span>
                     </button>
                 </div>
             </section>
@@ -564,9 +642,43 @@
             <div class="aislepilot-window-nav">
                 <p class="aislepilot-window-nav-hint" data-window-hint>Tap a tab to switch between meals, shopping list, and exports.</p>
                 <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
-                    <button type="button" id="aislepilot-tab-meals" class="aislepilot-window-tab" data-window-tab="aislepilot-meals" role="tab" aria-controls="aislepilot-meals" aria-selected="true">Meals</button>
-                    <button type="button" id="aislepilot-tab-shop" class="aislepilot-window-tab" data-window-tab="aislepilot-shop" role="tab" aria-controls="aislepilot-shop" aria-selected="false">Shopping</button>
-                    <button type="button" id="aislepilot-tab-export" class="aislepilot-window-tab" data-window-tab="aislepilot-export" role="tab" aria-controls="aislepilot-export" aria-selected="false">Export</button>
+                    <button type="button" id="aislepilot-tab-meals" class="aislepilot-window-tab" data-window-tab="aislepilot-meals" role="tab" aria-controls="aislepilot-meals" aria-selected="true">
+                        <span class="aislepilot-tab-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <circle cx="5" cy="7" r="1"></circle>
+                                    <circle cx="5" cy="12" r="1"></circle>
+                                    <circle cx="5" cy="17" r="1"></circle>
+                                    <path d="M8 7h11M8 12h11M8 17h11"></path>
+                                </svg>
+                            </span>
+                            Meals
+                        </span>
+                    </button>
+                    <button type="button" id="aislepilot-tab-shop" class="aislepilot-window-tab" data-window-tab="aislepilot-shop" role="tab" aria-controls="aislepilot-shop" aria-selected="false">
+                        <span class="aislepilot-tab-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <circle cx="9" cy="19" r="1.5"></circle>
+                                    <circle cx="17" cy="19" r="1.5"></circle>
+                                    <path d="M3 4h2l2.4 10h10.8l1.8-7H7"></path>
+                                </svg>
+                            </span>
+                            Shopping
+                        </span>
+                    </button>
+                    <button type="button" id="aislepilot-tab-export" class="aislepilot-window-tab" data-window-tab="aislepilot-export" role="tab" aria-controls="aislepilot-export" aria-selected="false">
+                        <span class="aislepilot-tab-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <path d="M12 16V6"></path>
+                                    <path d="m8 10 4-4 4 4"></path>
+                                    <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
+                                </svg>
+                            </span>
+                            Export
+                        </span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -646,15 +758,41 @@
                                 </div>
                                 <h3>@meal.MealName</h3>
                                 <div class="aislepilot-card-compact-meta">
-                                    <span class="aislepilot-card-meta-pill">Prep @meal.EstimatedPrepMinutes mins</span>
+                                    <span class="aislepilot-card-meta-pill">
+                                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" focusable="false">
+                                                <circle cx="12" cy="12" r="7"></circle>
+                                                <path d="M12 8v4l3 2"></path>
+                                            </svg>
+                                        </span>
+                                        Prep @meal.EstimatedPrepMinutes mins
+                                    </span>
                                     @if (meal.LeftoverDaysCovered > 0)
                                     {
-                                        <span class="aislepilot-card-meta-pill">Makes extra for @meal.LeftoverDaysCovered leftover day(s)</span>
+                                        <span class="aislepilot-card-meta-pill">
+                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" focusable="false">
+                                                    <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
+                                                    <path d="M20 4v6h-6"></path>
+                                                </svg>
+                                            </span>
+                                            Makes extra for @meal.LeftoverDaysCovered leftover day(s)
+                                        </span>
                                     }
                                 </div>
                                 <div class="aislepilot-card-action-row">
                                     <details class="aislepilot-meal-details">
-                                        <summary>View details</summary>
+                                        <summary>
+                                            <span class="aislepilot-btn-label">
+                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                                                        <circle cx="12" cy="12" r="2.5"></circle>
+                                                    </svg>
+                                                </span>
+                                                View details
+                                            </span>
+                                        </summary>
                                         <div class="aislepilot-meal-details-panel">
                                             <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
                                             <div class="aislepilot-meal-details-grid">
@@ -715,7 +853,19 @@
                                         }
                                         <input type="hidden" name="dayIndex" value="@mealIndex" />
                                         <input type="hidden" name="currentMealName" value="@meal.MealName" />
-                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping..." data-loading-delay-ms="220">Swap meal</button>
+                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping..." data-loading-delay-ms="220">
+                                            <span class="aislepilot-btn-label">
+                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                        <path d="M16 3h5v5"></path>
+                                                        <path d="M21 3 9 15"></path>
+                                                        <path d="M8 21H3v-5"></path>
+                                                        <path d="M3 21 15 9"></path>
+                                                    </svg>
+                                                </span>
+                                                Swap meal
+                                            </span>
+                                        </button>
                                     </form>
                                 </div>
                             </article>
