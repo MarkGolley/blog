@@ -846,7 +846,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-slider-input {
     --slider-progress: 50%;
     width: 100%;
-    min-height: 0.56rem !important;
+    min-height: 0.72rem !important;
     margin: 0;
     padding: 0;
     border: none !important;
@@ -858,7 +858,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-slider-input::-webkit-slider-runnable-track {
-    height: 0.22rem;
+    height: 0.3rem;
     border-radius: 999px;
     background:
         linear-gradient(
@@ -873,35 +873,35 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-slider-input::-webkit-slider-thumb {
     appearance: none;
     -webkit-appearance: none;
-    width: 0.78rem;
-    height: 0.78rem;
-    margin-top: -0.28rem;
+    width: 0.94rem;
+    height: 0.94rem;
+    margin-top: -0.34rem;
     border-radius: 999px;
     border: 1px solid rgba(16, 63, 101, 0.62);
     background: #fff;
-    box-shadow: 0 2px 6px rgba(11, 24, 42, 0.16);
+    box-shadow: 0 3px 9px rgba(11, 24, 42, 0.2);
 }
 
 .aislepilot-slider-input::-moz-range-track {
-    height: 0.22rem;
+    height: 0.3rem;
     border-radius: 999px;
     border: none;
     background: rgba(16, 63, 101, 0.14);
 }
 
 .aislepilot-slider-input::-moz-range-progress {
-    height: 0.22rem;
+    height: 0.3rem;
     border-radius: 999px;
     background: rgba(16, 63, 101, 0.7);
 }
 
 .aislepilot-slider-input::-moz-range-thumb {
-    width: 0.78rem;
-    height: 0.78rem;
+    width: 0.94rem;
+    height: 0.94rem;
     border-radius: 999px;
     border: 1px solid rgba(16, 63, 101, 0.62);
     background: #fff;
-    box-shadow: 0 2px 6px rgba(11, 24, 42, 0.16);
+    box-shadow: 0 3px 9px rgba(11, 24, 42, 0.2);
 }
 
 .aislepilot-slider-input:hover::-webkit-slider-thumb,

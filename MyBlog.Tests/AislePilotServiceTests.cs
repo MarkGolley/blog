@@ -517,6 +517,59 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlanWithBudgetRebalance_WhenPlanChangesMealMix_TotalCostDrops()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            HouseholdSize = 4,
+            CookDays = 7
+        };
+
+        AislePilotPlanResultViewModel? baseline = null;
+        AislePilotRequestModel? overBudgetRequest = null;
+        foreach (var budget in Enumerable.Range(20, 61))
+        {
+            var candidateRequest = new AislePilotRequestModel
+            {
+                Supermarket = request.Supermarket,
+                WeeklyBudget = budget,
+                HouseholdSize = request.HouseholdSize,
+                CookDays = request.CookDays,
+                PortionSize = request.PortionSize,
+                DietaryModes = [.. request.DietaryModes],
+                PreferQuickMeals = request.PreferQuickMeals
+            };
+
+            var candidatePlan = _service.BuildPlan(candidateRequest);
+            if (!candidatePlan.IsOverBudget)
+            {
+                continue;
+            }
+
+            overBudgetRequest = candidateRequest;
+            baseline = candidatePlan;
+            break;
+        }
+
+        Assert.NotNull(overBudgetRequest);
+        Assert.NotNull(baseline);
+
+        var baselineMealNames = baseline!.MealPlan.Select(meal => meal.MealName).ToList();
+        var rebalanced = _service.BuildPlanWithBudgetRebalance(
+            overBudgetRequest!,
+            currentPlanMealNames: baselineMealNames);
+        var sameMealSequence = rebalanced.MealPlan
+            .Select(meal => meal.MealName)
+            .SequenceEqual(baselineMealNames, StringComparer.OrdinalIgnoreCase);
+
+        if (!sameMealSequence)
+        {
+            Assert.True(rebalanced.EstimatedTotalCost < baseline.EstimatedTotalCost);
+        }
+    }
+
+    [Fact]
     public void SuggestMealsFromPantry_WithKnownIngredients_RanksBestMatchFirst()
     {
         var request = new AislePilotRequestModel

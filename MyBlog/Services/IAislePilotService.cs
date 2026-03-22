@@ -14,7 +14,8 @@ public interface IAislePilotService
     AislePilotPlanResultViewModel BuildPlan(AislePilotRequestModel request);
     AislePilotPlanResultViewModel BuildPlanWithBudgetRebalance(
         AislePilotRequestModel request,
-        int maxAttempts = 4);
+        int maxAttempts = 4,
+        IReadOnlyList<string>? currentPlanMealNames = null);
     AislePilotPlanResultViewModel SwapMealForDay(
         AislePilotRequestModel request,
         int dayIndex,

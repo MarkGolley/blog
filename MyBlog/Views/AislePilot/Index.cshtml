@@ -235,7 +235,7 @@
                                    type="range"
                                    min="15"
                                    max="600"
-                                   step="1"
+                                   step="5"
                                    class="aislepilot-slider-input"
                                    data-number-slider-range
                                    data-number-slider-prefix="£"
@@ -424,12 +424,12 @@
                                     <path d="M3 7.5 12 12l9-4.5"></path>
                                 </svg>
                             </span>
-                            Pantry items
+                            Foods on hand
                         </span>
                     </legend>
                     <div class="aislepilot-field aislepilot-field-optional">
-                        <label asp-for="Request.PantryItems">What do you already have?</label>
-                        <input asp-for="Request.PantryItems" placeholder="Example: rice, eggs, frozen peas, olive oil" />
+                        <label asp-for="Request.PantryItems">What foods do you already have?</label>
+                        <input asp-for="Request.PantryItems" placeholder="Example: rice, eggs, chicken breast, frozen peas, spinach, olive oil" />
                         <span asp-validation-for="Request.PantryItems" class="text-danger"></span>
                     </div>
                 </fieldset>
@@ -589,6 +589,10 @@
                     @foreach (var mode in Model.Request.DietaryModes)
                     {
                         <input type="hidden" name="Request.DietaryModes" value="@mode" />
+                    }
+                    @foreach (var existingMeal in result.MealPlan)
+                    {
+                        <input type="hidden" name="currentPlanMealNames" value="@existingMeal.MealName" />
                     }
                     <button type="submit"
                             class="aislepilot-overview-regenerate-btn"
@@ -896,10 +900,6 @@
                 </section>
 
                 <section id="aislepilot-export" aria-label="Export" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel" data-window-name="Export">
-                    <p class="aislepilot-window-meta">4 export options ready for in-store use.</p>
-                    <p class="section-intro">
-                        Download a full plan pack PDF (with quick jump links), or a lightweight checklist for your phone notes app.
-                    </p>
                     <div class="aislepilot-export-actions">
                         <form method="post" asp-action="ExportPlanPack">
                             @Html.AntiForgeryToken()

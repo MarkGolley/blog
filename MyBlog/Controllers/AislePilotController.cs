@@ -82,7 +82,7 @@ public class AislePilotController(
     [HttpPost("rebalance-budget")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
-    public IActionResult RebalanceBudget(AislePilotPageViewModel pageModel)
+    public IActionResult RebalanceBudget(AislePilotPageViewModel pageModel, List<string>? currentPlanMealNames)
     {
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
@@ -96,7 +96,9 @@ public class AislePilotController(
 
         try
         {
-            var result = aislePilotService.BuildPlanWithBudgetRebalance(request);
+            var result = aislePilotService.BuildPlanWithBudgetRebalance(
+                request,
+                currentPlanMealNames: currentPlanMealNames);
             return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
         }
         catch (InvalidOperationException ex)

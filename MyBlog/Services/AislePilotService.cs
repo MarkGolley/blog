@@ -640,7 +640,8 @@ public sealed class AislePilotService : IAislePilotService
 
     public AislePilotPlanResultViewModel BuildPlanWithBudgetRebalance(
         AislePilotRequestModel request,
-        int maxAttempts = 4)
+        int maxAttempts = 4,
+        IReadOnlyList<string>? currentPlanMealNames = null)
     {
         var normalizedMaxAttempts = Math.Clamp(maxAttempts, 1, 8);
         var baselinePlan = BuildPlan(request);
@@ -649,7 +650,19 @@ public sealed class AislePilotService : IAislePilotService
             return baselinePlan;
         }
 
+        var baselineMealNames = (currentPlanMealNames ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .ToList();
+        if (baselineMealNames.Count != baselinePlan.MealPlan.Count)
+        {
+            baselineMealNames = baselinePlan.MealPlan
+                .Select(meal => meal.MealName)
+                .ToList();
+        }
+
         var cheapestPlan = baselinePlan;
+        AislePilotPlanResultViewModel? cheapestChangedPlan = null;
         var rebalanceTargets = BuildBudgetRebalanceTargets(
             request.WeeklyBudget,
             baselinePlan.EstimatedTotalCost,
@@ -676,10 +689,23 @@ public sealed class AislePilotService : IAislePilotService
                 cheapestPlan = candidatePlan;
             }
 
+            if (!HasSameMealSequence(candidatePlan, baselineMealNames) &&
+                (cheapestChangedPlan is null ||
+                 candidatePlan.EstimatedTotalCost < cheapestChangedPlan.EstimatedTotalCost))
+            {
+                cheapestChangedPlan = candidatePlan;
+            }
+
             if (!candidatePlan.IsOverBudget)
             {
                 return candidatePlan;
             }
+        }
+
+        if (cheapestChangedPlan is not null &&
+            cheapestChangedPlan.EstimatedTotalCost < baselinePlan.EstimatedTotalCost)
+        {
+            return cheapestChangedPlan;
         }
 
         return cheapestPlan;
@@ -1871,6 +1897,26 @@ Return JSON only with this schema:
         return uniqueCount == expectedMeals;
     }
 
+    private static bool HasSameMealSequence(
+        AislePilotPlanResultViewModel plan,
+        IReadOnlyList<string> expectedMealNames)
+    {
+        if (plan.MealPlan.Count != expectedMealNames.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < expectedMealNames.Count; i++)
+        {
+            if (!plan.MealPlan[i].MealName.Equals(expectedMealNames[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static decimal BuildMealSelectionScore(
         MealTemplate template,
         decimal targetMealCost,
@@ -2492,7 +2538,11 @@ Return JSON only with this schema:
 
         var normalizedCookDays = NormalizeCookDays(cookDays);
         var selected = new List<MealTemplate>(normalizedCookDays);
-        var startIndex = Math.Abs(DateOnly.FromDateTime(DateTime.UtcNow).DayNumber) % scoredCandidates.Count;
+        var daySeed = DateOnly.FromDateTime(DateTime.UtcNow).DayNumber;
+        var budgetSeed = (long)decimal.Truncate(Math.Abs(weeklyBudget) * 100m);
+        var quickSeed = preferQuickMeals ? 17L : 0L;
+        var rotationSeed = Math.Abs((long)daySeed + budgetSeed + quickSeed + normalizedCookDays);
+        var startIndex = (int)(rotationSeed % scoredCandidates.Count);
         var rotatedCandidates = scoredCandidates
             .Skip(startIndex)
             .Concat(scoredCandidates.Take(startIndex))
