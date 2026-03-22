@@ -16,6 +16,8 @@ public sealed class AislePilotRequestModel
     [Range(1, 7, ErrorMessage = "Choose between 1 and 7 cook days.")]
     public int CookDays { get; set; } = 7;
 
+    public string PortionSize { get; set; } = "Medium";
+
     public List<string> DietaryModes { get; set; } = ["Balanced"];
 
     [StringLength(260, ErrorMessage = "Keep dislikes/allergen notes to 260 characters or fewer.")]

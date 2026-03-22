@@ -305,6 +305,68 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void GetSupportedPortionSizes_ReturnsExpectedValues()
+    {
+        var options = _service.GetSupportedPortionSizes();
+
+        Assert.Equal(["Small", "Medium", "Large"], options);
+    }
+
+    [Fact]
+    public void BuildPlan_LargerPortionSize_IncreasesMealAndShoppingVolumes()
+    {
+        var baseRequest = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegetarian", "Gluten-Free"],
+            DislikesOrAllergens = "lentils, coconut milk, chickpea, quinoa, black beans, sweet potatoes, mushrooms, risotto rice, spinach",
+            WeeklyBudget = 70m,
+            HouseholdSize = 2,
+            CookDays = 1
+        };
+
+        var mediumResult = _service.BuildPlan(new AislePilotRequestModel
+        {
+            Supermarket = baseRequest.Supermarket,
+            WeeklyBudget = baseRequest.WeeklyBudget,
+            HouseholdSize = baseRequest.HouseholdSize,
+            CookDays = baseRequest.CookDays,
+            PortionSize = "Medium",
+            DietaryModes = [.. baseRequest.DietaryModes],
+            DislikesOrAllergens = baseRequest.DislikesOrAllergens
+        });
+
+        var largeResult = _service.BuildPlan(new AislePilotRequestModel
+        {
+            Supermarket = baseRequest.Supermarket,
+            WeeklyBudget = baseRequest.WeeklyBudget,
+            HouseholdSize = baseRequest.HouseholdSize,
+            CookDays = baseRequest.CookDays,
+            PortionSize = "Large",
+            DietaryModes = [.. baseRequest.DietaryModes],
+            DislikesOrAllergens = baseRequest.DislikesOrAllergens
+        });
+
+        Assert.Single(mediumResult.MealPlan);
+        Assert.Single(largeResult.MealPlan);
+        Assert.Equal(mediumResult.MealPlan[0].MealName, largeResult.MealPlan[0].MealName);
+        Assert.Equal("Medium", mediumResult.PortionSize);
+        Assert.Equal("Large", largeResult.PortionSize);
+        Assert.True(largeResult.EstimatedTotalCost > mediumResult.EstimatedTotalCost);
+
+        Assert.Equal(mediumResult.ShoppingItems.Count, largeResult.ShoppingItems.Count);
+        foreach (var mediumItem in mediumResult.ShoppingItems)
+        {
+            var largeItem = Assert.Single(largeResult.ShoppingItems, item =>
+                item.Department.Equals(mediumItem.Department, StringComparison.OrdinalIgnoreCase) &&
+                item.Name.Equals(mediumItem.Name, StringComparison.OrdinalIgnoreCase) &&
+                item.Unit.Equals(mediumItem.Unit, StringComparison.OrdinalIgnoreCase));
+
+            Assert.True(largeItem.Quantity > mediumItem.Quantity);
+            Assert.True(largeItem.EstimatedCost > mediumItem.EstimatedCost);
+        }
+    }
+
+    [Fact]
     public void BuildPlan_BudgetTips_UseUkCurrencyFormatting_WhenCurrentCultureIsDifferent()
     {
         var originalCulture = CultureInfo.CurrentCulture;

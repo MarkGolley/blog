@@ -99,6 +99,13 @@ public sealed class AislePilotService : IAislePilotService
         "Custom"
     ];
 
+    private static readonly string[] SupportedPortionSizes =
+    [
+        "Small",
+        "Medium",
+        "Large"
+    ];
+
     private static readonly string[] SupportedDietaryModes =
     [
         "Balanced",
@@ -379,6 +386,11 @@ public sealed class AislePilotService : IAislePilotService
     public IReadOnlyList<string> GetSupportedSupermarkets()
     {
         return SupportedSupermarkets;
+    }
+
+    public IReadOnlyList<string> GetSupportedPortionSizes()
+    {
+        return SupportedPortionSizes;
     }
 
     public IReadOnlyList<string> GetSupportedDietaryModes()
@@ -1387,6 +1399,7 @@ Planner inputs:
 - Supermarket: {{context.Supermarket}}
 - Target meal budget: {{targetMealBudget.ToString("0.##", CultureInfo.InvariantCulture)}} GBP
 - Household size: {{request.HouseholdSize}}
+- Portion size: {{context.PortionSize}}
 - Prefer quick meals: {{(request.PreferQuickMeals ? "yes" : "no")}}
 - Dietary requirements: {{strictModeText}}
 - Dislikes or allergens: {{dislikesText}}
@@ -1464,15 +1477,18 @@ Return JSON only with this schema:
         var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
         var customAisleOrder = request.CustomAisleOrder ?? string.Empty;
         var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
+        var portionSize = NormalizePortionSize(request.PortionSize);
+        var portionSizeFactor = ResolvePortionSizeFactor(portionSize);
         var aisleOrder = ResolveAisleOrder(supermarket, customAisleOrder);
-        var householdFactor = Math.Max(0.5m, request.HouseholdSize / 2m);
+        var householdFactor = Math.Max(0.5m, request.HouseholdSize / 2m) * portionSizeFactor;
 
         return new PlanContext(
             supermarket,
             dietaryModes,
             aisleOrder,
             householdFactor,
-            dislikesOrAllergens);
+            dislikesOrAllergens,
+            portionSize);
     }
 
     private static AislePilotPlanResultViewModel BuildPlanFromMeals(
@@ -1510,6 +1526,7 @@ Return JSON only with this schema:
         return new AislePilotPlanResultViewModel
         {
             Supermarket = context.Supermarket,
+            PortionSize = context.PortionSize,
             AppliedDietaryModes = context.DietaryModes,
             UsedAiGeneratedMeals = usedAiGeneratedMeals,
             PlanSourceLabel = string.IsNullOrWhiteSpace(planSourceLabel)
@@ -2374,6 +2391,7 @@ Planner inputs:
 - Supermarket: {{context.Supermarket}}
 - Weekly budget: {{request.WeeklyBudget.ToString("0.##", CultureInfo.InvariantCulture)}} GBP
 - Household size: {{request.HouseholdSize}}
+- Portion size: {{context.PortionSize}}
 - Cook days this week: {{cookDays}}
 - Prefer quick meals: {{(request.PreferQuickMeals ? "yes" : "no")}}
 - Dietary requirements: {{strictModeText}}
@@ -3309,6 +3327,27 @@ Return JSON only with this schema:
         return selected ?? SupportedSupermarkets[0];
     }
 
+    private static string NormalizePortionSize(string value)
+    {
+        var selected = SupportedPortionSizes.FirstOrDefault(x => x.Equals(value, StringComparison.OrdinalIgnoreCase));
+        return selected ?? "Medium";
+    }
+
+    private static decimal ResolvePortionSizeFactor(string portionSize)
+    {
+        if (portionSize.Equals("Small", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0.85m;
+        }
+
+        if (portionSize.Equals("Large", StringComparison.OrdinalIgnoreCase))
+        {
+            return 1.25m;
+        }
+
+        return 1m;
+    }
+
     private static IReadOnlyList<string> NormalizeDietaryModes(IReadOnlyList<string>? incomingModes)
     {
         var normalized = incomingModes?
@@ -3371,7 +3410,8 @@ Return JSON only with this schema:
         IReadOnlyList<string> DietaryModes,
         IReadOnlyList<string> AisleOrder,
         decimal HouseholdFactor,
-        string DislikesOrAllergens);
+        string DislikesOrAllergens,
+        string PortionSize);
 
     private sealed class MutableShoppingItem
     {

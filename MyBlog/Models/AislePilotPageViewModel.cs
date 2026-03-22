@@ -10,6 +10,7 @@ public sealed class AislePilotPageViewModel
     public IReadOnlyList<AislePilotPantrySuggestionViewModel> PantrySuggestions { get; set; } =
         Array.Empty<AislePilotPantrySuggestionViewModel>();
     public IReadOnlyList<string> SupermarketOptions { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> PortionSizeOptions { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> DietaryOptions { get; set; } = Array.Empty<string>();
     public bool HasResult => Result is not null;
 }
@@ -17,6 +18,7 @@ public sealed class AislePilotPageViewModel
 public sealed class AislePilotPlanResultViewModel
 {
     public string Supermarket { get; set; } = string.Empty;
+    public string PortionSize { get; set; } = string.Empty;
     public IReadOnlyList<string> AppliedDietaryModes { get; set; } = Array.Empty<string>();
     public bool UsedAiGeneratedMeals { get; set; }
     public string PlanSourceLabel { get; set; } = string.Empty;

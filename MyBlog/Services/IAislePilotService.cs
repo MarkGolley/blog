@@ -5,6 +5,7 @@ namespace MyBlog.Services;
 public interface IAislePilotService
 {
     IReadOnlyList<string> GetSupportedSupermarkets();
+    IReadOnlyList<string> GetSupportedPortionSizes();
     IReadOnlyList<string> GetSupportedDietaryModes();
     bool HasCompatibleMeals(AislePilotRequestModel request);
     IReadOnlyList<AislePilotPantrySuggestionViewModel> SuggestMealsFromPantry(

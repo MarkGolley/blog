@@ -190,6 +190,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             Result = result,
             PantrySuggestions = pantrySuggestions ?? [],
             SupermarketOptions = aislePilotService.GetSupportedSupermarkets(),
+            PortionSizeOptions = aislePilotService.GetSupportedPortionSizes(),
             DietaryOptions = aislePilotService.GetSupportedDietaryModes()
         };
     }
@@ -234,6 +235,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     {
         var normalized = request ?? new AislePilotRequestModel();
         normalized.Supermarket = normalized.Supermarket?.Trim() ?? string.Empty;
+        normalized.PortionSize = normalized.PortionSize?.Trim() ?? string.Empty;
         normalized.CustomAisleOrder = normalized.CustomAisleOrder?.Trim() ?? string.Empty;
         normalized.DislikesOrAllergens = normalized.DislikesOrAllergens?.Trim() ?? string.Empty;
         normalized.PantryItems = normalized.PantryItems?.Trim() ?? string.Empty;
@@ -338,11 +340,17 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     private void ValidateRequest(AislePilotRequestModel request)
     {
         var supermarkets = aislePilotService.GetSupportedSupermarkets();
+        var portionSizes = aislePilotService.GetSupportedPortionSizes();
         var dietaryModes = aislePilotService.GetSupportedDietaryModes();
 
         if (!supermarkets.Contains(request.Supermarket, StringComparer.OrdinalIgnoreCase))
         {
             ModelState.AddModelError("Request.Supermarket", "Select a supported supermarket.");
+        }
+
+        if (!portionSizes.Contains(request.PortionSize, StringComparer.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError("Request.PortionSize", "Select a supported portion size.");
         }
 
         var unsupportedDietaryModes = request.DietaryModes
@@ -381,11 +389,17 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     private void ValidateRequestForSuggestions(AislePilotRequestModel request)
     {
         var supermarkets = aislePilotService.GetSupportedSupermarkets();
+        var portionSizes = aislePilotService.GetSupportedPortionSizes();
         var dietaryModes = aislePilotService.GetSupportedDietaryModes();
 
         if (!supermarkets.Contains(request.Supermarket, StringComparer.OrdinalIgnoreCase))
         {
             ModelState.AddModelError("Request.Supermarket", "Select a supported supermarket.");
+        }
+
+        if (!portionSizes.Contains(request.PortionSize, StringComparer.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError("Request.PortionSize", "Select a supported portion size.");
         }
 
         var unsupportedDietaryModes = request.DietaryModes
@@ -456,6 +470,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         var overviewRows = new List<(string Label, string Value)>
         {
             ("Supermarket", result.Supermarket),
+            ("Portion size", result.PortionSize),
             ("Household size", request.HouseholdSize.ToString(ukCulture)),
             ("Cook days", result.CookDays.ToString(ukCulture)),
             ("Leftover days", result.LeftoverDays.ToString(ukCulture)),
@@ -836,6 +851,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         var builder = new StringBuilder();
         builder.AppendLine("AislePilot Shopping Checklist");
         builder.AppendLine($"Supermarket: {result.Supermarket}");
+        builder.AppendLine($"Portion size: {result.PortionSize}");
         builder.AppendLine($"Estimated total: {result.EstimatedTotalCost.ToString("C", ukCulture)}");
         builder.AppendLine();
         builder.AppendLine($"Aisle order: {string.Join(" -> ", result.AisleOrderUsed)}");

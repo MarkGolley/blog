@@ -126,6 +126,233 @@
 
     wireSubmitLoadingHandlers(document);
 
+    const wirePlanBasicsSliders = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        const syncSliderProgress = rangeInput => {
+            if (!(rangeInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const min = Number.parseFloat(rangeInput.min ?? "0");
+            const max = Number.parseFloat(rangeInput.max ?? "100");
+            const value = Number.parseFloat(rangeInput.value ?? "0");
+            const span = max - min;
+            if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(value) || span <= 0) {
+                rangeInput.style.setProperty("--slider-progress", "0%");
+                return;
+            }
+
+            const clamped = Math.min(max, Math.max(min, value));
+            const progressPercent = ((clamped - min) / span) * 100;
+            rangeInput.style.setProperty("--slider-progress", `${progressPercent}%`);
+        };
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const optionSliders = Array.from(form.querySelectorAll("[data-option-slider]"));
+            optionSliders.forEach(sliderField => {
+                if (!(sliderField instanceof HTMLElement) || sliderField.dataset.sliderWired === "true") {
+                    return;
+                }
+
+                const rangeInput = sliderField.querySelector("[data-option-slider-range]");
+                const hiddenInput = sliderField.querySelector("[data-option-slider-hidden]");
+                const valueOutput = sliderField.querySelector("[data-option-slider-value]");
+
+                if (!(rangeInput instanceof HTMLInputElement) || !(hiddenInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                const optionValues = (rangeInput.dataset.optionSliderValues ?? "")
+                    .split("|")
+                    .map(value => value.trim())
+                    .filter(value => value.length > 0);
+                if (optionValues.length === 0) {
+                    return;
+                }
+
+                const applyOptionValue = shouldNotify => {
+                    const rawIndex = Number.parseInt(rangeInput.value ?? "0", 10);
+                    const safeIndex = Number.isInteger(rawIndex)
+                        ? Math.max(0, Math.min(optionValues.length - 1, rawIndex))
+                        : 0;
+                    const selectedValue = optionValues[safeIndex];
+
+                    rangeInput.value = `${safeIndex}`;
+                    syncSliderProgress(rangeInput);
+                    rangeInput.setAttribute("aria-valuetext", selectedValue);
+                    if (valueOutput instanceof HTMLElement) {
+                        valueOutput.textContent = selectedValue;
+                    }
+
+                    const previousValue = hiddenInput.value;
+                    hiddenInput.value = selectedValue;
+                    if (shouldNotify && previousValue !== selectedValue) {
+                        hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                };
+
+                const existingHiddenIndex = optionValues.findIndex(option =>
+                    option.toLowerCase() === (hiddenInput.value ?? "").trim().toLowerCase());
+                if (existingHiddenIndex >= 0) {
+                    rangeInput.value = `${existingHiddenIndex}`;
+                }
+
+                sliderField.dataset.sliderWired = "true";
+                rangeInput.addEventListener("input", () => {
+                    applyOptionValue(true);
+                });
+                rangeInput.addEventListener("change", () => {
+                    applyOptionValue(true);
+                });
+
+                applyOptionValue(false);
+            });
+
+            const numberSliders = Array.from(form.querySelectorAll("[data-number-slider-range]"));
+            numberSliders.forEach(rangeInput => {
+                if (!(rangeInput instanceof HTMLInputElement) || rangeInput.dataset.sliderWired === "true") {
+                    return;
+                }
+
+                const sliderField = rangeInput.closest(".aislepilot-slider-field");
+                const valueOutput = sliderField?.querySelector("[data-number-slider-value]");
+                const prefix = rangeInput.dataset.numberSliderPrefix ?? "";
+                const suffix = rangeInput.dataset.numberSliderSuffix ?? "";
+                const parsedDecimals = Number.parseInt(rangeInput.dataset.numberSliderDecimals ?? "0", 10);
+                const decimals = Number.isInteger(parsedDecimals) ? Math.max(0, Math.min(2, parsedDecimals)) : 0;
+
+                const applyNumberValue = () => {
+                    const parsed = Number.parseFloat(rangeInput.value ?? "0");
+                    const normalized = Number.isFinite(parsed) ? parsed : 0;
+                    const roundedValue = normalized.toFixed(decimals);
+                    const displayText = `${prefix}${roundedValue}${suffix}`;
+
+                    syncSliderProgress(rangeInput);
+                    rangeInput.setAttribute("aria-valuetext", displayText);
+                    if (valueOutput instanceof HTMLElement) {
+                        valueOutput.textContent = displayText;
+                    }
+                };
+
+                rangeInput.dataset.sliderWired = "true";
+                rangeInput.addEventListener("input", applyNumberValue);
+                rangeInput.addEventListener("change", applyNumberValue);
+                applyNumberValue();
+            });
+        });
+    };
+
+    wirePlanBasicsSliders(document);
+
+    const getSelectedSupermarket = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return "";
+        }
+
+        const supermarketRadioOptions = Array.from(form.querySelectorAll("[data-supermarket-option]"))
+            .filter(input => input instanceof HTMLInputElement);
+        if (supermarketRadioOptions.length > 0) {
+            const selectedOption = supermarketRadioOptions.find(input => input.checked);
+            return selectedOption instanceof HTMLInputElement ? selectedOption.value : "";
+        }
+
+        const supermarketSelect = form.querySelector("[data-supermarket-select]");
+        if (supermarketSelect instanceof HTMLSelectElement || supermarketSelect instanceof HTMLInputElement) {
+            return supermarketSelect.value;
+        }
+
+        return "";
+    };
+
+    const syncCustomAisleFieldVisibility = (selectedSupermarket, customAisleField, storeLayoutSection) => {
+        if (!(customAisleField instanceof HTMLElement) && !(storeLayoutSection instanceof HTMLElement)) {
+            return;
+        }
+
+        const isCustomSupermarket = selectedSupermarket.trim().toLowerCase() === "custom";
+        if (isCustomSupermarket) {
+            if (storeLayoutSection instanceof HTMLElement) {
+                storeLayoutSection.removeAttribute("hidden");
+                storeLayoutSection.setAttribute("aria-hidden", "false");
+            }
+            if (customAisleField instanceof HTMLElement) {
+                customAisleField.removeAttribute("hidden");
+                customAisleField.setAttribute("aria-hidden", "false");
+            }
+            return;
+        }
+
+        if (storeLayoutSection instanceof HTMLElement) {
+            storeLayoutSection.setAttribute("hidden", "hidden");
+            storeLayoutSection.setAttribute("aria-hidden", "true");
+        }
+        if (customAisleField instanceof HTMLElement) {
+            customAisleField.setAttribute("hidden", "hidden");
+            customAisleField.setAttribute("aria-hidden", "true");
+        }
+    };
+
+    const wireCustomAisleFieldVisibility = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const customAisleField = form.querySelector("[data-custom-aisle-field]");
+            const storeLayoutSection = form.querySelector("[data-store-layout-section]");
+            if (!(customAisleField instanceof HTMLElement) && !(storeLayoutSection instanceof HTMLElement)) {
+                return;
+            }
+
+            const supermarketControls = Array.from(
+                form.querySelectorAll("[data-supermarket-option], [data-supermarket-select]"));
+            if (supermarketControls.length === 0) {
+                return;
+            }
+
+            supermarketControls.forEach(control => {
+                if (!(control instanceof HTMLInputElement) && !(control instanceof HTMLSelectElement)) {
+                    return;
+                }
+
+                if (control.dataset.customAisleVisibilityWired === "true") {
+                    return;
+                }
+
+                control.dataset.customAisleVisibilityWired = "true";
+                const syncVisibility = () => {
+                    syncCustomAisleFieldVisibility(
+                        getSelectedSupermarket(form),
+                        customAisleField,
+                        storeLayoutSection);
+                };
+
+                control.addEventListener("change", syncVisibility);
+                if (control instanceof HTMLInputElement) {
+                    control.addEventListener("input", syncVisibility);
+                }
+            });
+
+            syncCustomAisleFieldVisibility(
+                getSelectedSupermarket(form),
+                customAisleField,
+                storeLayoutSection);
+        });
+    };
+
+    wireCustomAisleFieldVisibility(document);
+
     const resetSubmittingState = () => {
         getAislePilotForms().forEach(form => {
             clearSubmitLoadingDelay(form);
@@ -465,7 +692,6 @@
     const syncUi = (nextIndex, updateHash) => {
         const panelCount = panels.length;
         currentIndex = ((nextIndex % panelCount) + panelCount) % panelCount;
-        root.setAttribute("data-active-panel", panels[currentIndex].id);
 
         track.style.transform = `translateX(-${currentIndex * 100}%)`;
 
@@ -828,6 +1054,8 @@
         replaceSectionContent(responseDocument, "#aislepilot-export");
 
         wireSubmitLoadingHandlers(document);
+        wirePlanBasicsSliders(document);
+        wireCustomAisleFieldVisibility(document);
         wirePreserveScrollHandlers(document);
         wireSetupToggleHandlers(document);
         wireLeftoverPlanner(document);

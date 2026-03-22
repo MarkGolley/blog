@@ -9,11 +9,30 @@
     ViewData["CanonicalPath"] = "/projects/aisle-pilot";
     ViewData["OgImage"] = "/images/aislepilot-icon.svg";
     var ukCulture = CultureInfo.GetCultureInfo("en-GB");
+    var supermarketOptions = Model.SupermarketOptions.Count > 0
+        ? Model.SupermarketOptions.ToArray()
+        : ["Tesco"];
+    var portionSizeOptions = Model.PortionSizeOptions.Count > 0
+        ? Model.PortionSizeOptions.ToArray()
+        : ["Small", "Medium", "Large"];
+    var selectedSupermarket = supermarketOptions.FirstOrDefault(
+        option => option.Equals(Model.Request.Supermarket, StringComparison.OrdinalIgnoreCase))
+        ?? supermarketOptions[0];
+    var selectedPortionSizeIndex = Array.FindIndex(portionSizeOptions,
+        option => option.Equals(Model.Request.PortionSize, StringComparison.OrdinalIgnoreCase));
+    if (selectedPortionSizeIndex < 0)
+    {
+        selectedPortionSizeIndex = 0;
+    }
+    var portionSizeSliderValues = string.Join("|", portionSizeOptions);
+    var selectedPortionSize = portionSizeOptions[selectedPortionSizeIndex];
+    var isCustomSupermarketSelected = string.Equals(selectedSupermarket, "Custom", StringComparison.OrdinalIgnoreCase);
     var selectedDietary = Model.Request.DietaryModes.ToHashSet(StringComparer.OrdinalIgnoreCase);
     var hasResult = Model.HasResult && Model.Result is not null;
     var setupHiddenAttribute = hasResult ? "hidden" : null;
+    var storeLayoutSectionHiddenAttribute = isCustomSupermarketSelected ? null : "hidden";
+    var customAisleFieldHiddenAttribute = isCustomSupermarketSelected ? null : "hidden";
     var appHeadClass = hasResult ? "aislepilot-app-head is-compact" : "aislepilot-app-head";
-    var appClass = hasResult ? "aislepilot-app has-result" : "aislepilot-app";
     var modelErrors = ViewData.ModelState.Values
         .SelectMany(state => state.Errors)
         .Select(error => error.ErrorMessage?.Trim())
@@ -38,7 +57,7 @@
         joinedErrorText.Contains("unavailable", StringComparison.Ordinal);
 }
 
-<div class="@appClass">
+<div class="aislepilot-app">
     <section aria-label="AislePilot header" class="@appHeadClass" data-reveal>
         <div class="aislepilot-brand-lockup" aria-label="AislePilot brand">
             <img class="aislepilot-brand-logo" src="~/images/aislepilot-logo-horizontal.svg" alt="AislePilot" />
@@ -114,47 +133,117 @@
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             }
 
-            <div class="aislepilot-setup-strip">
-                <div class="aislepilot-inline-fields">
-                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
-                        <label asp-for="Request.Supermarket">Supermarket</label>
-                        <select asp-for="Request.Supermarket" class="aislepilot-supermarket-select">
-                            @foreach (var store in Model.SupermarketOptions)
-                            {
-                                <option value="@store">@store</option>
-                            }
-                        </select>
-                        <span asp-validation-for="Request.Supermarket" class="text-danger"></span>
-                    </div>
+            <div class="aislepilot-setup-sections">
+                <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
+                    <legend>Plan basics</legend>
+                    <div class="aislepilot-inline-fields">
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-field--full">
+                            <label asp-for="Request.Supermarket">Supermarket</label>
+                            <div class="aislepilot-supermarket-options">
+                                @foreach (var store in supermarketOptions)
+                                {
+                                    var isSelectedStore = store.Equals(selectedSupermarket, StringComparison.OrdinalIgnoreCase);
+                                    <label class="aislepilot-supermarket-option">
+                                        @if (isSelectedStore)
+                                        {
+                                            <input type="radio" name="Request.Supermarket" value="@store" checked data-supermarket-option />
+                                        }
+                                        else
+                                        {
+                                            <input type="radio" name="Request.Supermarket" value="@store" data-supermarket-option />
+                                        }
+                                        <span>@store</span>
+                                    </label>
+                                }
+                            </div>
+                            <span asp-validation-for="Request.Supermarket" class="text-danger"></span>
+                        </div>
 
-                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
-                        <label asp-for="Request.WeeklyBudget">Weekly budget</label>
-                        <input asp-for="Request.WeeklyBudget" type="number" min="15" max="600" step="any" inputmode="decimal" />
-                        <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
-                    </div>
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                            <label asp-for="Request.WeeklyBudget">Weekly budget</label>
+                            <input asp-for="Request.WeeklyBudget"
+                                   type="range"
+                                   min="15"
+                                   max="600"
+                                   step="1"
+                                   class="aislepilot-slider-input"
+                                   data-number-slider-range
+                                   data-number-slider-prefix="£"
+                                   data-number-slider-decimals="0" />
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
+                                <span class="aislepilot-slider-hint">£15 to £600</span>
+                            </div>
+                            <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
+                        </div>
 
-                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
-                        <label asp-for="Request.HouseholdSize">People</label>
-                        <input asp-for="Request.HouseholdSize" type="number" min="1" max="8" step="1" />
-                        <span asp-validation-for="Request.HouseholdSize" class="text-danger"></span>
-                    </div>
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                            <label asp-for="Request.HouseholdSize">People</label>
+                            <input asp-for="Request.HouseholdSize"
+                                   type="range"
+                                   min="1"
+                                   max="8"
+                                   step="1"
+                                   class="aislepilot-slider-input"
+                                   data-number-slider-range
+                                   data-number-slider-decimals="0" />
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.HouseholdSize</span>
+                                <span class="aislepilot-slider-hint">1 to 8</span>
+                            </div>
+                            <span asp-validation-for="Request.HouseholdSize" class="text-danger"></span>
+                        </div>
 
-                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field-chip-inline">
-                        <label asp-for="Request.CookDays">Cook days</label>
-                        <input asp-for="Request.CookDays" type="number" min="1" max="7" step="1" />
-                        <span asp-validation-for="Request.CookDays" class="text-danger"></span>
-                    </div>
-                </div>
-            </div>
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field" data-option-slider>
+                            <label asp-for="Request.PortionSize">Portion size</label>
+                            <input asp-for="Request.PortionSize" type="hidden" data-option-slider-hidden />
+                            <input type="range"
+                                   min="0"
+                                   max="@Math.Max(0, portionSizeOptions.Length - 1)"
+                                   step="1"
+                                   value="@selectedPortionSizeIndex"
+                                   class="aislepilot-slider-input"
+                                   data-option-slider-range
+                                   data-option-slider-values="@portionSizeSliderValues" />
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-option-slider-value>@selectedPortionSize</span>
+                                <span class="aislepilot-slider-hint">@portionSizeOptions.First() to @portionSizeOptions.Last()</span>
+                            </div>
+                            <span asp-validation-for="Request.PortionSize" class="text-danger"></span>
+                        </div>
 
-            <div class="aislepilot-setup-columns">
-                <div class="aislepilot-setup-panel">
-                    <div class="aislepilot-field">
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                            <label asp-for="Request.CookDays">Cook days</label>
+                            <input asp-for="Request.CookDays"
+                                   type="range"
+                                   min="1"
+                                   max="7"
+                                   step="1"
+                                   class="aislepilot-slider-input"
+                                   data-number-slider-range
+                                   data-number-slider-decimals="0" />
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.CookDays</span>
+                                <span class="aislepilot-slider-hint">1 to 7</span>
+                            </div>
+                            <span asp-validation-for="Request.CookDays" class="text-danger"></span>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="aislepilot-checkboxes aislepilot-setup-section"
+                          data-store-layout-section
+                          @storeLayoutSectionHiddenAttribute>
+                    <legend>Store layout</legend>
+                    <div class="aislepilot-field" data-custom-aisle-field @customAisleFieldHiddenAttribute>
                         <label asp-for="Request.CustomAisleOrder">Custom aisle order (only for Custom supermarket)</label>
                         <input asp-for="Request.CustomAisleOrder" placeholder="Produce, Bakery, Dairy & Eggs, Frozen, Tins & Dry Goods..." />
                         <span asp-validation-for="Request.CustomAisleOrder" class="text-danger"></span>
                     </div>
+                </fieldset>
 
+                <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                    <legend>Pantry and exclusions</legend>
                     <div class="aislepilot-field aislepilot-field-optional">
                         <label asp-for="Request.DislikesOrAllergens">Dislikes/allergens</label>
                         <input asp-for="Request.DislikesOrAllergens" placeholder="Example: peanuts, mushrooms, shellfish" />
@@ -173,34 +262,32 @@
                         </button>
                         <span asp-validation-for="Request.PantryItems" class="text-danger"></span>
                     </div>
-                </div>
+                </fieldset>
 
-                <div class="aislepilot-setup-panel">
-                    <fieldset class="aislepilot-checkboxes">
-                        <legend>Dietary requirements</legend>
-                        @foreach (var mode in Model.DietaryOptions)
-                        {
-                            var isChecked = selectedDietary.Contains(mode);
-                            <label class="aislepilot-checkbox-item aislepilot-mode-option">
-                                @if (isChecked)
-                                {
-                                    <input type="checkbox" name="Request.DietaryModes" value="@mode" checked />
-                                }
-                                else
-                                {
-                                    <input type="checkbox" name="Request.DietaryModes" value="@mode" />
-                                }
-                                <span>@mode</span>
-                            </label>
-                        }
-                    </fieldset>
+                <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                    <legend>Dietary requirements</legend>
+                    @foreach (var mode in Model.DietaryOptions)
+                    {
+                        var isChecked = selectedDietary.Contains(mode);
+                        <label class="aislepilot-checkbox-item aislepilot-mode-option">
+                            @if (isChecked)
+                            {
+                                <input type="checkbox" name="Request.DietaryModes" value="@mode" checked />
+                            }
+                            else
+                            {
+                                <input type="checkbox" name="Request.DietaryModes" value="@mode" />
+                            }
+                            <span>@mode</span>
+                        </label>
+                    }
                     <span asp-validation-for="Request.DietaryModes" class="text-danger"></span>
 
                     <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
                         <input asp-for="Request.PreferQuickMeals" type="checkbox" />
                         <span>Prioritise quick meals</span>
                     </label>
-                </div>
+                </fieldset>
             </div>
 
             <div class="aislepilot-submit-actions">
@@ -277,6 +364,7 @@
                     <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                     <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                     <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                    <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
                     <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                     <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                     <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -304,6 +392,10 @@
             <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Supermarket</p>
                 <p class="aislepilot-stat-value">@result.Supermarket</p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Portion size</p>
+                <p class="aislepilot-stat-value">@result.PortionSize</p>
             </article>
             <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Budget</p>
@@ -373,6 +465,7 @@
                                     <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                                     <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                                     <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                                    <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
                                     <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                                     <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                                     <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -455,6 +548,7 @@
                                         <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                                         <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                                         <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                                        <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
                                         <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                                         <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                                         <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -514,6 +608,7 @@
                             <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                             <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                             <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                            <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
                             <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                             <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                             <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -534,6 +629,7 @@
                             <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
                             <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                             <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                            <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
                             <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                             <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                             <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -551,13 +647,6 @@
                         <button type="button" class="aislepilot-export-btn" onclick="window.print()">Print current view</button>
                     </div>
                 </section>
-            </div>
-        </div>
-        <div class="aislepilot-mobile-jumpbar" data-mobile-jumpbar aria-label="Quick section switcher">
-            <div class="aislepilot-mobile-jumpbar-tabs">
-                <button type="button" class="aislepilot-window-tab aislepilot-mobile-jumpbar-tab" data-window-tab="aislepilot-meals">Meals</button>
-                <button type="button" class="aislepilot-window-tab aislepilot-mobile-jumpbar-tab" data-window-tab="aislepilot-shop">Shopping list</button>
-                <button type="button" class="aislepilot-window-tab aislepilot-mobile-jumpbar-tab" data-window-tab="aislepilot-export">Export files</button>
             </div>
         </div>
     </section>
@@ -601,7 +690,6 @@
             [data-setup-toggle] { display: none !important; }
             [data-aislepilot-window] .aislepilot-window-controls,
             [data-aislepilot-window] .aislepilot-window-tabs { display: none !important; }
-            [data-mobile-jumpbar] { display: none !important; }
             [data-aislepilot-window] .aislepilot-window-viewport { overflow: visible !important; height: auto !important; }
             [data-aislepilot-window] .aislepilot-window-track { display: block !important; transform: none !important; }
             [data-aislepilot-window] .aislepilot-window-panel { min-width: 100% !important; margin-bottom: 0.75rem; }
