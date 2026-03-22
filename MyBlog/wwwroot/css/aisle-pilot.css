@@ -1285,6 +1285,35 @@ html.aislepilot-restore-pending .aislepilot-app {
     position: relative;
 }
 
+.aislepilot-nutrition-details {
+    margin-top: 0.44rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.42rem 0.56rem;
+    background: rgba(248, 251, 255, 0.92);
+}
+
+.aislepilot-nutrition-details > summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--brand-deep);
+}
+
+.aislepilot-nutrition-list {
+    margin: 0.36rem 0 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.16rem;
+    color: var(--ink-soft);
+    font-size: 0.84rem;
+}
+
+.aislepilot-nutrition-note {
+    margin: 0.32rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.72rem;
+}
+
 .aislepilot-recipe-details {
     margin-top: 0;
     border: 1px solid var(--line);

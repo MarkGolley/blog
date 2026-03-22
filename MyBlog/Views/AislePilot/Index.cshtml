@@ -642,6 +642,16 @@
                                 {
                                     <p class="aislepilot-card-meta">Makes extra for @meal.LeftoverDaysCovered leftover day(s)</p>
                                 }
+                                <details class="aislepilot-nutrition-details">
+                                    <summary>Est. calories + macros</summary>
+                                    <ul class="aislepilot-nutrition-list">
+                                        <li>@meal.CaloriesPerServing kcal per serving</li>
+                                        <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                        <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                        <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                    </ul>
+                                    <p class="aislepilot-nutrition-note">Estimated from ingredient maths and AI nutrition signals when available.</p>
+                                </details>
                                 <div class="aislepilot-recipe-shell">
                                     <details class="aislepilot-recipe-details">
                                         <summary>Recipe + ingredients</summary>

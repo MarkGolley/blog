@@ -184,6 +184,29 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_PopulatesCaloriesAndMacros_ForEveryMeal()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            CookDays = 7
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.NotEmpty(result.MealPlan);
+        Assert.All(result.MealPlan, meal =>
+        {
+            Assert.True(meal.CaloriesPerServing > 0);
+            Assert.True(meal.ProteinGramsPerServing > 0);
+            Assert.True(meal.CarbsGramsPerServing > 0);
+            Assert.True(meal.FatGramsPerServing > 0);
+        });
+    }
+
+    [Fact]
     public void BuildPlan_WithFiveCookDays_ReturnsFiveMealsAndTwoLeftoverDays()
     {
         var request = new AislePilotRequestModel
@@ -372,6 +395,50 @@ public class AislePilotServiceTests
             Assert.True(largeItem.Quantity > mediumItem.Quantity);
             Assert.True(largeItem.EstimatedCost > mediumItem.EstimatedCost);
         }
+    }
+
+    [Fact]
+    public void BuildPlan_LargerPortionSize_IncreasesMealNutritionPerServing()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegetarian", "Gluten-Free"],
+            DislikesOrAllergens = "lentils, coconut milk, chickpea, quinoa, black beans, sweet potatoes, mushrooms, risotto rice, spinach",
+            WeeklyBudget = 70m,
+            HouseholdSize = 2,
+            CookDays = 1
+        };
+
+        var medium = _service.BuildPlan(new AislePilotRequestModel
+        {
+            Supermarket = request.Supermarket,
+            WeeklyBudget = request.WeeklyBudget,
+            HouseholdSize = request.HouseholdSize,
+            CookDays = request.CookDays,
+            PortionSize = "Medium",
+            DietaryModes = [.. request.DietaryModes],
+            DislikesOrAllergens = request.DislikesOrAllergens,
+            PreferQuickMeals = request.PreferQuickMeals
+        });
+        var large = _service.BuildPlan(new AislePilotRequestModel
+        {
+            Supermarket = request.Supermarket,
+            WeeklyBudget = request.WeeklyBudget,
+            HouseholdSize = request.HouseholdSize,
+            CookDays = request.CookDays,
+            PortionSize = "Large",
+            DietaryModes = [.. request.DietaryModes],
+            DislikesOrAllergens = request.DislikesOrAllergens,
+            PreferQuickMeals = request.PreferQuickMeals
+        });
+
+        Assert.Single(medium.MealPlan);
+        Assert.Single(large.MealPlan);
+        Assert.Equal(medium.MealPlan[0].MealName, large.MealPlan[0].MealName);
+        Assert.True(large.MealPlan[0].CaloriesPerServing > medium.MealPlan[0].CaloriesPerServing);
+        Assert.True(large.MealPlan[0].ProteinGramsPerServing > medium.MealPlan[0].ProteinGramsPerServing);
+        Assert.True(large.MealPlan[0].CarbsGramsPerServing > medium.MealPlan[0].CarbsGramsPerServing);
+        Assert.True(large.MealPlan[0].FatGramsPerServing > medium.MealPlan[0].FatGramsPerServing);
     }
 
     [Fact]
@@ -749,6 +816,108 @@ public class AislePilotServiceTests
         Assert.False(result.UsedAiGeneratedMeals);
         Assert.Equal("Template fallback", result.PlanSourceLabel);
         Assert.Equal(2, result.MealPlan.Count);
+    }
+
+    [Fact]
+    public void BuildPlan_WhenAiNutritionLooksExtreme_UsesIngredientBasedNutritionGuardrails()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var payloadContent = """
+{
+  "meals": [
+    {
+      "name": "Hybrid nutrition test meal",
+      "baseCostForTwo": 6.8,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat a large pan on medium heat for two minutes.",
+        "Cook onions until softened and lightly golden.",
+        "Add protein and cook until fully done.",
+        "Stir through sauce and simmer briefly.",
+        "Serve hot with your prepared side."
+      ],
+      "nutritionPerServing": {
+        "calories": 1400,
+        "proteinGrams": 30,
+        "carbsGrams": 40,
+        "fatGrams": 120
+      },
+      "ingredients": [
+        { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 2.7 },
+        { "name": "Rice", "department": "Tins & Dry Goods", "quantityForTwo": 0.4, "unit": "kg", "estimatedCostForTwo": 0.95 },
+        { "name": "Bell peppers", "department": "Produce", "quantityForTwo": 2, "unit": "pcs", "estimatedCostForTwo": 1.2 }
+      ]
+    }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            CookDays = 1,
+            WeeklyBudget = 65m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.True(result.UsedAiGeneratedMeals);
+        Assert.Single(result.MealPlan);
+        var meal = result.MealPlan[0];
+        Assert.InRange(meal.CaloriesPerServing, 220, 1200);
+        Assert.InRange(meal.ProteinGramsPerServing, 10m, 90m);
+        Assert.InRange(meal.CarbsGramsPerServing, 15m, 180m);
+        Assert.InRange(meal.FatGramsPerServing, 5m, 80m);
+    }
+
+    [Fact]
+    public void BuildPlan_EggFriedRiceCalories_AreWithinReasonableServingRange()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegetarian"],
+            CookDays = 1,
+            WeeklyBudget = 60m,
+            HouseholdSize = 2,
+            DislikesOrAllergens =
+                "lentils, coconut milk, tofu, noodles, paneer, tikka, chickpeas, quinoa, black beans, sweet potatoes, halloumi, couscous, courgettes, mushrooms, risotto, pesto, mozzarella, cod, salmon, turkey, beef, prawns, chicken"
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Single(result.MealPlan);
+        Assert.Equal("Egg fried rice", result.MealPlan[0].MealName, ignoreCase: true);
+        Assert.InRange(result.MealPlan[0].CaloriesPerServing, 420, 900);
     }
 
     [Fact]

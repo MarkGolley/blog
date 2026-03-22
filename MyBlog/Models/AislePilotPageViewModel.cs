@@ -43,6 +43,10 @@ public sealed class AislePilotMealDayViewModel
     public int LeftoverDaysCovered { get; set; }
     public decimal EstimatedCost { get; set; }
     public int EstimatedPrepMinutes { get; set; }
+    public int CaloriesPerServing { get; set; }
+    public decimal ProteinGramsPerServing { get; set; }
+    public decimal CarbsGramsPerServing { get; set; }
+    public decimal FatGramsPerServing { get; set; }
     public IReadOnlyList<string> IngredientLines { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> RecipeSteps { get; set; } = Array.Empty<string>();
 }

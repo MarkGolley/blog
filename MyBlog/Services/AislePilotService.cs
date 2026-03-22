@@ -85,6 +85,90 @@ public sealed class AislePilotService : IAislePilotService
         ]
     };
 
+    private static readonly Dictionary<string, NutritionReference> IngredientNutritionReferences = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["chicken breast"] = new(165m, 31m, 0m, 3.6m),
+        ["chicken thigh"] = new(209m, 25m, 0m, 11m),
+        ["salmon"] = new(208m, 20m, 0m, 13m),
+        ["turkey mince"] = new(170m, 22m, 0m, 9m),
+        ["tofu"] = new(144m, 17m, 3m, 9m),
+        ["red lentils"] = new(352m, 24m, 60m, 1.5m),
+        ["rice"] = new(360m, 7.5m, 79m, 0.7m),
+        ["egg noodles"] = new(350m, 12m, 70m, 3m),
+        ["bell peppers"] = new(31m, 1m, 6m, 0.3m, 150m),
+        ["soy sauce"] = new(53m, 8m, 4m, 0.6m),
+        ["potatoes"] = new(77m, 2m, 17m, 0.1m),
+        ["broccoli"] = new(34m, 2.8m, 7m, 0.4m, 300m),
+        ["olive oil"] = new(884m, 0m, 0m, 100m),
+        ["kidney beans"] = new(127m, 8.7m, 22.8m, 0.5m, 240m),
+        ["chopped tomatoes"] = new(21m, 1m, 4.8m, 0.2m, 400m),
+        ["chilli seasoning"] = new(280m, 12m, 45m, 8m, 30m),
+        ["coconut milk"] = new(197m, 2m, 3m, 20m, 400m),
+        ["spinach"] = new(23m, 2.9m, 3.6m, 0.4m),
+        ["curry paste"] = new(150m, 3m, 20m, 5m, 50m),
+        ["carrots"] = new(41m, 0.9m, 10m, 0.2m, 70m),
+        ["stir fry sauce"] = new(120m, 2m, 20m, 1m, 120m),
+        ["wraps"] = new(310m, 8m, 50m, 7m, 370m),
+        ["greek yogurt"] = new(97m, 9m, 4m, 5m),
+        ["lettuce"] = new(15m, 1.4m, 2.9m, 0.2m, 450m),
+        ["paneer"] = new(321m, 18m, 3.6m, 25m),
+        ["onions"] = new(40m, 1.1m, 9.3m, 0.1m),
+        ["tikka seasoning"] = new(280m, 12m, 45m, 8m, 30m),
+        ["king prawns"] = new(99m, 24m, 0.2m, 0.3m),
+        ["pasta"] = new(360m, 12m, 73m, 1.5m),
+        ["passata"] = new(30m, 1.5m, 5m, 0.2m, 500m),
+        ["parmesan"] = new(431m, 38m, 4m, 29m),
+        ["lean beef mince"] = new(250m, 26m, 0m, 17m),
+        ["frozen peas"] = new(81m, 5.4m, 14m, 0.4m),
+        ["chickpeas"] = new(164m, 8.9m, 27m, 2.6m, 240m),
+        ["quinoa"] = new(368m, 14m, 64m, 6m),
+        ["cucumber"] = new(15m, 0.7m, 3.6m, 0.1m, 300m),
+        ["cherry tomatoes"] = new(18m, 0.9m, 3.9m, 0.2m),
+        ["eggs"] = new(143m, 13m, 1.1m, 10.6m, 50m),
+        ["frozen mixed veg"] = new(65m, 3.5m, 11m, 0.5m),
+        ["black beans"] = new(132m, 8.9m, 23.7m, 0.5m, 240m),
+        ["sweet potatoes"] = new(86m, 1.6m, 20m, 0.1m),
+        ["halloumi"] = new(316m, 22m, 2m, 25m),
+        ["couscous"] = new(376m, 12.8m, 77m, 0.6m),
+        ["courgettes"] = new(17m, 1.2m, 3.1m, 0.3m, 200m),
+        ["risotto rice"] = new(360m, 7.4m, 80m, 0.6m),
+        ["chestnut mushrooms"] = new(22m, 3.1m, 3.3m, 0.3m),
+        ["pesto"] = new(440m, 5m, 8m, 44m, 190m),
+        ["mozzarella"] = new(280m, 22m, 2m, 17m, 125m),
+        ["cod fillets"] = new(82m, 18m, 0m, 0.7m, 140m),
+        ["green beans"] = new(31m, 1.8m, 7m, 0.2m),
+        ["paprika"] = new(282m, 14m, 54m, 13m, 28m),
+        ["firm tofu"] = new(144m, 17m, 3m, 9m),
+        ["turkey"] = new(170m, 22m, 0m, 9m),
+        ["beef mince"] = new(250m, 26m, 0m, 17m),
+        ["prawns"] = new(99m, 24m, 0.2m, 0.3m),
+        ["cod"] = new(82m, 18m, 0m, 0.7m)
+    };
+
+    private static readonly Dictionary<string, NutritionReference> DepartmentNutritionFallbacks = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Produce"] = new(45m, 1.5m, 8m, 0.4m),
+        ["Bakery"] = new(280m, 8m, 52m, 4m),
+        ["Meat & Fish"] = new(185m, 24m, 0m, 8m),
+        ["Dairy & Eggs"] = new(180m, 12m, 4m, 12m),
+        ["Frozen"] = new(95m, 5m, 13m, 2m),
+        ["Tins & Dry Goods"] = new(245m, 10m, 35m, 6m),
+        ["Spices & Sauces"] = new(210m, 4m, 25m, 10m),
+        ["Other"] = new(160m, 6m, 20m, 6m)
+    };
+
+    private static readonly Dictionary<string, decimal> IngredientNutritionConsumptionFactors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["rice"] = 0.40m,
+        ["pasta"] = 0.42m,
+        ["egg noodles"] = 0.45m,
+        ["quinoa"] = 0.45m,
+        ["couscous"] = 0.42m,
+        ["risotto rice"] = 0.42m,
+        ["red lentils"] = 0.45m,
+        ["wraps"] = 0.65m
+    };
+
     private static readonly HashSet<string> GenericPantryTokensNormalized = new(
         GenericPantryTokens.Select(NormalizePantryText),
         StringComparer.OrdinalIgnoreCase);
@@ -1286,6 +1370,7 @@ Rules:
 - `tags` must include every listed dietary requirement.
 - `recipeSteps` must contain 5-6 concrete, meal-specific cooking steps in order.
 - Keep each recipe step concise (ideally <= 140 characters).
+- Include `nutritionPerServing` for one medium serving (not household total), with calories and grams for protein/carbs/fat.
 
 Return JSON only with this schema:
 {
@@ -1300,6 +1385,12 @@ Return JSON only with this schema:
     "",
     ""
   ],
+  "nutritionPerServing": {
+    "calories": 0,
+    "proteinGrams": 0,
+    "carbsGrams": 0,
+    "fatGrams": 0
+  },
   "ingredients": [
     {
       "name": "",
@@ -1473,6 +1564,7 @@ Rules:
 - `quantityForTwo` must be a positive number.
 - `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
 - `recipeSteps` must contain 5-8 concrete, meal-specific cooking steps in order.
+- Include `nutritionPerServing` for one medium serving (not household total), with calories and grams for protein/carbs/fat.
 
 Return JSON only with this schema:
 {
@@ -1487,6 +1579,12 @@ Return JSON only with this schema:
     "",
     ""
   ],
+  "nutritionPerServing": {
+    "calories": 0,
+    "proteinGrams": 0,
+    "carbsGrams": 0,
+    "fatGrams": 0
+  },
   "ingredients": [
     {
       "name": "",
@@ -1649,10 +1747,12 @@ Return JSON only with this schema:
             cookDays,
             leftoverDays,
             requestedLeftoverSourceDays);
+        var portionSizeFactor = ResolvePortionSizeFactor(context.PortionSize);
         var dailyPlans = BuildDailyPlans(
             selectedMeals,
             mealPortionMultipliers,
             context.HouseholdFactor,
+            portionSizeFactor,
             context.DietaryModes,
             context.DislikesOrAllergens);
         var shoppingItems = BuildShoppingList(
@@ -1797,6 +1897,7 @@ Return JSON only with this schema:
         IReadOnlyList<MealTemplate> selectedMeals,
         IReadOnlyList<int> mealPortionMultipliers,
         decimal householdFactor,
+        decimal portionSizeFactor,
         IReadOnlyList<string> dietaryModes,
         string dislikesOrAllergens)
     {
@@ -1842,6 +1943,7 @@ Return JSON only with this schema:
                 .ToList();
             var basePrepMinutes = template.IsQuick ? 25 : 40;
             var estimatedPrepMinutes = RoundToNearestFiveMinutes(basePrepMinutes + (leftoverDaysCovered * 8));
+            var nutrition = EstimateMealNutritionPerServing(template, portionSizeFactor);
 
             plans.Add(new AislePilotMealDayViewModel
             {
@@ -1851,6 +1953,10 @@ Return JSON only with this schema:
                 LeftoverDaysCovered = leftoverDaysCovered,
                 EstimatedCost = estimatedCost,
                 EstimatedPrepMinutes = estimatedPrepMinutes,
+                CaloriesPerServing = nutrition.CaloriesPerServing,
+                ProteinGramsPerServing = nutrition.ProteinGramsPerServing,
+                CarbsGramsPerServing = nutrition.CarbsGramsPerServing,
+                FatGramsPerServing = nutrition.FatGramsPerServing,
                 IngredientLines = ingredientLines,
                 RecipeSteps = BuildRecipeSteps(template)
             });
@@ -2027,6 +2133,281 @@ Return JSON only with this schema:
                 "Combine everything with sauce or seasoning and heat through.",
                 "Taste, adjust seasoning, and serve warm."
             ]
+        };
+    }
+
+    private static MealNutritionEstimate EstimateMealNutritionPerServing(
+        MealTemplate template,
+        decimal portionSizeFactor)
+    {
+        var deterministic = EstimateDeterministicMealNutritionPerServing(template, portionSizeFactor);
+        var ai = EstimateAiMealNutritionForPortion(template, portionSizeFactor);
+        if (ai is null)
+        {
+            deterministic.SourceLabel = "Ingredient estimate";
+            return deterministic;
+        }
+
+        return BlendMealNutritionEstimates(deterministic, ai);
+    }
+
+    private static MealNutritionEstimate EstimateDeterministicMealNutritionPerServing(
+        MealTemplate template,
+        decimal portionSizeFactor)
+    {
+        var safePortionFactor = Math.Clamp(portionSizeFactor, 0.75m, 1.35m);
+        var caloriesForTwo = 0m;
+        var proteinForTwo = 0m;
+        var carbsForTwo = 0m;
+        var fatForTwo = 0m;
+        var ingredientCount = 0;
+        var qualitySum = 0m;
+
+        foreach (var ingredient in template.Ingredients)
+        {
+            ingredientCount++;
+            var reference = ResolveNutritionReference(ingredient, out var mappingQuality);
+            qualitySum += mappingQuality;
+            var grams = ConvertIngredientQuantityToGrams(ingredient.QuantityForTwo, ingredient.Unit, reference.GramsPerUnit);
+            if (grams <= 0m)
+            {
+                continue;
+            }
+            grams *= ResolveIngredientNutritionConsumptionFactor(ingredient);
+
+            var scale = grams / 100m;
+            caloriesForTwo += reference.CaloriesPer100g * scale;
+            proteinForTwo += reference.ProteinPer100g * scale;
+            carbsForTwo += reference.CarbsPer100g * scale;
+            fatForTwo += reference.FatPer100g * scale;
+        }
+
+        if (caloriesForTwo <= 0m)
+        {
+            var fallback = BuildFallbackMealNutritionEstimate(template, safePortionFactor);
+            fallback.ConfidenceScore = 0.35m;
+            fallback.SourceLabel = "Fallback estimate";
+            return fallback;
+        }
+
+        var caloriesPerServing = (caloriesForTwo / 2m) * safePortionFactor;
+        var proteinPerServing = (proteinForTwo / 2m) * safePortionFactor;
+        var carbsPerServing = (carbsForTwo / 2m) * safePortionFactor;
+        var fatPerServing = (fatForTwo / 2m) * safePortionFactor;
+        var averageMappingQuality = ingredientCount == 0
+            ? 0.35m
+            : qualitySum / ingredientCount;
+
+        var roundedCalories = (int)Math.Round(caloriesPerServing, MidpointRounding.AwayFromZero);
+        return new MealNutritionEstimate
+        {
+            CaloriesPerServing = Math.Clamp(roundedCalories, 220, 1350),
+            ProteinGramsPerServing = Math.Clamp(decimal.Round(proteinPerServing, 1, MidpointRounding.AwayFromZero), 1m, 120m),
+            CarbsGramsPerServing = Math.Clamp(decimal.Round(carbsPerServing, 1, MidpointRounding.AwayFromZero), 1m, 170m),
+            FatGramsPerServing = Math.Clamp(decimal.Round(fatPerServing, 1, MidpointRounding.AwayFromZero), 1m, 95m),
+            ConfidenceScore = Math.Clamp(0.45m + (averageMappingQuality * 0.5m), 0.45m, 0.95m),
+            SourceLabel = "Ingredient estimate"
+        };
+    }
+
+    private static MealNutritionEstimate? EstimateAiMealNutritionForPortion(
+        MealTemplate template,
+        decimal portionSizeFactor)
+    {
+        var ai = template.AiNutritionPerServingMedium;
+        if (ai is null)
+        {
+            return null;
+        }
+
+        var safePortionFactor = Math.Clamp(portionSizeFactor, 0.75m, 1.35m);
+        var calories = Math.Round(ai.CaloriesPerServingMedium * safePortionFactor, MidpointRounding.AwayFromZero);
+        var protein = ai.ProteinGramsPerServingMedium * safePortionFactor;
+        var carbs = ai.CarbsGramsPerServingMedium * safePortionFactor;
+        var fat = ai.FatGramsPerServingMedium * safePortionFactor;
+
+        return new MealNutritionEstimate
+        {
+            CaloriesPerServing = Math.Clamp((int)calories, 180, 1500),
+            ProteinGramsPerServing = Math.Clamp(decimal.Round(protein, 1, MidpointRounding.AwayFromZero), 1m, 130m),
+            CarbsGramsPerServing = Math.Clamp(decimal.Round(carbs, 1, MidpointRounding.AwayFromZero), 1m, 200m),
+            FatGramsPerServing = Math.Clamp(decimal.Round(fat, 1, MidpointRounding.AwayFromZero), 1m, 120m),
+            ConfidenceScore = Math.Clamp(ai.ConfidenceScore, 0.40m, 0.85m),
+            SourceLabel = "AI nutrition"
+        };
+    }
+
+    private static MealNutritionEstimate BlendMealNutritionEstimates(
+        MealNutritionEstimate deterministic,
+        MealNutritionEstimate ai)
+    {
+        if (!IsAiNutritionCompatibleWithDeterministic(deterministic, ai))
+        {
+            deterministic.SourceLabel = "Ingredient estimate";
+            return deterministic;
+        }
+
+        var deterministicWeight = Math.Clamp(deterministic.ConfidenceScore, 0.45m, 0.95m);
+        var aiWeight = Math.Clamp(ai.ConfidenceScore, 0.40m, 0.85m);
+        var totalWeight = deterministicWeight + aiWeight;
+        if (totalWeight <= 0m)
+        {
+            deterministic.SourceLabel = "Ingredient estimate";
+            return deterministic;
+        }
+
+        var blendedCalories = (
+            (deterministic.CaloriesPerServing * deterministicWeight) +
+            (ai.CaloriesPerServing * aiWeight)) / totalWeight;
+        var blendedProtein = (
+            (deterministic.ProteinGramsPerServing * deterministicWeight) +
+            (ai.ProteinGramsPerServing * aiWeight)) / totalWeight;
+        var blendedCarbs = (
+            (deterministic.CarbsGramsPerServing * deterministicWeight) +
+            (ai.CarbsGramsPerServing * aiWeight)) / totalWeight;
+        var blendedFat = (
+            (deterministic.FatGramsPerServing * deterministicWeight) +
+            (ai.FatGramsPerServing * aiWeight)) / totalWeight;
+
+        return new MealNutritionEstimate
+        {
+            CaloriesPerServing = Math.Clamp((int)Math.Round(blendedCalories, MidpointRounding.AwayFromZero), 200, 1450),
+            ProteinGramsPerServing = Math.Clamp(decimal.Round(blendedProtein, 1, MidpointRounding.AwayFromZero), 1m, 125m),
+            CarbsGramsPerServing = Math.Clamp(decimal.Round(blendedCarbs, 1, MidpointRounding.AwayFromZero), 1m, 190m),
+            FatGramsPerServing = Math.Clamp(decimal.Round(blendedFat, 1, MidpointRounding.AwayFromZero), 1m, 110m),
+            ConfidenceScore = Math.Clamp((deterministicWeight + aiWeight) / 2m, 0.50m, 0.92m),
+            SourceLabel = "Ingredient + AI blend"
+        };
+    }
+
+    private static bool IsAiNutritionCompatibleWithDeterministic(
+        MealNutritionEstimate deterministic,
+        MealNutritionEstimate ai)
+    {
+        var calorieRatio = ai.CaloriesPerServing / (decimal)Math.Max(1, deterministic.CaloriesPerServing);
+        if (calorieRatio < 0.55m || calorieRatio > 1.80m)
+        {
+            return false;
+        }
+
+        var proteinRatio = ai.ProteinGramsPerServing / Math.Max(1m, deterministic.ProteinGramsPerServing);
+        var carbsRatio = ai.CarbsGramsPerServing / Math.Max(1m, deterministic.CarbsGramsPerServing);
+        var fatRatio = ai.FatGramsPerServing / Math.Max(1m, deterministic.FatGramsPerServing);
+        return proteinRatio >= 0.45m && proteinRatio <= 2.10m &&
+               carbsRatio >= 0.45m && carbsRatio <= 2.10m &&
+               fatRatio >= 0.45m && fatRatio <= 2.10m;
+    }
+
+    private static MealNutritionEstimate BuildFallbackMealNutritionEstimate(
+        MealTemplate template,
+        decimal portionSizeFactor)
+    {
+        var calories = Math.Clamp(
+            (int)Math.Round(template.BaseCostForTwo * 118m * portionSizeFactor, MidpointRounding.AwayFromZero),
+            320,
+            1100);
+        var highProtein = template.Tags.Contains("High-Protein", StringComparer.OrdinalIgnoreCase);
+        var plantBased = template.Tags.Contains("Vegan", StringComparer.OrdinalIgnoreCase) ||
+                         template.Tags.Contains("Vegetarian", StringComparer.OrdinalIgnoreCase);
+
+        var protein = highProtein ? 38m : plantBased ? 20m : 30m;
+        protein *= portionSizeFactor;
+        var fat = (calories * 0.32m) / 9m;
+        var carbs = (calories - (protein * 4m) - (fat * 9m)) / 4m;
+
+        return new MealNutritionEstimate
+        {
+            CaloriesPerServing = calories,
+            ProteinGramsPerServing = decimal.Round(Math.Clamp(protein, 12m, 80m), 1, MidpointRounding.AwayFromZero),
+            CarbsGramsPerServing = decimal.Round(Math.Clamp(carbs, 20m, 150m), 1, MidpointRounding.AwayFromZero),
+            FatGramsPerServing = decimal.Round(Math.Clamp(fat, 10m, 70m), 1, MidpointRounding.AwayFromZero),
+            SourceLabel = "Fallback estimate"
+        };
+    }
+
+    private static NutritionReference ResolveNutritionReference(
+        IngredientTemplate ingredient,
+        out decimal mappingQuality)
+    {
+        if (IngredientNutritionReferences.TryGetValue(ingredient.Name, out var exact))
+        {
+            mappingQuality = 1m;
+            return exact;
+        }
+
+        var normalizedName = ingredient.Name.Trim();
+        foreach (var pair in IngredientNutritionReferences)
+        {
+            if (normalizedName.Contains(pair.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                mappingQuality = 0.8m;
+                return pair.Value;
+            }
+        }
+
+        if (DepartmentNutritionFallbacks.TryGetValue(ingredient.Department, out var departmentFallback))
+        {
+            mappingQuality = 0.45m;
+            return departmentFallback;
+        }
+
+        mappingQuality = 0.35m;
+        return DepartmentNutritionFallbacks["Other"];
+    }
+
+    private static decimal ResolveIngredientNutritionConsumptionFactor(IngredientTemplate ingredient)
+    {
+        var normalizedName = ingredient.Name.Trim();
+        foreach (var pair in IngredientNutritionConsumptionFactors)
+        {
+            if (normalizedName.Contains(pair.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                return pair.Value;
+            }
+        }
+
+        return 1m;
+    }
+
+    private static decimal ConvertIngredientQuantityToGrams(
+        decimal quantity,
+        string unit,
+        decimal? gramsPerUnit)
+    {
+        if (quantity <= 0m)
+        {
+            return 0m;
+        }
+
+        var normalizedUnit = (unit ?? string.Empty).Trim().ToLowerInvariant();
+        return normalizedUnit switch
+        {
+            "kg" => quantity * 1000m,
+            "g" => quantity,
+            "l" => quantity * 1000m,
+            "ml" => quantity,
+            _ => quantity * ResolveDefaultUnitWeightGrams(normalizedUnit, gramsPerUnit)
+        };
+    }
+
+    private static decimal ResolveDefaultUnitWeightGrams(string unit, decimal? explicitUnitWeightGrams)
+    {
+        if (explicitUnitWeightGrams is > 0m)
+        {
+            return explicitUnitWeightGrams.Value;
+        }
+
+        return unit switch
+        {
+            "pcs" => 80m,
+            "tin" or "tins" => 240m,
+            "pack" or "packs" => 250m,
+            "jar" or "jars" => 190m,
+            "bottle" or "bottles" => 500m,
+            "head" => 500m,
+            "fillets" => 140m,
+            "balls" => 125m,
+            _ => 100m
         };
     }
 
@@ -2223,6 +2604,16 @@ Return JSON only with this schema:
                 })
                 .ToList(),
             RecipeSteps = meal.AiRecipeSteps?.ToList() ?? [],
+            NutritionPerServingMedium = meal.AiNutritionPerServingMedium is null
+                ? null
+                : new FirestoreAislePilotNutrition
+                {
+                    Calories = meal.AiNutritionPerServingMedium.CaloriesPerServingMedium,
+                    ProteinGrams = (double)meal.AiNutritionPerServingMedium.ProteinGramsPerServingMedium,
+                    CarbsGrams = (double)meal.AiNutritionPerServingMedium.CarbsGramsPerServingMedium,
+                    FatGrams = (double)meal.AiNutritionPerServingMedium.FatGramsPerServingMedium,
+                    ConfidenceScore = (double)meal.AiNutritionPerServingMedium.ConfidenceScore
+                },
             CreatedAtUtc = DateTime.UtcNow,
             Source = "openai"
         };
@@ -2251,7 +2642,16 @@ Return JSON only with this schema:
                     EstimatedCostForTwo = (decimal)ingredient.EstimatedCostForTwo
                 })
                 .ToList(),
-            RecipeSteps = doc.RecipeSteps
+            RecipeSteps = doc.RecipeSteps,
+            NutritionPerServing = doc.NutritionPerServingMedium is null
+                ? null
+                : new AislePilotAiNutritionPayload
+                {
+                    Calories = (decimal)doc.NutritionPerServingMedium.Calories,
+                    ProteinGrams = (decimal)doc.NutritionPerServingMedium.ProteinGrams,
+                    CarbsGrams = (decimal)doc.NutritionPerServingMedium.CarbsGrams,
+                    FatGrams = (decimal)doc.NutritionPerServingMedium.FatGrams
+                }
         };
 
         return ValidateAndMapAiMeal(
@@ -2562,6 +2962,7 @@ Rules:
 - `recipeSteps` must contain 5-6 concrete, meal-specific cooking steps in order.
 - Do not write generic filler; include relevant timings, heat levels, and ingredient usage.
 - Keep each recipe step concise (ideally <= 140 characters).
+- Include `nutritionPerServing` for one medium serving (not household total), with calories and grams for protein/carbs/fat.
 {{(compactJson ? "- Keep ingredient names short and return compact JSON with no markdown, no comments, and no unnecessary whitespace." : string.Empty)}}
 
 Return JSON only with this schema:
@@ -2579,6 +2980,12 @@ Return JSON only with this schema:
         "",
         ""
       ],
+      "nutritionPerServing": {
+        "calories": 0,
+        "proteinGrams": 0,
+        "carbsGrams": 0,
+        "fatGrams": 0
+      },
       "ingredients": [
         {
           "name": "",
@@ -2742,6 +3149,15 @@ Return JSON only with this schema:
             return null;
         }
 
+        AiMealNutritionEstimate? aiNutritionPerServingMedium = null;
+        if (payload.NutritionPerServing is not null)
+        {
+            TryValidateAiNutritionPerServing(
+                payload.NutritionPerServing,
+                out aiNutritionPerServingMedium,
+                out _);
+        }
+
         return new MealTemplate(
             name,
             decimal.Round(baseCostForTwo, 2, MidpointRounding.AwayFromZero),
@@ -2749,7 +3165,8 @@ Return JSON only with this schema:
             tags,
             ingredients.Select(item => item.mapped!).ToList())
         {
-            AiRecipeSteps = recipeSteps.Count == 0 ? null : recipeSteps
+            AiRecipeSteps = recipeSteps.Count == 0 ? null : recipeSteps,
+            AiNutritionPerServingMedium = aiNutritionPerServingMedium
         };
     }
 
@@ -2876,6 +3293,59 @@ Return JSON only with this schema:
             validationReason = $"base_to_ingredient_ratio_out_of_range(ratio={ratio.ToString("0.##", CultureInfo.InvariantCulture)},base={baseCostForTwo.ToString("0.##", CultureInfo.InvariantCulture)},ingredients={ingredientCostForTwo.ToString("0.##", CultureInfo.InvariantCulture)})";
             return false;
         }
+
+        return true;
+    }
+
+    private static bool TryValidateAiNutritionPerServing(
+        AislePilotAiNutritionPayload payload,
+        out AiMealNutritionEstimate? estimate,
+        out string? validationReason)
+    {
+        estimate = null;
+        validationReason = null;
+        var calories = payload.Calories ?? 0m;
+        var protein = payload.ProteinGrams ?? 0m;
+        var carbs = payload.CarbsGrams ?? 0m;
+        var fat = payload.FatGrams ?? 0m;
+
+        if (calories < 150m || calories > 1500m)
+        {
+            validationReason = "nutrition_calories_out_of_range";
+            return false;
+        }
+
+        if (protein <= 0m || carbs <= 0m || fat <= 0m ||
+            protein > 120m || carbs > 190m || fat > 110m)
+        {
+            validationReason = "nutrition_macros_out_of_range";
+            return false;
+        }
+
+        var caloriesFromMacros = (protein * 4m) + (carbs * 4m) + (fat * 9m);
+        if (caloriesFromMacros <= 0m)
+        {
+            validationReason = "nutrition_macro_calories_invalid";
+            return false;
+        }
+
+        var consistencyRatio = calories / caloriesFromMacros;
+        if (consistencyRatio < 0.75m || consistencyRatio > 1.35m)
+        {
+            validationReason = "nutrition_calorie_macro_mismatch";
+            return false;
+        }
+
+        var consistencyScore = 1m - Math.Min(1m, Math.Abs(1m - consistencyRatio) * 2m);
+        var confidence = Math.Clamp(0.40m + (consistencyScore * 0.45m), 0.40m, 0.85m);
+        estimate = new AiMealNutritionEstimate
+        {
+            CaloriesPerServingMedium = (int)Math.Round(calories, MidpointRounding.AwayFromZero),
+            ProteinGramsPerServingMedium = decimal.Round(protein, 1, MidpointRounding.AwayFromZero),
+            CarbsGramsPerServingMedium = decimal.Round(carbs, 1, MidpointRounding.AwayFromZero),
+            FatGramsPerServingMedium = decimal.Round(fat, 1, MidpointRounding.AwayFromZero),
+            ConfidenceScore = confidence
+        };
 
         return true;
     }
@@ -3630,6 +4100,16 @@ Return JSON only with this schema:
         string DislikesOrAllergens,
         string PortionSize);
 
+    private sealed class MealNutritionEstimate
+    {
+        public int CaloriesPerServing { get; set; }
+        public decimal ProteinGramsPerServing { get; set; }
+        public decimal CarbsGramsPerServing { get; set; }
+        public decimal FatGramsPerServing { get; set; }
+        public decimal ConfidenceScore { get; set; } = 0.5m;
+        public string SourceLabel { get; set; } = "Ingredient estimate";
+    }
+
     private sealed class MutableShoppingItem
     {
         public string Department { get; init; } = string.Empty;
@@ -3647,6 +4127,7 @@ Return JSON only with this schema:
         IReadOnlyList<IngredientTemplate> Ingredients)
     {
         public IReadOnlyList<string>? AiRecipeSteps { get; init; }
+        public AiMealNutritionEstimate? AiNutritionPerServingMedium { get; init; }
     }
 
     private sealed record IngredientTemplate(
@@ -3655,6 +4136,22 @@ Return JSON only with this schema:
         decimal QuantityForTwo,
         string Unit,
         decimal EstimatedCostForTwo);
+
+    private sealed record NutritionReference(
+        decimal CaloriesPer100g,
+        decimal ProteinPer100g,
+        decimal CarbsPer100g,
+        decimal FatPer100g,
+        decimal? GramsPerUnit = null);
+
+    private sealed class AiMealNutritionEstimate
+    {
+        public int CaloriesPerServingMedium { get; set; }
+        public decimal ProteinGramsPerServingMedium { get; set; }
+        public decimal CarbsGramsPerServingMedium { get; set; }
+        public decimal FatGramsPerServingMedium { get; set; }
+        public decimal ConfidenceScore { get; set; } = 0.55m;
+    }
 
     private sealed class ChatCompletionResponse
     {
@@ -3684,6 +4181,15 @@ Return JSON only with this schema:
         public List<string>? Tags { get; set; }
         public List<AislePilotAiIngredientPayload>? Ingredients { get; set; }
         public List<string>? RecipeSteps { get; set; }
+        public AislePilotAiNutritionPayload? NutritionPerServing { get; set; }
+    }
+
+    private sealed class AislePilotAiNutritionPayload
+    {
+        public decimal? Calories { get; set; }
+        public decimal? ProteinGrams { get; set; }
+        public decimal? CarbsGrams { get; set; }
+        public decimal? FatGrams { get; set; }
     }
 
     private sealed class AislePilotAiIngredientPayload
@@ -3717,6 +4223,9 @@ Return JSON only with this schema:
         public List<string> RecipeSteps { get; set; } = [];
 
         [FirestoreProperty]
+        public FirestoreAislePilotNutrition? NutritionPerServingMedium { get; set; }
+
+        [FirestoreProperty]
         public DateTime CreatedAtUtc { get; set; }
 
         [FirestoreProperty]
@@ -3740,6 +4249,25 @@ Return JSON only with this schema:
 
         [FirestoreProperty]
         public double EstimatedCostForTwo { get; set; }
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreAislePilotNutrition
+    {
+        [FirestoreProperty]
+        public double Calories { get; set; }
+
+        [FirestoreProperty]
+        public double ProteinGrams { get; set; }
+
+        [FirestoreProperty]
+        public double CarbsGrams { get; set; }
+
+        [FirestoreProperty]
+        public double FatGrams { get; set; }
+
+        [FirestoreProperty]
+        public double ConfidenceScore { get; set; }
     }
 
     private sealed record AiMealBatchResult(
