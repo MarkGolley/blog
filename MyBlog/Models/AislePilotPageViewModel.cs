@@ -39,6 +39,7 @@ public sealed class AislePilotMealDayViewModel
 {
     public string Day { get; set; } = string.Empty;
     public string MealName { get; set; } = string.Empty;
+    public string MealImageUrl { get; set; } = string.Empty;
     public string MealReason { get; set; } = string.Empty;
     public int LeftoverDaysCovered { get; set; }
     public decimal EstimatedCost { get; set; }

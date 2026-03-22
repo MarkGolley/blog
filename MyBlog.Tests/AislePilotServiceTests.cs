@@ -570,6 +570,27 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_AssignsMealImageUrl_ForEveryMeal()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            CookDays = 5,
+            DietaryModes = ["Balanced"]
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(5, result.MealPlan.Count);
+        Assert.All(result.MealPlan, meal =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(meal.MealImageUrl));
+            Assert.StartsWith("/images/", meal.MealImageUrl, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
     public void SuggestMealsFromPantry_WithKnownIngredients_RanksBestMatchFirst()
     {
         var request = new AislePilotRequestModel
@@ -661,6 +682,9 @@ public class AislePilotServiceTests
 
         Assert.Equal(7, swappedPlan.MealPlan.Count);
         Assert.NotEqual(currentMealName, swappedPlan.MealPlan[0].MealName);
+        Assert.Equal(
+            swappedPlan.MealPlan.Count,
+            swappedPlan.MealPlan.Select(meal => meal.MealName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
     [Fact]
@@ -694,7 +718,8 @@ public class AislePilotServiceTests
         {
             DietaryModes = ["Vegetarian", "Gluten-Free"],
             WeeklyBudget = 70m,
-            HouseholdSize = 2
+            HouseholdSize = 2,
+            CookDays = 4
         };
 
         var initialPlan = _service.BuildPlan(request);
@@ -711,6 +736,26 @@ public class AislePilotServiceTests
         };
 
         Assert.All(swappedPlan.MealPlan, meal => Assert.Contains(meal.MealName, allowedMeals));
+    }
+
+    [Fact]
+    public void SwapMealForDay_WhenNoUniqueCandidateExists_ThrowsInvalidOperationException()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegetarian", "Gluten-Free"],
+            WeeklyBudget = 70m,
+            HouseholdSize = 2,
+            CookDays = 7
+        };
+
+        var initialPlan = _service.BuildPlan(request);
+        var currentMealName = initialPlan.MealPlan[2].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan.Select(meal => meal.MealName).ToList();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.SwapMealForDay(request, 2, currentMealName, currentPlanMealNames, [currentMealName]));
+        Assert.Contains("No unique compatible replacement meal is available", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

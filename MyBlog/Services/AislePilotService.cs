@@ -1,4 +1,5 @@
 using Google.Cloud.Firestore;
+using Microsoft.AspNetCore.Hosting;
 using MyBlog.Models;
 using MyBlog.Utilities;
 using System.Collections.Concurrent;
@@ -8,6 +9,7 @@ using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MyBlog.Services;
 
@@ -28,16 +30,24 @@ public sealed class AislePilotService : IAislePilotService
     private const int RetryAiMealPlanMaxTokens = 2200;
     private const int WarmupMealMaxTokens = 1000;
     private const string AiMealsCollection = "aislePilotAiMeals";
+    private const string MealImagesCollection = "aislePilotMealImages";
     private const string OpenAiChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
+    private const string OpenAiImageGenerationsEndpoint = "https://api.openai.com/v1/images/generations";
     private const int OpenAiMaxAttempts = 1;
+    private const int OpenAiImageMaxAttempts = 1;
     private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(22);
+    private static readonly TimeSpan OpenAiImageRequestTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
     private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);
 
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, string> MealImagePool = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, byte> MealImageGenerationInFlight = new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
+    private static readonly SemaphoreSlim MealImagePoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim AiMealWarmupLock = new(1, 1);
     private static DateTime? _lastAiMealPoolRefreshUtc;
+    private static DateTime? _lastMealImagePoolRefreshUtc;
 
     private static readonly HashSet<string> GenericPantryTokens = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -445,22 +455,31 @@ public sealed class AislePilotService : IAislePilotService
     private readonly ILogger<AislePilotService>? _logger;
     private readonly string? _apiKey;
     private readonly string _model;
+    private readonly string _imageModel;
     private readonly bool _enableAiGeneration;
+    private readonly bool _enableAiImageGeneration;
     private readonly bool _allowTemplateFallback;
     private readonly FirestoreDb? _db;
+    private readonly IWebHostEnvironment? _webHostEnvironment;
 
     public AislePilotService(
         HttpClient? httpClient = null,
         IConfiguration? configuration = null,
         ILogger<AislePilotService>? logger = null,
-        FirestoreDb? db = null)
+        FirestoreDb? db = null,
+        IWebHostEnvironment? webHostEnvironment = null)
     {
         _httpClient = httpClient;
         _logger = logger;
         _db = db;
+        _webHostEnvironment = webHostEnvironment;
         _apiKey = configuration?["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         _model = configuration?["AislePilot:Model"] ?? "gpt-4.1-mini";
+        _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-1";
         _enableAiGeneration = !bool.TryParse(configuration?["AislePilot:EnableAiGeneration"], out var parsed) || parsed;
+        _enableAiImageGeneration = !bool.TryParse(
+            configuration?["AislePilot:EnableAiImageGeneration"],
+            out var parsedImageGeneration) || parsedImageGeneration;
         _allowTemplateFallback =
             bool.TryParse(configuration?["AislePilot:AllowTemplateFallback"], out var allowTemplateFallback)
                 ? allowTemplateFallback
@@ -1046,8 +1065,7 @@ public sealed class AislePilotService : IAislePilotService
                 request.WeeklyBudget,
                 context.HouseholdFactor,
                 request.PreferQuickMeals,
-                dayMultiplier,
-                allowAlreadyUsedMeals: true);
+                dayMultiplier);
         }
 
         if (replacement is null)
@@ -1086,7 +1104,7 @@ public sealed class AislePilotService : IAislePilotService
         if (replacement is null)
         {
             throw new InvalidOperationException(
-                "No compatible replacement meal is available right now. Try loosening dietary filters or regenerate your full plan.");
+                "No unique compatible replacement meal is available right now. Loosen one dietary filter or regenerate your full plan.");
         }
 
         AddMealsToAiPool([replacement]);
@@ -1246,8 +1264,7 @@ public sealed class AislePilotService : IAislePilotService
             weeklyBudget,
             context.HouseholdFactor,
             preferQuickMeals,
-            dayMultiplier,
-            allowAlreadyUsedMeals: true);
+            dayMultiplier);
     }
 
     private static IReadOnlyList<WarmupProfileWithTarget> BuildWarmupProfiles(
@@ -1756,7 +1773,7 @@ Return JSON only with this schema:
         return plan;
     }
 
-    private static AislePilotPlanResultViewModel BuildPlanFromMeals(
+    private AislePilotPlanResultViewModel BuildPlanFromMeals(
         AislePilotRequestModel request,
         PlanContext context,
         IReadOnlyList<MealTemplate> selectedMeals,
@@ -1773,10 +1790,12 @@ Return JSON only with this schema:
             cookDays,
             leftoverDays,
             requestedLeftoverSourceDays);
+        var mealImageUrls = ResolveMealImageUrls(selectedMeals);
         var portionSizeFactor = ResolvePortionSizeFactor(context.PortionSize);
         var dailyPlans = BuildDailyPlans(
             selectedMeals,
             mealPortionMultipliers,
+            mealImageUrls,
             context.HouseholdFactor,
             portionSizeFactor,
             context.DietaryModes,
@@ -1812,6 +1831,374 @@ Return JSON only with this schema:
         };
     }
 
+    private IReadOnlyDictionary<string, string> ResolveMealImageUrls(IReadOnlyList<MealTemplate> selectedMeals)
+    {
+        EnsureMealImagePoolHydrated();
+
+        var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var meal in selectedMeals)
+        {
+            var normalizedEmbeddedUrl = NormalizeImageUrl(meal.ImageUrl);
+            if (!string.IsNullOrWhiteSpace(normalizedEmbeddedUrl) && IsMealImageUrlUsable(normalizedEmbeddedUrl))
+            {
+                MealImagePool[meal.Name] = normalizedEmbeddedUrl;
+                resolved[meal.Name] = normalizedEmbeddedUrl;
+                continue;
+            }
+
+            if (TryGetCachedMealImageUrl(meal.Name, out var cachedUrl))
+            {
+                resolved[meal.Name] = cachedUrl;
+                continue;
+            }
+
+            resolved[meal.Name] = GetFallbackMealImageUrl();
+            QueueMealImageGeneration(meal);
+        }
+
+        return resolved;
+    }
+
+    private bool TryGetCachedMealImageUrl(string mealName, out string imageUrl)
+    {
+        imageUrl = string.Empty;
+        if (!MealImagePool.TryGetValue(mealName, out var cached))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeImageUrl(cached);
+        if (string.IsNullOrWhiteSpace(normalized) || !IsMealImageUrlUsable(normalized))
+        {
+            MealImagePool.TryRemove(mealName, out _);
+            return false;
+        }
+
+        imageUrl = normalized;
+        return true;
+    }
+
+    private static string GetFallbackMealImageUrl()
+    {
+        return "/images/aislepilot-icon.svg";
+    }
+
+    private bool IsMealImageUrlUsable(string imageUrl)
+    {
+        if (!imageUrl.StartsWith("/images/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (_webHostEnvironment is null || string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath))
+        {
+            return false;
+        }
+
+        var relativePath = imageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var fullPath = Path.Combine(_webHostEnvironment.WebRootPath, relativePath);
+        return File.Exists(fullPath);
+    }
+
+    private void EnsureMealImagePoolHydrated()
+    {
+        try
+        {
+            EnsureMealImagePoolHydratedAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Unable to hydrate AislePilot meal image cache from Firestore.");
+        }
+    }
+
+    private async Task EnsureMealImagePoolHydratedAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db is null)
+        {
+            return;
+        }
+
+        var shouldRefresh =
+            MealImagePool.IsEmpty ||
+            !_lastMealImagePoolRefreshUtc.HasValue ||
+            DateTime.UtcNow - _lastMealImagePoolRefreshUtc.Value > TimeSpan.FromMinutes(20);
+        if (!shouldRefresh)
+        {
+            return;
+        }
+
+        await MealImagePoolRefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            shouldRefresh =
+                MealImagePool.IsEmpty ||
+                !_lastMealImagePoolRefreshUtc.HasValue ||
+                DateTime.UtcNow - _lastMealImagePoolRefreshUtc.Value > TimeSpan.FromMinutes(20);
+            if (!shouldRefresh)
+            {
+                return;
+            }
+
+            var snapshot = await _db.Collection(MealImagesCollection).GetSnapshotAsync(cancellationToken);
+            foreach (var doc in snapshot.Documents)
+            {
+                if (!doc.Exists)
+                {
+                    continue;
+                }
+
+                FirestoreAislePilotMealImage? mapped;
+                try
+                {
+                    mapped = doc.ConvertTo<FirestoreAislePilotMealImage>();
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(mapped.Name))
+                {
+                    continue;
+                }
+
+                var normalizedUrl = NormalizeImageUrl(mapped.ImageUrl);
+                if (string.IsNullOrWhiteSpace(normalizedUrl) || !IsMealImageUrlUsable(normalizedUrl))
+                {
+                    continue;
+                }
+
+                MealImagePool[mapped.Name.Trim()] = normalizedUrl;
+            }
+
+            _lastMealImagePoolRefreshUtc = DateTime.UtcNow;
+        }
+        finally
+        {
+            MealImagePoolRefreshLock.Release();
+        }
+    }
+
+    private void QueueMealImageGeneration(MealTemplate meal)
+    {
+        if (!_enableAiGeneration ||
+            !_enableAiImageGeneration ||
+            _httpClient is null ||
+            string.IsNullOrWhiteSpace(_apiKey) ||
+            _webHostEnvironment is null ||
+            string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath))
+        {
+            return;
+        }
+
+        var key = ToAiMealDocumentId(meal.Name);
+        if (!MealImageGenerationInFlight.TryAdd(key, 1))
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (TryGetCachedMealImageUrl(meal.Name, out _))
+                {
+                    return;
+                }
+
+                var imageBytes = await TryGenerateMealImageBytesWithAiAsync(meal, CancellationToken.None);
+                if (imageBytes is null || imageBytes.Length == 0)
+                {
+                    return;
+                }
+
+                var imageUrl = await SaveMealImageToDiskAsync(meal.Name, imageBytes, CancellationToken.None);
+                if (string.IsNullOrWhiteSpace(imageUrl))
+                {
+                    return;
+                }
+
+                MealImagePool[meal.Name] = imageUrl;
+
+                if (AiMealPool.TryGetValue(meal.Name, out var existingMeal))
+                {
+                    AiMealPool[meal.Name] = existingMeal with { ImageUrl = imageUrl };
+                }
+
+                await PersistMealImageAsync(meal.Name, imageUrl, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "AislePilot meal image generation failed for '{MealName}'.", meal.Name);
+            }
+            finally
+            {
+                MealImageGenerationInFlight.TryRemove(key, out _);
+            }
+        });
+    }
+
+    private async Task<byte[]?> TryGenerateMealImageBytesWithAiAsync(
+        MealTemplate meal,
+        CancellationToken cancellationToken)
+    {
+        if (_httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
+        {
+            return null;
+        }
+
+        var requestBody = new
+        {
+            model = _imageModel,
+            prompt = BuildAiMealImagePrompt(meal),
+            size = "1024x1024",
+            quality = "low",
+            n = 1
+        };
+        var serializedBody = JsonSerializer.Serialize(requestBody);
+
+        for (var attempt = 1; attempt <= OpenAiImageMaxAttempts; attempt++)
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(OpenAiImageRequestTimeout);
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, OpenAiImageGenerationsEndpoint)
+            {
+                Content = new StringContent(serializedBody, Encoding.UTF8, "application/json")
+            };
+            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+
+            try
+            {
+                using var response = await _httpClient.SendAsync(requestMessage, timeoutCts.Token);
+                var responseContent = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorSample = responseContent.Length <= 220 ? responseContent : responseContent[..220];
+                    _logger?.LogWarning(
+                        "AislePilot meal image request failed with status {StatusCode}. Attempt={Attempt}/{MaxAttempts}. ResponseSample={ResponseSample}",
+                        (int)response.StatusCode,
+                        attempt,
+                        OpenAiImageMaxAttempts,
+                        errorSample);
+                    continue;
+                }
+
+                var payload = JsonSerializer.Deserialize<OpenAiImageGenerationResponse>(responseContent, JsonOptions);
+                var imageData = payload?.Data?.FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(imageData?.B64Json))
+                {
+                    try
+                    {
+                        return Convert.FromBase64String(imageData.B64Json);
+                    }
+                    catch (FormatException)
+                    {
+                        _logger?.LogWarning("AislePilot meal image payload had invalid base64 data for '{MealName}'.", meal.Name);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(imageData?.Url))
+                {
+                    try
+                    {
+                        using var imageResponse = await _httpClient.GetAsync(imageData.Url, timeoutCts.Token);
+                        if (imageResponse.IsSuccessStatusCode)
+                        {
+                            return await imageResponse.Content.ReadAsByteArrayAsync(timeoutCts.Token);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore and return null below.
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "AislePilot meal image request failed for '{MealName}'.", meal.Name);
+            }
+        }
+
+        return null;
+    }
+
+    private static string BuildAiMealImagePrompt(MealTemplate meal)
+    {
+        var ingredientText = string.Join(
+            ", ",
+            meal.Ingredients
+                .Take(4)
+                .Select(ingredient => ingredient.Name.Trim().ToLowerInvariant()));
+        if (string.IsNullOrWhiteSpace(ingredientText))
+        {
+            ingredientText = "seasonal ingredients";
+        }
+
+        return $"""
+Create a photorealistic hero image of the finished plated dish: "{meal.Name}".
+Style: natural light food photography, 45-degree angle, realistic textures, appetising and modern.
+Include visible ingredients where appropriate: {ingredientText}.
+Single plated meal only, neutral background, no people, no text, no logos, no watermarks.
+""";
+    }
+
+    private async Task<string?> SaveMealImageToDiskAsync(
+        string mealName,
+        byte[] imageBytes,
+        CancellationToken cancellationToken)
+    {
+        if (_webHostEnvironment is null || string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath))
+        {
+            return null;
+        }
+
+        var directoryPath = Path.Combine(_webHostEnvironment.WebRootPath, "images", "aislepilot-meals");
+        Directory.CreateDirectory(directoryPath);
+
+        var fileName = $"{ToAiMealDocumentId(mealName)}.png";
+        var filePath = Path.Combine(directoryPath, fileName);
+        await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
+        return $"/images/aislepilot-meals/{fileName}";
+    }
+
+    private async Task PersistMealImageAsync(
+        string mealName,
+        string imageUrl,
+        CancellationToken cancellationToken)
+    {
+        if (_db is null || string.IsNullOrWhiteSpace(mealName) || string.IsNullOrWhiteSpace(imageUrl))
+        {
+            return;
+        }
+
+        try
+        {
+            var docRef = _db.Collection(MealImagesCollection).Document(ToAiMealDocumentId(mealName));
+            await docRef.SetAsync(
+                new FirestoreAislePilotMealImage
+                {
+                    Name = mealName,
+                    ImageUrl = imageUrl,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                    Source = "openai-image"
+                },
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(
+                ex,
+                "AislePilot failed to persist meal image for '{MealName}'.",
+                mealName);
+        }
+    }
+
+    private static string NormalizeImageUrl(string? imageUrl)
+    {
+        return imageUrl?.Trim() ?? string.Empty;
+    }
+
     private static MealTemplate? SelectSwapCandidate(
         IReadOnlyList<MealTemplate> allCandidates,
         IReadOnlyList<MealTemplate> selectedMeals,
@@ -1820,8 +2207,7 @@ Return JSON only with this schema:
         decimal weeklyBudget,
         decimal householdFactor,
         bool preferQuickMeals,
-        int dayMultiplier,
-        bool allowAlreadyUsedMeals)
+        int dayMultiplier)
     {
         if (allCandidates.Count == 0)
         {
@@ -1838,21 +2224,7 @@ Return JSON only with this schema:
                 !usedNames.Contains(meal.Name))
             .ToList();
 
-        var fallbackPool = allowAlreadyUsedMeals
-            ? allCandidates
-                .Where(meal => !meal.Name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase))
-                .ToList()
-            : [];
-
-        var candidatePool = preferredPool.Count > 0
-            ? preferredPool
-            : fallbackPool.Count > 0
-                ? fallbackPool
-                : allowAlreadyUsedMeals
-                    ? allCandidates.ToList()
-                    : [];
-
-        if (candidatePool.Count == 0)
+        if (preferredPool.Count == 0)
         {
             return null;
         }
@@ -1862,7 +2234,7 @@ Return JSON only with this schema:
         var previousName = dayIndex > 0 ? selectedMeals[dayIndex - 1].Name : null;
         var nextName = dayIndex < selectedMeals.Count - 1 ? selectedMeals[dayIndex + 1].Name : null;
 
-        return candidatePool
+        return preferredPool
             .Select(template => new
             {
                 template,
@@ -1942,6 +2314,7 @@ Return JSON only with this schema:
     private static IReadOnlyList<AislePilotMealDayViewModel> BuildDailyPlans(
         IReadOnlyList<MealTemplate> selectedMeals,
         IReadOnlyList<int> mealPortionMultipliers,
+        IReadOnlyDictionary<string, string> mealImageUrls,
         decimal householdFactor,
         decimal portionSizeFactor,
         IReadOnlyList<string> dietaryModes,
@@ -1995,6 +2368,7 @@ Return JSON only with this schema:
             {
                 Day = cookDayNames[i],
                 MealName = template.Name,
+                MealImageUrl = mealImageUrls.GetValueOrDefault(template.Name, GetFallbackMealImageUrl()),
                 MealReason = reason,
                 LeftoverDaysCovered = leftoverDaysCovered,
                 EstimatedCost = estimatedCost,
@@ -2664,6 +3038,7 @@ Return JSON only with this schema:
                     FatGrams = (double)meal.AiNutritionPerServingMedium.FatGramsPerServingMedium,
                     ConfidenceScore = (double)meal.AiNutritionPerServingMedium.ConfidenceScore
                 },
+            ImageUrl = meal.ImageUrl ?? string.Empty,
             CreatedAtUtc = DateTime.UtcNow,
             Source = "openai"
         };
@@ -2701,16 +3076,26 @@ Return JSON only with this schema:
                     ProteinGrams = (decimal)doc.NutritionPerServingMedium.ProteinGrams,
                     CarbsGrams = (decimal)doc.NutritionPerServingMedium.CarbsGrams,
                     FatGrams = (decimal)doc.NutritionPerServingMedium.FatGrams
-                }
+                },
+            ImageUrl = doc.ImageUrl
         };
 
-        return ValidateAndMapAiMeal(
+        var mapped = ValidateAndMapAiMeal(
             payload,
             doc.Tags?
                 .Where(mode => !string.Equals(mode, "Balanced", StringComparison.OrdinalIgnoreCase))
                 .ToArray() ?? [],
             requireRecipeSteps: false,
             out _);
+        if (mapped is null)
+        {
+            return null;
+        }
+
+        var normalizedImageUrl = NormalizeImageUrl(doc.ImageUrl);
+        return string.IsNullOrWhiteSpace(normalizedImageUrl)
+            ? mapped
+            : mapped with { ImageUrl = normalizedImageUrl };
     }
 
     private static bool ContainsToken(MealTemplate meal, string token)
@@ -3216,7 +3601,8 @@ Return JSON only with this schema:
             ingredients.Select(item => item.mapped!).ToList())
         {
             AiRecipeSteps = recipeSteps.Count == 0 ? null : recipeSteps,
-            AiNutritionPerServingMedium = aiNutritionPerServingMedium
+            AiNutritionPerServingMedium = aiNutritionPerServingMedium,
+            ImageUrl = NormalizeImageUrl(payload.ImageUrl)
         };
     }
 
@@ -4178,6 +4564,7 @@ Return JSON only with this schema:
     {
         public IReadOnlyList<string>? AiRecipeSteps { get; init; }
         public AiMealNutritionEstimate? AiNutritionPerServingMedium { get; init; }
+        public string? ImageUrl { get; init; }
     }
 
     private sealed record IngredientTemplate(
@@ -4232,6 +4619,7 @@ Return JSON only with this schema:
         public List<AislePilotAiIngredientPayload>? Ingredients { get; set; }
         public List<string>? RecipeSteps { get; set; }
         public AislePilotAiNutritionPayload? NutritionPerServing { get; set; }
+        public string? ImageUrl { get; set; }
     }
 
     private sealed class AislePilotAiNutritionPayload
@@ -4276,6 +4664,9 @@ Return JSON only with this schema:
         public FirestoreAislePilotNutrition? NutritionPerServingMedium { get; set; }
 
         [FirestoreProperty]
+        public string ImageUrl { get; set; } = string.Empty;
+
+        [FirestoreProperty]
         public DateTime CreatedAtUtc { get; set; }
 
         [FirestoreProperty]
@@ -4318,6 +4709,37 @@ Return JSON only with this schema:
 
         [FirestoreProperty]
         public double ConfidenceScore { get; set; }
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreAislePilotMealImage
+    {
+        [FirestoreProperty]
+        public string Name { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public string ImageUrl { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public DateTime UpdatedAtUtc { get; set; }
+
+        [FirestoreProperty]
+        public string Source { get; set; } = string.Empty;
+    }
+
+    private sealed class OpenAiImageGenerationResponse
+    {
+        [JsonPropertyName("data")]
+        public List<OpenAiImagePayload>? Data { get; set; }
+    }
+
+    private sealed class OpenAiImagePayload
+    {
+        [JsonPropertyName("b64_json")]
+        public string? B64Json { get; set; }
+
+        [JsonPropertyName("url")]
+        public string? Url { get; set; }
     }
 
     private sealed record AiMealBatchResult(
