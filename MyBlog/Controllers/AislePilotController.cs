@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using MyBlog.Models;
@@ -11,8 +12,15 @@ using QuestPDF.Infrastructure;
 namespace MyBlog.Controllers;
 
 [Route("projects/aisle-pilot")]
-public class AislePilotController(IAislePilotService aislePilotService) : Controller
+public class AislePilotController(
+    IAislePilotService aislePilotService,
+    ILogger<AislePilotController> logger) : Controller
 {
+    private const string SetupStateCookieName = "aislepilot.setup.v1";
+    private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
     private const string AislePilotMarkSvg = """
         <svg width="128" height="128" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
           <g fill="none" stroke="#103F65" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
@@ -31,7 +39,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     [HttpGet("")]
     public IActionResult Index(string? returnUrl = null)
     {
-        var request = new AislePilotRequestModel();
+        var request = NormalizeRequest(TryReadSavedSetupState() ?? new AislePilotRequestModel());
         var resolvedReturnUrl = ResolveReturnUrl(returnUrl);
         return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
     }
@@ -42,6 +50,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     public IActionResult Index(AislePilotPageViewModel pageModel)
     {
         var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequest(request);
 
@@ -60,6 +69,49 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             ModelState.AddModelError(string.Empty, ex.Message);
             return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot regenerate failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Plan regeneration hit a temporary issue. Please retry in a few seconds.");
+            return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+    }
+
+    [HttpPost("rebalance-budget")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public IActionResult RebalanceBudget(AislePilotPageViewModel pageModel)
+    {
+        var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
+        ValidateRequest(request);
+
+        if (!ModelState.IsValid)
+        {
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        try
+        {
+            var result = aislePilotService.BuildPlanWithBudgetRebalance(request);
+            return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot budget rebalance failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Budget refresh hit a temporary issue. Please retry in a few seconds.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
     }
 
     [HttpPost("suggest-from-pantry")]
@@ -68,6 +120,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     public IActionResult SuggestFromPantry(AislePilotPageViewModel pageModel)
     {
         var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequestForSuggestions(request);
 
@@ -76,14 +129,25 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
-        var suggestions = aislePilotService.SuggestMealsFromPantry(request, 6);
-        if (suggestions.Count == 0)
+        try
         {
-            ModelState.AddModelError("Request.PantryItems", "No full meals found from your current pantry items. Add more ingredients or generate a full weekly plan.");
+            var suggestions = aislePilotService.SuggestMealsFromPantry(request, 6);
+            if (suggestions.Count == 0)
+            {
+                ModelState.AddModelError("Request.PantryItems", "No full meals found from your current pantry items. Add more ingredients or generate a full weekly plan.");
+                return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+            }
+
+            return View("Index", BuildPageModel(request, pantrySuggestions: suggestions, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot pantry suggestion failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Meal generator hit a temporary issue. Please retry in a few seconds.");
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
-
-        return View("Index", BuildPageModel(request, pantrySuggestions: suggestions, returnUrl: resolvedReturnUrl));
     }
 
     [HttpPost("swap-meal")]
@@ -92,6 +156,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     public IActionResult SwapMeal(AislePilotPageViewModel pageModel, int dayIndex, string? currentMealName, List<string>? currentPlanMealNames)
     {
         var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequest(request);
         var cookDays = Math.Clamp(request.CookDays, 1, 7);
@@ -123,6 +188,14 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
             ModelState.AddModelError(string.Empty, ex.Message);
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot swap meal failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Meal swap hit a temporary issue. Please retry.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
     }
 
     [HttpPost("export/plan-pack")]
@@ -131,6 +204,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     public IActionResult ExportPlanPack(AislePilotPageViewModel pageModel)
     {
         var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
         ValidateRequest(request);
         if (!ModelState.IsValid)
         {
@@ -149,6 +223,14 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         {
             return Problem(title: "AislePilot AI unavailable", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot plan-pack export failed unexpectedly.");
+            return Problem(
+                title: "Export failed",
+                detail: "Plan-pack export hit a temporary issue. Please retry.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
     }
 
     [HttpPost("export/checklist")]
@@ -157,6 +239,7 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
     public IActionResult ExportChecklist(AislePilotPageViewModel pageModel)
     {
         var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
         ValidateRequest(request);
         if (!ModelState.IsValid)
         {
@@ -174,6 +257,14 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         catch (InvalidOperationException ex)
         {
             return Problem(title: "AislePilot AI unavailable", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot checklist export failed unexpectedly.");
+            return Problem(
+                title: "Export failed",
+                detail: "Checklist export hit a temporary issue. Please retry.",
+                statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 
@@ -335,6 +426,80 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
                 .OrderBy(pair => pair.Key)
                 .Where(pair => pair.Value.Count > 0)
                 .Select(pair => $"{pair.Key}:{string.Join('|', pair.Value.Distinct(StringComparer.OrdinalIgnoreCase))}"));
+    }
+
+    private void PersistSetupState(AislePilotRequestModel request)
+    {
+        var state = new AislePilotSetupStateCookieModel
+        {
+            Supermarket = request.Supermarket,
+            WeeklyBudget = request.WeeklyBudget,
+            HouseholdSize = request.HouseholdSize,
+            CookDays = request.CookDays,
+            PortionSize = request.PortionSize,
+            DietaryModes = request.DietaryModes.ToList(),
+            DislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty,
+            CustomAisleOrder = request.CustomAisleOrder ?? string.Empty,
+            PantryItems = request.PantryItems ?? string.Empty,
+            PreferQuickMeals = request.PreferQuickMeals
+        };
+
+        var payload = JsonSerializer.Serialize(state, SetupStateJsonOptions);
+        if (payload.Length > 3500)
+        {
+            return;
+        }
+
+        Response.Cookies.Append(
+            SetupStateCookieName,
+            payload,
+            new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddDays(45),
+                IsEssential = true,
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = Request.IsHttps
+            });
+    }
+
+    private AislePilotRequestModel? TryReadSavedSetupState()
+    {
+        if (!Request.Cookies.TryGetValue(SetupStateCookieName, out var payload) || string.IsNullOrWhiteSpace(payload))
+        {
+            return null;
+        }
+
+        try
+        {
+            var state = JsonSerializer.Deserialize<AislePilotSetupStateCookieModel>(payload, SetupStateJsonOptions);
+            if (state is null)
+            {
+                return null;
+            }
+
+            return new AislePilotRequestModel
+            {
+                Supermarket = state.Supermarket ?? string.Empty,
+                WeeklyBudget = Math.Clamp(state.WeeklyBudget, 15m, 600m),
+                HouseholdSize = Math.Clamp(state.HouseholdSize, 1, 8),
+                CookDays = Math.Clamp(state.CookDays, 1, 7),
+                PortionSize = state.PortionSize ?? string.Empty,
+                DietaryModes = state.DietaryModes?
+                    .Where(mode => !string.IsNullOrWhiteSpace(mode))
+                    .Select(mode => mode.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList() ?? [],
+                DislikesOrAllergens = state.DislikesOrAllergens ?? string.Empty,
+                CustomAisleOrder = state.CustomAisleOrder ?? string.Empty,
+                PantryItems = state.PantryItems ?? string.Empty,
+                PreferQuickMeals = state.PreferQuickMeals
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void ValidateRequest(AislePilotRequestModel request)
@@ -867,5 +1032,19 @@ public class AislePilotController(IAislePilotService aislePilotService) : Contro
         }
 
         return builder.ToString();
+    }
+
+    private sealed class AislePilotSetupStateCookieModel
+    {
+        public string? Supermarket { get; set; }
+        public decimal WeeklyBudget { get; set; } = 65m;
+        public int HouseholdSize { get; set; } = 2;
+        public int CookDays { get; set; } = 7;
+        public string? PortionSize { get; set; }
+        public List<string> DietaryModes { get; set; } = [];
+        public string? DislikesOrAllergens { get; set; }
+        public string? CustomAisleOrder { get; set; }
+        public string? PantryItems { get; set; }
+        public bool PreferQuickMeals { get; set; } = true;
     }
 }

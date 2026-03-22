@@ -375,6 +375,29 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin: 0;
 }
 
+.aislepilot-overbudget-flag {
+    margin: 0 0 0.56rem;
+    padding: 0.56rem 0.62rem;
+    border: 1px solid rgba(146, 38, 31, 0.34);
+    border-radius: 12px;
+    background: rgba(252, 237, 236, 0.85);
+    display: grid;
+    gap: 0.36rem;
+}
+
+.aislepilot-overbudget-title {
+    margin: 0;
+    color: #7b2119;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.aislepilot-overbudget-note {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+}
+
 .aislepilot-overview-regenerate-btn {
     min-height: 2.1rem !important;
     border: none !important;
@@ -407,23 +430,55 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-setup-mode-switch {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.24rem;
-    padding: 0.2rem;
-    border: 1px solid rgba(16, 63, 101, 0.22);
-    border-radius: 999px;
-    background: rgba(16, 63, 101, 0.08);
+    gap: 0.26rem;
+    padding: 0.24rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 14px;
+    background: linear-gradient(150deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.97));
 }
 
 .aislepilot-setup-mode-toggle {
-    min-height: 2rem !important;
+    min-height: 2.48rem !important;
+    display: grid;
+    gap: 0.06rem;
+    align-content: center;
+    justify-items: start;
+    text-align: left;
     border: 1px solid rgba(16, 63, 101, 0.16) !important;
-    border-radius: 999px !important;
+    border-radius: 10px !important;
     background: rgba(255, 255, 255, 0.97) !important;
-    color: var(--brand-deep) !important;
+    color: var(--ink) !important;
     box-shadow: none !important;
-    padding: 0.3rem 0.56rem !important;
-    font-size: 0.8rem !important;
+    padding: 0.32rem 0.58rem !important;
+    font-size: 0.78rem !important;
     font-weight: 700 !important;
+    transition: background 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.aislepilot-setup-mode-toggle:hover {
+    border-color: rgba(16, 63, 101, 0.28) !important;
+}
+
+.aislepilot-setup-mode-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.16) !important;
+}
+
+.aislepilot-setup-mode-toggle-title {
+    display: block;
+    color: inherit;
+    font-size: 0.79rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.aislepilot-setup-mode-toggle-note {
+    display: block;
+    color: var(--ink-soft);
+    font-size: 0.66rem;
+    font-weight: 600;
+    line-height: 1.2;
+    opacity: 0.9;
 }
 
 .aislepilot-setup-mode-toggle.is-active {
@@ -433,14 +488,20 @@ html.aislepilot-restore-pending .aislepilot-app {
     box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14) !important;
 }
 
+.aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-note {
+    color: rgba(255, 255, 255, 0.9);
+}
+
 .aislepilot-setup-mode {
     display: grid;
-    gap: 0.52rem;
+    gap: 0.6rem;
     margin: 0;
-    padding: 0.66rem;
+    padding: 0.72rem;
     border: 1px solid rgba(16, 63, 101, 0.2);
-    border-radius: 14px;
+    border-radius: 12px;
     background: linear-gradient(150deg, rgba(247, 251, 255, 0.94), rgba(255, 255, 255, 0.97));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    animation: aislepilot-setup-mode-enter 0.2s ease;
 }
 
 .aislepilot-setup-mode.is-secondary {
@@ -448,11 +509,9 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: rgba(255, 255, 255, 0.95);
 }
 
-.aislepilot-setup-mode-title {
-    margin: 0;
-    color: var(--brand-deep);
-    font-size: 0.98rem;
-    line-height: 1.25;
+.aislepilot-setup-mode-head {
+    display: grid;
+    gap: 0.08rem;
 }
 
 .aislepilot-setup-mode-copy {
@@ -460,6 +519,18 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: var(--ink-soft);
     font-size: 0.84rem;
     line-height: 1.35;
+}
+
+@keyframes aislepilot-setup-mode-enter {
+    from {
+        opacity: 0.74;
+        transform: translateY(3px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .aislepilot-setup-sections {
@@ -612,7 +683,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     display: grid;
     gap: 0.42rem;
     max-width: 22rem;
-    margin-inline: auto;
+    margin-inline: 0;
     width: 100%;
 }
 
@@ -1289,6 +1360,10 @@ html.aislepilot-restore-pending .aislepilot-app {
     .aislepilot-card.is-swap-updated {
         animation: none;
     }
+
+    .aislepilot-setup-mode {
+        animation: none;
+    }
 }
 
 @media (min-width: 640px) {
@@ -1361,6 +1436,16 @@ html.aislepilot-restore-pending .aislepilot-app {
 
     .aislepilot-alert-btn {
         width: 100%;
+    }
+
+    .aislepilot-setup-mode-toggle {
+        justify-items: center;
+        text-align: center;
+        min-height: 2.05rem !important;
+    }
+
+    .aislepilot-setup-mode-toggle-note {
+        display: none;
     }
 
     .aislepilot-section-head {

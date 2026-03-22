@@ -353,6 +353,128 @@
 
     wireCustomAisleFieldVisibility(document);
 
+    const wireNotesExportButtons = scope => {
+        const shells = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-notes-export-shell]"))
+            : Array.from(document.querySelectorAll("[data-notes-export-shell]"));
+
+        const setTemporaryButtonLabel = (button, label) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            const defaultLabel = button.dataset.notesDefaultLabel?.trim()
+                || button.dataset.originalLabel?.trim()
+                || button.textContent?.trim()
+                || "Share shopping list to iPhone Notes";
+            button.textContent = label;
+
+            const timeoutRaw = button.dataset.notesLabelTimeoutMs ?? "2400";
+            const timeoutMs = Number.parseInt(timeoutRaw, 10);
+            const safeTimeout = Number.isInteger(timeoutMs) ? Math.max(800, Math.min(6000, timeoutMs)) : 2400;
+
+            window.setTimeout(() => {
+                if (button.isConnected) {
+                    button.textContent = defaultLabel;
+                }
+            }, safeTimeout);
+        };
+
+        const copyTextToClipboard = async text => {
+            if (typeof text !== "string" || text.length === 0) {
+                return false;
+            }
+
+            if (navigator.clipboard?.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch {
+                    // Fallback below.
+                }
+            }
+
+            if (typeof document.execCommand !== "function") {
+                return false;
+            }
+
+            const tempInput = document.createElement("textarea");
+            tempInput.value = text;
+            tempInput.setAttribute("readonly", "readonly");
+            tempInput.style.position = "fixed";
+            tempInput.style.left = "-9999px";
+            tempInput.style.top = "0";
+            document.body.appendChild(tempInput);
+            tempInput.focus({ preventScroll: true });
+            tempInput.select();
+            const copied = document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            return copied;
+        };
+
+        shells.forEach(shell => {
+            if (!(shell instanceof HTMLElement)) {
+                return;
+            }
+
+            const trigger = shell.querySelector("[data-notes-export-trigger]");
+            const contentField = shell.querySelector("[data-notes-export-content]");
+            if (!(trigger instanceof HTMLButtonElement) || !(contentField instanceof HTMLTextAreaElement)) {
+                return;
+            }
+
+            if (trigger.dataset.notesExportWired === "true") {
+                return;
+            }
+
+            trigger.dataset.notesExportWired = "true";
+            const defaultLabel = trigger.dataset.notesDefaultLabel?.trim()
+                || trigger.textContent?.trim()
+                || "Share shopping list to iPhone Notes";
+            trigger.dataset.originalLabel = defaultLabel;
+            trigger.textContent = defaultLabel;
+
+            trigger.addEventListener("click", async () => {
+                const notesText = contentField.value?.trim() ?? "";
+                if (notesText.length === 0) {
+                    const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not prepare shopping list.";
+                    setTemporaryButtonLabel(trigger, failedLabel);
+                    return;
+                }
+
+                if (typeof navigator.share === "function") {
+                    try {
+                        await navigator.share({
+                            title: "AislePilot Shopping List",
+                            text: notesText
+                        });
+                        const sharedLabel = trigger.dataset.notesSharedLabel?.trim() || "Share sheet opened. Choose Notes.";
+                        setTemporaryButtonLabel(trigger, sharedLabel);
+                        return;
+                    } catch (error) {
+                        if (error instanceof DOMException && error.name === "AbortError") {
+                            return;
+                        }
+                    }
+                }
+
+                const copied = await copyTextToClipboard(notesText);
+                if (copied) {
+                    const copiedLabel = trigger.dataset.notesCopiedLabel?.trim() || "Shopping list copied. Paste into Notes.";
+                    setTemporaryButtonLabel(trigger, copiedLabel);
+                    return;
+                }
+
+                const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not share. Try again.";
+                setTemporaryButtonLabel(trigger, failedLabel);
+            });
+        });
+    };
+
+    wireNotesExportButtons(document);
+
+    const setupModeStorageKey = "aislepilot:setup-mode";
+
     const wireSetupModeSwitches = scope => {
         const switches = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-setup-mode-switch]"))
@@ -376,6 +498,12 @@
             if (panels.length === 0) {
                 return;
             }
+            const modeSubmitButtons = Array.from(panelScope.querySelectorAll("button[type='submit'][data-setup-mode-submit]"))
+                .filter(button => button instanceof HTMLButtonElement);
+            const modeValueInput = panelScope.querySelector("[data-setup-mode-value]");
+            const modeIds = buttons
+                .map(button => button.dataset.setupModeToggle?.trim() ?? "")
+                .filter(mode => mode.length > 0);
 
             const resolveMode = mode => {
                 const normalizedMode = typeof mode === "string" ? mode.trim() : "";
@@ -387,11 +515,12 @@
                 return fallbackMode;
             };
 
-            const applyMode = mode => {
+            const applyMode = (mode, options = {}) => {
                 const nextMode = resolveMode(mode);
                 if (!nextMode) {
                     return;
                 }
+                const shouldPersist = options.persist !== false;
 
                 buttons.forEach(button => {
                     if (!(button instanceof HTMLButtonElement)) {
@@ -418,6 +547,18 @@
                         panel.setAttribute("aria-hidden", "true");
                     }
                 });
+
+                if (modeValueInput instanceof HTMLInputElement) {
+                    modeValueInput.value = nextMode;
+                }
+
+                if (shouldPersist) {
+                    try {
+                        window.localStorage.setItem(setupModeStorageKey, nextMode);
+                    } catch {
+                        // Ignore storage failures in private modes.
+                    }
+                }
             };
 
             buttons.forEach(button => {
@@ -429,13 +570,109 @@
                 button.addEventListener("click", () => {
                     applyMode(button.dataset.setupModeToggle);
                 });
+                button.addEventListener("keydown", event => {
+                    const currentIndex = modeIds.findIndex(mode => mode === button.dataset.setupModeToggle);
+                    if (currentIndex < 0) {
+                        return;
+                    }
+
+                    let targetIndex = -1;
+                    switch (event.key) {
+                        case "ArrowLeft":
+                        case "ArrowUp":
+                            targetIndex = (currentIndex - 1 + modeIds.length) % modeIds.length;
+                            break;
+                        case "ArrowRight":
+                        case "ArrowDown":
+                            targetIndex = (currentIndex + 1) % modeIds.length;
+                            break;
+                        case "Home":
+                            targetIndex = 0;
+                            break;
+                        case "End":
+                            targetIndex = modeIds.length - 1;
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (targetIndex < 0 || targetIndex === currentIndex) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const targetMode = modeIds[targetIndex];
+                    const targetButton = buttons.find(candidate => candidate.dataset.setupModeToggle === targetMode);
+                    applyMode(targetMode);
+                    if (targetButton instanceof HTMLButtonElement) {
+                        targetButton.focus();
+                    }
+                });
             });
+
+            if (ownerForm instanceof HTMLFormElement && ownerForm.dataset.setupModeSubmitWired !== "true") {
+                ownerForm.dataset.setupModeSubmitWired = "true";
+                const skippedInputTypes = new Set(["submit", "button", "checkbox", "radio", "range", "file"]);
+                ownerForm.addEventListener("keydown", event => {
+                    if (event.defaultPrevented || event.key !== "Enter") {
+                        return;
+                    }
+
+                    const target = event.target;
+                    if (!(target instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    if (
+                        target instanceof HTMLTextAreaElement ||
+                        target instanceof HTMLButtonElement ||
+                        target instanceof HTMLSelectElement
+                    ) {
+                        return;
+                    }
+
+                    if (target instanceof HTMLInputElement) {
+                        if (skippedInputTypes.has(target.type.toLowerCase())) {
+                            return;
+                        }
+                    }
+
+                    const activePanel = panels.find(panel => !panel.hasAttribute("hidden"));
+                    if (!(activePanel instanceof HTMLElement) || !activePanel.contains(target)) {
+                        return;
+                    }
+
+                    const activeMode = activePanel.dataset.setupModePanel?.trim();
+                    if (!activeMode) {
+                        return;
+                    }
+
+                    const activeSubmitButton = modeSubmitButtons.find(button =>
+                        button.dataset.setupModeSubmit?.trim() === activeMode);
+                    if (!(activeSubmitButton instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    activeSubmitButton.click();
+                });
+            }
 
             const visibleMode = panels
                 .find(panel => panel instanceof HTMLElement && !panel.hasAttribute("hidden"))
                 ?.dataset.setupModePanel;
             const defaultMode = modeSwitch.dataset.setupModeDefault;
-            applyMode(visibleMode ?? defaultMode);
+            const shouldForceDefaultMode = modeSwitch.dataset.setupModeForceDefault === "true";
+            let storedMode = null;
+            if (!shouldForceDefaultMode) {
+                try {
+                    storedMode = window.localStorage.getItem(setupModeStorageKey);
+                } catch {
+                    storedMode = null;
+                }
+            }
+
+            applyMode(visibleMode ?? storedMode ?? defaultMode, { persist: false });
             modeSwitch.dataset.setupModeWired = "true";
         });
     };
@@ -1149,6 +1386,7 @@
         wireSetupToggleHandlers(document);
         wireLeftoverPlanner(document);
         wireAjaxSwapHandlers(document);
+        wireNotesExportButtons(document);
         syncSetupToggleState();
         observeActivePanelHeight();
         updateViewportHeight(true);

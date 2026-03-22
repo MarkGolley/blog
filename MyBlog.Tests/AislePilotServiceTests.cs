@@ -19,9 +19,9 @@ public class AislePilotServiceTests
     [InlineData(1.00, "kg", "1000 g")]
     [InlineData(1.24, "kg", "1.2 kg")]
     [InlineData(2.06, "kg", "2.1 kg")]
-    [InlineData(0.45, "bottle", "1 bottle")]
-    [InlineData(1.2, "bottle", "2 bottles")]
-    [InlineData(0.06, "jar", "1 jar")]
+    [InlineData(0.45, "bottle", "0.45 bottle")]
+    [InlineData(1.2, "bottle", "1.2 bottles")]
+    [InlineData(0.06, "jar", "0.06 jar")]
     [InlineData(6, "pcs", "6 pcs")]
     public void QuantityDisplayFormatter_FormatsQuantitiesAsExpected(decimal quantity, string unit, string expected)
     {
@@ -39,6 +39,14 @@ public class AislePilotServiceTests
         var formatted = QuantityDisplayFormatter.FormatForRecipe(quantity, unit);
 
         Assert.Equal(expected, formatted);
+    }
+
+    [Fact]
+    public void QuantityDisplayFormatter_ShoppingListFormatting_StillRoundsWholePurchaseUnits()
+    {
+        var formatted = QuantityDisplayFormatter.Format(0.45m, "tin");
+
+        Assert.Equal("1 tin", formatted);
     }
 
     [Fact]
@@ -397,6 +405,51 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlanWithBudgetRebalance_WhenPlanIsOverBudget_DoesNotIncreaseTotalCost()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            HouseholdSize = 4,
+            CookDays = 7
+        };
+
+        AislePilotPlanResultViewModel? baseline = null;
+        AislePilotRequestModel? overBudgetRequest = null;
+        foreach (var budget in Enumerable.Range(20, 61))
+        {
+            var candidateRequest = new AislePilotRequestModel
+            {
+                Supermarket = request.Supermarket,
+                WeeklyBudget = budget,
+                HouseholdSize = request.HouseholdSize,
+                CookDays = request.CookDays,
+                PortionSize = request.PortionSize,
+                DietaryModes = [.. request.DietaryModes],
+                PreferQuickMeals = request.PreferQuickMeals
+            };
+
+            var candidatePlan = _service.BuildPlan(candidateRequest);
+            if (!candidatePlan.IsOverBudget)
+            {
+                continue;
+            }
+
+            overBudgetRequest = candidateRequest;
+            baseline = candidatePlan;
+            break;
+        }
+
+        Assert.NotNull(overBudgetRequest);
+        Assert.NotNull(baseline);
+
+        var rebalanced = _service.BuildPlanWithBudgetRebalance(overBudgetRequest!);
+
+        Assert.Equal(overBudgetRequest!.WeeklyBudget, rebalanced.WeeklyBudget);
+        Assert.True(rebalanced.EstimatedTotalCost <= baseline!.EstimatedTotalCost);
+    }
+
+    [Fact]
     public void SuggestMealsFromPantry_WithKnownIngredients_RanksBestMatchFirst()
     {
         var request = new AislePilotRequestModel
@@ -573,6 +626,132 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WhenAiReturnsUnrealisticallyCheapIngredientPrices_FallsBackToTemplatePlan()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var payloadContent = """
+{
+  "meals": [
+    {
+      "name": "Budget test meal one",
+      "baseCostForTwo": 6.5,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat a large pan on medium heat for two minutes.",
+        "Add oil and cook the onions for five minutes until softened.",
+        "Stir in the protein and cook until browned and hot through.",
+        "Add sauce and simmer for six minutes until slightly reduced.",
+        "Serve immediately with your chosen side."
+      ],
+      "ingredients": [
+        { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 2.6 },
+        { "name": "Rice", "department": "Tins & Dry Goods", "quantityForTwo": 0.4, "unit": "kg", "estimatedCostForTwo": 0.9 },
+        { "name": "Kidney beans", "department": "Tins & Dry Goods", "quantityForTwo": 2, "unit": "tins", "estimatedCostForTwo": 0.1 }
+      ]
+    },
+    {
+      "name": "Budget test meal two",
+      "baseCostForTwo": 6.2,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat a large pan on medium heat for two minutes.",
+        "Add oil and cook the onions for five minutes until softened.",
+        "Stir in the protein and cook until browned and hot through.",
+        "Add sauce and simmer for six minutes until slightly reduced.",
+        "Serve immediately with your chosen side."
+      ],
+      "ingredients": [
+        { "name": "Turkey mince", "department": "Meat & Fish", "quantityForTwo": 0.4, "unit": "kg", "estimatedCostForTwo": 2.8 },
+        { "name": "Chopped tomatoes", "department": "Tins & Dry Goods", "quantityForTwo": 2, "unit": "tins", "estimatedCostForTwo": 1.2 },
+        { "name": "Chilli seasoning", "department": "Spices & Sauces", "quantityForTwo": 1, "unit": "pack", "estimatedCostForTwo": 0.7 }
+      ]
+    },
+    {
+      "name": "Budget test meal three",
+      "baseCostForTwo": 5.9,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat a large pan on medium heat for two minutes.",
+        "Add oil and cook the onions for five minutes until softened.",
+        "Stir in the protein and cook until browned and hot through.",
+        "Add sauce and simmer for six minutes until slightly reduced.",
+        "Serve immediately with your chosen side."
+      ],
+      "ingredients": [
+        { "name": "Pasta", "department": "Tins & Dry Goods", "quantityForTwo": 0.45, "unit": "kg", "estimatedCostForTwo": 1.1 },
+        { "name": "Passata", "department": "Tins & Dry Goods", "quantityForTwo": 0.7, "unit": "bottle", "estimatedCostForTwo": 0.9 },
+        { "name": "Parmesan", "department": "Dairy & Eggs", "quantityForTwo": 0.12, "unit": "kg", "estimatedCostForTwo": 1.2 }
+      ]
+    },
+    {
+      "name": "Budget test meal four",
+      "baseCostForTwo": 6.8,
+      "isQuick": false,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat a large pan on medium heat for two minutes.",
+        "Add oil and cook the onions for five minutes until softened.",
+        "Stir in the protein and cook until browned and hot through.",
+        "Add sauce and simmer for six minutes until slightly reduced.",
+        "Serve immediately with your chosen side."
+      ],
+      "ingredients": [
+        { "name": "Cod fillets", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 3.6 },
+        { "name": "Sweet potatoes", "department": "Produce", "quantityForTwo": 0.9, "unit": "kg", "estimatedCostForTwo": 1.5 },
+        { "name": "Green beans", "department": "Produce", "quantityForTwo": 0.3, "unit": "kg", "estimatedCostForTwo": 1.3 }
+      ]
+    }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            CookDays = 2,
+            WeeklyBudget = 65m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(2, handler.CallCount);
+        Assert.False(result.UsedAiGeneratedMeals);
+        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal(2, result.MealPlan.Count);
+    }
+
+    [Fact]
     public async Task WarmupAiMealPoolAsync_GeneratesAtMostConfiguredMeals()
     {
         var configuration = new ConfigurationBuilder()
@@ -661,6 +840,19 @@ public class AislePilotServiceTests
 
         var args = new object?[] { mealName, null };
         _ = tryRemove.Invoke(pool, args);
+    }
+
+    private static void ClearAiPool()
+    {
+        var field = typeof(AislePilotService).GetField("AiMealPool", BindingFlags.NonPublic | BindingFlags.Static);
+        var pool = field?.GetValue(null);
+        if (pool is null)
+        {
+            return;
+        }
+
+        var clear = pool.GetType().GetMethod("Clear", BindingFlags.Public | BindingFlags.Instance);
+        clear?.Invoke(pool, null);
     }
 
     private sealed class StaticResponseHandler(HttpStatusCode statusCode, string responseBody) : HttpMessageHandler

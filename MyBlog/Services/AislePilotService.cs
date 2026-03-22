@@ -554,6 +554,53 @@ public sealed class AislePilotService : IAislePilotService
         return BuildPlanFromTemplateCatalog(request, context, cookDays);
     }
 
+    public AislePilotPlanResultViewModel BuildPlanWithBudgetRebalance(
+        AislePilotRequestModel request,
+        int maxAttempts = 4)
+    {
+        var normalizedMaxAttempts = Math.Clamp(maxAttempts, 1, 8);
+        var baselinePlan = BuildPlan(request);
+        if (!baselinePlan.IsOverBudget)
+        {
+            return baselinePlan;
+        }
+
+        var cheapestPlan = baselinePlan;
+        var rebalanceTargets = BuildBudgetRebalanceTargets(
+            request.WeeklyBudget,
+            baselinePlan.EstimatedTotalCost,
+            normalizedMaxAttempts - 1);
+        foreach (var targetBudget in rebalanceTargets)
+        {
+            var candidateRequest = CloneRequest(request);
+            candidateRequest.WeeklyBudget = targetBudget;
+
+            AislePilotPlanResultViewModel candidatePlan;
+            try
+            {
+                candidatePlan = BuildPlan(candidateRequest);
+            }
+            catch (InvalidOperationException)
+            {
+                continue;
+            }
+
+            candidatePlan = RebasePlanToOriginalBudget(candidatePlan, request.WeeklyBudget);
+
+            if (candidatePlan.EstimatedTotalCost < cheapestPlan.EstimatedTotalCost)
+            {
+                cheapestPlan = candidatePlan;
+            }
+
+            if (!candidatePlan.IsOverBudget)
+            {
+                return candidatePlan;
+            }
+        }
+
+        return cheapestPlan;
+    }
+
     private bool ShouldUseTemplateFallback()
     {
         return _allowTemplateFallback &&
@@ -1224,6 +1271,7 @@ Rules:
 - It must be different from all excluded meal names.
 - Use UK English.
 - Keep it realistic for a UK supermarket shop.
+- Use typical UK non-promo shelf prices (no loyalty-only offers, markdowns, or extreme bulk discounts).
 - Respect dietary requirements strictly.
 - Keep it practical for a weekday dinner.
 - Every meal must include 3-7 ingredients only.
@@ -1231,6 +1279,8 @@ Rules:
 - Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
 - `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
 - `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
+- Use realistic prices, avoid placeholder values, and keep all monetary values to 2 decimal places.
+- The sum of `estimatedCostForTwo` across ingredients should be broadly consistent with `baseCostForTwo`.
 - `quantityForTwo` must be a positive number.
 - `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
 - `tags` must include every listed dietary requirement.
@@ -1410,6 +1460,7 @@ Rules:
 - It must be different from the current meal and different from the excluded meals.
 - Use UK English.
 - Keep it realistic for a UK supermarket shop.
+- Use typical UK non-promo shelf prices (no loyalty-only offers, markdowns, or extreme bulk discounts).
 - Respect dietary requirements and dislikes/allergens strictly.
 - If quick meals are preferred, target 30 minutes or less.
 - Every meal must include 3-7 ingredients only.
@@ -1417,6 +1468,8 @@ Rules:
 - Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
 - `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
 - `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
+- Use realistic prices, avoid placeholder values, and keep all monetary values to 2 decimal places.
+- The sum of `estimatedCostForTwo` across ingredients should be broadly consistent with `baseCostForTwo`.
 - `quantityForTwo` must be a positive number.
 - `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
 - `recipeSteps` must contain 5-8 concrete, meal-specific cooking steps in order.
@@ -1489,6 +1542,94 @@ Return JSON only with this schema:
             householdFactor,
             dislikesOrAllergens,
             portionSize);
+    }
+
+    private static AislePilotRequestModel CloneRequest(AislePilotRequestModel request)
+    {
+        return new AislePilotRequestModel
+        {
+            Supermarket = request.Supermarket,
+            WeeklyBudget = request.WeeklyBudget,
+            HouseholdSize = request.HouseholdSize,
+            CookDays = request.CookDays,
+            PortionSize = request.PortionSize,
+            DietaryModes = [.. request.DietaryModes],
+            DislikesOrAllergens = request.DislikesOrAllergens,
+            CustomAisleOrder = request.CustomAisleOrder,
+            PantryItems = request.PantryItems,
+            LeftoverCookDayIndexesCsv = request.LeftoverCookDayIndexesCsv,
+            SwapHistoryState = request.SwapHistoryState,
+            PreferQuickMeals = request.PreferQuickMeals
+        };
+    }
+
+    private static IReadOnlyList<decimal> BuildBudgetRebalanceTargets(
+        decimal originalBudget,
+        decimal baselineEstimatedTotal,
+        int maxTargets)
+    {
+        if (maxTargets <= 0 || originalBudget <= 15m)
+        {
+            return [];
+        }
+
+        var overspend = Math.Max(0m, baselineEstimatedTotal - originalBudget);
+        var rawTargets = new[]
+        {
+            originalBudget - Math.Max(overspend + 1m, originalBudget * 0.08m),
+            originalBudget * 0.92m,
+            originalBudget * 0.88m,
+            originalBudget * 0.84m,
+            originalBudget * 0.80m
+        };
+
+        var maxTargetBudget = decimal.Round(Math.Max(15m, originalBudget - 1m), 2, MidpointRounding.AwayFromZero);
+        var dedupedTargets = new List<decimal>(rawTargets.Length);
+        foreach (var rawTarget in rawTargets)
+        {
+            var normalized = decimal.Round(rawTarget, 2, MidpointRounding.AwayFromZero);
+            if (normalized < 15m)
+            {
+                normalized = 15m;
+            }
+
+            if (normalized > maxTargetBudget)
+            {
+                normalized = maxTargetBudget;
+            }
+
+            if (normalized >= originalBudget)
+            {
+                continue;
+            }
+
+            if (!dedupedTargets.Contains(normalized))
+            {
+                dedupedTargets.Add(normalized);
+            }
+        }
+
+        return dedupedTargets
+            .Take(maxTargets)
+            .ToList();
+    }
+
+    private static AislePilotPlanResultViewModel RebasePlanToOriginalBudget(
+        AislePilotPlanResultViewModel plan,
+        decimal originalBudget)
+    {
+        var budgetDelta = decimal.Round(originalBudget - plan.EstimatedTotalCost, 2, MidpointRounding.AwayFromZero);
+        var isOverBudget = budgetDelta < 0;
+        var sourceLabel = string.IsNullOrWhiteSpace(plan.PlanSourceLabel)
+            ? "Budget rebalance"
+            : $"Budget rebalance ({plan.PlanSourceLabel})";
+
+        plan.WeeklyBudget = originalBudget;
+        plan.BudgetDelta = budgetDelta;
+        plan.IsOverBudget = isOverBudget;
+        plan.BudgetTips = BuildBudgetTips(isOverBudget, budgetDelta, plan.LeftoverDays);
+        plan.PlanSourceLabel = sourceLabel;
+        return plan;
     }
 
     private static AislePilotPlanResultViewModel BuildPlanFromMeals(
@@ -2403,6 +2544,7 @@ Rules:
 {{(requestedMealCount > cookDays ? $"- The app will display {cookDays} meals and keep the rest as spare alternatives, so include a little variety across the batch." : string.Empty)}}
 - Use UK English.
 - Meals must be realistic for a UK supermarket shop.
+- Use typical UK non-promo shelf prices (no loyalty-only offers, markdowns, or extreme bulk discounts).
 - Keep the full week roughly within the stated budget.
 - Avoid repeating the same dinner in the same week.
 - Respect dietary requirements and dislikes/allergens strictly.
@@ -2412,6 +2554,8 @@ Rules:
 - Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
 - `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
 - `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
+- Use realistic prices, avoid placeholder values, and keep all monetary values to 2 decimal places.
+- The sum of `estimatedCostForTwo` across ingredients should be broadly consistent with `baseCostForTwo`.
 - `quantityForTwo` must be a positive number.
 - `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
 - Include all requested dietary modes in each meal's tags, except Balanced is optional.
@@ -2562,6 +2706,16 @@ Return JSON only with this schema:
             return null;
         }
 
+        var ingredientCostForTwo = decimal.Round(
+            ingredients.Sum(item => item.mapped!.EstimatedCostForTwo),
+            2,
+            MidpointRounding.AwayFromZero);
+        if (!IsAiMealCostProfileReasonable(baseCostForTwo, ingredientCostForTwo, out var mealCostReason))
+        {
+            validationReason = $"meal_cost_profile_invalid:{mealCostReason ?? "unknown"}";
+            return null;
+        }
+
         var tags = payload.Tags?
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
             .Select(tag => SupportedDietaryModes.FirstOrDefault(mode => mode.Equals(tag.Trim(), StringComparison.OrdinalIgnoreCase)))
@@ -2622,7 +2776,8 @@ Return JSON only with this schema:
             quantityForTwo <= 0m ||
             !IsAiIngredientQuantityReasonable(unit, quantityForTwo) ||
             estimatedCostForTwo <= 0m ||
-            estimatedCostForTwo > 20m)
+            estimatedCostForTwo > 20m ||
+            !IsAiIngredientPriceReasonable(unit, quantityForTwo, estimatedCostForTwo, out _))
         {
             validationReason =
                 $"ingredient_fields_invalid(name='{name}',department='{department}',unit='{unit}',qty={quantityForTwo.ToString(CultureInfo.InvariantCulture)},cost={estimatedCostForTwo.ToString(CultureInfo.InvariantCulture)})";
@@ -2661,6 +2816,68 @@ Return JSON only with this schema:
         };
 
         return quantity <= max;
+    }
+
+    private static bool IsAiIngredientPriceReasonable(
+        string unit,
+        decimal quantityForTwo,
+        decimal estimatedCostForTwo,
+        out string? validationReason)
+    {
+        validationReason = null;
+        if (quantityForTwo <= 0m || estimatedCostForTwo <= 0m)
+        {
+            validationReason = "non_positive_quantity_or_cost";
+            return false;
+        }
+
+        var normalizedUnit = unit.Trim().ToLowerInvariant();
+        var unitPrice = estimatedCostForTwo / quantityForTwo;
+        var minUnitPrice = normalizedUnit switch
+        {
+            "kg" => 0.65m,
+            "g" => 0.00065m,
+            "l" => 0.75m,
+            "ml" => 0.00075m,
+            "pcs" => 0.05m,
+            "tin" or "tins" => 0.40m,
+            "pack" or "packs" => 0.50m,
+            "jar" or "jars" => 0.65m,
+            "bottle" or "bottles" => 0.70m,
+            "head" => 0.55m,
+            "fillets" => 0.70m,
+            _ => 0.03m
+        };
+
+        if (unitPrice < minUnitPrice)
+        {
+            validationReason = $"unit_price_too_low(unit={normalizedUnit},unit_price={unitPrice.ToString("0.####", CultureInfo.InvariantCulture)},min={minUnitPrice.ToString("0.####", CultureInfo.InvariantCulture)})";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsAiMealCostProfileReasonable(
+        decimal baseCostForTwo,
+        decimal ingredientCostForTwo,
+        out string? validationReason)
+    {
+        validationReason = null;
+        if (ingredientCostForTwo <= 0m)
+        {
+            validationReason = "ingredient_cost_sum_non_positive";
+            return false;
+        }
+
+        var ratio = baseCostForTwo / ingredientCostForTwo;
+        if (ratio < 0.8m || ratio > 2.5m)
+        {
+            validationReason = $"base_to_ingredient_ratio_out_of_range(ratio={ratio.ToString("0.##", CultureInfo.InvariantCulture)},base={baseCostForTwo.ToString("0.##", CultureInfo.InvariantCulture)},ingredients={ingredientCostForTwo.ToString("0.##", CultureInfo.InvariantCulture)})";
+            return false;
+        }
+
+        return true;
     }
 
     private static IReadOnlyList<string> CleanAiRecipeSteps(IReadOnlyList<string>? recipeSteps)

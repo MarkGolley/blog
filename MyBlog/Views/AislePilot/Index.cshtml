@@ -1,4 +1,5 @@
 @using System.Globalization
+@using System.Text
 @model AislePilotPageViewModel
 @{
     Layout = "_AislePilotLayout";
@@ -35,6 +36,8 @@
     var hasPantryValidationErrors = ViewData.ModelState.TryGetValue("Request.PantryItems", out var pantryFieldState) &&
         pantryFieldState.Errors.Count > 0;
     var shouldShowGeneratorMode = Model.PantrySuggestions.Count > 0 || hasPantryValidationErrors;
+    var defaultSetupMode = shouldShowGeneratorMode ? "generator" : "planner";
+    var forceDefaultSetupMode = shouldShowGeneratorMode ? "true" : "false";
     var plannerModeHiddenAttribute = shouldShowGeneratorMode ? "hidden" : null;
     var generatorModeHiddenAttribute = shouldShowGeneratorMode ? null : "hidden";
     var plannerToggleClass = shouldShowGeneratorMode
@@ -139,6 +142,7 @@
         <form method="post" asp-action="Index" id="aislepilot-setup-form" class="contact-form aislepilot-form">
             @Html.AntiForgeryToken()
             <input asp-for="ReturnUrl" type="hidden" />
+            <input type="hidden" name="SetupMode" value="@defaultSetupMode" data-setup-mode-value />
             @if (!hasModelErrors)
             {
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -148,14 +152,16 @@
                  role="tablist"
                  aria-label="Setup mode"
                  data-setup-mode-switch
-                 data-setup-mode-default="@(shouldShowGeneratorMode ? "generator" : "planner")">
+                 data-setup-mode-default="@defaultSetupMode"
+                 data-setup-mode-force-default="@forceDefaultSetupMode">
                 <button type="button"
                         class="@plannerToggleClass"
                         role="tab"
                         aria-controls="aislepilot-planner-mode"
                         aria-selected="@(shouldShowGeneratorMode ? "false" : "true")"
                         data-setup-mode-toggle="planner">
-                    Meal planner
+                    <span class="aislepilot-setup-mode-toggle-title">Meal planner</span>
+                    <span class="aislepilot-setup-mode-toggle-note">Multi-day output</span>
                 </button>
                 <button type="button"
                         class="@generatorToggleClass"
@@ -163,18 +169,20 @@
                         aria-controls="aislepilot-generator-mode"
                         aria-selected="@(shouldShowGeneratorMode ? "true" : "false")"
                         data-setup-mode-toggle="generator">
-                    Meal generator
+                    <span class="aislepilot-setup-mode-toggle-title">Meal generator</span>
+                    <span class="aislepilot-setup-mode-toggle-note">Single meal output</span>
                 </button>
             </div>
 
             <section id="aislepilot-planner-mode"
                      class="aislepilot-setup-mode"
-                     aria-labelledby="aislepilot-planner-title"
+                     aria-label="Meal planner"
                      role="tabpanel"
                      data-setup-mode-panel="planner"
                      @plannerModeHiddenAttribute>
-                <h3 id="aislepilot-planner-title" class="aislepilot-setup-mode-title">Meal planner</h3>
-                <p class="aislepilot-setup-mode-copy">Build your weekly plan and shopping list.</p>
+                <div class="aislepilot-setup-mode-head">
+                    <p class="aislepilot-setup-mode-copy">Build your weekly plan, recipes, and supermarket-ordered shopping list.</p>
+                </div>
 
                 <div class="aislepilot-setup-sections">
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
@@ -312,7 +320,10 @@
                             </label>
                         }
                         <span asp-validation-for="Request.DietaryModes" class="text-danger"></span>
+                    </fieldset>
 
+                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                        <legend>Cooking preferences</legend>
                         <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
                             <input asp-for="Request.PreferQuickMeals" type="checkbox" />
                             <span>Prioritise quick meals</span>
@@ -321,18 +332,19 @@
                 </div>
 
                 <div class="aislepilot-submit-actions">
-                    <button type="submit" data-loading-label="Generating plan...">Generate weekly plan</button>
+                    <button type="submit" data-loading-label="Generating plan..." data-setup-mode-submit="planner">Generate weekly plan</button>
                 </div>
             </section>
 
             <section id="aislepilot-generator-mode"
                      class="aislepilot-setup-mode is-secondary"
-                     aria-labelledby="aislepilot-generator-title"
+                     aria-label="Meal generator"
                      role="tabpanel"
                      data-setup-mode-panel="generator"
                      @generatorModeHiddenAttribute>
-                <h3 id="aislepilot-generator-title" class="aislepilot-setup-mode-title">Meal generator</h3>
-                <p class="aislepilot-setup-mode-copy">Generate one quick dish from what is already in your pantry.</p>
+                <div class="aislepilot-setup-mode-head">
+                    <p class="aislepilot-setup-mode-copy">Generate one quick dish from pantry items using your dietary requirements.</p>
+                </div>
                 <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
                     <legend>Pantry items</legend>
                     <div class="aislepilot-field aislepilot-field-optional">
@@ -345,6 +357,7 @@
                     <button
                         type="submit"
                         data-loading-label="Finding meals..."
+                        data-setup-mode-submit="generator"
                         formaction="@Url.Action("SuggestFromPantry", "AislePilot")">
                         Generate dish now
                     </button>
@@ -410,6 +423,22 @@
     var mealLabel = mealCount == 1 ? "meal" : "meals";
     var totalShopItems = result.ShoppingItems.Count;
     var departmentCount = groupedItems.Count;
+    var shoppingListNotesBuilder = new StringBuilder();
+    shoppingListNotesBuilder.AppendLine("AislePilot Shopping List");
+    shoppingListNotesBuilder.AppendLine($"Supermarket: {result.Supermarket}");
+    shoppingListNotesBuilder.AppendLine($"Estimated total: {result.EstimatedTotalCost.ToString("C", ukCulture)}");
+    shoppingListNotesBuilder.AppendLine();
+    foreach (var department in groupedItems)
+    {
+        shoppingListNotesBuilder.AppendLine(department.Key);
+        foreach (var item in department)
+        {
+            shoppingListNotesBuilder.AppendLine(
+                $"[ ] {item.Name} ({item.QuantityDisplay}) - {item.EstimatedCost.ToString("C", ukCulture)}");
+        }
+        shoppingListNotesBuilder.AppendLine();
+    }
+    var shoppingListNotesText = shoppingListNotesBuilder.ToString().TrimEnd();
 
     <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-reveal>
         <div class="aislepilot-section-head">
@@ -445,6 +474,43 @@
                 </button>
             </div>
         </div>
+        @if (result.IsOverBudget)
+        {
+            <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
+                <p class="aislepilot-overbudget-title">
+                    This plan is @Math.Abs(result.BudgetDelta).ToString("C", ukCulture) over your weekly budget.
+                </p>
+                <p class="aislepilot-overbudget-note">
+                    Keep this plan if you are happy to spend more, or refresh with a lower-cost mix.
+                </p>
+                <form method="post"
+                      action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"
+                      class="aislepilot-overview-regenerate-form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                    <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
+                    <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
+                    <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
+                    <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
+                    <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
+                    <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
+                    <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
+                    <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
+                    <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
+                    <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
+                    <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
+                    @foreach (var mode in Model.Request.DietaryModes)
+                    {
+                        <input type="hidden" name="Request.DietaryModes" value="@mode" />
+                    }
+                    <button type="submit"
+                            class="aislepilot-overview-regenerate-btn"
+                            data-loading-label="Refreshing lower-cost plan...">
+                        Refresh for lower cost
+                    </button>
+                </form>
+            </div>
+        }
         <div class="aislepilot-budget-grid">
             <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Supermarket</p>
@@ -654,7 +720,7 @@
                 </section>
 
                 <section id="aislepilot-export" aria-label="Export files" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel" data-window-name="Export files">
-                    <p class="aislepilot-window-meta">3 export options ready for in-store use.</p>
+                    <p class="aislepilot-window-meta">4 export options ready for in-store use.</p>
                     <p class="section-intro">
                         Download a full plan pack PDF (with quick jump links), or a lightweight checklist for your phone notes app.
                     </p>
@@ -702,6 +768,19 @@
                         </form>
 
                         <button type="button" class="aislepilot-export-btn" onclick="window.print()">Print current view</button>
+
+                        <div data-notes-export-shell>
+                            <textarea hidden data-notes-export-content>@shoppingListNotesText</textarea>
+                            <button type="button"
+                                    class="aislepilot-export-btn"
+                                    data-notes-export-trigger
+                                    data-notes-default-label="Share shopping list to iPhone Notes"
+                                    data-notes-shared-label="Share sheet opened. Choose Notes."
+                                    data-notes-copied-label="Shopping list copied. Paste into Notes."
+                                    data-notes-failed-label="Could not share. Try again.">
+                                Share shopping list to iPhone Notes
+                            </button>
+                        </div>
                     </div>
                 </section>
             </div>
