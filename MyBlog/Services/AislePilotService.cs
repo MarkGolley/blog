@@ -38,6 +38,8 @@ public sealed class AislePilotService : IAislePilotService
     private const int OpenAiMaxAttempts = 1;
     private const int OpenAiImageMaxAttempts = 1;
     private const int MaxMealImageBytesForFirestore = 700_000;
+    private const int MealImageChunkCharLength = 180_000;
+    private const string MealImageChunksSubcollection = "chunks";
     private const int SupermarketLayoutCacheVersion = 2;
     private const int SupermarketLayoutRefreshCooldownMinutes = 120;
     private const int SupermarketLayoutStaleDays = 30;
@@ -61,6 +63,7 @@ public sealed class AislePilotService : IAislePilotService
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImagePoolRefreshLock = new(1, 1);
+    private static readonly SemaphoreSlim MealImageGenerationThrottle = new(1, 1);
     private static readonly SemaphoreSlim SupermarketLayoutRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim AiMealWarmupLock = new(1, 1);
     private static DateTime? _lastAiMealPoolRefreshUtc;
@@ -2258,7 +2261,7 @@ Return JSON only with this schema:
 
     private IReadOnlyDictionary<string, string> ResolveMealImageUrls(IReadOnlyList<MealTemplate> selectedMeals)
     {
-        EnsureMealImagePoolHydrated();
+        EnsureMealImagePoolHydrated(selectedMeals.Select(meal => meal.Name));
 
         var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var meal in selectedMeals)
@@ -2349,11 +2352,11 @@ Return JSON only with this schema:
         return true;
     }
 
-    private void EnsureMealImagePoolHydrated()
+    private void EnsureMealImagePoolHydrated(IEnumerable<string> mealNames)
     {
         try
         {
-            EnsureMealImagePoolHydratedAsync().GetAwaiter().GetResult();
+            EnsureMealImagePoolHydratedAsync(mealNames.ToList()).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
@@ -2361,18 +2364,21 @@ Return JSON only with this schema:
         }
     }
 
-    private async Task EnsureMealImagePoolHydratedAsync(CancellationToken cancellationToken = default)
+    private async Task EnsureMealImagePoolHydratedAsync(
+        IReadOnlyList<string> mealNames,
+        CancellationToken cancellationToken = default)
     {
-        if (_db is null)
+        if (_db is null || mealNames.Count == 0)
         {
             return;
         }
 
-        var shouldRefresh =
-            MealImagePool.IsEmpty ||
-            !_lastMealImagePoolRefreshUtc.HasValue ||
-            DateTime.UtcNow - _lastMealImagePoolRefreshUtc.Value > TimeSpan.FromMinutes(20);
-        if (!shouldRefresh)
+        var distinctMealNames = mealNames
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (distinctMealNames.Count == 0)
         {
             return;
         }
@@ -2380,18 +2386,15 @@ Return JSON only with this schema:
         await MealImagePoolRefreshLock.WaitAsync(cancellationToken);
         try
         {
-            shouldRefresh =
-                MealImagePool.IsEmpty ||
-                !_lastMealImagePoolRefreshUtc.HasValue ||
-                DateTime.UtcNow - _lastMealImagePoolRefreshUtc.Value > TimeSpan.FromMinutes(20);
-            if (!shouldRefresh)
+            foreach (var mealName in distinctMealNames)
             {
-                return;
-            }
+                if (TryGetCachedMealImageUrl(mealName, out _))
+                {
+                    continue;
+                }
 
-            var snapshot = await _db.Collection(MealImagesCollection).GetSnapshotAsync(cancellationToken);
-            foreach (var doc in snapshot.Documents)
-            {
+                var docId = ToAiMealDocumentId(mealName);
+                var doc = await _db.Collection(MealImagesCollection).Document(docId).GetSnapshotAsync(cancellationToken);
                 if (!doc.Exists)
                 {
                     continue;
@@ -2407,29 +2410,34 @@ Return JSON only with this schema:
                     continue;
                 }
 
-                if (string.IsNullOrWhiteSpace(mapped.Name))
+                if (mapped is null)
                 {
                     continue;
                 }
 
+                var normalizedName = string.IsNullOrWhiteSpace(mapped.Name)
+                    ? mealName
+                    : mapped.Name.Trim();
                 var normalizedUrl = NormalizeImageUrl(mapped.ImageUrl);
                 if (string.IsNullOrWhiteSpace(normalizedUrl))
                 {
                     continue;
                 }
 
-                if (!await EnsureMealImageAvailableAsync(normalizedUrl, mapped.ImageBase64, cancellationToken))
+                var imageBase64 = string.IsNullOrWhiteSpace(mapped.ImageBase64)
+                    ? await TryReadMealImageBase64FromChunksAsync(docId, mapped.ImageChunkCount, cancellationToken)
+                    : mapped.ImageBase64;
+                if (!await EnsureMealImageAvailableAsync(normalizedUrl, imageBase64, cancellationToken))
                 {
                     continue;
                 }
 
-                var normalizedName = mapped.Name.Trim();
                 MealImagePool[normalizedName] = normalizedUrl;
 
-                if (string.IsNullOrWhiteSpace(mapped.ImageBase64))
+                if (string.IsNullOrWhiteSpace(mapped.ImageBase64) && mapped.ImageChunkCount <= 0)
                 {
                     var diskBytes = await TryReadMealImageBytesFromDiskAsync(normalizedUrl, cancellationToken);
-                    if (diskBytes is { Length: > 0 and <= MaxMealImageBytesForFirestore })
+                    if (diskBytes is { Length: > 0 })
                     {
                         await PersistMealImageAsync(normalizedName, normalizedUrl, diskBytes, cancellationToken);
                     }
@@ -2531,6 +2539,125 @@ Return JSON only with this schema:
         }
     }
 
+    private async Task<string?> TryReadMealImageBase64FromChunksAsync(
+        string docId,
+        int expectedChunkCount,
+        CancellationToken cancellationToken)
+    {
+        if (_db is null || string.IsNullOrWhiteSpace(docId) || expectedChunkCount <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var chunkSnapshot = await _db.Collection(MealImagesCollection)
+                .Document(docId)
+                .Collection(MealImageChunksSubcollection)
+                .GetSnapshotAsync(cancellationToken);
+            if (chunkSnapshot.Documents.Count == 0)
+            {
+                return null;
+            }
+
+            var chunks = chunkSnapshot.Documents
+                .Select(doc =>
+                {
+                    try
+                    {
+                        return doc.ConvertTo<FirestoreAislePilotMealImageChunk>();
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                })
+                .Where(chunk => chunk is not null && !string.IsNullOrWhiteSpace(chunk.Data))
+                .OrderBy(chunk => chunk!.Index)
+                .ToList();
+            if (chunks.Count == 0)
+            {
+                return null;
+            }
+
+            var joined = string.Concat(chunks.Select(chunk => chunk!.Data));
+            return string.IsNullOrWhiteSpace(joined) ? null : joined;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Unable to read meal image backup chunks for doc '{DocId}'.", docId);
+            return null;
+        }
+    }
+
+    private async Task PersistMealImageChunksAsync(
+        DocumentReference docRef,
+        IReadOnlyList<string> chunks,
+        CancellationToken cancellationToken)
+    {
+        if (_db is null)
+        {
+            return;
+        }
+
+        var chunkCollection = docRef.Collection(MealImageChunksSubcollection);
+        const int batchSize = 450;
+        for (var offset = 0; offset < chunks.Count; offset += batchSize)
+        {
+            var batch = _db.StartBatch();
+            var count = Math.Min(batchSize, chunks.Count - offset);
+            for (var i = 0; i < count; i++)
+            {
+                var chunkIndex = offset + i;
+                var chunkDocId = chunkIndex.ToString("D4", CultureInfo.InvariantCulture);
+                var chunkRef = chunkCollection.Document(chunkDocId);
+                batch.Set(
+                    chunkRef,
+                    new FirestoreAislePilotMealImageChunk
+                    {
+                        Index = chunkIndex,
+                        Data = chunks[chunkIndex]
+                    });
+            }
+
+            await batch.CommitAsync(cancellationToken);
+        }
+    }
+
+    private async Task DeleteMealImageChunksAsync(DocumentReference docRef, CancellationToken cancellationToken)
+    {
+        if (_db is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var snapshot = await docRef.Collection(MealImageChunksSubcollection).GetSnapshotAsync(cancellationToken);
+            if (snapshot.Documents.Count == 0)
+            {
+                return;
+            }
+
+            const int batchSize = 450;
+            for (var offset = 0; offset < snapshot.Documents.Count; offset += batchSize)
+            {
+                var batch = _db.StartBatch();
+                var count = Math.Min(batchSize, snapshot.Documents.Count - offset);
+                for (var i = 0; i < count; i++)
+                {
+                    batch.Delete(snapshot.Documents[offset + i].Reference);
+                }
+
+                await batch.CommitAsync(cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed deleting meal image backup chunks for '{DocId}'.", docRef.Id);
+        }
+    }
+
     private void QueueMealImageGeneration(MealTemplate meal)
     {
         if (!_enableAiGeneration ||
@@ -2553,6 +2680,7 @@ Return JSON only with this schema:
         {
             try
             {
+                await MealImageGenerationThrottle.WaitAsync(CancellationToken.None);
                 if (TryGetCachedMealImageUrl(meal.Name, out _))
                 {
                     return;
@@ -2585,6 +2713,7 @@ Return JSON only with this schema:
             }
             finally
             {
+                MealImageGenerationThrottle.Release();
                 MealImageGenerationInFlight.TryRemove(key, out _);
             }
         });
@@ -2603,7 +2732,7 @@ Return JSON only with this schema:
         {
             model = _imageModel,
             prompt = BuildAiMealImagePrompt(meal),
-            size = "1024x1024",
+            size = "auto",
             quality = "low",
             n = 1
         };
@@ -2724,29 +2853,36 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             return;
         }
 
-        var imageBase64 = string.Empty;
-        if (imageBytes is { Length: > 0 and <= MaxMealImageBytesForFirestore })
-        {
-            imageBase64 = Convert.ToBase64String(imageBytes);
-        }
-        else if (imageBytes is { Length: > MaxMealImageBytesForFirestore })
-        {
-            _logger?.LogWarning(
-                "Skipping Firestore image byte backup for '{MealName}' because payload size {ByteLength} exceeds cap {MaxByteLength}.",
-                mealName,
-                imageBytes.Length,
-                MaxMealImageBytesForFirestore);
-        }
-
         try
         {
             var docRef = _db.Collection(MealImagesCollection).Document(ToAiMealDocumentId(mealName));
+            var imageBase64 = string.Empty;
+            var imageChunkCount = 0;
+            if (imageBytes is { Length: > 0 and <= MaxMealImageBytesForFirestore })
+            {
+                imageBase64 = Convert.ToBase64String(imageBytes);
+                await DeleteMealImageChunksAsync(docRef, cancellationToken);
+            }
+            else if (imageBytes is { Length: > MaxMealImageBytesForFirestore })
+            {
+                var oversizedBase64 = Convert.ToBase64String(imageBytes);
+                var chunks = SplitBase64IntoChunks(oversizedBase64, MealImageChunkCharLength);
+                imageChunkCount = chunks.Count;
+                await DeleteMealImageChunksAsync(docRef, cancellationToken);
+                await PersistMealImageChunksAsync(docRef, chunks, cancellationToken);
+                _logger?.LogInformation(
+                    "Persisted oversized meal image backup for '{MealName}' as {ChunkCount} Firestore chunks.",
+                    mealName,
+                    imageChunkCount);
+            }
+
             await docRef.SetAsync(
                 new FirestoreAislePilotMealImage
                 {
                     Name = mealName,
                     ImageUrl = imageUrl,
                     ImageBase64 = imageBase64,
+                    ImageChunkCount = imageChunkCount,
                     UpdatedAtUtc = DateTime.UtcNow,
                     Source = "openai-image"
                 },
@@ -2764,6 +2900,24 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
     private static string NormalizeImageUrl(string? imageUrl)
     {
         return imageUrl?.Trim() ?? string.Empty;
+    }
+
+    private static IReadOnlyList<string> SplitBase64IntoChunks(string base64, int chunkLength)
+    {
+        if (string.IsNullOrWhiteSpace(base64))
+        {
+            return [];
+        }
+
+        var normalizedChunkLength = Math.Max(1, chunkLength);
+        var chunks = new List<string>((base64.Length / normalizedChunkLength) + 1);
+        for (var offset = 0; offset < base64.Length; offset += normalizedChunkLength)
+        {
+            var length = Math.Min(normalizedChunkLength, base64.Length - offset);
+            chunks.Add(base64.Substring(offset, length));
+        }
+
+        return chunks;
     }
 
     private static MealTemplate? SelectSwapCandidate(
@@ -5959,10 +6113,23 @@ Return JSON only with this schema:
         public string ImageBase64 { get; set; } = string.Empty;
 
         [FirestoreProperty]
+        public int ImageChunkCount { get; set; }
+
+        [FirestoreProperty]
         public DateTime UpdatedAtUtc { get; set; }
 
         [FirestoreProperty]
         public string Source { get; set; } = string.Empty;
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreAislePilotMealImageChunk
+    {
+        [FirestoreProperty]
+        public int Index { get; set; }
+
+        [FirestoreProperty]
+        public string Data { get; set; } = string.Empty;
     }
 
     [FirestoreData]
