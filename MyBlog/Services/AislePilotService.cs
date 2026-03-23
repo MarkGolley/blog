@@ -49,6 +49,7 @@ public sealed class AislePilotService : IAislePilotService
     private const decimal AiMealBaseCostMaxToIngredientFactor = 1.35m;
     private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(22);
     private static readonly TimeSpan OpenAiImageRequestTimeout = TimeSpan.FromSeconds(18);
+    private static readonly TimeSpan OpenAiImageDownloadTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
     private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);
 
@@ -2678,9 +2679,11 @@ Return JSON only with this schema:
 
         _ = Task.Run(async () =>
         {
+            var throttleAcquired = false;
             try
             {
                 await MealImageGenerationThrottle.WaitAsync(CancellationToken.None);
+                throttleAcquired = true;
                 if (TryGetCachedMealImageUrl(meal.Name, out _))
                 {
                     return;
@@ -2713,7 +2716,11 @@ Return JSON only with this schema:
             }
             finally
             {
-                MealImageGenerationThrottle.Release();
+                if (throttleAcquired)
+                {
+                    MealImageGenerationThrottle.Release();
+                }
+
                 MealImageGenerationInFlight.TryRemove(key, out _);
             }
         });
@@ -2740,8 +2747,8 @@ Return JSON only with this schema:
 
         for (var attempt = 1; attempt <= OpenAiImageMaxAttempts; attempt++)
         {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(OpenAiImageRequestTimeout);
+            using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            requestCts.CancelAfter(OpenAiImageRequestTimeout);
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, OpenAiImageGenerationsEndpoint)
             {
                 Content = new StringContent(serializedBody, Encoding.UTF8, "application/json")
@@ -2750,8 +2757,11 @@ Return JSON only with this schema:
 
             try
             {
-                using var response = await _httpClient.SendAsync(requestMessage, timeoutCts.Token);
-                var responseContent = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+                using var response = await _httpClient.SendAsync(
+                    requestMessage,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    requestCts.Token);
+                var responseContent = await response.Content.ReadAsStringAsync(CancellationToken.None);
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorSample = responseContent.Length <= 220 ? responseContent : responseContent[..220];
@@ -2782,17 +2792,38 @@ Return JSON only with this schema:
                 {
                     try
                     {
-                        using var imageResponse = await _httpClient.GetAsync(imageData.Url, timeoutCts.Token);
+                        using var downloadCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        downloadCts.CancelAfter(OpenAiImageDownloadTimeout);
+                        using var imageResponse = await _httpClient.GetAsync(
+                            imageData.Url,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            downloadCts.Token);
                         if (imageResponse.IsSuccessStatusCode)
                         {
-                            return await imageResponse.Content.ReadAsByteArrayAsync(timeoutCts.Token);
+                            return await imageResponse.Content.ReadAsByteArrayAsync(CancellationToken.None);
                         }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger?.LogInformation(
+                            "AislePilot image CDN fetch timed out for '{MealName}'. Attempt={Attempt}/{MaxAttempts}.",
+                            meal.Name,
+                            attempt,
+                            OpenAiImageMaxAttempts);
                     }
                     catch
                     {
                         // Ignore and return null below.
                     }
                 }
+            }
+            catch (OperationCanceledException) when (requestCts.IsCancellationRequested)
+            {
+                _logger?.LogInformation(
+                    "AislePilot meal image request timed out for '{MealName}'. Attempt={Attempt}/{MaxAttempts}.",
+                    meal.Name,
+                    attempt,
+                    OpenAiImageMaxAttempts);
             }
             catch (Exception ex)
             {
