@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using MailKit.Net.Smtp;
+using MailKit.Security;
 using MimeKit;
 using System.Text.RegularExpressions;
 using MyBlog.Models;
@@ -422,10 +423,10 @@ public class BlogController : Controller
             };
 
             using var client = new SmtpClient();
-            await client.ConnectAsync("smtp.mail.me.com", 587, false);
-            await client.AuthenticateAsync(emailAddress, emailPassword);
-            await client.SendAsync(emailMessage);
-            await client.DisconnectAsync(true);
+            await client.ConnectAsync("smtp.mail.me.com", 587, SecureSocketOptions.StartTls, HttpContext.RequestAborted);
+            await client.AuthenticateAsync(emailAddress, emailPassword, HttpContext.RequestAborted);
+            await client.SendAsync(emailMessage, HttpContext.RequestAborted);
+            await client.DisconnectAsync(true, HttpContext.RequestAborted);
         }
         catch (Exception ex)
         {

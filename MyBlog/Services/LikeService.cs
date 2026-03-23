@@ -1,4 +1,5 @@
 using System.Text;
+using System.Globalization;
 using Google.Cloud.Firestore;
 
 namespace MyBlog.Services;
@@ -8,6 +9,8 @@ public class LikeService
     private const string PostLikesCollection = "postLikes";
     private const string CommentLikesCollection = "commentLikes";
     private const string CommentsCollection = "comments";
+    private const string PostLikeStatsCollection = "postLikeStats";
+    private const string CommentLikeStatsCollection = "commentLikeStats";
 
     private static readonly object LocalStateLock = new();
     private static readonly HashSet<string> LocalPostLikes = new(StringComparer.Ordinal);
@@ -34,14 +37,13 @@ public class LikeService
         }
 
         var likes = await _db.Collection(PostLikesCollection)
-            .WhereEqualTo(nameof(FirestorePostLike.PostId), postId)
+            .Document(BuildPostLikeDocId(postId, visitorId))
             .GetSnapshotAsync();
 
-        var count = likes.Count;
-        var isLiked = likes.Documents
-            .Any(d => d.TryGetValue<string>(nameof(FirestorePostLike.VisitorId), out var v) && v == visitorId);
+        var count = await GetPostLikeCountAsync(postId);
+        var isLiked = likes.Exists;
 
-        return (count, isLiked);
+        return (Math.Max(0, count), isLiked);
     }
 
     public async Task<Dictionary<string, (int Count, bool IsLikedByVisitor)>> GetPostLikeSummariesAsync(
@@ -76,23 +78,13 @@ public class LikeService
             return result;
         }
 
-        foreach (var batch in Batch(ids, 30))
+        foreach (var id in ids)
         {
-            var snapshot = await _db.Collection(PostLikesCollection)
-                .WhereIn(nameof(FirestorePostLike.PostId), batch.Cast<object>().ToList())
+            var count = await GetPostLikeCountAsync(id);
+            var liked = await _db.Collection(PostLikesCollection)
+                .Document(BuildPostLikeDocId(id, visitorId))
                 .GetSnapshotAsync();
-
-            foreach (var doc in snapshot.Documents)
-            {
-                var like = doc.ConvertTo<FirestorePostLike>();
-                if (!result.TryGetValue(like.PostId, out var existing))
-                {
-                    continue;
-                }
-
-                var likedByVisitor = existing.Item2 || string.Equals(like.VisitorId, visitorId, StringComparison.Ordinal);
-                result[like.PostId] = (existing.Item1 + 1, likedByVisitor);
-            }
+            result[id] = (Math.Max(0, count), liked.Exists);
         }
 
         return result;
@@ -126,23 +118,13 @@ public class LikeService
             return result;
         }
 
-        foreach (var batch in Batch(ids, 30))
+        foreach (var id in ids)
         {
-            var snapshot = await _db.Collection(CommentLikesCollection)
-                .WhereIn(nameof(FirestoreCommentLike.CommentId), batch.Cast<object>().ToList())
+            var count = await GetCommentLikeCountAsync(id);
+            var liked = await _db.Collection(CommentLikesCollection)
+                .Document(BuildCommentLikeDocId(id, visitorId))
                 .GetSnapshotAsync();
-
-            foreach (var doc in snapshot.Documents)
-            {
-                var like = doc.ConvertTo<FirestoreCommentLike>();
-                if (!result.TryGetValue(like.CommentId, out var existing))
-                {
-                    continue;
-                }
-
-                var likedByVisitor = existing.Item2 || string.Equals(like.VisitorId, visitorId, StringComparison.Ordinal);
-                result[like.CommentId] = (existing.Item1 + 1, likedByVisitor);
-            }
+            result[id] = (Math.Max(0, count), liked.Exists);
         }
 
         return result;
@@ -166,19 +148,37 @@ public class LikeService
 
         var docId = BuildPostLikeDocId(postId, visitorId);
         var docRef = _db.Collection(PostLikesCollection).Document(docId);
-        var snapshot = await docRef.GetSnapshotAsync();
+        var statsRef = _db.Collection(PostLikeStatsCollection).Document(ToIdPart(postId));
 
-        if (snapshot.Exists)
+        await _db.RunTransactionAsync(async transaction =>
         {
-            await docRef.DeleteAsync();
-            return;
-        }
+            var likeSnapshot = await transaction.GetSnapshotAsync(docRef);
+            var statsSnapshot = await transaction.GetSnapshotAsync(statsRef);
+            var currentCount = GetLikeCountFromStatsSnapshot(statsSnapshot);
 
-        await docRef.CreateAsync(new FirestorePostLike
-        {
-            PostId = postId,
-            VisitorId = visitorId,
-            LikedAt = DateTime.UtcNow
+            if (likeSnapshot.Exists)
+            {
+                transaction.Delete(docRef);
+                var nextCount = Math.Max(0, currentCount - 1);
+                transaction.Set(statsRef, new FirestoreLikeStat
+                {
+                    Count = nextCount,
+                    UpdatedAt = DateTime.UtcNow
+                });
+                return;
+            }
+
+            transaction.Create(docRef, new FirestorePostLike
+            {
+                PostId = postId,
+                VisitorId = visitorId,
+                LikedAt = DateTime.UtcNow
+            });
+            transaction.Set(statsRef, new FirestoreLikeStat
+            {
+                Count = currentCount + 1,
+                UpdatedAt = DateTime.UtcNow
+            });
         });
     }
 
@@ -216,31 +216,114 @@ public class LikeService
 
         var docId = BuildCommentLikeDocId(commentId, visitorId);
         var docRef = _db.Collection(CommentLikesCollection).Document(docId);
-        var snapshot = await docRef.GetSnapshotAsync();
+        var statsRef = _db.Collection(CommentLikeStatsCollection).Document(commentId.ToString(CultureInfo.InvariantCulture));
 
-        if (snapshot.Exists)
+        await _db.RunTransactionAsync(async transaction =>
         {
-            await docRef.DeleteAsync();
-            return true;
-        }
+            var likeSnapshot = await transaction.GetSnapshotAsync(docRef);
+            var statsSnapshot = await transaction.GetSnapshotAsync(statsRef);
+            var currentCount = GetLikeCountFromStatsSnapshot(statsSnapshot);
 
-        await docRef.CreateAsync(new FirestoreCommentLike
-        {
-            CommentId = commentId,
-            VisitorId = visitorId,
-            LikedAt = DateTime.UtcNow
+            if (likeSnapshot.Exists)
+            {
+                transaction.Delete(docRef);
+                var nextCount = Math.Max(0, currentCount - 1);
+                transaction.Set(statsRef, new FirestoreLikeStat
+                {
+                    Count = nextCount,
+                    UpdatedAt = DateTime.UtcNow
+                });
+                return;
+            }
+
+            transaction.Create(docRef, new FirestoreCommentLike
+            {
+                CommentId = commentId,
+                VisitorId = visitorId,
+                LikedAt = DateTime.UtcNow
+            });
+            transaction.Set(statsRef, new FirestoreLikeStat
+            {
+                Count = currentCount + 1,
+                UpdatedAt = DateTime.UtcNow
+            });
         });
 
         return true;
     }
 
-    private static IEnumerable<List<T>> Batch<T>(IReadOnlyList<T> items, int batchSize)
+    private async Task<int> GetPostLikeCountAsync(string postId)
     {
-        for (var i = 0; i < items.Count; i += batchSize)
+        if (_db is null)
         {
-            var count = Math.Min(batchSize, items.Count - i);
-            yield return items.Skip(i).Take(count).ToList();
+            return 0;
         }
+
+        var statsRef = _db.Collection(PostLikeStatsCollection).Document(ToIdPart(postId));
+        var statsSnapshot = await statsRef.GetSnapshotAsync();
+        if (statsSnapshot.Exists)
+        {
+            return GetLikeCountFromStatsSnapshot(statsSnapshot);
+        }
+
+        var likesSnapshot = await _db.Collection(PostLikesCollection)
+            .WhereEqualTo(nameof(FirestorePostLike.PostId), postId)
+            .GetSnapshotAsync();
+        var count = Math.Max(0, likesSnapshot.Count);
+
+        await statsRef.SetAsync(new FirestoreLikeStat
+        {
+            Count = count,
+            UpdatedAt = DateTime.UtcNow
+        }, SetOptions.MergeAll);
+        return count;
+    }
+
+    private async Task<int> GetCommentLikeCountAsync(int commentId)
+    {
+        if (_db is null)
+        {
+            return 0;
+        }
+
+        var statsRef = _db.Collection(CommentLikeStatsCollection).Document(commentId.ToString(CultureInfo.InvariantCulture));
+        var statsSnapshot = await statsRef.GetSnapshotAsync();
+        if (statsSnapshot.Exists)
+        {
+            return GetLikeCountFromStatsSnapshot(statsSnapshot);
+        }
+
+        var likesSnapshot = await _db.Collection(CommentLikesCollection)
+            .WhereEqualTo(nameof(FirestoreCommentLike.CommentId), commentId)
+            .GetSnapshotAsync();
+        var count = Math.Max(0, likesSnapshot.Count);
+
+        await statsRef.SetAsync(new FirestoreLikeStat
+        {
+            Count = count,
+            UpdatedAt = DateTime.UtcNow
+        }, SetOptions.MergeAll);
+        return count;
+    }
+
+    private static int GetLikeCountFromStatsSnapshot(DocumentSnapshot statsSnapshot)
+    {
+        if (!statsSnapshot.Exists)
+        {
+            return 0;
+        }
+
+        if (statsSnapshot.TryGetValue<long>(nameof(FirestoreLikeStat.Count), out var asLong))
+        {
+            return asLong < 0 ? 0 : (int)Math.Min(int.MaxValue, asLong);
+        }
+
+        if (statsSnapshot.TryGetValue<int>(nameof(FirestoreLikeStat.Count), out var asInt))
+        {
+            return Math.Max(0, asInt);
+        }
+
+        return 0;
     }
 
     private static string BuildPostLikeDocId(string postId, string visitorId)
@@ -285,5 +368,15 @@ public class LikeService
 
         [FirestoreProperty]
         public DateTime LikedAt { get; set; }
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreLikeStat
+    {
+        [FirestoreProperty]
+        public int Count { get; set; }
+
+        [FirestoreProperty]
+        public DateTime UpdatedAt { get; set; }
     }
 }

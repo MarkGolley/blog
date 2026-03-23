@@ -195,16 +195,13 @@ public class SubscriptionController : Controller
         var postUrl = BuildAbsoluteUrl(postPath);
 
         var subscribers = await _subscriptionService.GetConfirmedSubscribersAsync();
+        var notifiedSubscriberIds = await _subscriptionService.GetNotifiedSubscriberIdsAsync(post.Id);
 
-        var sent = 0;
-        var skipped = 0;
-        var failed = 0;
-
+        var pendingNotifications = new List<NotificationEmailRequest>();
         foreach (var subscriber in subscribers)
         {
-            if (await _subscriptionService.HasPostNotificationAsync(subscriber.SubscriberId, post.Id))
+            if (notifiedSubscriberIds.Contains(subscriber.SubscriberId))
             {
-                skipped++;
                 continue;
             }
 
@@ -214,21 +211,26 @@ public class SubscriptionController : Controller
                 values: new { token = subscriber.UnsubscribeToken }) ?? "/subscribe/unsubscribe";
             var unsubscribeUrl = BuildAbsoluteUrl(unsubscribePath);
 
-            var emailSent = await _subscriptionEmailService.SendNewPostNotificationAsync(
+            pendingNotifications.Add(new NotificationEmailRequest(
+                subscriber.SubscriberId,
                 subscriber.Email,
                 post.Title,
                 postUrl,
-                unsubscribeUrl);
-
-            if (!emailSent)
-            {
-                failed++;
-                continue;
-            }
-
-            await _subscriptionService.MarkPostNotificationAsync(subscriber.SubscriberId, post.Id);
-            sent++;
+                unsubscribeUrl));
         }
+
+        var skipped = subscribers.Count - pendingNotifications.Count;
+        var sendResults = await _subscriptionEmailService.SendNewPostNotificationsAsync(
+            pendingNotifications,
+            HttpContext.RequestAborted);
+        var sentSubscriberIds = sendResults
+            .Where(result => result.Value)
+            .Select(result => result.Key)
+            .ToList();
+        await _subscriptionService.MarkPostNotificationsAsync(sentSubscriberIds, post.Id);
+
+        var sent = sentSubscriberIds.Count;
+        var failed = pendingNotifications.Count - sent;
 
         _logger.LogInformation(
             "Subscriber notification for post {PostId} completed. Sent: {Sent}, Skipped: {Skipped}, Failed: {Failed}.",

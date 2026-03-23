@@ -34,25 +34,29 @@ public class CommentService
         }
 
         var commentsCollection = _db.Collection(CommentsCollection);
+        var commentDepth = 1;
 
         if (comment.ParentCommentId.HasValue)
         {
-            var postCommentsSnapshot = await commentsCollection
-                .WhereEqualTo(nameof(FirestoreComment.PostId), comment.PostId)
-                .GetSnapshotAsync();
-
-            var commentById = postCommentsSnapshot.Documents
-                .Select(d => d.ConvertTo<FirestoreComment>())
-                .ToDictionary(c => c.Id, c => c.ParentCommentId);
-
-            if (!commentById.ContainsKey(comment.ParentCommentId.Value))
+            var parentRef = commentsCollection.Document(comment.ParentCommentId.Value.ToString());
+            var parentSnapshot = await parentRef.GetSnapshotAsync();
+            if (!parentSnapshot.Exists)
             {
                 throw new InvalidOperationException("The comment you are replying to could not be found.");
             }
 
-            var parentDepth = GetDepth(comment.ParentCommentId.Value, commentById);
-            var replyDepth = parentDepth + 1;
-            if (replyDepth > MaxThreadDepth)
+            var parentComment = parentSnapshot.ConvertTo<FirestoreComment>();
+            if (!string.Equals(parentComment.PostId, comment.PostId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The comment you are replying to could not be found.");
+            }
+
+            var parentDepth = await ResolveCommentDepthAsync(
+                comment.PostId,
+                parentComment,
+                commentsCollection);
+            commentDepth = parentDepth + 1;
+            if (commentDepth > MaxThreadDepth)
             {
                 throw new InvalidOperationException($"Reply depth limit reached. Max depth is {MaxThreadDepth} levels.");
             }
@@ -83,7 +87,8 @@ public class CommentService
                 PostedAt = comment.PostedAt,
                 PostId = comment.PostId,
                 ParentCommentId = comment.ParentCommentId,
-                IsApproved = comment.IsApproved
+                IsApproved = comment.IsApproved,
+                Depth = commentDepth
             };
 
             transaction.Create(commentRef, doc);
@@ -354,13 +359,69 @@ public class CommentService
             return GetCommentThreadIdsInMemory(commentId);
         }
 
-        var allComments = await _db.Collection(CommentsCollection).GetSnapshotAsync();
-        var comments = allComments.Documents
-            .Select(d => d.ConvertTo<FirestoreComment>())
-            .Select(MapToComment)
-            .ToList();
+        var commentsCollection = _db.Collection(CommentsCollection);
+        var rootSnapshot = await commentsCollection.Document(commentId.ToString()).GetSnapshotAsync();
+        if (!rootSnapshot.Exists)
+        {
+            return [];
+        }
 
-        return GetThreadIds(commentId, comments);
+        var ids = new List<int>();
+        var visited = new HashSet<int>();
+        var queue = new Queue<int>();
+        queue.Enqueue(commentId);
+
+        while (queue.Count > 0)
+        {
+            var currentId = queue.Dequeue();
+            if (!visited.Add(currentId))
+            {
+                continue;
+            }
+
+            ids.Add(currentId);
+
+            var childrenSnapshot = await commentsCollection
+                .WhereEqualTo(nameof(FirestoreComment.ParentCommentId), currentId)
+                .GetSnapshotAsync();
+
+            foreach (var document in childrenSnapshot.Documents)
+            {
+                var childComment = document.ConvertTo<FirestoreComment>();
+                if (childComment.Id > 0)
+                {
+                    queue.Enqueue(childComment.Id);
+                }
+            }
+        }
+
+        return ids;
+    }
+
+    private async Task<int> ResolveCommentDepthAsync(
+        string postId,
+        FirestoreComment comment,
+        CollectionReference commentsCollection)
+    {
+        if (comment.Depth > 0)
+        {
+            return comment.Depth;
+        }
+
+        if (!comment.ParentCommentId.HasValue)
+        {
+            return 1;
+        }
+
+        var postCommentsSnapshot = await commentsCollection
+            .WhereEqualTo(nameof(FirestoreComment.PostId), postId)
+            .GetSnapshotAsync();
+
+        var commentById = postCommentsSnapshot.Documents
+            .Select(d => d.ConvertTo<FirestoreComment>())
+            .ToDictionary(c => c.Id, c => c.ParentCommentId);
+
+        return GetDepth(comment.Id, commentById);
     }
 
     private static List<int> GetCommentThreadIdsInMemory(int commentId)
@@ -424,5 +485,8 @@ public class CommentService
 
         [FirestoreProperty]
         public bool IsApproved { get; set; }
+
+        [FirestoreProperty]
+        public int Depth { get; set; }
     }
 }

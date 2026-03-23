@@ -260,6 +260,40 @@ public class SubscriptionService
         return snapshot.Exists;
     }
 
+    public async Task<HashSet<string>> GetNotifiedSubscriberIdsAsync(string postSlug)
+    {
+        var normalizedPostSlug = postSlug?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedPostSlug))
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        if (_db == null)
+        {
+            lock (LocalStateLock)
+            {
+                return LocalNotificationKeys
+                    .Select(key => key.Split("::", 2, StringSplitOptions.None))
+                    .Where(parts =>
+                        parts.Length == 2 &&
+                        string.Equals(parts[1], normalizedPostSlug, StringComparison.Ordinal))
+                    .Select(parts => parts[0])
+                    .Where(subscriberId => !string.IsNullOrWhiteSpace(subscriberId))
+                    .ToHashSet(StringComparer.Ordinal);
+            }
+        }
+
+        var snapshot = await _db.Collection(NotificationsCollection)
+            .WhereEqualTo(nameof(FirestoreSubscriberNotification.PostSlug), normalizedPostSlug)
+            .GetSnapshotAsync();
+
+        return snapshot.Documents
+            .Select(document => document.ConvertTo<FirestoreSubscriberNotification>())
+            .Select(document => document.SubscriberId?.Trim() ?? string.Empty)
+            .Where(subscriberId => !string.IsNullOrWhiteSpace(subscriberId))
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
     public async Task MarkPostNotificationAsync(string subscriberId, string postSlug)
     {
         var normalizedSubscriberId = subscriberId?.Trim() ?? string.Empty;
@@ -286,6 +320,53 @@ public class SubscriptionService
             PostSlug = normalizedPostSlug,
             NotifiedAt = DateTime.UtcNow
         });
+    }
+
+    public async Task MarkPostNotificationsAsync(IReadOnlyList<string> subscriberIds, string postSlug)
+    {
+        var normalizedPostSlug = postSlug?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedPostSlug) || subscriberIds.Count == 0)
+        {
+            return;
+        }
+
+        var normalizedSubscriberIds = subscriberIds
+            .Where(subscriberId => !string.IsNullOrWhiteSpace(subscriberId))
+            .Select(subscriberId => subscriberId.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (normalizedSubscriberIds.Count == 0)
+        {
+            return;
+        }
+
+        if (_db == null)
+        {
+            lock (LocalStateLock)
+            {
+                foreach (var subscriberId in normalizedSubscriberIds)
+                {
+                    LocalNotificationKeys.Add(BuildLocalNotificationKey(subscriberId, normalizedPostSlug));
+                }
+            }
+
+            return;
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var batch = _db.StartBatch();
+        foreach (var subscriberId in normalizedSubscriberIds)
+        {
+            var notificationRef = GetNotificationDocument(subscriberId, normalizedPostSlug);
+            batch.Set(notificationRef, new FirestoreSubscriberNotification
+            {
+                SubscriberId = subscriberId,
+                PostSlug = normalizedPostSlug,
+                NotifiedAt = nowUtc
+            });
+        }
+
+        await batch.CommitAsync();
     }
 
     private SubscribeResult SubscribeInMemory(string email)

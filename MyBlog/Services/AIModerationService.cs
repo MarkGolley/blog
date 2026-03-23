@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Net.Http.Headers;
+using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MyBlog.Models;
@@ -12,6 +13,7 @@ public class AIModerationService
     {
         PropertyNameCaseInsensitive = true
     };
+    private const int MaxModerationAttempts = 2;
 
     private readonly HttpClient _httpClient;
     private readonly string? _apiKey;
@@ -24,7 +26,9 @@ public class AIModerationService
         _logger = logger;
     }
 
-    public async Task<ModerationEvaluationResult> EvaluateCommentAsync(string content)
+    public async Task<ModerationEvaluationResult> EvaluateCommentAsync(
+        string content,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -47,50 +51,71 @@ public class AIModerationService
 
         try
         {
-            var requestBody = new
+            for (var attempt = 1; attempt <= MaxModerationAttempts; attempt++)
             {
-                model = "omni-moderation-latest",
-                input = content
-            };
+                var requestBody = new
+                {
+                    model = "omni-moderation-latest",
+                    input = content
+                };
 
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/moderations")
-            {
-                Content = new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json")
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+                using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/moderations")
+                {
+                    Content = new StringContent(
+                        JsonSerializer.Serialize(requestBody),
+                        System.Text.Encoding.UTF8,
+                        "application/json")
+                };
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
-            var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (attempt < MaxModerationAttempts && IsTransientStatus(response.StatusCode))
+                    {
+                        await Task.Delay(TimeSpan.FromMilliseconds(350 * attempt), cancellationToken);
+                        continue;
+                    }
 
-            var responseContent = await response.Content.ReadAsStringAsync();
-            var moderationResult = JsonSerializer.Deserialize<OpenAIModerationResponse>(responseContent, JsonOptions);
-            var firstResult = moderationResult?.Results?.FirstOrDefault();
-            if (firstResult?.Flagged is not bool flagged)
-            {
-                _logger.LogWarning(
-                    "OpenAI moderation response did not include a usable flagged decision. Comment will require manual review.");
+                    response.EnsureSuccessStatusCode();
+                }
+
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                var moderationResult = JsonSerializer.Deserialize<OpenAIModerationResponse>(responseContent, JsonOptions);
+                var firstResult = moderationResult?.Results?.FirstOrDefault();
+                if (firstResult?.Flagged is not bool flagged)
+                {
+                    _logger.LogWarning(
+                        "OpenAI moderation response did not include a usable flagged decision. Comment will require manual review.");
+                    return new ModerationEvaluationResult
+                    {
+                        Decision = ModerationDecision.ManualReview,
+                        ReasonCode = "invalid_response_payload"
+                    };
+                }
+
+                var requestId = response.Headers.TryGetValues("x-request-id", out var values)
+                    ? values.FirstOrDefault()
+                    : null;
+
+                _logger.LogInformation(
+                    "OpenAI moderation completed. Flagged={Flagged}. OpenAIRequestId={OpenAIRequestId}",
+                    flagged,
+                    requestId ?? "n/a");
+
                 return new ModerationEvaluationResult
                 {
-                    Decision = ModerationDecision.ManualReview,
-                    ReasonCode = "invalid_response_payload"
+                    Decision = flagged ? ModerationDecision.Block : ModerationDecision.Allow,
+                    ReasonCode = flagged ? "openai_flagged" : "openai_clear",
+                    FlaggedByModel = flagged,
+                    OpenAiRequestId = requestId
                 };
             }
 
-            var requestId = response.Headers.TryGetValues("x-request-id", out var values)
-                ? values.FirstOrDefault()
-                : null;
-
-            _logger.LogInformation(
-                "OpenAI moderation completed. Flagged={Flagged}. OpenAIRequestId={OpenAIRequestId}",
-                flagged,
-                requestId ?? "n/a");
-
             return new ModerationEvaluationResult
             {
-                Decision = flagged ? ModerationDecision.Block : ModerationDecision.Allow,
-                ReasonCode = flagged ? "openai_flagged" : "openai_clear",
-                FlaggedByModel = flagged,
-                OpenAiRequestId = requestId
+                Decision = ModerationDecision.ManualReview,
+                ReasonCode = "request_failed"
             };
         }
         catch (Exception ex)
@@ -108,6 +133,16 @@ public class AIModerationService
     {
         var result = await EvaluateCommentAsync(content);
         return result.IsSafe;
+    }
+
+    private static bool IsTransientStatus(HttpStatusCode statusCode)
+    {
+        return statusCode == HttpStatusCode.TooManyRequests ||
+               statusCode == HttpStatusCode.RequestTimeout ||
+               statusCode == HttpStatusCode.BadGateway ||
+               statusCode == HttpStatusCode.ServiceUnavailable ||
+               statusCode == HttpStatusCode.GatewayTimeout ||
+               (int)statusCode >= 500;
     }
 
     private class OpenAIModerationResponse

@@ -129,11 +129,20 @@ builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SubscriptionEmailService>();
-builder.Services.AddHttpClient<AislePilotService>();
+builder.Services.AddHttpClient<AislePilotService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(75);
+});
 builder.Services.AddScoped<IAislePilotService>(sp => sp.GetRequiredService<AislePilotService>());
 builder.Services.AddScoped<IAislePilotExportService, AislePilotExportService>();
-builder.Services.AddHttpClient<AIModerationService>();
-builder.Services.AddHttpClient<DailyCodingCapsuleService>();
+builder.Services.AddHttpClient<AIModerationService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(12);
+});
+builder.Services.AddHttpClient<DailyCodingCapsuleService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddTransient<IDailyCodingCapsuleProvider>(sp => sp.GetRequiredService<DailyCodingCapsuleService>());
 
 var openAiApiKey =
@@ -272,11 +281,17 @@ app.Use(async (context, next) =>
         headers.TryAdd("X-Permitted-Cross-Domain-Policies", "none");
         headers["X-App-Version"] = appVersion;
 
-        if (ShouldDisableCaching(context))
+        var cachePolicy = ResolveCachePolicy(context);
+        if (cachePolicy == CachePolicy.NoStore)
         {
             headers["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate, private";
             headers["Pragma"] = "no-cache";
             headers["Expires"] = "0";
+        }
+        else if (cachePolicy == CachePolicy.PrivateRevalidate)
+        {
+            headers["Cache-Control"] = "private, no-cache, max-age=0, must-revalidate";
+            headers["Pragma"] = "no-cache";
 
             var varyValues = headers.Vary.ToString();
             if (string.IsNullOrWhiteSpace(varyValues))
@@ -429,25 +444,34 @@ static string GetUserAgentBucket(string? userAgent)
     return "other";
 }
 
-static bool ShouldDisableCaching(HttpContext context)
+static CachePolicy ResolveCachePolicy(HttpContext context)
 {
     if (context.Response.Headers.ContainsKey("Set-Cookie"))
     {
-        return true;
+        return CachePolicy.NoStore;
     }
 
     var path = context.Request.Path.Value ?? string.Empty;
     if (string.IsNullOrWhiteSpace(path))
     {
-        return false;
+        return CachePolicy.None;
     }
 
-    return path.Equals("/admin", StringComparison.OrdinalIgnoreCase)
-           || path.StartsWith("/admin/", StringComparison.OrdinalIgnoreCase)
-           || path.Equals("/blog", StringComparison.OrdinalIgnoreCase)
-           || path.StartsWith("/blog/", StringComparison.OrdinalIgnoreCase)
-           || path.Equals("/subscribe", StringComparison.OrdinalIgnoreCase)
-           || path.StartsWith("/subscribe/", StringComparison.OrdinalIgnoreCase);
+    if (path.Equals("/admin", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/admin/", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/subscribe", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/subscribe/", StringComparison.OrdinalIgnoreCase))
+    {
+        return CachePolicy.NoStore;
+    }
+
+    if (path.Equals("/blog", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/blog/", StringComparison.OrdinalIgnoreCase))
+    {
+        return CachePolicy.PrivateRevalidate;
+    }
+
+    return CachePolicy.None;
 }
 
 static bool ShouldRecoverFromBadRequest(string requestPath)
@@ -553,6 +577,13 @@ static string AddOrReplaceQueryParameter(string path, string key, string value)
     flattenedValues.Add(new KeyValuePair<string, string?>(key, value));
     var queryString = QueryString.Create(flattenedValues).ToUriComponent();
     return $"{basePath}{queryString}{anchor}";
+}
+
+enum CachePolicy
+{
+    None,
+    PrivateRevalidate,
+    NoStore
 }
 
 public partial class Program;
