@@ -55,6 +55,8 @@
         .ToList();
     var hasModelErrors = modelErrors.Count > 0;
     var joinedErrorText = string.Join(" ", modelErrors).ToLowerInvariant();
+    const string fallbackMealImageUrl = "/images/aislepilot-icon.svg";
+    var mealImagesPollUrl = Url.Action("MealImages", "AislePilot") ?? "/projects/aisle-pilot/meal-images";
     string FormatSetupOptionLabel(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -752,7 +754,10 @@
                             </div>
                         </div>
                     }
-                    <div class="aislepilot-meal-grid">
+                    <div class="aislepilot-meal-grid"
+                         data-meal-image-poll-root
+                         data-fallback-meal-image-url="@fallbackMealImageUrl"
+                         data-meal-image-poll-url="@mealImagesPollUrl">
                         @for (var mealIndex = 0; mealIndex < result.MealPlan.Count; mealIndex++)
                         {
                             var meal = result.MealPlan[mealIndex];
@@ -761,6 +766,8 @@
                                 <div class="aislepilot-meal-image-shell">
                                     <img class="aislepilot-meal-image"
                                          src="@meal.MealImageUrl"
+                                         data-meal-image
+                                         data-meal-name="@meal.MealName"
                                          alt="@($"{meal.MealName} plated meal")"
                                          loading="lazy"
                                          decoding="async" />

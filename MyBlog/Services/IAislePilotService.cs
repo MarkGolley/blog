@@ -22,6 +22,9 @@ public interface IAislePilotService
         string? currentMealName,
         IReadOnlyList<string>? currentPlanMealNames,
         IReadOnlyList<string>? seenMealNames);
+    Task<IReadOnlyDictionary<string, string>> GetMealImageUrlsAsync(
+        IReadOnlyList<string> mealNames,
+        CancellationToken cancellationToken = default);
     Task<AislePilotWarmupResult> WarmupAiMealPoolAsync(
         int minPerSingleMode = 8,
         int minPerKeyPair = 6,

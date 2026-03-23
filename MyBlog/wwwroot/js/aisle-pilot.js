@@ -746,6 +746,11 @@
     let touchStartX = 0;
     let touchStartY = 0;
     let activePanelResizeObserver = null;
+    let mealImagePollIntervalId = null;
+    let mealImagePollInFlight = false;
+    let mealImagePollAttempts = 0;
+    const mealImagePollIntervalMs = 5000;
+    const mealImagePollMaxAttempts = 48;
 
     const hideTabHint = () => {
         if (tabHint instanceof HTMLElement) {
@@ -1200,6 +1205,207 @@
         forms.forEach(wirePreserveScrollForm);
     };
 
+    const normalizeImagePath = value => {
+        if (typeof value !== "string") {
+            return "";
+        }
+
+        const trimmed = value.trim();
+        if (trimmed.length === 0) {
+            return "";
+        }
+
+        try {
+            return new URL(trimmed, window.location.origin).pathname.toLowerCase();
+        } catch {
+            const fallbackPath = trimmed.split("?")[0].split("#")[0];
+            return fallbackPath.toLowerCase();
+        }
+    };
+
+    const getMealImagePollContext = () => {
+        const pollRoot = document.querySelector("[data-meal-image-poll-root]");
+        if (!(pollRoot instanceof HTMLElement)) {
+            return null;
+        }
+
+        const imageElements = Array.from(pollRoot.querySelectorAll("img[data-meal-image][data-meal-name]"))
+            .filter(node => node instanceof HTMLImageElement);
+        if (imageElements.length === 0) {
+            return null;
+        }
+
+        const endpoint = pollRoot.dataset.mealImagePollUrl?.trim() || "/projects/aisle-pilot/meal-images";
+        const fallbackPath = normalizeImagePath(
+            pollRoot.dataset.fallbackMealImageUrl?.trim() || "/images/aislepilot-icon.svg"
+        );
+
+        return {
+            endpoint,
+            fallbackPath,
+            imageElements
+        };
+    };
+
+    const getPendingMealImageNames = pollContext => {
+        const pendingByMealName = new Map();
+        if (!pollContext) {
+            return pendingByMealName;
+        }
+
+        pollContext.imageElements.forEach(imageElement => {
+            if (!(imageElement instanceof HTMLImageElement)) {
+                return;
+            }
+
+            const mealName = imageElement.dataset.mealName?.trim();
+            if (!mealName) {
+                return;
+            }
+
+            const currentSrc = imageElement.getAttribute("src") || imageElement.currentSrc || "";
+            const currentPath = normalizeImagePath(currentSrc);
+            if (currentPath !== pollContext.fallbackPath) {
+                return;
+            }
+
+            const existing = pendingByMealName.get(mealName);
+            if (Array.isArray(existing)) {
+                existing.push(imageElement);
+                return;
+            }
+
+            pendingByMealName.set(mealName, [imageElement]);
+        });
+
+        return pendingByMealName;
+    };
+
+    const stopMealImagePolling = () => {
+        if (typeof mealImagePollIntervalId === "number") {
+            window.clearInterval(mealImagePollIntervalId);
+        }
+
+        mealImagePollIntervalId = null;
+        mealImagePollInFlight = false;
+        mealImagePollAttempts = 0;
+    };
+
+    const pollMealImagesOnce = async () => {
+        if (mealImagePollInFlight || document.visibilityState === "hidden") {
+            return;
+        }
+
+        const pollContext = getMealImagePollContext();
+        if (!pollContext) {
+            stopMealImagePolling();
+            return;
+        }
+
+        const pendingByMealName = getPendingMealImageNames(pollContext);
+        if (pendingByMealName.size === 0) {
+            stopMealImagePolling();
+            return;
+        }
+
+        if (mealImagePollAttempts >= mealImagePollMaxAttempts) {
+            stopMealImagePolling();
+            return;
+        }
+
+        mealImagePollAttempts += 1;
+        mealImagePollInFlight = true;
+
+        try {
+            const searchParams = new URLSearchParams();
+            pendingByMealName.forEach((_, mealName) => {
+                searchParams.append("mealNames", mealName);
+            });
+
+            const requestUrl = `${pollContext.endpoint}?${searchParams.toString()}`;
+            const response = await fetch(requestUrl, {
+                method: "GET",
+                credentials: "same-origin",
+                headers: {
+                    "Accept": "application/json"
+                }
+            });
+            if (!response.ok) {
+                return;
+            }
+
+            const payload = await response.json();
+            const images = Array.isArray(payload?.images) ? payload.images : [];
+            if (images.length === 0) {
+                return;
+            }
+
+            const imageUrlByMealName = new Map();
+            images.forEach(item => {
+                if (!item || typeof item !== "object") {
+                    return;
+                }
+
+                const mealName = typeof item.mealName === "string" ? item.mealName.trim() : "";
+                const imageUrl = typeof item.imageUrl === "string" ? item.imageUrl.trim() : "";
+                if (!mealName || !imageUrl) {
+                    return;
+                }
+
+                imageUrlByMealName.set(mealName, imageUrl);
+            });
+
+            pendingByMealName.forEach((imageElements, mealName) => {
+                const nextImageUrl = imageUrlByMealName.get(mealName);
+                if (!nextImageUrl) {
+                    return;
+                }
+
+                if (normalizeImagePath(nextImageUrl) === pollContext.fallbackPath) {
+                    return;
+                }
+
+                const cacheBustedUrl = `${nextImageUrl}${nextImageUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+                imageElements.forEach(imageElement => {
+                    if (imageElement instanceof HTMLImageElement) {
+                        imageElement.src = cacheBustedUrl;
+                    }
+                });
+            });
+
+            if (getPendingMealImageNames(getMealImagePollContext()).size === 0) {
+                stopMealImagePolling();
+            }
+        } catch {
+            // Ignore transient polling failures and try again on next interval.
+        } finally {
+            mealImagePollInFlight = false;
+        }
+    };
+
+    const startMealImagePolling = () => {
+        const pollContext = getMealImagePollContext();
+        if (!pollContext) {
+            stopMealImagePolling();
+            return;
+        }
+
+        if (getPendingMealImageNames(pollContext).size === 0) {
+            stopMealImagePolling();
+            return;
+        }
+
+        if (typeof mealImagePollIntervalId === "number") {
+            window.clearInterval(mealImagePollIntervalId);
+        }
+
+        mealImagePollAttempts = 0;
+        mealImagePollIntervalId = window.setInterval(() => {
+            void pollMealImagesOnce();
+        }, mealImagePollIntervalMs);
+        void pollMealImagesOnce();
+    };
+
     const replaceSectionContent = (responseDocument, selector) => {
         const currentSection = document.querySelector(selector);
         const nextSection = responseDocument.querySelector(selector);
@@ -1387,6 +1593,7 @@
         wireLeftoverPlanner(document);
         wireAjaxSwapHandlers(document);
         wireNotesExportButtons(document);
+        startMealImagePolling();
         syncSetupToggleState();
         observeActivePanelHeight();
         updateViewportHeight(true);
@@ -1521,6 +1728,13 @@
     wirePreserveScrollHandlers(document);
     wireLeftoverPlanner(document);
     wireAjaxSwapHandlers(document);
+    startMealImagePolling();
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            void pollMealImagesOnce();
+        }
+    });
 
     viewport.addEventListener("touchstart", event => {
         const touch = event.changedTouches[0];

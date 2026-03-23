@@ -566,6 +566,52 @@ public sealed class AislePilotService : IAislePilotService
         return SupportedDietaryModes;
     }
 
+    public async Task<IReadOnlyDictionary<string, string>> GetMealImageUrlsAsync(
+        IReadOnlyList<string> mealNames,
+        CancellationToken cancellationToken = default)
+    {
+        if (mealNames.Count == 0)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var normalizedMealNames = mealNames
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(24)
+            .ToList();
+        if (normalizedMealNames.Count == 0)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        await EnsureMealImagePoolHydratedAsync(normalizedMealNames, cancellationToken);
+
+        var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var mealName in normalizedMealNames)
+        {
+            if (TryGetCachedMealImageUrl(mealName, out var cachedUrl))
+            {
+                resolved[mealName] = cachedUrl;
+                continue;
+            }
+
+            var template = AiMealPool.TryGetValue(mealName, out var aiMeal)
+                ? aiMeal
+                : MealTemplates.FirstOrDefault(template =>
+                    template.Name.Equals(mealName, StringComparison.OrdinalIgnoreCase));
+            if (template is not null)
+            {
+                QueueMealImageGeneration(template);
+            }
+
+            resolved[mealName] = GetFallbackMealImageUrl();
+        }
+
+        return resolved;
+    }
+
     public async Task<AislePilotWarmupResult> WarmupAiMealPoolAsync(
         int minPerSingleMode = 8,
         int minPerKeyPair = 6,
