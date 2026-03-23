@@ -55,6 +55,8 @@
         .ToList();
     var hasModelErrors = modelErrors.Count > 0;
     var joinedErrorText = string.Join(" ", modelErrors).ToLowerInvariant();
+    const string fallbackMealImageUrl = "/images/aislepilot-icon.svg";
+    var mealImagesPollUrl = Url.Action("MealImages", "AislePilot") ?? "/projects/aisle-pilot/meal-images";
     string FormatSetupOptionLabel(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -568,7 +570,9 @@
                     This plan is @Math.Abs(result.BudgetDelta).ToString("C", ukCulture) over your weekly budget.
                 </p>
                 <p class="aislepilot-overbudget-note">
-                    Keep this plan if you are happy to spend more, or refresh with a lower-cost mix.
+                    @(string.IsNullOrWhiteSpace(result.BudgetRebalanceStatusMessage)
+                        ? "Keep this plan if you are happy to spend more, or refresh with a lower-cost mix."
+                        : result.BudgetRebalanceStatusMessage)
                 </p>
                 <form method="post"
                       action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"
@@ -750,12 +754,24 @@
                             </div>
                         </div>
                     }
-                    <div class="aislepilot-meal-grid">
+                    <div class="aislepilot-meal-grid"
+                         data-meal-image-poll-root
+                         data-fallback-meal-image-url="@fallbackMealImageUrl"
+                         data-meal-image-poll-url="@mealImagesPollUrl">
                         @for (var mealIndex = 0; mealIndex < result.MealPlan.Count; mealIndex++)
                         {
                             var meal = result.MealPlan[mealIndex];
                             var mealCardClass = meal.LeftoverDaysCovered > 0 ? "aislepilot-card is-leftover-source" : "aislepilot-card";
                             <article class="@mealCardClass" data-leftover-day-card data-day-index="@mealIndex">
+                                <div class="aislepilot-meal-image-shell">
+                                    <img class="aislepilot-meal-image"
+                                         src="@meal.MealImageUrl"
+                                         data-meal-image
+                                         data-meal-name="@meal.MealName"
+                                         alt="@($"{meal.MealName} plated meal")"
+                                         loading="lazy"
+                                         decoding="async" />
+                                </div>
                                 <div class="aislepilot-card-head">
                                     <p class="aislepilot-card-kicker">@meal.Day</p>
                                     <p class="aislepilot-cost">@meal.EstimatedCost.ToString("C", ukCulture)</p>

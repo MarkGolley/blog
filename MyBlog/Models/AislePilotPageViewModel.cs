@@ -28,6 +28,9 @@ public sealed class AislePilotPlanResultViewModel
     public decimal EstimatedTotalCost { get; set; }
     public decimal BudgetDelta { get; set; }
     public bool IsOverBudget { get; set; }
+    public bool BudgetRebalanceAttempted { get; set; }
+    public bool BudgetRebalanceReducedCost { get; set; }
+    public string BudgetRebalanceStatusMessage { get; set; } = string.Empty;
     public IReadOnlyList<string> AisleOrderUsed { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> BudgetTips { get; set; } = Array.Empty<string>();
     public IReadOnlyList<AislePilotMealDayViewModel> MealPlan { get; set; } = Array.Empty<AislePilotMealDayViewModel>();
@@ -39,6 +42,7 @@ public sealed class AislePilotMealDayViewModel
 {
     public string Day { get; set; } = string.Empty;
     public string MealName { get; set; } = string.Empty;
+    public string MealImageUrl { get; set; } = string.Empty;
     public string MealReason { get; set; } = string.Empty;
     public int LeftoverDaysCovered { get; set; }
     public decimal EstimatedCost { get; set; }

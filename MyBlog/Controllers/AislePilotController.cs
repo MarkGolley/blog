@@ -200,6 +200,38 @@ public class AislePilotController(
         }
     }
 
+    [HttpGet("meal-images")]
+    [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> MealImages([FromQuery] List<string>? mealNames, CancellationToken cancellationToken)
+    {
+        if (mealNames is null || mealNames.Count == 0)
+        {
+            return Ok(new { images = Array.Empty<object>() });
+        }
+
+        var normalizedMealNames = mealNames
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(24)
+            .ToList();
+        if (normalizedMealNames.Count == 0)
+        {
+            return Ok(new { images = Array.Empty<object>() });
+        }
+
+        var imageUrls = await aislePilotService.GetMealImageUrlsAsync(normalizedMealNames, cancellationToken);
+        var images = normalizedMealNames
+            .Select(name => new
+            {
+                mealName = name,
+                imageUrl = imageUrls.GetValueOrDefault(name, string.Empty)
+            })
+            .ToList();
+
+        return Ok(new { images });
+    }
+
     [HttpPost("export/plan-pack")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
