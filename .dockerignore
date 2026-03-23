@@ -21,5 +21,11 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
+artifacts
+.artifacts
+MyBlog.Tests
+MyBlog.ModerationEval
+docs
+Deployment
 LICENSE
 README.md

@@ -39,11 +39,25 @@ Deployment now runs these checks automatically before image build/push when you 
 .\Deployment\deploy.ps1
 ```
 
+By default, deploy uses a fast pre-deploy profile (`Tests` mode only). To run full browser E2E checks as part of deploy, use:
+
+```powershell
+.\Deployment\deploy.ps1 -PreDeployChecksProfile Full
+```
+
 Optional deploy flags:
 
 - `-SkipPreDeployChecks` skips all pre-deploy checks.
-- `-SkipBrowserInstall` keeps checks enabled but skips Playwright browser install.
+- `-PreDeployChecksProfile Fast|Full` chooses fast tests-only checks (default) or full tests + E2E checks.
+- `-SkipBrowserInstall` keeps checks enabled but skips Playwright browser install (used with `-PreDeployChecksProfile Full`).
 - `-SkipProductionSmokeCheck` skips post-deploy production auth/comment smoke checks.
+- `-DisableBuildxCache` turns off Buildx registry cache and uses standard `docker build`.
+- `-DisableChangeBasedSkipping` disables automatic skip logic and always runs the selected check profile.
+
+Deploy defaults now include:
+
+- Docker Buildx cache (`gcr.io/<project>/<service>:buildcache`) for faster repeated builds.
+- Change-based check skipping for docs/ops-only diffs.
 
 What it does:
 
@@ -59,6 +73,7 @@ Additional modes:
 .\run_checks.ps1 -Mode Tests
 .\run_checks.ps1 -Mode E2E
 .\run_checks.ps1 -Mode PreDeploy -SkipBrowserInstall
+.\run_checks.ps1 -Mode PreDeploy -UseChangeBasedSkipping
 ```
 
 Batch wrappers are available if you want double-click launch:

@@ -3,6 +3,10 @@ param(
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
     [switch]$SkipProductionSmokeCheck,
+    [switch]$DisableBuildxCache,
+    [switch]$DisableChangeBasedSkipping,
+    [ValidateSet("Fast", "Full")]
+    [string]$PreDeployChecksProfile = "Fast",
     [int]$DockerStartupTimeoutSeconds = 120
 )
 
@@ -28,6 +32,11 @@ function Invoke-External {
 
 function Test-DockerReady {
     & docker info *> $null
+    return $LASTEXITCODE -eq 0
+}
+
+function Test-DockerBuildxReady {
+    & docker buildx version *> $null
     return $LASTEXITCODE -eq 0
 }
 
@@ -75,20 +84,34 @@ $service = "myblog-app"
 $region = "europe-west2"
 $tag = Get-Date -Format "yyyyMMdd-HHmmss"
 $image = "gcr.io/$project/${service}:$tag"
+$cacheImage = "gcr.io/$project/${service}:buildcache"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
 Push-Location $repoRoot
 try {
     if (-not $SkipPreDeployChecks) {
+        $checkMode = if ($PreDeployChecksProfile -eq "Full") { "PreDeploy" } else { "Tests" }
+        Write-Host "Pre-deploy checks profile: $PreDeployChecksProfile (mode: $checkMode)."
+
         $checkArgs = @(
             "-NoProfile",
             "-ExecutionPolicy", "Bypass",
             "-File", (Join-Path $repoRoot "run_checks.ps1"),
-            "-Mode", "PreDeploy"
+            "-Mode", $checkMode
         )
 
-        if ($SkipBrowserInstall) {
+        if ($SkipBrowserInstall -and $checkMode -eq "PreDeploy") {
             $checkArgs += "-SkipBrowserInstall"
+        }
+        elseif ($SkipBrowserInstall) {
+            Write-Host "Ignoring -SkipBrowserInstall because browser checks are not part of the Fast profile."
+        }
+
+        if (-not $DisableChangeBasedSkipping) {
+            $checkArgs += "-UseChangeBasedSkipping"
+        }
+        else {
+            Write-Host "Change-based check skipping disabled. Running full checks for selected profile."
         }
 
         Invoke-External `
@@ -103,23 +126,58 @@ try {
     Ensure-DockerRunning -TimeoutSeconds $DockerStartupTimeoutSeconds
 
     $previousBuildkit = $env:DOCKER_BUILDKIT
-    $env:DOCKER_BUILDKIT = "0"
-    Invoke-External `
-        -Label "Building Docker image" `
-        -Command "docker" `
-        -Arguments @("build", "-t", $image, ".")
+    $env:DOCKER_BUILDKIT = "1"
+    $imagePushedByBuild = $false
+    try {
+        $canUseBuildxCache = -not $DisableBuildxCache -and (Test-DockerBuildxReady)
+        if ($canUseBuildxCache) {
+            Invoke-External `
+                -Label "Building and pushing Docker image with Buildx registry cache" `
+                -Command "docker" `
+                -Arguments @(
+                    "buildx", "build",
+                    "--pull",
+                    "--platform", "linux/amd64",
+                    "--cache-from", "type=registry,ref=$cacheImage",
+                    "--cache-to", "type=registry,ref=$cacheImage,mode=max",
+                    "--tag", $image,
+                    "--push",
+                    "."
+                )
+            $imagePushedByBuild = $true
+        }
+        else {
+            if ($DisableBuildxCache) {
+                Write-Host "Buildx cache disabled by flag. Using standard docker build."
+            }
+            else {
+                Write-Host "Docker Buildx is unavailable. Falling back to standard docker build."
+            }
 
-    if ($null -eq $previousBuildkit) {
-        Remove-Item Env:DOCKER_BUILDKIT -ErrorAction SilentlyContinue
+            Invoke-External `
+                -Label "Building Docker image (BuildKit enabled)" `
+                -Command "docker" `
+                -Arguments @("build", "-t", $image, ".")
+        }
+    }
+    finally {
+        if ($null -eq $previousBuildkit) {
+            Remove-Item Env:DOCKER_BUILDKIT -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:DOCKER_BUILDKIT = $previousBuildkit
+        }
+    }
+
+    if (-not $imagePushedByBuild) {
+        Invoke-External `
+            -Label "Pushing Docker image to GCR" `
+            -Command "docker" `
+            -Arguments @("push", $image)
     }
     else {
-        $env:DOCKER_BUILDKIT = $previousBuildkit
+        Write-Host "Image push completed by Buildx."
     }
-
-    Invoke-External `
-        -Label "Pushing Docker image to GCR" `
-        -Command "docker" `
-        -Arguments @("push", $image)
 
     Invoke-External `
         -Label "Deploying to Cloud Run" `
