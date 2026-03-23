@@ -212,7 +212,7 @@ public sealed class AislePilotService : IAislePilotService
         "Aldi",
         "Lidl",
         "Asda",
-        "Custom"
+        "Other"
     ];
 
     private static readonly string[] SupportedPortionSizes =
@@ -601,10 +601,7 @@ public sealed class AislePilotService : IAislePilotService
                 ? aiMeal
                 : MealTemplates.FirstOrDefault(template =>
                     template.Name.Equals(mealName, StringComparison.OrdinalIgnoreCase));
-            if (template is not null)
-            {
-                QueueMealImageGeneration(template);
-            }
+            QueueMealImageGeneration(template ?? BuildImageGenerationFallbackTemplate(mealName));
 
             resolved[mealName] = GetFallbackMealImageUrl();
         }
@@ -744,7 +741,7 @@ public sealed class AislePilotService : IAislePilotService
     public AislePilotPlanResultViewModel BuildPlan(AislePilotRequestModel request)
     {
         var context = BuildPlanContext(request);
-        var cookDays = NormalizeCookDays(request.CookDays);
+        var cookDays = NormalizeCookDays(request.CookDays, request.PlanDays);
         if (ShouldUseTemplateFallback())
         {
             _logger?.LogWarning("AislePilot is using local meal templates because AI generation is unavailable in this runtime.");
@@ -775,7 +772,7 @@ public sealed class AislePilotService : IAislePilotService
     {
         var normalizedMaxAttempts = Math.Clamp(maxAttempts, 1, 8);
         var context = BuildPlanContext(request);
-        var cookDays = NormalizeCookDays(request.CookDays);
+        var cookDays = NormalizeCookDays(request.CookDays, request.PlanDays);
 
         var selectedMealsFromCurrentPlan = BuildSelectedMealsFromCurrentPlanNames(currentPlanMealNames, cookDays);
         var baselinePlan = selectedMealsFromCurrentPlan is not null
@@ -1167,7 +1164,8 @@ public sealed class AislePilotService : IAislePilotService
         IReadOnlyList<string>? currentPlanMealNames,
         IReadOnlyList<string>? seenMealNames)
     {
-        var cookDays = NormalizeCookDays(request.CookDays);
+        var planDays = NormalizePlanDays(request.PlanDays);
+        var cookDays = NormalizeCookDays(request.CookDays, planDays);
         if (dayIndex < 0 || dayIndex >= cookDays)
         {
             throw new ArgumentOutOfRangeException(
@@ -1195,13 +1193,15 @@ public sealed class AislePilotService : IAislePilotService
         var currentName = string.IsNullOrWhiteSpace(currentMealName)
             ? selectedMeals[dayIndex].Name
             : currentMealName.Trim();
-        var leftoverDays = Math.Max(0, 7 - cookDays);
+        var leftoverDays = Math.Max(0, planDays - cookDays);
         var requestedLeftoverSourceDays = ParseRequestedLeftoverSourceDays(
             request.LeftoverCookDayIndexesCsv,
             cookDays,
+            planDays,
             leftoverDays);
         var mealPortionMultipliers = BuildMealPortionMultipliers(
             cookDays,
+            planDays,
             leftoverDays,
             requestedLeftoverSourceDays);
         var dayMultiplier = mealPortionMultipliers[dayIndex];
@@ -1865,6 +1865,7 @@ Return JSON only with this schema:
             Supermarket = request.Supermarket,
             WeeklyBudget = request.WeeklyBudget,
             HouseholdSize = request.HouseholdSize,
+            PlanDays = request.PlanDays,
             CookDays = request.CookDays,
             PortionSize = request.PortionSize,
             DietaryModes = [.. request.DietaryModes],
@@ -1953,13 +1954,16 @@ Return JSON only with this schema:
         }
 
         var selectedMeals = baselineMeals.ToList();
-        var leftoverDays = Math.Max(0, 7 - cookDays);
+        var planDays = NormalizePlanDays(request.PlanDays);
+        var leftoverDays = Math.Max(0, planDays - cookDays);
         var requestedLeftoverSourceDays = ParseRequestedLeftoverSourceDays(
             request.LeftoverCookDayIndexesCsv,
             cookDays,
+            planDays,
             leftoverDays);
         var dayMultipliers = BuildMealPortionMultipliers(
             cookDays,
+            planDays,
             leftoverDays,
             requestedLeftoverSourceDays);
 
@@ -2256,13 +2260,17 @@ Return JSON only with this schema:
         bool usedAiGeneratedMeals = false,
         string? planSourceLabel = null)
     {
-        var leftoverDays = Math.Max(0, 7 - cookDays);
+        var planDays = NormalizePlanDays(request.PlanDays);
+        var normalizedCookDays = NormalizeCookDays(cookDays, planDays);
+        var leftoverDays = Math.Max(0, planDays - normalizedCookDays);
         var requestedLeftoverSourceDays = ParseRequestedLeftoverSourceDays(
             request.LeftoverCookDayIndexesCsv,
-            cookDays,
+            normalizedCookDays,
+            planDays,
             leftoverDays);
         var mealPortionMultipliers = BuildMealPortionMultipliers(
-            cookDays,
+            normalizedCookDays,
+            planDays,
             leftoverDays,
             requestedLeftoverSourceDays);
         var mealImageUrls = ResolveMealImageUrls(selectedMeals);
@@ -2293,7 +2301,8 @@ Return JSON only with this schema:
             PlanSourceLabel = string.IsNullOrWhiteSpace(planSourceLabel)
                 ? usedAiGeneratedMeals ? "OpenAI generated" : string.Empty
                 : planSourceLabel,
-            CookDays = cookDays,
+            PlanDays = planDays,
+            CookDays = normalizedCookDays,
             LeftoverDays = leftoverDays,
             WeeklyBudget = request.WeeklyBudget,
             EstimatedTotalCost = estimatedTotalCost,
@@ -2316,8 +2325,13 @@ Return JSON only with this schema:
             var normalizedEmbeddedUrl = NormalizeImageUrl(meal.ImageUrl);
             if (!string.IsNullOrWhiteSpace(normalizedEmbeddedUrl) && IsMealImageUrlUsable(normalizedEmbeddedUrl))
             {
-                MealImagePool[meal.Name] = normalizedEmbeddedUrl;
-                resolved[meal.Name] = normalizedEmbeddedUrl;
+                var resolvedEmbeddedUrl = TryNormalizeManagedMealImageUrl(
+                    normalizedEmbeddedUrl,
+                    out var normalizedManagedUrl)
+                    ? normalizedManagedUrl
+                    : normalizedEmbeddedUrl;
+                MealImagePool[meal.Name] = resolvedEmbeddedUrl;
+                resolved[meal.Name] = resolvedEmbeddedUrl;
                 continue;
             }
 
@@ -2343,13 +2357,16 @@ Return JSON only with this schema:
         }
 
         var normalized = NormalizeImageUrl(cached);
-        if (string.IsNullOrWhiteSpace(normalized) || !IsMealImageUrlUsable(normalized))
+        var normalizedCandidate = TryNormalizeManagedMealImageUrl(normalized, out var normalizedManaged)
+            ? normalizedManaged
+            : normalized;
+        if (string.IsNullOrWhiteSpace(normalizedCandidate) || !IsMealImageUrlUsable(normalizedCandidate))
         {
             MealImagePool.TryRemove(mealName, out _);
             return false;
         }
 
-        imageUrl = normalized;
+        imageUrl = normalizedCandidate;
         return true;
     }
 
@@ -2360,17 +2377,53 @@ Return JSON only with this schema:
 
     private bool IsMealImageUrlUsable(string imageUrl)
     {
-        if (!imageUrl.StartsWith("/images/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        if (!TryNormalizeManagedMealImageUrl(imageUrl, out var normalizedManagedUrl))
         {
-            return true;
+            return false;
         }
 
-        if (!TryResolveMealImageDiskPath(imageUrl, out var fullPath))
+        if (!TryResolveMealImageDiskPath(normalizedManagedUrl, out var fullPath))
         {
             return false;
         }
 
         return File.Exists(fullPath);
+    }
+
+    private static bool TryNormalizeManagedMealImageUrl(string imageUrl, out string normalizedManagedUrl)
+    {
+        normalizedManagedUrl = string.Empty;
+        var normalized = NormalizeImageUrl(imageUrl);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        if (normalized.StartsWith("/images/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedManagedUrl = normalized.Split('?', '#')[0];
+            return true;
+        }
+
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        var isHttp = uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+                     uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+        if (!isHttp)
+        {
+            return false;
+        }
+
+        if (!uri.AbsolutePath.StartsWith("/images/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        normalizedManagedUrl = uri.AbsolutePath;
+        return true;
     }
 
     private bool TryResolveMealImageDiskPath(string imageUrl, out string fullPath)
@@ -2471,22 +2524,26 @@ Return JSON only with this schema:
                     continue;
                 }
 
+                var candidateUrl = TryNormalizeManagedMealImageUrl(normalizedUrl, out var normalizedManagedUrl)
+                    ? normalizedManagedUrl
+                    : normalizedUrl;
+
                 var imageBase64 = string.IsNullOrWhiteSpace(mapped.ImageBase64)
                     ? await TryReadMealImageBase64FromChunksAsync(docId, mapped.ImageChunkCount, cancellationToken)
                     : mapped.ImageBase64;
-                if (!await EnsureMealImageAvailableAsync(normalizedUrl, imageBase64, cancellationToken))
+                if (!await EnsureMealImageAvailableAsync(candidateUrl, imageBase64, cancellationToken))
                 {
                     continue;
                 }
 
-                MealImagePool[normalizedName] = normalizedUrl;
+                MealImagePool[normalizedName] = candidateUrl;
 
                 if (string.IsNullOrWhiteSpace(mapped.ImageBase64) && mapped.ImageChunkCount <= 0)
                 {
-                    var diskBytes = await TryReadMealImageBytesFromDiskAsync(normalizedUrl, cancellationToken);
+                    var diskBytes = await TryReadMealImageBytesFromDiskAsync(candidateUrl, cancellationToken);
                     if (diskBytes is { Length: > 0 })
                     {
-                        await PersistMealImageAsync(normalizedName, normalizedUrl, diskBytes, cancellationToken);
+                        await PersistMealImageAsync(normalizedName, candidateUrl, diskBytes, cancellationToken);
                     }
                 }
             }
@@ -2504,12 +2561,12 @@ Return JSON only with this schema:
         string? imageBase64,
         CancellationToken cancellationToken)
     {
-        if (!imageUrl.StartsWith("/images/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        if (!TryNormalizeManagedMealImageUrl(imageUrl, out var normalizedManagedUrl))
         {
-            return true;
+            return false;
         }
 
-        if (IsMealImageUrlUsable(imageUrl))
+        if (IsMealImageUrlUsable(normalizedManagedUrl))
         {
             return true;
         }
@@ -2519,7 +2576,7 @@ Return JSON only with this schema:
             return false;
         }
 
-        return await TryRestoreMealImageFromBase64Async(imageUrl, imageBase64, cancellationToken);
+        return await TryRestoreMealImageFromBase64Async(normalizedManagedUrl, imageBase64, cancellationToken);
     }
 
     private async Task<bool> TryRestoreMealImageFromBase64Async(
@@ -2977,6 +3034,19 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
     private static string NormalizeImageUrl(string? imageUrl)
     {
         return imageUrl?.Trim() ?? string.Empty;
+    }
+
+    private static MealTemplate BuildImageGenerationFallbackTemplate(string mealName)
+    {
+        return new MealTemplate(
+            Name: mealName,
+            BaseCostForTwo: 6.00m,
+            IsQuick: true,
+            Tags: ["Balanced"],
+            Ingredients:
+            [
+                new IngredientTemplate("Fresh ingredients", "Produce", 1m, "pack", 1m)
+            ]);
     }
 
     private static IReadOnlyList<string> SplitBase64IntoChunks(string base64, int chunkLength)
@@ -4119,7 +4189,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
 
         if (leftoverDays > 0)
         {
-            tips.Add($"{leftoverDays} day(s) are allocated to leftovers this week.");
+            tips.Add($"{leftoverDays} day(s) are allocated to leftovers in this plan.");
         }
 
         if (isOverBudget)
@@ -4144,9 +4214,20 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         return tips;
     }
 
+    private static int NormalizePlanDays(int planDays)
+    {
+        return Math.Clamp(planDays, 1, 7);
+    }
+
     private static int NormalizeCookDays(int cookDays)
     {
         return Math.Clamp(cookDays, 1, 7);
+    }
+
+    private static int NormalizeCookDays(int cookDays, int planDays)
+    {
+        var normalizedPlanDays = NormalizePlanDays(planDays);
+        return Math.Clamp(cookDays, 1, normalizedPlanDays);
     }
 
     private static int RoundToNearestFiveMinutes(int minutes)
@@ -4162,6 +4243,9 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         int requestedMealCount,
         bool compactJson = false)
     {
+        var planDays = NormalizePlanDays(request.PlanDays);
+        var normalizedCookDays = NormalizeCookDays(cookDays, planDays);
+        var leftoverDays = Math.Max(0, planDays - normalizedCookDays);
         var strictModes = context.DietaryModes
             .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
             .ToArray();
@@ -4176,14 +4260,16 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             : request.PantryItems!;
 
         return $$"""
-Generate a weekly dinner plan for a UK grocery-planning app.
+Generate a multi-day dinner plan for a UK grocery-planning app.
 
 Planner inputs:
 - Supermarket: {{context.Supermarket}}
 - Weekly budget: {{request.WeeklyBudget.ToString("0.##", CultureInfo.InvariantCulture)}} GBP
 - Household size: {{request.HouseholdSize}}
 - Portion size: {{context.PortionSize}}
-- Cook days this week: {{cookDays}}
+- Plan days: {{planDays}}
+- Cook days: {{normalizedCookDays}}
+- Leftover days from double portions: {{leftoverDays}}
 - Prefer quick meals: {{(request.PreferQuickMeals ? "yes" : "no")}}
 - Dietary requirements: {{strictModeText}}
 - Dislikes or allergens: {{dislikesText}}
@@ -4191,7 +4277,7 @@ Planner inputs:
 
 Rules:
 - Return exactly {{requestedMealCount}} dinners in `meals`.
-{{(requestedMealCount > cookDays ? $"- The app will display {cookDays} meals and keep the rest as spare alternatives, so include a little variety across the batch." : string.Empty)}}
+{{(requestedMealCount > normalizedCookDays ? $"- The app will display {normalizedCookDays} meals and keep the rest as spare alternatives, so include a little variety across the batch." : string.Empty)}}
 - Use UK English.
 - Meals must be realistic for a UK supermarket shop.
 - Use typical UK non-promo shelf prices (no loyalty-only offers, markdowns, or extreme bulk discounts).
@@ -5231,11 +5317,13 @@ Return JSON only with this schema:
 
     private static IReadOnlyList<int> BuildMealPortionMultipliers(
         int cookDays,
+        int planDays,
         int leftoverDays,
         IReadOnlyList<int>? requestedLeftoverSourceDays = null)
     {
-        var normalizedCookDays = NormalizeCookDays(cookDays);
-        var normalizedLeftoverDays = Math.Clamp(leftoverDays, 0, 7 - normalizedCookDays);
+        var normalizedPlanDays = NormalizePlanDays(planDays);
+        var normalizedCookDays = NormalizeCookDays(cookDays, normalizedPlanDays);
+        var normalizedLeftoverDays = Math.Clamp(leftoverDays, 0, normalizedPlanDays - normalizedCookDays);
         var defaultMultipliers = Enumerable.Repeat(1, normalizedCookDays).ToArray();
         for (var i = 0; i < normalizedLeftoverDays; i++)
         {
@@ -5248,7 +5336,7 @@ Return JSON only with this schema:
         }
 
         var requestedWeekDays = (requestedLeftoverSourceDays ?? [])
-            .Where(dayIndex => dayIndex >= 0 && dayIndex < 7)
+            .Where(dayIndex => dayIndex >= 0 && dayIndex < normalizedPlanDays)
             .Take(normalizedLeftoverDays)
             .ToList();
 
@@ -5257,7 +5345,7 @@ Return JSON only with this schema:
             return defaultMultipliers;
         }
 
-        var candidates = BuildMealPortionMultiplierCandidates(normalizedCookDays).ToList();
+        var candidates = BuildMealPortionMultiplierCandidates(normalizedCookDays, normalizedPlanDays).ToList();
         if (candidates.Count == 0)
         {
             return defaultMultipliers;
@@ -5284,10 +5372,12 @@ Return JSON only with this schema:
     private static IReadOnlyList<int> ParseRequestedLeftoverSourceDays(
         string? leftoverCookDayIndexesCsv,
         int cookDays,
+        int planDays,
         int leftoverDays)
     {
-        var normalizedCookDays = NormalizeCookDays(cookDays);
-        var normalizedLeftoverDays = Math.Clamp(leftoverDays, 0, 7 - normalizedCookDays);
+        var normalizedPlanDays = NormalizePlanDays(planDays);
+        var normalizedCookDays = NormalizeCookDays(cookDays, normalizedPlanDays);
+        var normalizedLeftoverDays = Math.Clamp(leftoverDays, 0, normalizedPlanDays - normalizedCookDays);
         if (normalizedLeftoverDays == 0 || string.IsNullOrWhiteSpace(leftoverCookDayIndexesCsv))
         {
             return [];
@@ -5309,7 +5399,7 @@ Return JSON only with this schema:
                 continue;
             }
 
-            if (dayIndex < 0 || dayIndex >= 7)
+            if (dayIndex < 0 || dayIndex >= normalizedPlanDays)
             {
                 continue;
             }
@@ -5322,9 +5412,15 @@ Return JSON only with this schema:
 
     private static IEnumerable<int[]> BuildMealPortionMultiplierCandidates(int cookDays)
     {
-        var normalizedCookDays = NormalizeCookDays(cookDays);
+        return BuildMealPortionMultiplierCandidates(cookDays, 7);
+    }
+
+    private static IEnumerable<int[]> BuildMealPortionMultiplierCandidates(int cookDays, int planDays)
+    {
+        var normalizedPlanDays = NormalizePlanDays(planDays);
+        var normalizedCookDays = NormalizeCookDays(cookDays, normalizedPlanDays);
         var candidate = new int[normalizedCookDays];
-        foreach (var composition in BuildMultiplierCompositions(0, normalizedCookDays, 7, candidate))
+        foreach (var composition in BuildMultiplierCompositions(0, normalizedCookDays, normalizedPlanDays, candidate))
         {
             yield return composition;
         }
@@ -5433,8 +5529,19 @@ Return JSON only with this schema:
 
     private static string NormalizeSupermarket(string value)
     {
+        if (value.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Other";
+        }
+
         var selected = SupportedSupermarkets.FirstOrDefault(x => x.Equals(value, StringComparison.OrdinalIgnoreCase));
         return selected ?? SupportedSupermarkets[0];
+    }
+
+    private static bool IsOtherSupermarket(string supermarket)
+    {
+        return supermarket.Equals("Other", StringComparison.OrdinalIgnoreCase) ||
+               supermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizePortionSize(string value)
@@ -5478,7 +5585,7 @@ Return JSON only with this schema:
 
     private IReadOnlyList<string> ResolveAisleOrder(string supermarket, string customAisleOrder)
     {
-        if (supermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+        if (IsOtherSupermarket(supermarket))
         {
             var custom = customAisleOrder
                 .Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -5657,7 +5764,7 @@ Return JSON only with this schema:
         CancellationToken cancellationToken)
     {
         var normalizedSupermarket = NormalizeSupermarket(supermarket);
-        if (normalizedSupermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase) || !CanUseOnlineLayoutDiscovery())
+        if (IsOtherSupermarket(normalizedSupermarket) || !CanUseOnlineLayoutDiscovery())
         {
             return null;
         }
@@ -5711,7 +5818,7 @@ Return JSON only with this schema:
     private void QueueSupermarketLayoutRefresh(string supermarket)
     {
         var normalizedSupermarket = NormalizeSupermarket(supermarket);
-        if (normalizedSupermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+        if (IsOtherSupermarket(normalizedSupermarket))
         {
             return;
         }

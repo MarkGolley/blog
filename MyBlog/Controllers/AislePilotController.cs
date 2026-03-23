@@ -161,7 +161,7 @@ public class AislePilotController(
         PersistSetupState(request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequest(request);
-        var cookDays = Math.Clamp(request.CookDays, 1, 7);
+        var cookDays = Math.Clamp(request.CookDays, 1, Math.Clamp(request.PlanDays, 1, 7));
 
         if (dayIndex < 0 || dayIndex >= cookDays)
         {
@@ -173,7 +173,7 @@ public class AislePilotController(
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
-        var seenMealNames = GetSeenMealsForDay(request.SwapHistoryState, dayIndex, currentMealName);
+        var seenMealNames = GetSeenMealsForPlan(request.SwapHistoryState, currentMealName);
 
         try
         {
@@ -360,12 +360,19 @@ public class AislePilotController(
     {
         var normalized = request ?? new AislePilotRequestModel();
         normalized.Supermarket = normalized.Supermarket?.Trim() ?? string.Empty;
+        if (string.Equals(normalized.Supermarket, "Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized.Supermarket = "Other";
+        }
+
         normalized.PortionSize = normalized.PortionSize?.Trim() ?? string.Empty;
         normalized.CustomAisleOrder = normalized.CustomAisleOrder?.Trim() ?? string.Empty;
         normalized.DislikesOrAllergens = normalized.DislikesOrAllergens?.Trim() ?? string.Empty;
         normalized.PantryItems = normalized.PantryItems?.Trim() ?? string.Empty;
         normalized.LeftoverCookDayIndexesCsv = normalized.LeftoverCookDayIndexesCsv?.Trim() ?? string.Empty;
         normalized.SwapHistoryState = normalized.SwapHistoryState?.Trim() ?? string.Empty;
+        normalized.PlanDays = Math.Clamp(normalized.PlanDays, 1, 7);
+        normalized.CookDays = Math.Clamp(normalized.CookDays, 1, normalized.PlanDays);
         normalized.DietaryModes = normalized.DietaryModes?
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
@@ -374,12 +381,14 @@ public class AislePilotController(
         return normalized;
     }
 
-    private static IReadOnlyList<string> GetSeenMealsForDay(string? swapHistoryState, int dayIndex, string? currentMealName)
+    private static IReadOnlyList<string> GetSeenMealsForPlan(string? swapHistoryState, string? currentMealName)
     {
         var history = ParseSwapHistoryState(swapHistoryState);
-        var seenMeals = history.TryGetValue(dayIndex, out var names)
-            ? names
-            : [];
+        var seenMeals = history.Values
+            .SelectMany(names => names)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         if (string.IsNullOrWhiteSpace(currentMealName))
         {
@@ -469,6 +478,7 @@ public class AislePilotController(
             Supermarket = request.Supermarket,
             WeeklyBudget = request.WeeklyBudget,
             HouseholdSize = request.HouseholdSize,
+            PlanDays = request.PlanDays,
             CookDays = request.CookDays,
             PortionSize = request.PortionSize,
             DietaryModes = request.DietaryModes.ToList(),
@@ -517,7 +527,8 @@ public class AislePilotController(
                 Supermarket = state.Supermarket ?? string.Empty,
                 WeeklyBudget = Math.Clamp(state.WeeklyBudget, 15m, 600m),
                 HouseholdSize = Math.Clamp(state.HouseholdSize, 1, 8),
-                CookDays = Math.Clamp(state.CookDays, 1, 7),
+                PlanDays = Math.Clamp(state.PlanDays, 1, 7),
+                CookDays = Math.Clamp(state.CookDays, 1, Math.Clamp(state.PlanDays, 1, 7)),
                 PortionSize = state.PortionSize ?? string.Empty,
                 DietaryModes = state.DietaryModes?
                     .Where(mode => !string.IsNullOrWhiteSpace(mode))
@@ -566,14 +577,15 @@ public class AislePilotController(
             ModelState.AddModelError("Request.DietaryModes", "Choose at least one dietary mode.");
         }
 
-        if (string.Equals(request.Supermarket, "Custom", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(request.Supermarket, "Other", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(request.Supermarket, "Custom", StringComparison.OrdinalIgnoreCase))
         {
             var customAisles = ParseCustomAisles(request.CustomAisleOrder);
             if (customAisles.Count < 3)
             {
                 ModelState.AddModelError(
                     "Request.CustomAisleOrder",
-                    "Add at least 3 comma-separated aisles when using Custom supermarket.");
+                    "Add at least 3 comma-separated aisles when using Other supermarket.");
             }
         }
 
@@ -671,6 +683,7 @@ public class AislePilotController(
             ("Supermarket", result.Supermarket),
             ("Portion size", result.PortionSize),
             ("Household size", request.HouseholdSize.ToString(ukCulture)),
+            ("Plan days", result.PlanDays.ToString(ukCulture)),
             ("Cook days", result.CookDays.ToString(ukCulture)),
             ("Leftover days", result.LeftoverDays.ToString(ukCulture)),
             ("Dietary requirements", dietaryModesText),
@@ -1073,6 +1086,7 @@ public class AislePilotController(
         public string? Supermarket { get; set; }
         public decimal WeeklyBudget { get; set; } = 65m;
         public int HouseholdSize { get; set; } = 2;
+        public int PlanDays { get; set; } = 7;
         public int CookDays { get; set; } = 7;
         public string? PortionSize { get; set; }
         public List<string> DietaryModes { get; set; } = [];

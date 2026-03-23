@@ -226,6 +226,47 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithFivePlanDaysAndThreeCookDays_ReturnsThreeMealsAndTwoLeftoverDays()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 5,
+            CookDays = 3
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(5, result.PlanDays);
+        Assert.Equal(3, result.CookDays);
+        Assert.Equal(2, result.LeftoverDays);
+        Assert.Equal(3, result.MealPlan.Count);
+        Assert.Equal(5, result.MealPlan.Sum(meal => 1 + meal.LeftoverDaysCovered));
+        Assert.Equal("Monday", result.MealPlan[0].Day);
+        Assert.Equal("Wednesday", result.MealPlan[1].Day);
+        Assert.Equal("Friday", result.MealPlan[2].Day);
+    }
+
+    [Fact]
+    public void BuildPlan_WhenCookDaysExceedsPlanDays_ClampsCookDaysToPlanDays()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 3,
+            CookDays = 5
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(3, result.PlanDays);
+        Assert.Equal(3, result.CookDays);
+        Assert.Equal(0, result.LeftoverDays);
+        Assert.Equal(3, result.MealPlan.Count);
+        Assert.All(result.MealPlan, meal => Assert.Equal(0, meal.LeftoverDaysCovered));
+    }
+
+    [Fact]
     public void BuildPlan_WithRequestedLeftoverSourceDays_AppliesCustomDistribution()
     {
         var request = new AislePilotRequestModel

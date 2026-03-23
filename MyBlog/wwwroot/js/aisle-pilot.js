@@ -246,6 +246,39 @@
                 rangeInput.addEventListener("change", applyNumberValue);
                 applyNumberValue();
             });
+
+            const planDaysRange = form.querySelector("[data-plan-days-range]");
+            const cookDaysRange = form.querySelector("[data-cook-days-range]");
+            const cookDaysHint = form.querySelector("[data-cook-days-hint]");
+            if (
+                planDaysRange instanceof HTMLInputElement &&
+                cookDaysRange instanceof HTMLInputElement &&
+                planDaysRange.dataset.planCookLinkWired !== "true"
+            ) {
+                const syncCookDayLimit = () => {
+                    const parsedPlanDays = Number.parseInt(planDaysRange.value ?? "7", 10);
+                    const maxCookDays = Number.isInteger(parsedPlanDays)
+                        ? Math.min(7, Math.max(1, parsedPlanDays))
+                        : 7;
+                    cookDaysRange.max = `${maxCookDays}`;
+
+                    const parsedCookDays = Number.parseInt(cookDaysRange.value ?? "1", 10);
+                    if (!Number.isInteger(parsedCookDays) || parsedCookDays > maxCookDays) {
+                        cookDaysRange.value = `${maxCookDays}`;
+                    }
+
+                    if (cookDaysHint instanceof HTMLElement) {
+                        cookDaysHint.textContent = `1 to ${maxCookDays}`;
+                    }
+
+                    cookDaysRange.dispatchEvent(new Event("input", { bubbles: true }));
+                };
+
+                planDaysRange.dataset.planCookLinkWired = "true";
+                planDaysRange.addEventListener("input", syncCookDayLimit);
+                planDaysRange.addEventListener("change", syncCookDayLimit);
+                syncCookDayLimit();
+            }
         });
     };
 
@@ -276,7 +309,8 @@
             return;
         }
 
-        const isCustomSupermarket = selectedSupermarket.trim().toLowerCase() === "custom";
+        const normalizedSupermarket = selectedSupermarket.trim().toLowerCase();
+        const isCustomSupermarket = normalizedSupermarket === "other" || normalizedSupermarket === "custom";
         if (isCustomSupermarket) {
             if (storeLayoutSection instanceof HTMLElement) {
                 storeLayoutSection.removeAttribute("hidden");
@@ -1406,6 +1440,38 @@
         void pollMealImagesOnce();
     };
 
+    const wireMealImageErrorFallbacks = scope => {
+        const pollRoot = scope instanceof Element && scope.matches("[data-meal-image-poll-root]")
+            ? scope
+            : (scope instanceof Element
+                ? scope.querySelector("[data-meal-image-poll-root]")
+                : document.querySelector("[data-meal-image-poll-root]"));
+        if (!(pollRoot instanceof HTMLElement)) {
+            return;
+        }
+
+        const fallbackImageUrl = pollRoot.dataset.fallbackMealImageUrl?.trim() || "/images/aislepilot-icon.svg";
+        const fallbackPath = normalizeImagePath(fallbackImageUrl);
+        const imageElements = Array.from(pollRoot.querySelectorAll("img[data-meal-image][data-meal-name]"))
+            .filter(node => node instanceof HTMLImageElement);
+
+        imageElements.forEach(imageElement => {
+            if (!(imageElement instanceof HTMLImageElement) || imageElement.dataset.mealImageErrorWired === "true") {
+                return;
+            }
+
+            imageElement.dataset.mealImageErrorWired = "true";
+            imageElement.addEventListener("error", () => {
+                const currentSrc = imageElement.currentSrc || imageElement.getAttribute("src") || "";
+                if (normalizeImagePath(currentSrc) !== fallbackPath) {
+                    imageElement.src = fallbackImageUrl;
+                }
+
+                startMealImagePolling();
+            });
+        });
+    };
+
     const replaceSectionContent = (responseDocument, selector) => {
         const currentSection = document.querySelector(selector);
         const nextSection = responseDocument.querySelector(selector);
@@ -1593,6 +1659,7 @@
         wireLeftoverPlanner(document);
         wireAjaxSwapHandlers(document);
         wireNotesExportButtons(document);
+        wireMealImageErrorFallbacks(document);
         startMealImagePolling();
         syncSetupToggleState();
         observeActivePanelHeight();
@@ -1728,6 +1795,7 @@
     wirePreserveScrollHandlers(document);
     wireLeftoverPlanner(document);
     wireAjaxSwapHandlers(document);
+    wireMealImageErrorFallbacks(document);
     startMealImagePolling();
 
     document.addEventListener("visibilitychange", () => {

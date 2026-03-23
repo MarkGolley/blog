@@ -27,7 +27,11 @@
     }
     var portionSizeSliderValues = string.Join("|", portionSizeOptions);
     var selectedPortionSize = portionSizeOptions[selectedPortionSizeIndex];
-    var isCustomSupermarketSelected = string.Equals(selectedSupermarket, "Custom", StringComparison.OrdinalIgnoreCase);
+    var selectedPlanDays = Math.Clamp(Model.Request.PlanDays, 1, 7);
+    var selectedCookDays = Math.Clamp(Model.Request.CookDays, 1, selectedPlanDays);
+    var isCustomSupermarketSelected =
+        string.Equals(selectedSupermarket, "Other", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(selectedSupermarket, "Custom", StringComparison.OrdinalIgnoreCase);
     var selectedDietary = Model.Request.DietaryModes.ToHashSet(StringComparer.OrdinalIgnoreCase);
     var hasResult = Model.HasResult && Model.Result is not null;
     var setupHiddenAttribute = hasResult ? "hidden" : null;
@@ -285,18 +289,37 @@
                         </div>
 
                         <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
-                            <label asp-for="Request.CookDays">Cook days</label>
-                            <input asp-for="Request.CookDays"
+                            <label asp-for="Request.PlanDays">Plan days</label>
+                            <input asp-for="Request.PlanDays"
                                    type="range"
                                    min="1"
                                    max="7"
                                    step="1"
                                    class="aislepilot-slider-input"
                                    data-number-slider-range
-                                   data-number-slider-decimals="0" />
+                                   data-number-slider-decimals="0"
+                                   data-plan-days-range />
                             <div class="aislepilot-slider-meta">
-                                <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.CookDays</span>
+                                <span class="aislepilot-slider-value" data-number-slider-value>@selectedPlanDays</span>
                                 <span class="aislepilot-slider-hint">1 to 7</span>
+                            </div>
+                            <span asp-validation-for="Request.PlanDays" class="text-danger"></span>
+                        </div>
+
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                            <label asp-for="Request.CookDays">Cook days</label>
+                            <input asp-for="Request.CookDays"
+                                   type="range"
+                                   min="1"
+                                   max="@selectedPlanDays"
+                                   step="1"
+                                   class="aislepilot-slider-input"
+                                   data-number-slider-range
+                                   data-number-slider-decimals="0"
+                                   data-cook-days-range />
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
+                                <span class="aislepilot-slider-hint" data-cook-days-hint>1 to @selectedPlanDays</span>
                             </div>
                             <span asp-validation-for="Request.CookDays" class="text-danger"></span>
                         </div>
@@ -384,8 +407,8 @@
                                 Store layout
                             </span>
                         </legend>
-                        <div class="aislepilot-field" data-custom-aisle-field @customAisleFieldHiddenAttribute>
-                            <label asp-for="Request.CustomAisleOrder">Custom aisle order (only for Custom supermarket)</label>
+                        <div class="aislepilot-field aislepilot-field-optional" data-custom-aisle-field @customAisleFieldHiddenAttribute>
+                            <label asp-for="Request.CustomAisleOrder">Aisle Order</label>
                             <input asp-for="Request.CustomAisleOrder" placeholder="Produce, Bakery, Dairy & Eggs, Frozen, Tins & Dry Goods..." />
                             <span asp-validation-for="Request.CustomAisleOrder" class="text-danger"></span>
                         </div>
@@ -491,15 +514,18 @@
         .GroupBy(item => item.Department)
         .OrderBy(group => aisleRank.GetValueOrDefault(group.Key, int.MaxValue))
         .ToList();
-    var weekDayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
-    var weekDayShortLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
-    var weekDayLookup = weekDayNames
+    var allWeekDayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+    var allWeekDayShortLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
+    var planDays = Math.Clamp(result.PlanDays, 1, 7);
+    var weekDayNames = allWeekDayNames.Take(planDays).ToArray();
+    var weekDayShortLabels = allWeekDayShortLabels.Take(planDays).ToArray();
+    var weekDayLookup = allWeekDayNames
         .Select((name, index) => new { name, index })
         .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
     var leftoverSourceWeekDayIndexes = result.MealPlan
         .SelectMany(meal =>
         {
-            if (!weekDayLookup.TryGetValue(meal.Day, out var weekDayIndex))
+            if (!weekDayLookup.TryGetValue(meal.Day, out var weekDayIndex) || weekDayIndex >= planDays)
             {
                 return Enumerable.Empty<int>();
             }
@@ -540,6 +566,7 @@
                     <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                     <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
                     <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
+                    <input type="hidden" name="Request.PlanDays" value="@Model.Request.PlanDays" />
                     <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                     <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                     <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -583,6 +610,7 @@
                     <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                     <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
                     <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
+                    <input type="hidden" name="Request.PlanDays" value="@Model.Request.PlanDays" />
                     <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                     <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                     <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -628,6 +656,10 @@
                 <p class="aislepilot-stat-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                     @result.BudgetDelta.ToString("C", ukCulture)
                 </p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Plan days</p>
+                <p class="aislepilot-stat-value">@result.PlanDays</p>
             </article>
             <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Cook days</p>
@@ -718,6 +750,7 @@
                                     <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                                     <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
                                     <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
+                                    <input type="hidden" name="Request.PlanDays" value="@Model.Request.PlanDays" />
                                     <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                                     <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                                     <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -856,6 +889,7 @@
                                         <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                                         <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
                                         <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
+                                        <input type="hidden" name="Request.PlanDays" value="@Model.Request.PlanDays" />
                                         <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                                         <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                                         <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -924,6 +958,7 @@
                             <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                             <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
                             <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
+                            <input type="hidden" name="Request.PlanDays" value="@Model.Request.PlanDays" />
                             <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                             <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                             <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
@@ -945,6 +980,7 @@
                             <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
                             <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
                             <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
+                            <input type="hidden" name="Request.PlanDays" value="@Model.Request.PlanDays" />
                             <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
                             <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
                             <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />

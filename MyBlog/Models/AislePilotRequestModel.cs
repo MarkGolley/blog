@@ -13,6 +13,9 @@ public sealed class AislePilotRequestModel
     [Range(1, 8, ErrorMessage = "People must be between 1 and 8.")]
     public int HouseholdSize { get; set; } = 2;
 
+    [Range(1, 7, ErrorMessage = "Choose between 1 and 7 plan days.")]
+    public int PlanDays { get; set; } = 7;
+
     [Range(1, 7, ErrorMessage = "Choose between 1 and 7 cook days.")]
     public int CookDays { get; set; } = 7;
 

@@ -318,6 +318,34 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task Index_Post_WithFivePlanDaysAndThreeCookDays_ShowsPlanDaysAndLeftovers()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "5",
+            ["Request.CookDays"] = "3",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Plan days", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">5<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Leftovers", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("2 day(s)", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Post_WithCustomLeftoverAssignment_ShowsDoubleLeftoverOnRequestedDay()
     {
         using var client = CreateClient(allowAutoRedirect: true);
