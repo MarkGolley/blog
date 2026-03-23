@@ -131,6 +131,7 @@ builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SubscriptionEmailService>();
 builder.Services.AddHttpClient<AislePilotService>();
 builder.Services.AddScoped<IAislePilotService>(sp => sp.GetRequiredService<AislePilotService>());
+builder.Services.AddScoped<IAislePilotExportService, AislePilotExportService>();
 builder.Services.AddHttpClient<AIModerationService>();
 builder.Services.AddHttpClient<DailyCodingCapsuleService>();
 builder.Services.AddTransient<IDailyCodingCapsuleProvider>(sp => sp.GetRequiredService<DailyCodingCapsuleService>());
