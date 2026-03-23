@@ -1,5 +1,11 @@
 [CmdletBinding()]
 param(
+    [ValidateSet("Production", "Staging")]
+    [string]$EnvironmentName = "Production",
+    [string]$ProjectId = "my-blog-website-470819",
+    [string]$Region = "europe-west2",
+    [string]$Service = "",
+    [string]$PublicBaseUrl = "",
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
     [switch]$SkipProductionSmokeCheck,
@@ -70,11 +76,52 @@ function Ensure-DockerRunning {
     throw "Docker did not become ready within $TimeoutSeconds seconds. Check Docker Desktop and rerun deploy."
 }
 
-$project = "my-blog-website-470819"
-$service = "myblog-app"
-$region = "europe-west2"
-$tag = Get-Date -Format "yyyyMMdd-HHmmss"
-$image = "gcr.io/$project/${service}:$tag"
+function Resolve-DeploymentTarget {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EnvironmentName,
+        [Parameter(Mandatory = $false)]
+        [string]$Service,
+        [Parameter(Mandatory = $false)]
+        [string]$PublicBaseUrl
+    )
+
+    $normalizedEnvironment = $EnvironmentName.Trim().ToLowerInvariant()
+
+    switch ($normalizedEnvironment) {
+        "production" {
+            $defaultService = "myblog-app"
+            $defaultPublicBaseUrl = "https://markgolley.dev"
+            $aspNetCoreEnvironment = "Production"
+        }
+        "staging" {
+            $defaultService = "myblog-app-staging"
+            $defaultPublicBaseUrl = ""
+            $aspNetCoreEnvironment = "Staging"
+        }
+        default {
+            throw "Unsupported EnvironmentName '$EnvironmentName'."
+        }
+    }
+
+    $effectiveService = if ([string]::IsNullOrWhiteSpace($Service)) { $defaultService } else { $Service.Trim() }
+    $effectivePublicBaseUrl = if ([string]::IsNullOrWhiteSpace($PublicBaseUrl)) { $defaultPublicBaseUrl } else { $PublicBaseUrl.Trim() }
+
+    [PSCustomObject]@{
+        EnvironmentName      = if ($normalizedEnvironment -eq "staging") { "Staging" } else { "Production" }
+        AspNetCoreEnvironment = $aspNetCoreEnvironment
+        Service              = $effectiveService
+        PublicBaseUrl        = $effectivePublicBaseUrl
+    }
+}
+
+$deploymentTarget = Resolve-DeploymentTarget `
+    -EnvironmentName $EnvironmentName `
+    -Service $Service `
+    -PublicBaseUrl $PublicBaseUrl
+
+$tag = "{0}-{1}" -f $deploymentTarget.EnvironmentName.ToLowerInvariant(), (Get-Date -Format "yyyyMMdd-HHmmss")
+$image = "gcr.io/$ProjectId/$($deploymentTarget.Service):$tag"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
 Push-Location $repoRoot
@@ -121,16 +168,29 @@ try {
         -Command "docker" `
         -Arguments @("push", $image)
 
+    $envVars = @(
+        "APP_VERSION=$tag",
+        "ASPNETCORE_ENVIRONMENT=$($deploymentTarget.AspNetCoreEnvironment)"
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($deploymentTarget.PublicBaseUrl)) {
+        $envVars += "Site__PublicBaseUrl=$($deploymentTarget.PublicBaseUrl)"
+    }
+
+    $envVarsArgument = [string]::Join(",", $envVars)
+
     Invoke-External `
-        -Label "Deploying to Cloud Run" `
+        -Label "Deploying to Cloud Run ($($deploymentTarget.EnvironmentName))" `
         -Command "gcloud" `
         -Arguments @(
-            "run", "deploy", $service,
+            "run", "deploy", $deploymentTarget.Service,
             "--image", $image,
-            "--region", $region,
+            "--region", $Region,
+            "--project", $ProjectId,
             "--platform", "managed",
             "--allow-unauthenticated",
-            "--set-env-vars", "APP_VERSION=$tag",
+            "--set-env-vars", $envVarsArgument,
+            "--labels", "environment=$($deploymentTarget.EnvironmentName.ToLowerInvariant())",
             "--memory=256Mi",
             "--cpu=0.25",
             "--concurrency=1",
@@ -140,22 +200,36 @@ try {
         )
 
     if (-not $SkipProductionSmokeCheck) {
+        $smokePublicBaseUrl = $deploymentTarget.PublicBaseUrl
+        if ([string]::IsNullOrWhiteSpace($smokePublicBaseUrl)) {
+            $resolvedDirectBaseUrl = & gcloud run services describe $deploymentTarget.Service --region $Region --project $ProjectId --format "value(status.url)"
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resolvedDirectBaseUrl)) {
+                throw "Unable to resolve Cloud Run service URL for smoke checks. Provide -PublicBaseUrl or check gcloud access."
+            }
+
+            $smokePublicBaseUrl = $resolvedDirectBaseUrl.Trim().TrimEnd("/")
+            Write-Host "PublicBaseUrl not provided for $($deploymentTarget.EnvironmentName). Using direct Cloud Run URL for smoke checks: $smokePublicBaseUrl"
+        }
+
         Invoke-External `
-            -Label "Running production auth smoke checks" `
+            -Label "Running auth smoke checks ($($deploymentTarget.EnvironmentName))" `
             -Command "powershell" `
             -Arguments @(
                 "-NoProfile",
                 "-ExecutionPolicy", "Bypass",
                 "-File", (Join-Path $repoRoot "Deployment\verify-production-auth.ps1"),
-                "-ProjectId", $project,
-                "-Service", $service,
-                "-Region", $region
+                "-PublicBaseUrl", $smokePublicBaseUrl,
+                "-ProjectId", $ProjectId,
+                "-Service", $deploymentTarget.Service,
+                "-Region", $Region
             )
     }
     else {
-        Write-Host "Skipping production auth smoke checks because -SkipProductionSmokeCheck was provided."
+        Write-Host "Skipping auth smoke checks because -SkipProductionSmokeCheck was provided."
     }
 
+    Write-Host "Environment: $($deploymentTarget.EnvironmentName)"
+    Write-Host "Service: $($deploymentTarget.Service)"
     Write-Host "Deployed image: $image"
     Write-Host "APP_VERSION set to: $tag"
 }

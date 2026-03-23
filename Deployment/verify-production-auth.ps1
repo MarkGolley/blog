@@ -515,4 +515,4 @@ if ($FailOnLowAislePilotMeals) {
 }
 
 Write-Host ""
-Write-Host "Production smoke checks passed."
+Write-Host "Smoke checks passed."
