@@ -823,7 +823,7 @@
                                           data-ajax-swap-form>
                                         @Html.AntiForgeryToken()
                                         <partial name="_AislePilotHiddenRequestFields"
-                                                 model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                                                 model="BuildHiddenRequestFields()" />
                                         <input type="hidden" name="dayIndex" value="@mealIndex" />
                                         <input type="hidden" name="currentMealName" value="@meal.MealName" />
                                         <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping..." data-loading-delay-ms="220">

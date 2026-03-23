@@ -15,6 +15,7 @@ public class AislePilotController(
     ILogger<AislePilotController> logger) : Controller
 {
     private const string SetupStateCookieName = "aislepilot.setup.v1";
+    private const string CurrentPlanStateCookieName = "aislepilot.plan.v1";
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -46,6 +47,7 @@ public class AislePilotController(
         try
         {
             var result = await aislePilotService.BuildPlanAsync(request, cancellationToken);
+            PersistCurrentPlanState(result);
             return View(BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
         }
         catch (InvalidOperationException ex)
@@ -83,10 +85,12 @@ public class AislePilotController(
 
         try
         {
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
             var result = await aislePilotService.BuildPlanWithBudgetRebalanceAsync(
                 request,
-                currentPlanMealNames: currentPlanMealNames,
+                currentPlanMealNames: resolvedCurrentPlanMealNames,
                 cancellationToken: cancellationToken);
+            PersistCurrentPlanState(result);
             return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
         }
         catch (InvalidOperationException ex)
@@ -170,11 +174,12 @@ public class AislePilotController(
 
         try
         {
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
             var result = await aislePilotService.SwapMealForDayAsync(
                 request,
                 dayIndex,
                 currentMealName,
-                currentPlanMealNames,
+                resolvedCurrentPlanMealNames,
                 seenMealNames,
                 cancellationToken);
             request.SwapHistoryState = UpdateSwapHistoryState(
@@ -182,7 +187,14 @@ public class AislePilotController(
                 dayIndex,
                 currentMealName,
                 result.MealPlan.ElementAtOrDefault(dayIndex)?.MealName);
-            return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+            PersistCurrentPlanState(result);
+            var responseModel = BuildPageModel(request, result, returnUrl: resolvedReturnUrl);
+            if (IsAjaxRequest())
+            {
+                return PartialView("_AislePilotResultSections", responseModel);
+            }
+
+            return View("Index", responseModel);
         }
         catch (InvalidOperationException ex)
         {
@@ -313,9 +325,10 @@ public class AislePilotController(
         IReadOnlyList<string>? currentPlanMealNames,
         CancellationToken cancellationToken)
     {
-        if (currentPlanMealNames is not null && currentPlanMealNames.Count > 0)
+        var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+        if (resolvedCurrentPlanMealNames is not null && resolvedCurrentPlanMealNames.Count > 0)
         {
-            return await aislePilotService.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames, cancellationToken);
+            return await aislePilotService.BuildPlanFromCurrentMealsAsync(request, resolvedCurrentPlanMealNames, cancellationToken);
         }
 
         logger.LogWarning("AislePilot export request did not include currentPlanMealNames; regenerating plan.");
@@ -375,6 +388,39 @@ public class AislePilotController(
 
         var path = url.Split('?', '#')[0];
         return path.StartsWith("/projects/aisle-pilot", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IReadOnlyList<string>? ResolveCurrentPlanMealNames(IReadOnlyList<string>? postedCurrentPlanMealNames)
+    {
+        var normalizedFromRequest = NormalizeCurrentPlanMealNames(postedCurrentPlanMealNames);
+        if (normalizedFromRequest is not null && normalizedFromRequest.Count > 0)
+        {
+            return normalizedFromRequest;
+        }
+
+        return TryReadCurrentPlanState();
+    }
+
+    private static IReadOnlyList<string>? NormalizeCurrentPlanMealNames(IReadOnlyList<string>? mealNames)
+    {
+        if (mealNames is null || mealNames.Count == 0)
+        {
+            return null;
+        }
+
+        var normalized = mealNames
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .ToList();
+        return normalized.Count > 0 ? normalized : null;
+    }
+
+    private bool IsAjaxRequest()
+    {
+        return string.Equals(
+            Request.Headers["X-Requested-With"],
+            "XMLHttpRequest",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private AislePilotRequestModel NormalizeRequest(AislePilotRequestModel? request)
@@ -550,6 +596,54 @@ public class AislePilotController(
                 PantryItems = state.PantryItems ?? string.Empty,
                 PreferQuickMeals = state.PreferQuickMeals
             };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void PersistCurrentPlanState(AislePilotPlanResultViewModel result)
+    {
+        var mealNames = result.MealPlan
+            .Select(meal => meal.MealName?.Trim() ?? string.Empty)
+            .Where(name => name.Length > 0)
+            .ToList();
+        if (mealNames.Count == 0)
+        {
+            return;
+        }
+
+        var payload = JsonSerializer.Serialize(mealNames, SetupStateJsonOptions);
+        if (payload.Length > 3500)
+        {
+            return;
+        }
+
+        Response.Cookies.Append(
+            CurrentPlanStateCookieName,
+            payload,
+            new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddDays(3),
+                IsEssential = true,
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = Request.IsHttps
+            });
+    }
+
+    private IReadOnlyList<string>? TryReadCurrentPlanState()
+    {
+        if (!Request.Cookies.TryGetValue(CurrentPlanStateCookieName, out var payload) || string.IsNullOrWhiteSpace(payload))
+        {
+            return null;
+        }
+
+        try
+        {
+            var mealNames = JsonSerializer.Deserialize<List<string>>(payload, SetupStateJsonOptions);
+            return NormalizeCurrentPlanMealNames(mealNames);
         }
         catch
         {

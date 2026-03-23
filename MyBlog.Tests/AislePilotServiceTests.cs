@@ -1006,7 +1006,7 @@ public class AislePilotServiceTests
 
         var result = service.BuildPlan(request);
 
-        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(2, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
         Assert.Equal("Template fallback", result.PlanSourceLabel);
         Assert.Equal(7, result.MealPlan.Count);

@@ -35,11 +35,12 @@ public sealed class AislePilotService : IAislePilotService
     private const string OpenAiChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
     private const string OpenAiResponsesEndpoint = "https://api.openai.com/v1/responses";
     private const string OpenAiImageGenerationsEndpoint = "https://api.openai.com/v1/images/generations";
-    private const int OpenAiMaxAttempts = 1;
-    private const int OpenAiImageMaxAttempts = 1;
+    private const int OpenAiMaxAttempts = 2;
+    private const int OpenAiImageMaxAttempts = 2;
     private const int MaxMealImageBytesForFirestore = 700_000;
     private const int MealImageChunkCharLength = 180_000;
     private const string MealImageChunksSubcollection = "chunks";
+    private const int MaxMealImageMissCacheEntries = 2048;
     private const int MaxAiMealPoolEntries = 320;
     private const int SupermarketLayoutCacheVersion = 2;
     private const int SupermarketLayoutRefreshCooldownMinutes = 120;
@@ -54,11 +55,14 @@ public sealed class AislePilotService : IAislePilotService
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
     private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan AiMealPoolEntryTtl = TimeSpan.FromHours(24);
+    private static readonly TimeSpan MealImageLookupMissTtl = TimeSpan.FromSeconds(45);
 
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> AiMealPoolLastTouchedUtc =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string> MealImagePool = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, DateTime> MealImageLookupMissesUtc =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> MealImageGenerationInFlight = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, SupermarketLayoutCacheEntry> SupermarketLayoutCache =
         new(StringComparer.OrdinalIgnoreCase);
@@ -2686,7 +2690,77 @@ Return JSON only with this schema:
         }
 
         imageUrl = normalized;
+        ClearMealImageLookupMiss(mealName);
         return true;
+    }
+
+    private static bool ShouldSkipMealImageLookup(string mealName, DateTime nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            return false;
+        }
+
+        if (!MealImageLookupMissesUtc.TryGetValue(mealName, out var blockedUntilUtc))
+        {
+            return false;
+        }
+
+        if (blockedUntilUtc <= nowUtc)
+        {
+            MealImageLookupMissesUtc.TryRemove(mealName, out _);
+            return false;
+        }
+
+        return true;
+    }
+
+    private static void MarkMealImageLookupMiss(string mealName, DateTime nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            return;
+        }
+
+        MealImageLookupMissesUtc[mealName] = nowUtc + MealImageLookupMissTtl;
+        PruneMealImageLookupMisses(nowUtc);
+    }
+
+    private static void ClearMealImageLookupMiss(string mealName)
+    {
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            return;
+        }
+
+        MealImageLookupMissesUtc.TryRemove(mealName, out _);
+    }
+
+    private static void PruneMealImageLookupMisses(DateTime nowUtc)
+    {
+        foreach (var entry in MealImageLookupMissesUtc)
+        {
+            if (entry.Value <= nowUtc)
+            {
+                MealImageLookupMissesUtc.TryRemove(entry.Key, out _);
+            }
+        }
+
+        var overflowCount = MealImageLookupMissesUtc.Count - MaxMealImageMissCacheEntries;
+        if (overflowCount <= 0)
+        {
+            return;
+        }
+
+        var evictionCandidates = MealImageLookupMissesUtc
+            .OrderBy(entry => entry.Value)
+            .Take(overflowCount)
+            .Select(entry => entry.Key)
+            .ToList();
+        foreach (var mealName in evictionCandidates)
+        {
+            MealImageLookupMissesUtc.TryRemove(mealName, out _);
+        }
     }
 
     private static string GetFallbackMealImageUrl()
@@ -2769,9 +2843,15 @@ Return JSON only with this schema:
         await MealImagePoolRefreshLock.WaitAsync(cancellationToken);
         try
         {
+            var nowUtc = DateTime.UtcNow;
             foreach (var mealName in distinctMealNames)
             {
                 if (TryGetCachedMealImageUrl(mealName, out _))
+                {
+                    continue;
+                }
+
+                if (ShouldSkipMealImageLookup(mealName, nowUtc))
                 {
                     continue;
                 }
@@ -2780,6 +2860,7 @@ Return JSON only with this schema:
                 var doc = await _db.Collection(MealImagesCollection).Document(docId).GetSnapshotAsync(cancellationToken);
                 if (!doc.Exists)
                 {
+                    MarkMealImageLookupMiss(mealName, nowUtc);
                     continue;
                 }
 
@@ -2790,11 +2871,13 @@ Return JSON only with this schema:
                 }
                 catch
                 {
+                    MarkMealImageLookupMiss(mealName, nowUtc);
                     continue;
                 }
 
                 if (mapped is null)
                 {
+                    MarkMealImageLookupMiss(mealName, nowUtc);
                     continue;
                 }
 
@@ -2804,6 +2887,7 @@ Return JSON only with this schema:
                 var normalizedUrl = NormalizeImageUrl(mapped.ImageUrl);
                 if (string.IsNullOrWhiteSpace(normalizedUrl))
                 {
+                    MarkMealImageLookupMiss(mealName, nowUtc);
                     continue;
                 }
 
@@ -2812,10 +2896,13 @@ Return JSON only with this schema:
                     : mapped.ImageBase64;
                 if (!await EnsureMealImageAvailableAsync(normalizedUrl, imageBase64, cancellationToken))
                 {
+                    MarkMealImageLookupMiss(mealName, nowUtc);
                     continue;
                 }
 
                 MealImagePool[normalizedName] = normalizedUrl;
+                ClearMealImageLookupMiss(mealName);
+                ClearMealImageLookupMiss(normalizedName);
 
                 if (string.IsNullOrWhiteSpace(mapped.ImageBase64) && mapped.ImageChunkCount <= 0)
                 {
@@ -2827,7 +2914,7 @@ Return JSON only with this schema:
                 }
             }
 
-            _lastMealImagePoolRefreshUtc = DateTime.UtcNow;
+            _lastMealImagePoolRefreshUtc = nowUtc;
         }
         finally
         {
@@ -3054,6 +3141,8 @@ Return JSON only with this schema:
             return;
         }
 
+        MarkMealImageLookupMiss(meal.Name, DateTime.UtcNow);
+
         _ = Task.Run(async () =>
         {
             var throttleAcquired = false;
@@ -3079,6 +3168,7 @@ Return JSON only with this schema:
                 }
 
                 MealImagePool[meal.Name] = imageUrl;
+                ClearMealImageLookupMiss(meal.Name);
 
                 if (AiMealPool.TryGetValue(meal.Name, out var existingMeal))
                 {

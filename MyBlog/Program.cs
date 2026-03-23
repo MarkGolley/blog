@@ -368,16 +368,65 @@ static string GetRateLimitPartitionKey(HttpContext context)
         ip = "unknown-ip";
     }
 
+    var userAgentBucket = GetUserAgentBucket(userAgent);
+
+    return $"{ip}|{userAgentBucket}";
+}
+
+static string GetUserAgentBucket(string? userAgent)
+{
     if (string.IsNullOrWhiteSpace(userAgent))
     {
-        userAgent = "unknown-ua";
-    }
-    else if (userAgent.Length > 120)
-    {
-        userAgent = userAgent[..120];
+        return "unknown-ua";
     }
 
-    return $"{ip}|{userAgent}";
+    var ua = userAgent.ToLowerInvariant();
+    if (ua.Contains("bot", StringComparison.Ordinal) || ua.Contains("crawler", StringComparison.Ordinal))
+    {
+        return "bot";
+    }
+
+    if (ua.Contains("postmanruntime/", StringComparison.Ordinal))
+    {
+        return "postman";
+    }
+
+    if (ua.Contains("curl/", StringComparison.Ordinal))
+    {
+        return "curl";
+    }
+
+    if (ua.Contains("python-requests", StringComparison.Ordinal))
+    {
+        return "python-requests";
+    }
+
+    if (ua.Contains("edg/", StringComparison.Ordinal))
+    {
+        return "edge";
+    }
+
+    if (ua.Contains("opr/", StringComparison.Ordinal) || ua.Contains("opera/", StringComparison.Ordinal))
+    {
+        return "opera";
+    }
+
+    if (ua.Contains("firefox/", StringComparison.Ordinal))
+    {
+        return "firefox";
+    }
+
+    if (ua.Contains("chrome/", StringComparison.Ordinal))
+    {
+        return "chrome";
+    }
+
+    if (ua.Contains("safari/", StringComparison.Ordinal) && ua.Contains("version/", StringComparison.Ordinal))
+    {
+        return "safari";
+    }
+
+    return "other";
 }
 
 static bool ShouldDisableCaching(HttpContext context)
