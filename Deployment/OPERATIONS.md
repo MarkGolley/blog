@@ -39,11 +39,23 @@ Deployment now runs these checks automatically before image build/push when you 
 .\Deployment\deploy.ps1
 ```
 
+Environment targets:
+
+- Production (default): `.\Deployment\deploy.ps1`
+- Staging: `.\Deployment\deploy.ps1 -EnvironmentName Staging`
+
+Optional overrides for either target:
+
+- `-ProjectId` (defaults to `my-blog-website-470819`)
+- `-Region` (defaults to `europe-west2`)
+- `-Service` (defaults to `myblog-app` for Production, `myblog-app-staging` for Staging)
+- `-PublicBaseUrl` (defaults to `https://markgolley.dev` for Production; blank for Staging unless provided)
+
 Optional deploy flags:
 
 - `-SkipPreDeployChecks` skips all pre-deploy checks.
 - `-SkipBrowserInstall` keeps checks enabled but skips Playwright browser install.
-- `-SkipProductionSmokeCheck` skips post-deploy production auth/comment smoke checks.
+- `-SkipProductionSmokeCheck` skips post-deploy auth/comment smoke checks.
 
 What it does:
 
@@ -68,10 +80,18 @@ Batch wrappers are available if you want double-click launch:
 
 ## Deployment Verification
 
-After deploy, verify that the latest revision is serving:
+After deploy, verify that the latest revision is serving.
+Production example:
 
 ```powershell
 curl.exe -sSI https://markgolley.dev/admin/login
+```
+
+Staging direct Cloud Run example:
+
+```powershell
+$stagingUrl = gcloud run services describe myblog-app-staging --region europe-west2 --project my-blog-website-470819 --format "value(status.url)"
+curl.exe -sSI "$stagingUrl/admin/login"
 ```
 
 Check these headers:
@@ -82,11 +102,17 @@ Check these headers:
 
 ### Auth + Comment Smoke Check
 
-This is run automatically at the end of `.\Deployment\deploy.ps1`.
+This is run automatically at the end of `.\Deployment\deploy.ps1` for both Production and Staging.
 You can still run it manually after each deploy:
 
 ```powershell
 .\Deployment\verify-production-auth.ps1
+```
+
+Staging manual run:
+
+```powershell
+.\Deployment\verify-production-auth.ps1 -Service myblog-app-staging -PublicBaseUrl "$(gcloud run services describe myblog-app-staging --region europe-west2 --project my-blog-website-470819 --format 'value(status.url)')"
 ```
 
 What it verifies:

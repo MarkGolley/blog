@@ -7,6 +7,7 @@ public class BlogService
 {
     private static readonly Regex HtmlTagRegex = new("<[^>]*>", RegexOptions.Compiled);
     private static readonly Regex WordRegex = new(@"[A-Za-z0-9#\+]+", RegexOptions.Compiled);
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
 
     private static readonly (string Keyword, string Tag)[] TagKeywords =
     {
@@ -34,6 +35,8 @@ public class BlogService
     };
 
     private readonly IWebHostEnvironment _env;
+    private readonly object _snapshotLock = new();
+    private BlogSnapshot? _cachedSnapshot;
 
     public BlogService(IWebHostEnvironment env)
     {
@@ -42,26 +45,7 @@ public class BlogService
 
     public IEnumerable<BlogPost> GetAllPosts()
     {
-        var postsPath = Path.Combine(_env.WebRootPath, "BlogStorage"); 
-
-        var posts = (from file in Directory.GetFiles(postsPath, "*.html")
-                     let id = Path.GetFileNameWithoutExtension(file)
-                     let title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(id.Replace("_", " "))
-                     let content = File.ReadAllText(file)
-                     let published = ParsePublishedDate(content)
-                     let tags = ParseTags(content, title)
-                     let readingTimeMinutes = ParseReadingTimeMinutes(content)
-                     select new BlogPost
-                     {
-                         Id = id,
-                         Title = title,
-                         Content = content,
-                         DatePosted = published,
-                         Tags = tags,
-                         ReadingTimeMinutes = readingTimeMinutes
-                     }).ToList();
-
-        return posts.OrderByDescending(p => p.DatePosted);
+        return GetOrBuildSnapshot().Posts;
     }
 
     public BlogPost? GetPostBySlug(string? slug)
@@ -73,42 +57,124 @@ public class BlogService
             return null;
         }
 
-        var path = ResolvePostPath(normalizedSlug);
-        if (path == null) return null;
-
-        var content = File.ReadAllText(path);
-        var published = ParsePublishedDate(content);
-        var fileSlug = Path.GetFileNameWithoutExtension(path);
-        var title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(fileSlug.Replace("_", " "));
-
-        return new BlogPost
-        {
-            Id = fileSlug,
-            Title = title,
-            Content = content,
-            DatePosted = published,
-            Tags = ParseTags(content, title),
-            ReadingTimeMinutes = ParseReadingTimeMinutes(content)
-        };
+        var snapshot = GetOrBuildSnapshot();
+        return snapshot.PostBySlug.GetValueOrDefault(normalizedSlug);
     }
 
-    private string? ResolvePostPath(string slug)
+    private BlogSnapshot GetOrBuildSnapshot()
     {
         var postsPath = Path.Combine(_env.WebRootPath, "BlogStorage");
         if (!Directory.Exists(postsPath))
         {
-            return null;
+            return BlogSnapshot.Empty;
         }
 
-        var expectedFileName = slug + ".html";
+        var nowUtc = DateTime.UtcNow;
+        lock (_snapshotLock)
+        {
+            if (_cachedSnapshot is null)
+            {
+                // Build outside lock.
+            }
+            else if (nowUtc - _cachedSnapshot.BuiltAtUtc < CacheTtl)
+            {
+                return _cachedSnapshot;
+            }
+            else if (!HasPostStorageChanged(postsPath, _cachedSnapshot.FileWriteTimesUtc))
+            {
+                // Content is unchanged, so refresh cache age without reparsing file contents.
+                _cachedSnapshot = _cachedSnapshot with { BuiltAtUtc = nowUtc };
+                return _cachedSnapshot;
+            }
+        }
 
-        return Directory
-            .EnumerateFiles(postsPath, "*.html")
-            .FirstOrDefault(file =>
-                string.Equals(
-                    Path.GetFileName(file),
-                    expectedFileName,
-                    StringComparison.OrdinalIgnoreCase));
+        var rebuiltSnapshot = BuildSnapshot(postsPath, nowUtc);
+        lock (_snapshotLock)
+        {
+            _cachedSnapshot = rebuiltSnapshot;
+            return rebuiltSnapshot;
+        }
+    }
+
+    private static bool HasPostStorageChanged(string postsPath, IReadOnlyDictionary<string, DateTime> knownWriteTimesUtc)
+    {
+        var currentFiles = Directory.EnumerateFiles(postsPath, "*.html").ToList();
+        if (currentFiles.Count != knownWriteTimesUtc.Count)
+        {
+            return true;
+        }
+
+        foreach (var file in currentFiles)
+        {
+            var fileName = Path.GetFileName(file);
+            var writeTimeUtc = File.GetLastWriteTimeUtc(file);
+            if (!knownWriteTimesUtc.TryGetValue(fileName, out var knownWriteTimeUtc) ||
+                writeTimeUtc != knownWriteTimeUtc)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static BlogSnapshot BuildSnapshot(string postsPath, DateTime builtAtUtc)
+    {
+        var fileWriteTimesUtc = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        var posts = (from file in Directory.GetFiles(postsPath, "*.html")
+                     let fileName = Path.GetFileName(file)
+                     let id = Path.GetFileNameWithoutExtension(file)
+                     let title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(id.Replace("_", " "))
+                     let content = File.ReadAllText(file)
+                     let published = ParsePublishedDate(content)
+                     let tags = ParseTags(content, title)
+                     let readingTimeMinutes = ParseReadingTimeMinutes(content)
+                     select CreatePost(
+                         fileName,
+                         File.GetLastWriteTimeUtc(file),
+                         id,
+                         title,
+                         content,
+                         published,
+                         tags,
+                         readingTimeMinutes)).ToList();
+
+        var orderedPosts = posts
+            .Select(tuple =>
+            {
+                fileWriteTimesUtc[tuple.FileName] = tuple.LastWriteTimeUtc;
+                return tuple.Post;
+            })
+            .OrderByDescending(post => post.DatePosted)
+            .ToList();
+
+        var postBySlug = orderedPosts
+            .ToDictionary(post => post.Id, post => post, StringComparer.OrdinalIgnoreCase);
+
+        return new BlogSnapshot(orderedPosts, postBySlug, fileWriteTimesUtc, builtAtUtc);
+    }
+
+    private static (string FileName, DateTime LastWriteTimeUtc, BlogPost Post) CreatePost(
+        string fileName,
+        DateTime lastWriteTimeUtc,
+        string id,
+        string title,
+        string content,
+        DateTime published,
+        List<string> tags,
+        int readingTimeMinutes)
+    {
+        var post = new BlogPost
+        {
+            Id = id,
+            Title = title,
+            Content = content,
+            DatePosted = published,
+            Tags = tags,
+            ReadingTimeMinutes = readingTimeMinutes
+        };
+
+        return (fileName, lastWriteTimeUtc, post);
     }
 
     private static string? NormalizeSlug(string rawSlug)
@@ -251,5 +317,18 @@ public class BlogService
         }
 
         return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(tag.Trim().ToLowerInvariant());
+    }
+
+    private sealed record BlogSnapshot(
+        IReadOnlyList<BlogPost> Posts,
+        IReadOnlyDictionary<string, BlogPost> PostBySlug,
+        IReadOnlyDictionary<string, DateTime> FileWriteTimesUtc,
+        DateTime BuiltAtUtc)
+    {
+        public static BlogSnapshot Empty { get; } = new(
+            [],
+            new Dictionary<string, BlogPost>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase),
+            DateTime.MinValue);
     }
 }

@@ -129,10 +129,20 @@ builder.Services.AddScoped<CommentService>();
 builder.Services.AddScoped<LikeService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<SubscriptionEmailService>();
-builder.Services.AddHttpClient<AislePilotService>();
+builder.Services.AddHttpClient<AislePilotService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(75);
+});
 builder.Services.AddScoped<IAislePilotService>(sp => sp.GetRequiredService<AislePilotService>());
-builder.Services.AddHttpClient<AIModerationService>();
-builder.Services.AddHttpClient<DailyCodingCapsuleService>();
+builder.Services.AddScoped<IAislePilotExportService, AislePilotExportService>();
+builder.Services.AddHttpClient<AIModerationService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(12);
+});
+builder.Services.AddHttpClient<DailyCodingCapsuleService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddTransient<IDailyCodingCapsuleProvider>(sp => sp.GetRequiredService<DailyCodingCapsuleService>());
 
 var openAiApiKey =
@@ -223,8 +233,20 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: GetRateLimitPartitionKey(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5000,
+                PermitLimit = 45,
                 Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("aislePilotAdminWarmupWrites", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 2,
+                Window = TimeSpan.FromMinutes(10),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,
                 AutoReplenishment = true
@@ -259,11 +281,17 @@ app.Use(async (context, next) =>
         headers.TryAdd("X-Permitted-Cross-Domain-Policies", "none");
         headers["X-App-Version"] = appVersion;
 
-        if (ShouldDisableCaching(context))
+        var cachePolicy = ResolveCachePolicy(context);
+        if (cachePolicy == CachePolicy.NoStore)
         {
             headers["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate, private";
             headers["Pragma"] = "no-cache";
             headers["Expires"] = "0";
+        }
+        else if (cachePolicy == CachePolicy.PrivateRevalidate)
+        {
+            headers["Cache-Control"] = "private, no-cache, max-age=0, must-revalidate";
+            headers["Pragma"] = "no-cache";
 
             var varyValues = headers.Vary.ToString();
             if (string.IsNullOrWhiteSpace(varyValues))
@@ -355,37 +383,95 @@ static string GetRateLimitPartitionKey(HttpContext context)
         ip = "unknown-ip";
     }
 
-    if (string.IsNullOrWhiteSpace(userAgent))
-    {
-        userAgent = "unknown-ua";
-    }
-    else if (userAgent.Length > 120)
-    {
-        userAgent = userAgent[..120];
-    }
+    var userAgentBucket = GetUserAgentBucket(userAgent);
 
-    return $"{ip}|{userAgent}";
+    return $"{ip}|{userAgentBucket}";
 }
 
-static bool ShouldDisableCaching(HttpContext context)
+static string GetUserAgentBucket(string? userAgent)
+{
+    if (string.IsNullOrWhiteSpace(userAgent))
+    {
+        return "unknown-ua";
+    }
+
+    var ua = userAgent.ToLowerInvariant();
+    if (ua.Contains("bot", StringComparison.Ordinal) || ua.Contains("crawler", StringComparison.Ordinal))
+    {
+        return "bot";
+    }
+
+    if (ua.Contains("postmanruntime/", StringComparison.Ordinal))
+    {
+        return "postman";
+    }
+
+    if (ua.Contains("curl/", StringComparison.Ordinal))
+    {
+        return "curl";
+    }
+
+    if (ua.Contains("python-requests", StringComparison.Ordinal))
+    {
+        return "python-requests";
+    }
+
+    if (ua.Contains("edg/", StringComparison.Ordinal))
+    {
+        return "edge";
+    }
+
+    if (ua.Contains("opr/", StringComparison.Ordinal) || ua.Contains("opera/", StringComparison.Ordinal))
+    {
+        return "opera";
+    }
+
+    if (ua.Contains("firefox/", StringComparison.Ordinal))
+    {
+        return "firefox";
+    }
+
+    if (ua.Contains("chrome/", StringComparison.Ordinal))
+    {
+        return "chrome";
+    }
+
+    if (ua.Contains("safari/", StringComparison.Ordinal) && ua.Contains("version/", StringComparison.Ordinal))
+    {
+        return "safari";
+    }
+
+    return "other";
+}
+
+static CachePolicy ResolveCachePolicy(HttpContext context)
 {
     if (context.Response.Headers.ContainsKey("Set-Cookie"))
     {
-        return true;
+        return CachePolicy.NoStore;
     }
 
     var path = context.Request.Path.Value ?? string.Empty;
     if (string.IsNullOrWhiteSpace(path))
     {
-        return false;
+        return CachePolicy.None;
     }
 
-    return path.Equals("/admin", StringComparison.OrdinalIgnoreCase)
-           || path.StartsWith("/admin/", StringComparison.OrdinalIgnoreCase)
-           || path.Equals("/blog", StringComparison.OrdinalIgnoreCase)
-           || path.StartsWith("/blog/", StringComparison.OrdinalIgnoreCase)
-           || path.Equals("/subscribe", StringComparison.OrdinalIgnoreCase)
-           || path.StartsWith("/subscribe/", StringComparison.OrdinalIgnoreCase);
+    if (path.Equals("/admin", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/admin/", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/subscribe", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/subscribe/", StringComparison.OrdinalIgnoreCase))
+    {
+        return CachePolicy.NoStore;
+    }
+
+    if (path.Equals("/blog", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/blog/", StringComparison.OrdinalIgnoreCase))
+    {
+        return CachePolicy.PrivateRevalidate;
+    }
+
+    return CachePolicy.None;
 }
 
 static bool ShouldRecoverFromBadRequest(string requestPath)
@@ -491,6 +577,13 @@ static string AddOrReplaceQueryParameter(string path, string key, string value)
     flattenedValues.Add(new KeyValuePair<string, string?>(key, value));
     var queryString = QueryString.Create(flattenedValues).ToUriComponent();
     return $"{basePath}{queryString}{anchor}";
+}
+
+enum CachePolicy
+{
+    None,
+    PrivateRevalidate,
+    NoStore
 }
 
 public partial class Program;

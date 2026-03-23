@@ -12,6 +12,7 @@ public sealed class AislePilotPageViewModel
     public IReadOnlyList<string> SupermarketOptions { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> PortionSizeOptions { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> DietaryOptions { get; set; } = Array.Empty<string>();
+    public bool MealImagePollingEnabled { get; set; }
     public bool HasResult => Result is not null;
 }
 

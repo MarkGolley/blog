@@ -18,7 +18,7 @@ public class ContactController(ILogger<ContactController> logger) : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [EnableRateLimiting("contactWrites")]
-    public IActionResult Index(ContactFormModel model)
+    public async Task<IActionResult> Index(ContactFormModel model, CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
         {
@@ -48,13 +48,11 @@ public class ContactController(ILogger<ContactController> logger) : Controller
                 Text = $"Name: {model.Name}\nEmail: {model.Email}\n\nMessage:\n{model.Message}"
             };
 
-            using (var client = new SmtpClient())
-            {
-                client.Connect("smtp.mail.me.com", 587, SecureSocketOptions.StartTls);
-                client.Authenticate(emailAddress, emailPassword);
-                client.Send(emailMessage);
-                client.Disconnect(true);
-            }
+            using var client = new SmtpClient();
+            await client.ConnectAsync("smtp.mail.me.com", 587, SecureSocketOptions.StartTls, cancellationToken);
+            await client.AuthenticateAsync(emailAddress, emailPassword, cancellationToken);
+            await client.SendAsync(emailMessage, cancellationToken);
+            await client.DisconnectAsync(true, cancellationToken);
 
             ViewBag.MessageSent = true;
         }

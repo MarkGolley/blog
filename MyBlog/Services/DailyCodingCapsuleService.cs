@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Collections.Concurrent;
+using System.Net;
 using Google.Cloud.Firestore;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -10,6 +11,7 @@ namespace MyBlog.Services;
 public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
 {
     private const string DailyCapsulesCollection = "dailyCapsules";
+    private const int OpenAiMaxAttempts = 2;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -233,55 +235,75 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
                 }
             };
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
-            {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(requestBody),
-                    System.Text.Encoding.UTF8,
-                    "application/json")
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            var serializedRequestBody = JsonSerializer.Serialize(requestBody);
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-            var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
-            if (string.IsNullOrWhiteSpace(rawJson))
+            HttpResponseMessage? response = null;
+            for (var attempt = 1; attempt <= OpenAiMaxAttempts; attempt++)
             {
-                _logger.LogWarning("Daily capsule generation returned an empty response body.");
-                RecordGenerationFailure("AI response was empty.");
-                return null;
+                using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+                {
+                    Content = new StringContent(
+                        serializedRequestBody,
+                        System.Text.Encoding.UTF8,
+                        "application/json")
+                };
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+
+                response = await _httpClient.SendAsync(request, cancellationToken);
+                if (response.IsSuccessStatusCode)
+                {
+                    break;
+                }
+
+                if (attempt >= OpenAiMaxAttempts || !IsTransientStatus(response.StatusCode))
+                {
+                    response.EnsureSuccessStatusCode();
+                }
+
+                response.Dispose();
+                await Task.Delay(TimeSpan.FromMilliseconds(350 * attempt), cancellationToken);
             }
 
-            var capsulePayload = JsonSerializer.Deserialize<CapsulePayload>(rawJson, JsonOptions);
-            if (capsulePayload is null)
+            using (response)
             {
-                _logger.LogWarning("Daily capsule generation returned unparsable JSON content.");
-                RecordGenerationFailure("AI response JSON was invalid.");
-                return null;
+                var responseContent = await response!.Content.ReadAsStringAsync(cancellationToken);
+                var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
+                var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+                if (string.IsNullOrWhiteSpace(rawJson))
+                {
+                    _logger.LogWarning("Daily capsule generation returned an empty response body.");
+                    RecordGenerationFailure("AI response was empty.");
+                    return null;
+                }
+
+                var capsulePayload = JsonSerializer.Deserialize<CapsulePayload>(rawJson, JsonOptions);
+                if (capsulePayload is null)
+                {
+                    _logger.LogWarning("Daily capsule generation returned unparsable JSON content.");
+                    RecordGenerationFailure("AI response JSON was invalid.");
+                    return null;
+                }
+
+                var capsule = CreateValidatedCapsule(ukDate, capsulePayload);
+                if (capsule is null)
+                {
+                    _logger.LogWarning("Daily capsule generation returned content that did not pass validation.");
+                    RecordGenerationFailure("AI response did not pass validation.");
+                    return null;
+                }
+
+                var requestId = response.Headers.TryGetValues("x-request-id", out var values)
+                    ? values.FirstOrDefault()
+                    : null;
+
+                _logger.LogInformation(
+                    "Daily capsule generated via AI for UK date {UkDate}. OpenAIRequestId={OpenAIRequestId}",
+                    ukDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    requestId ?? "n/a");
+                RecordGenerationSuccess();
+
+                return capsule;
             }
-
-            var capsule = CreateValidatedCapsule(ukDate, capsulePayload);
-            if (capsule is null)
-            {
-                _logger.LogWarning("Daily capsule generation returned content that did not pass validation.");
-                RecordGenerationFailure("AI response did not pass validation.");
-                return null;
-            }
-
-            var requestId = response.Headers.TryGetValues("x-request-id", out var values)
-                ? values.FirstOrDefault()
-                : null;
-
-            _logger.LogInformation(
-                "Daily capsule generated via AI for UK date {UkDate}. OpenAIRequestId={OpenAIRequestId}",
-                ukDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                requestId ?? "n/a");
-            RecordGenerationSuccess();
-
-            return capsule;
         }
         catch (Exception ex)
         {
@@ -591,6 +613,16 @@ Return JSON only with this schema:
     private static bool GetBool(string? value, bool defaultValue)
     {
         return bool.TryParse(value, out var parsed) ? parsed : defaultValue;
+    }
+
+    private static bool IsTransientStatus(HttpStatusCode statusCode)
+    {
+        return statusCode == HttpStatusCode.TooManyRequests ||
+               statusCode == HttpStatusCode.RequestTimeout ||
+               statusCode == HttpStatusCode.BadGateway ||
+               statusCode == HttpStatusCode.ServiceUnavailable ||
+               statusCode == HttpStatusCode.GatewayTimeout ||
+               (int)statusCode >= 500;
     }
 
     private static void RecordGenerationAttempt()

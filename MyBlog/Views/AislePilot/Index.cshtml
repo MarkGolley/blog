@@ -508,6 +508,9 @@
         })
         .ToList();
     var leftoverSourceDayIndexesCsv = string.Join(",", leftoverSourceWeekDayIndexes);
+    var currentPlanMealNames = result.MealPlan
+        .Select(meal => meal.MealName)
+        .ToList();
     var mealCount = result.MealPlan.Count;
     var mealLabel = mealCount == 1 ? "meal" : "meals";
     var totalShopItems = result.ShoppingItems.Count;
@@ -528,6 +531,22 @@
         shoppingListNotesBuilder.AppendLine();
     }
     var shoppingListNotesText = shoppingListNotesBuilder.ToString().TrimEnd();
+    AislePilotHiddenRequestFieldsViewModel BuildHiddenRequestFields(
+        bool includeCurrentPlanMealNames = false,
+        bool includeLeftoverCsvDataAttribute = false)
+    {
+        return new AislePilotHiddenRequestFieldsViewModel
+        {
+            ReturnUrl = Model.ReturnUrl,
+            Request = Model.Request,
+            LeftoverCookDayIndexesCsv = leftoverSourceDayIndexesCsv,
+            CurrentPlanMealNames = includeCurrentPlanMealNames
+                ? currentPlanMealNames
+                : Array.Empty<string>(),
+            IncludeCurrentPlanMealNames = includeCurrentPlanMealNames,
+            IncludeLeftoverCsvDataAttribute = includeLeftoverCsvDataAttribute
+        };
+    }
 
     <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-reveal>
         <div class="aislepilot-section-head">
@@ -535,22 +554,8 @@
             <div class="aislepilot-overview-actions">
                 <form method="post" action="@Url.Action("Index", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
-                    <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
-                    <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
-                    <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
-                    <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
-                    <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
-                    <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
-                    <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
-                    <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
-                    <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
-                    <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
-                    <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
-                    @foreach (var mode in Model.Request.DietaryModes)
-                    {
-                        <input type="hidden" name="Request.DietaryModes" value="@mode" />
-                    }
+                    <partial name="_AislePilotHiddenRequestFields"
+                             model="BuildHiddenRequestFields()" />
                     <button type="submit" class="aislepilot-overview-regenerate-btn" data-loading-label="Regenerating...">Regenerate plan</button>
                 </form>
                 <button
@@ -578,26 +583,8 @@
                       action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"
                       class="aislepilot-overview-regenerate-form">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
-                    <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
-                    <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
-                    <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
-                    <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
-                    <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
-                    <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
-                    <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
-                    <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
-                    <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
-                    <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
-                    <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
-                    @foreach (var mode in Model.Request.DietaryModes)
-                    {
-                        <input type="hidden" name="Request.DietaryModes" value="@mode" />
-                    }
-                    @foreach (var existingMeal in result.MealPlan)
-                    {
-                        <input type="hidden" name="currentPlanMealNames" value="@existingMeal.MealName" />
-                    }
+                    <partial name="_AislePilotHiddenRequestFields"
+                             model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                     <button type="submit"
                             class="aislepilot-overview-regenerate-btn"
                             data-loading-label="Refreshing lower-cost plan...">
@@ -713,25 +700,8 @@
                                       data-leftover-rebalance-form
                                       data-preserve-scroll-form>
                                     @Html.AntiForgeryToken()
-                                    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
-                                    <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
-                                    <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
-                                    <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
-                                    <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
-                                    <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
-                                    <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
-                                    <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
-                                    <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
-                                    <input type="hidden"
-                                           name="Request.LeftoverCookDayIndexesCsv"
-                                           value="@leftoverSourceDayIndexesCsv"
-                                           data-leftover-csv />
-                                    <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
-                                    <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
-                                    @foreach (var mode in Model.Request.DietaryModes)
-                                    {
-                                        <input type="hidden" name="Request.DietaryModes" value="@mode" />
-                                    }
+                                    <partial name="_AislePilotHiddenRequestFields"
+                                             model="BuildHiddenRequestFields(includeLeftoverCsvDataAttribute: true)" />
                                 </form>
                                 <div class="aislepilot-leftover-planner" role="list" aria-label="Leftover day allocation">
                                     @for (var dayIndex = 0; dayIndex < weekDayNames.Length; dayIndex++)
@@ -757,6 +727,7 @@
                     <div class="aislepilot-meal-grid"
                          data-meal-image-poll-root
                          data-fallback-meal-image-url="@fallbackMealImageUrl"
+                         data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
                          data-meal-image-poll-url="@mealImagesPollUrl">
                         @for (var mealIndex = 0; mealIndex < result.MealPlan.Count; mealIndex++)
                         {
@@ -851,26 +822,8 @@
                                           data-preserve-scroll-form
                                           data-ajax-swap-form>
                                         @Html.AntiForgeryToken()
-                                        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
-                                        <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
-                                        <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
-                                        <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
-                                        <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
-                                        <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
-                                        <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
-                                        <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
-                                        <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
-                                        <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
-                                        <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
-                                        <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
-                                        @foreach (var mode in Model.Request.DietaryModes)
-                                        {
-                                            <input type="hidden" name="Request.DietaryModes" value="@mode" />
-                                        }
-                                        @foreach (var existingMeal in result.MealPlan)
-                                        {
-                                            <input type="hidden" name="currentPlanMealNames" value="@existingMeal.MealName" />
-                                        }
+                                        <partial name="_AislePilotHiddenRequestFields"
+                                                 model="BuildHiddenRequestFields()" />
                                         <input type="hidden" name="dayIndex" value="@mealIndex" />
                                         <input type="hidden" name="currentMealName" value="@meal.MealName" />
                                         <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping..." data-loading-delay-ms="220">
@@ -919,43 +872,15 @@
                     <div class="aislepilot-export-actions">
                         <form method="post" asp-action="ExportPlanPack">
                             @Html.AntiForgeryToken()
-                            <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
-                            <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
-                            <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
-                            <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
-                            <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
-                            <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
-                            <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
-                            <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
-                            <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
-                            <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
-                            <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
-                            <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
-                            @foreach (var mode in Model.Request.DietaryModes)
-                            {
-                                <input type="hidden" name="Request.DietaryModes" value="@mode" />
-                            }
+                            <partial name="_AislePilotHiddenRequestFields"
+                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                             <button type="submit" class="aislepilot-export-btn" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
                         </form>
 
                         <form method="post" asp-action="ExportChecklist">
                             @Html.AntiForgeryToken()
-                            <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
-                            <input type="hidden" name="Request.Supermarket" value="@Model.Request.Supermarket" />
-                            <input type="hidden" name="Request.WeeklyBudget" value="@Model.Request.WeeklyBudget" />
-                            <input type="hidden" name="Request.HouseholdSize" value="@Model.Request.HouseholdSize" />
-                            <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
-                            <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
-                            <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
-                            <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
-                            <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
-                            <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@leftoverSourceDayIndexesCsv" />
-                            <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
-                            <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
-                            @foreach (var mode in Model.Request.DietaryModes)
-                            {
-                                <input type="hidden" name="Request.DietaryModes" value="@mode" />
-                            }
+                            <partial name="_AislePilotHiddenRequestFields"
+                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                             <button type="submit" class="aislepilot-export-btn" data-loading-label="Building checklist...">Download shopping checklist (.txt)</button>
                         </form>
 
@@ -1027,5 +952,7 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/aisle-pilot/setup-mode.js" asp-append-version="true"></script>
+    <script src="~/js/aisle-pilot/meal-image-polling.js" asp-append-version="true"></script>
     <script src="~/js/aisle-pilot.js" asp-append-version="true"></script>
 }
