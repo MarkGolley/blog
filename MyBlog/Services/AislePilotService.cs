@@ -40,6 +40,7 @@ public sealed class AislePilotService : IAislePilotService
     private const int MaxMealImageBytesForFirestore = 700_000;
     private const int MealImageChunkCharLength = 180_000;
     private const string MealImageChunksSubcollection = "chunks";
+    private const int MaxAiMealPoolEntries = 320;
     private const int SupermarketLayoutCacheVersion = 2;
     private const int SupermarketLayoutRefreshCooldownMinutes = 120;
     private const int SupermarketLayoutStaleDays = 30;
@@ -52,8 +53,11 @@ public sealed class AislePilotService : IAislePilotService
     private static readonly TimeSpan OpenAiImageDownloadTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
     private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan AiMealPoolEntryTtl = TimeSpan.FromHours(24);
 
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, DateTime> AiMealPoolLastTouchedUtc =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string> MealImagePool = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> MealImageGenerationInFlight = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, SupermarketLayoutCacheEntry> SupermarketLayoutCache =
@@ -566,6 +570,16 @@ public sealed class AislePilotService : IAislePilotService
         return SupportedDietaryModes;
     }
 
+    public bool CanGenerateMealImages()
+    {
+        return _enableAiGeneration &&
+               _enableAiImageGeneration &&
+               _httpClient is not null &&
+               !string.IsNullOrWhiteSpace(_apiKey) &&
+               _webHostEnvironment is not null &&
+               !string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath);
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> GetMealImageUrlsAsync(
         IReadOnlyList<string> mealNames,
         CancellationToken cancellationToken = default)
@@ -743,21 +757,28 @@ public sealed class AislePilotService : IAislePilotService
 
     public AislePilotPlanResultViewModel BuildPlan(AislePilotRequestModel request)
     {
-        var context = BuildPlanContext(request);
+        return BuildPlanAsync(request).GetAwaiter().GetResult();
+    }
+
+    public async Task<AislePilotPlanResultViewModel> BuildPlanAsync(
+        AislePilotRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var context = await BuildPlanContextAsync(request, cancellationToken);
         var cookDays = NormalizeCookDays(request.CookDays);
         if (ShouldUseTemplateFallback())
         {
             _logger?.LogWarning("AislePilot is using local meal templates because AI generation is unavailable in this runtime.");
-            return BuildPlanFromTemplateCatalog(request, context, cookDays);
+            return await BuildPlanFromTemplateCatalogAsync(request, context, cookDays, cancellationToken);
         }
 
-        var pooledAiPlan = TryBuildPlanFromAiPool(request, context, cookDays);
+        var pooledAiPlan = await TryBuildPlanFromAiPoolAsync(request, context, cookDays, cancellationToken);
         if (pooledAiPlan is not null)
         {
             return pooledAiPlan;
         }
 
-        var aiPlan = TryBuildPlanWithAi(request, context, cookDays);
+        var aiPlan = await TryBuildPlanWithAiAsync(request, context, cookDays, cancellationToken);
         if (aiPlan is not null)
         {
             return aiPlan;
@@ -765,7 +786,40 @@ public sealed class AislePilotService : IAislePilotService
 
         _logger?.LogWarning(
             "AislePilot AI generation was unavailable for this request. Serving template fallback instead.");
-        return BuildPlanFromTemplateCatalog(request, context, cookDays);
+        return await BuildPlanFromTemplateCatalogAsync(request, context, cookDays, cancellationToken);
+    }
+
+    public async Task<AislePilotPlanResultViewModel> BuildPlanFromCurrentMealsAsync(
+        AislePilotRequestModel request,
+        IReadOnlyList<string> currentPlanMealNames,
+        CancellationToken cancellationToken = default)
+    {
+        var cookDays = NormalizeCookDays(request.CookDays);
+        var normalizedMealNames = currentPlanMealNames
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .ToList();
+        if (normalizedMealNames.Count != cookDays)
+        {
+            throw new InvalidOperationException("Could not resolve the current plan for export. Generate a fresh plan and try again.");
+        }
+
+        var context = await BuildPlanContextAsync(request, cancellationToken);
+        await EnsureAiMealPoolHydratedAsync(cancellationToken);
+        var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(normalizedMealNames, cookDays);
+        if (selectedMeals is null)
+        {
+            throw new InvalidOperationException("Could not resolve the current plan for export. Generate a fresh plan and try again.");
+        }
+
+        return await BuildPlanFromMealsAsync(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: true,
+            planSourceLabel: "Current plan",
+            cancellationToken: cancellationToken);
     }
 
     public AislePilotPlanResultViewModel BuildPlanWithBudgetRebalance(
@@ -773,20 +827,32 @@ public sealed class AislePilotService : IAislePilotService
         int maxAttempts = 4,
         IReadOnlyList<string>? currentPlanMealNames = null)
     {
+        return BuildPlanWithBudgetRebalanceAsync(request, maxAttempts, currentPlanMealNames)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    public async Task<AislePilotPlanResultViewModel> BuildPlanWithBudgetRebalanceAsync(
+        AislePilotRequestModel request,
+        int maxAttempts = 4,
+        IReadOnlyList<string>? currentPlanMealNames = null,
+        CancellationToken cancellationToken = default)
+    {
         var normalizedMaxAttempts = Math.Clamp(maxAttempts, 1, 8);
-        var context = BuildPlanContext(request);
+        var context = await BuildPlanContextAsync(request, cancellationToken);
         var cookDays = NormalizeCookDays(request.CookDays);
 
         var selectedMealsFromCurrentPlan = BuildSelectedMealsFromCurrentPlanNames(currentPlanMealNames, cookDays);
         var baselinePlan = selectedMealsFromCurrentPlan is not null
-            ? BuildPlanFromMeals(
+            ? await BuildPlanFromMealsAsync(
                 request,
                 context,
                 selectedMealsFromCurrentPlan,
                 cookDays,
                 usedAiGeneratedMeals: true,
-                planSourceLabel: "Current plan")
-            : BuildPlan(request);
+                planSourceLabel: "Current plan",
+                cancellationToken: cancellationToken)
+            : await BuildPlanAsync(request, cancellationToken);
         if (!baselinePlan.IsOverBudget)
         {
             return baselinePlan;
@@ -824,11 +890,12 @@ public sealed class AislePilotService : IAislePilotService
 
         if (selectedMealsFromCurrentPlan is not null)
         {
-            var targetedSwapPlan = TryBuildTargetedLowerCostPlan(
+            var targetedSwapPlan = await TryBuildTargetedLowerCostPlanAsync(
                 request,
                 context,
                 selectedMealsFromCurrentPlan,
-                cookDays);
+                cookDays,
+                cancellationToken);
             if (targetedSwapPlan is not null)
             {
                 ConsiderCandidate(targetedSwapPlan);
@@ -841,7 +908,7 @@ public sealed class AislePilotService : IAislePilotService
 
         try
         {
-            var lowestCostPlan = BuildLowestCostRebalancePlan(request, context, cookDays);
+            var lowestCostPlan = await BuildLowestCostRebalancePlanAsync(request, context, cookDays, cancellationToken);
             lowestCostPlan = RebasePlanToOriginalBudget(lowestCostPlan, request.WeeklyBudget);
             ConsiderCandidate(lowestCostPlan);
             if (!lowestCostPlan.IsOverBudget)
@@ -866,7 +933,7 @@ public sealed class AislePilotService : IAislePilotService
             AislePilotPlanResultViewModel candidatePlan;
             try
             {
-                candidatePlan = BuildPlan(candidateRequest);
+                candidatePlan = await BuildPlanAsync(candidateRequest, cancellationToken);
             }
             catch (InvalidOperationException)
             {
@@ -903,6 +970,15 @@ public sealed class AislePilotService : IAislePilotService
         PlanContext context,
         int cookDays)
     {
+        return BuildPlanFromTemplateCatalogAsync(request, context, cookDays).GetAwaiter().GetResult();
+    }
+
+    private async Task<AislePilotPlanResultViewModel> BuildPlanFromTemplateCatalogAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays,
+        CancellationToken cancellationToken = default)
+    {
         var selectedMeals = SelectMeals(
             MealTemplates,
             context.DietaryModes,
@@ -915,13 +991,14 @@ public sealed class AislePilotService : IAislePilotService
         // Keep swap behavior consistent by making fallback-selected meals available in the in-memory pool.
         AddMealsToAiPool(selectedMeals);
 
-        return BuildPlanFromMeals(
+        return await BuildPlanFromMealsAsync(
             request,
             context,
             selectedMeals,
             cookDays,
             usedAiGeneratedMeals: false,
-            planSourceLabel: "Template fallback");
+            planSourceLabel: "Template fallback",
+            cancellationToken: cancellationToken);
     }
 
     private AislePilotPlanResultViewModel? TryBuildPlanWithAi(
@@ -1160,12 +1237,66 @@ public sealed class AislePilotService : IAislePilotService
             planSourceLabel: "AI meal pool");
     }
 
+    private async Task<AislePilotPlanResultViewModel?> TryBuildPlanFromAiPoolAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureAiMealPoolHydratedAsync(cancellationToken);
+        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        if (pooledMeals.Count == 0)
+        {
+            _logger?.LogWarning("AislePilot AI meal pool did not contain compatible meals for the current request.");
+            return null;
+        }
+
+        var selectedMeals = SelectMeals(
+            pooledMeals,
+            context.DietaryModes,
+            request.WeeklyBudget,
+            context.HouseholdFactor,
+            request.PreferQuickMeals,
+            context.DislikesOrAllergens,
+            cookDays);
+
+        if (!HasUniqueMealNames(selectedMeals, cookDays))
+        {
+            _logger?.LogInformation(
+                "AislePilot AI meal pool did not contain enough unique meals for {CookDays} cook days; requesting fresh AI meals.",
+                cookDays);
+            return null;
+        }
+
+        return await BuildPlanFromMealsAsync(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: true,
+            planSourceLabel: "AI meal pool",
+            cancellationToken: cancellationToken);
+    }
+
     public AislePilotPlanResultViewModel SwapMealForDay(
         AislePilotRequestModel request,
         int dayIndex,
         string? currentMealName,
         IReadOnlyList<string>? currentPlanMealNames,
         IReadOnlyList<string>? seenMealNames)
+    {
+        return SwapMealForDayAsync(request, dayIndex, currentMealName, currentPlanMealNames, seenMealNames)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    public async Task<AislePilotPlanResultViewModel> SwapMealForDayAsync(
+        AislePilotRequestModel request,
+        int dayIndex,
+        string? currentMealName,
+        IReadOnlyList<string>? currentPlanMealNames,
+        IReadOnlyList<string>? seenMealNames,
+        CancellationToken cancellationToken = default)
     {
         var cookDays = NormalizeCookDays(request.CookDays);
         if (dayIndex < 0 || dayIndex >= cookDays)
@@ -1175,12 +1306,12 @@ public sealed class AislePilotService : IAislePilotService
                 $"Day index must be between 0 and {cookDays - 1}.");
         }
 
-        var context = BuildPlanContext(request);
-        EnsureAiMealPoolHydrated();
+        var context = await BuildPlanContextAsync(request, cancellationToken);
+        await EnsureAiMealPoolHydratedAsync(cancellationToken);
         var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(currentPlanMealNames, cookDays);
         if (selectedMeals is null && _allowTemplateFallback)
         {
-            var fallbackPlan = BuildPlanFromTemplateCatalog(request, context, cookDays);
+            var fallbackPlan = await BuildPlanFromTemplateCatalogAsync(request, context, cookDays, cancellationToken);
             selectedMeals = BuildSelectedMealsFromCurrentPlanNames(
                 fallbackPlan.MealPlan.Select(meal => meal.MealName).ToList(),
                 cookDays);
@@ -1232,14 +1363,15 @@ public sealed class AislePilotService : IAislePilotService
 
         if (replacement is null)
         {
-            replacement = TryBuildReplacementMealWithAi(
+            replacement = await TryBuildReplacementMealWithAiAsync(
                 request,
                 context,
                 selectedMeals,
                 dayIndex,
                 currentName,
                 dayMultiplier,
-                normalizedSeenMealNames);
+                normalizedSeenMealNames,
+                cancellationToken);
             if (replacement is not null)
             {
                 planSourceLabel = "OpenAI swap";
@@ -1271,13 +1403,14 @@ public sealed class AislePilotService : IAislePilotService
 
         AddMealsToAiPool([replacement]);
         selectedMeals[dayIndex] = replacement;
-        return BuildPlanFromMeals(
+        return await BuildPlanFromMealsAsync(
             request,
             context,
             selectedMeals,
             cookDays,
             usedAiGeneratedMeals: !planSourceLabel.Equals("Template swap", StringComparison.OrdinalIgnoreCase),
-            planSourceLabel: planSourceLabel);
+            planSourceLabel: planSourceLabel,
+            cancellationToken: cancellationToken);
     }
 
     private MealTemplate? TryBuildReplacementMealWithAi(
@@ -1623,6 +1756,8 @@ Return JSON only with this schema:
 
     private async Task EnsureAiMealPoolHydratedAsync(CancellationToken cancellationToken = default)
     {
+        PruneAiMealPool(DateTime.UtcNow);
+
         if (_db is null)
         {
             return;
@@ -1655,6 +1790,7 @@ Return JSON only with this schema:
                 .OrderByDescending(nameof(FirestoreAislePilotMeal.CreatedAtUtc))
                 .Limit(150)
                 .GetSnapshotAsync(cancellationToken);
+            var refreshedAtUtc = DateTime.UtcNow;
 
             foreach (var doc in snapshot.Documents)
             {
@@ -1667,11 +1803,12 @@ Return JSON only with this schema:
                 var mappedMeal = FromFirestoreDocument(firestoreMeal);
                 if (mappedMeal is not null)
                 {
-                    AiMealPool[mappedMeal.Name] = mappedMeal;
+                    UpsertAiMealPoolEntry(mappedMeal, refreshedAtUtc);
                 }
             }
 
-            _lastAiMealPoolRefreshUtc = DateTime.UtcNow;
+            PruneAiMealPool(refreshedAtUtc);
+            _lastAiMealPoolRefreshUtc = refreshedAtUtc;
         }
         finally
         {
@@ -1847,6 +1984,28 @@ Return JSON only with this schema:
         var portionSize = NormalizePortionSize(request.PortionSize);
         var portionSizeFactor = ResolvePortionSizeFactor(portionSize);
         var aisleOrder = ResolveAisleOrder(supermarket, customAisleOrder);
+        var householdFactor = Math.Max(0.5m, request.HouseholdSize / 2m) * portionSizeFactor;
+
+        return new PlanContext(
+            supermarket,
+            dietaryModes,
+            aisleOrder,
+            householdFactor,
+            dislikesOrAllergens,
+            portionSize);
+    }
+
+    private async Task<PlanContext> BuildPlanContextAsync(
+        AislePilotRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var supermarket = NormalizeSupermarket(request.Supermarket);
+        var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
+        var customAisleOrder = request.CustomAisleOrder ?? string.Empty;
+        var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
+        var portionSize = NormalizePortionSize(request.PortionSize);
+        var portionSizeFactor = ResolvePortionSizeFactor(portionSize);
+        var aisleOrder = await ResolveAisleOrderAsync(supermarket, customAisleOrder, cancellationToken);
         var householdFactor = Math.Max(0.5m, request.HouseholdSize / 2m) * portionSizeFactor;
 
         return new PlanContext(
@@ -2036,6 +2195,116 @@ Return JSON only with this schema:
             planSourceLabel: "Budget trim swaps");
     }
 
+    private async Task<AislePilotPlanResultViewModel?> TryBuildTargetedLowerCostPlanAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        IReadOnlyList<MealTemplate> baselineMeals,
+        int cookDays,
+        CancellationToken cancellationToken = default)
+    {
+        if (baselineMeals.Count != cookDays)
+        {
+            return null;
+        }
+
+        await EnsureAiMealPoolHydratedAsync(cancellationToken);
+        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        var templateMeals = FilterMeals(context.DietaryModes, context.DislikesOrAllergens, MealTemplates);
+        var compatiblePool = pooledMeals
+            .Concat(templateMeals)
+            .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderBy(meal => meal.BaseCostForTwo).First())
+            .ToList();
+        if (compatiblePool.Count == 0)
+        {
+            return null;
+        }
+
+        var selectedMeals = baselineMeals.ToList();
+        var leftoverDays = Math.Max(0, 7 - cookDays);
+        var requestedLeftoverSourceDays = ParseRequestedLeftoverSourceDays(
+            request.LeftoverCookDayIndexesCsv,
+            cookDays,
+            leftoverDays);
+        var dayMultipliers = BuildMealPortionMultipliers(
+            cookDays,
+            leftoverDays,
+            requestedLeftoverSourceDays);
+
+        var currentTotal = CalculatePlanCost(selectedMeals, context.HouseholdFactor, dayMultipliers);
+        var maxIterations = Math.Max(4, cookDays * 2);
+        var hasChanges = false;
+
+        for (var iteration = 0; iteration < maxIterations && currentTotal > request.WeeklyBudget; iteration++)
+        {
+            var orderedDayIndexes = Enumerable.Range(0, cookDays)
+                .OrderByDescending(index => CalculateScaledMealCost(
+                    selectedMeals[index],
+                    context.HouseholdFactor,
+                    dayMultipliers[index]))
+                .ToList();
+
+            var swappedThisIteration = false;
+            foreach (var dayIndex in orderedDayIndexes)
+            {
+                var replacement = SelectLowerCostSwapCandidateForDay(
+                    compatiblePool,
+                    selectedMeals,
+                    dayIndex,
+                    context.HouseholdFactor,
+                    dayMultipliers[dayIndex],
+                    request.PreferQuickMeals);
+                if (replacement is null)
+                {
+                    continue;
+                }
+
+                var currentMealCost = CalculateScaledMealCost(
+                    selectedMeals[dayIndex],
+                    context.HouseholdFactor,
+                    dayMultipliers[dayIndex]);
+                var replacementMealCost = CalculateScaledMealCost(
+                    replacement,
+                    context.HouseholdFactor,
+                    dayMultipliers[dayIndex]);
+
+                if (replacementMealCost >= currentMealCost)
+                {
+                    continue;
+                }
+
+                selectedMeals[dayIndex] = replacement;
+                currentTotal = decimal.Round(
+                    currentTotal - currentMealCost + replacementMealCost,
+                    2,
+                    MidpointRounding.AwayFromZero);
+                hasChanges = true;
+                swappedThisIteration = true;
+                break;
+            }
+
+            if (!swappedThisIteration)
+            {
+                break;
+            }
+        }
+
+        if (!hasChanges)
+        {
+            return null;
+        }
+
+        AddMealsToAiPool(selectedMeals);
+        return await BuildPlanFromMealsAsync(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: pooledMeals.Count > 0,
+            planSourceLabel: "Budget trim swaps",
+            cancellationToken: cancellationToken);
+    }
+
     private static MealTemplate? SelectLowerCostSwapCandidateForDay(
         IReadOnlyList<MealTemplate> compatiblePool,
         IReadOnlyList<MealTemplate> selectedMeals,
@@ -2139,6 +2408,44 @@ Return JSON only with this schema:
             cookDays,
             usedAiGeneratedMeals: pooledMeals.Count > 0,
             planSourceLabel: "Budget floor");
+    }
+
+    private async Task<AislePilotPlanResultViewModel> BuildLowestCostRebalancePlanAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureAiMealPoolHydratedAsync(cancellationToken);
+
+        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        var templateMeals = FilterMeals(context.DietaryModes, context.DislikesOrAllergens, MealTemplates);
+
+        var combinedSource = pooledMeals
+            .Concat(templateMeals)
+            .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderBy(meal => meal.BaseCostForTwo).First())
+            .ToList();
+        if (combinedSource.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "No meals match the selected dietary modes and dislikes/allergens.");
+        }
+
+        var selectedMeals = SelectLowestCostMeals(
+            combinedSource,
+            context.HouseholdFactor,
+            request.PreferQuickMeals,
+            cookDays);
+
+        return await BuildPlanFromMealsAsync(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: pooledMeals.Count > 0,
+            planSourceLabel: "Budget floor",
+            cancellationToken: cancellationToken);
     }
 
     private static IReadOnlyList<MealTemplate> SelectLowestCostMeals(
@@ -2256,6 +2563,26 @@ Return JSON only with this schema:
         bool usedAiGeneratedMeals = false,
         string? planSourceLabel = null)
     {
+        return BuildPlanFromMealsAsync(
+                request,
+                context,
+                selectedMeals,
+                cookDays,
+                usedAiGeneratedMeals,
+                planSourceLabel)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    private async Task<AislePilotPlanResultViewModel> BuildPlanFromMealsAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        IReadOnlyList<MealTemplate> selectedMeals,
+        int cookDays,
+        bool usedAiGeneratedMeals = false,
+        string? planSourceLabel = null,
+        CancellationToken cancellationToken = default)
+    {
         var leftoverDays = Math.Max(0, 7 - cookDays);
         var requestedLeftoverSourceDays = ParseRequestedLeftoverSourceDays(
             request.LeftoverCookDayIndexesCsv,
@@ -2265,7 +2592,7 @@ Return JSON only with this schema:
             cookDays,
             leftoverDays,
             requestedLeftoverSourceDays);
-        var mealImageUrls = ResolveMealImageUrls(selectedMeals);
+        var mealImageUrls = await ResolveMealImageUrlsAsync(selectedMeals, cancellationToken);
         var portionSizeFactor = ResolvePortionSizeFactor(context.PortionSize);
         var dailyPlans = BuildDailyPlans(
             selectedMeals,
@@ -2308,7 +2635,16 @@ Return JSON only with this schema:
 
     private IReadOnlyDictionary<string, string> ResolveMealImageUrls(IReadOnlyList<MealTemplate> selectedMeals)
     {
-        EnsureMealImagePoolHydrated(selectedMeals.Select(meal => meal.Name));
+        return ResolveMealImageUrlsAsync(selectedMeals).GetAwaiter().GetResult();
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> ResolveMealImageUrlsAsync(
+        IReadOnlyList<MealTemplate> selectedMeals,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureMealImagePoolHydratedAsync(
+            selectedMeals.Select(meal => meal.Name).ToList(),
+            cancellationToken);
 
         var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var meal in selectedMeals)
@@ -2707,12 +3043,7 @@ Return JSON only with this schema:
 
     private void QueueMealImageGeneration(MealTemplate meal)
     {
-        if (!_enableAiGeneration ||
-            !_enableAiImageGeneration ||
-            _httpClient is null ||
-            string.IsNullOrWhiteSpace(_apiKey) ||
-            _webHostEnvironment is null ||
-            string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath))
+        if (!CanGenerateMealImages())
         {
             return;
         }
@@ -2751,7 +3082,7 @@ Return JSON only with this schema:
 
                 if (AiMealPool.TryGetValue(meal.Name, out var existingMeal))
                 {
-                    AiMealPool[meal.Name] = existingMeal with { ImageUrl = imageUrl };
+                    UpsertAiMealPoolEntry(existingMeal with { ImageUrl = imageUrl }, DateTime.UtcNow);
                 }
 
                 await PersistMealImageAsync(meal.Name, imageUrl, imageBytes, CancellationToken.None);
@@ -3802,14 +4133,72 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         IReadOnlyList<string> dietaryModes,
         string dislikesOrAllergens)
     {
+        PruneAiMealPool(DateTime.UtcNow);
         return FilterMeals(dietaryModes, dislikesOrAllergens, AiMealPool.Values.ToList());
     }
 
     private static void AddMealsToAiPool(IReadOnlyList<MealTemplate> meals)
     {
+        var nowUtc = DateTime.UtcNow;
         foreach (var meal in meals)
         {
-            AiMealPool[meal.Name] = meal;
+            UpsertAiMealPoolEntry(meal, nowUtc);
+        }
+
+        PruneAiMealPool(nowUtc);
+    }
+
+    private static void UpsertAiMealPoolEntry(MealTemplate meal, DateTime touchedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(meal.Name))
+        {
+            return;
+        }
+
+        AiMealPool[meal.Name] = meal;
+        AiMealPoolLastTouchedUtc[meal.Name] = touchedAtUtc;
+    }
+
+    private static void RemoveAiMealPoolEntry(string mealName)
+    {
+        AiMealPool.TryRemove(mealName, out _);
+        AiMealPoolLastTouchedUtc.TryRemove(mealName, out _);
+    }
+
+    private static void PruneAiMealPool(DateTime nowUtc)
+    {
+        foreach (var entry in AiMealPoolLastTouchedUtc)
+        {
+            if (nowUtc - entry.Value > AiMealPoolEntryTtl)
+            {
+                RemoveAiMealPoolEntry(entry.Key);
+            }
+        }
+
+        foreach (var mealName in AiMealPool.Keys)
+        {
+            if (!AiMealPoolLastTouchedUtc.ContainsKey(mealName))
+            {
+                RemoveAiMealPoolEntry(mealName);
+            }
+        }
+
+        var overflowCount = AiMealPool.Count - MaxAiMealPoolEntries;
+        if (overflowCount <= 0)
+        {
+            return;
+        }
+
+        var evictionCandidates = AiMealPoolLastTouchedUtc
+            .OrderBy(entry => entry.Value)
+            .ThenBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
+            .Take(overflowCount)
+            .Select(entry => entry.Key)
+            .ToList();
+
+        foreach (var mealName in evictionCandidates)
+        {
+            RemoveAiMealPoolEntry(mealName);
         }
     }
 
@@ -5528,6 +5917,61 @@ Return JSON only with this schema:
         return NormalizeResolvedAisleOrder(DefaultAisleOrder);
     }
 
+    private async Task<IReadOnlyList<string>> ResolveAisleOrderAsync(
+        string supermarket,
+        string customAisleOrder,
+        CancellationToken cancellationToken = default)
+    {
+        if (supermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            var custom = customAisleOrder
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => x.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (custom.Count >= 3)
+            {
+                return NormalizeResolvedAisleOrder(custom);
+            }
+        }
+
+        await EnsureSupermarketLayoutCacheHydratedAsync(cancellationToken);
+        if (SupermarketLayoutCache.TryGetValue(supermarket, out var cachedLayout) &&
+            cachedLayout.AisleOrder.Count >= 3)
+        {
+            if (!IsSupermarketLayoutStale(cachedLayout.UpdatedAtUtc))
+            {
+                return cachedLayout.AisleOrder;
+            }
+
+            var refreshedStaleOrder = await TryRefreshSupermarketLayoutWithTimeoutAsync(supermarket, cancellationToken);
+            if (refreshedStaleOrder is not null)
+            {
+                return refreshedStaleOrder;
+            }
+
+            QueueSupermarketLayoutRefresh(supermarket);
+            return cachedLayout.AisleOrder;
+        }
+
+        var discoveredOrder = await TryRefreshSupermarketLayoutWithTimeoutAsync(supermarket, cancellationToken);
+        if (discoveredOrder is not null)
+        {
+            return discoveredOrder;
+        }
+
+        QueueSupermarketLayoutRefresh(supermarket);
+
+        if (SupermarketAisleOrders.TryGetValue(supermarket, out var predefined))
+        {
+            return NormalizeResolvedAisleOrder(predefined);
+        }
+
+        return NormalizeResolvedAisleOrder(DefaultAisleOrder);
+    }
+
     private void EnsureSupermarketLayoutCacheHydrated()
     {
         try
@@ -5630,7 +6074,9 @@ Return JSON only with this schema:
                !string.IsNullOrWhiteSpace(_apiKey);
     }
 
-    private IReadOnlyList<string>? TryRefreshSupermarketLayoutSynchronously(string supermarket)
+    private async Task<IReadOnlyList<string>?> TryRefreshSupermarketLayoutWithTimeoutAsync(
+        string supermarket,
+        CancellationToken cancellationToken)
     {
         if (!CanUseOnlineLayoutDiscovery())
         {
@@ -5639,16 +6085,22 @@ Return JSON only with this schema:
 
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-            return TryRefreshSupermarketLayoutAsync(supermarket, force: false, cts.Token)
-                .GetAwaiter()
-                .GetResult();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(8));
+            return await TryRefreshSupermarketLayoutAsync(supermarket, force: false, cts.Token);
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "Synchronous supermarket layout refresh failed for '{Supermarket}'.", supermarket);
+            _logger?.LogWarning(ex, "Supermarket layout refresh failed for '{Supermarket}'.", supermarket);
             return null;
         }
+    }
+
+    private IReadOnlyList<string>? TryRefreshSupermarketLayoutSynchronously(string supermarket)
+    {
+        return TryRefreshSupermarketLayoutWithTimeoutAsync(supermarket, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
     }
 
     private async Task<IReadOnlyList<string>?> TryRefreshSupermarketLayoutAsync(

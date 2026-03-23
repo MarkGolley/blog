@@ -7,6 +7,11 @@ namespace MyBlog.Controllers;
 [ApiExplorerSettings(IgnoreApi = true)]
 public class HealthController : Controller
 {
+    private static readonly SemaphoreSlim AislePilotMealCountCacheLock = new(1, 1);
+    private static readonly TimeSpan AislePilotMealCountCacheTtl = TimeSpan.FromMinutes(5);
+    private static int? _cachedAislePilotMealCount;
+    private static DateTime? _cachedAislePilotMealCountRefreshedUtc;
+
     private readonly IWebHostEnvironment _env;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<HealthController> _logger;
@@ -86,8 +91,7 @@ public class HealthController : Controller
                 await firestore.Collection("meta").Limit(1).GetSnapshotAsync(timeoutCts.Token);
                 checks["firestore"] = new { status = "ok" };
 
-                var aiMealSnapshot = await firestore.Collection("aislePilotAiMeals").GetSnapshotAsync(timeoutCts.Token);
-                var aiMealCount = aiMealSnapshot.Documents.Count;
+                var aiMealCount = await GetAislePilotMealCountAsync(firestore, timeoutCts.Token);
                 var cacheStatus = aiMealCount >= minimumAislePilotCacheCount ? "ok" : "warning";
                 checks["aislePilotMealCache"] = new
                 {
@@ -160,5 +164,39 @@ public class HealthController : Controller
         };
 
         return StatusCode(isHealthy ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable, payload);
+    }
+
+    private static async Task<int> GetAislePilotMealCountAsync(
+        FirestoreDb firestore,
+        CancellationToken cancellationToken)
+    {
+        if (_cachedAislePilotMealCount.HasValue &&
+            _cachedAislePilotMealCountRefreshedUtc.HasValue &&
+            DateTime.UtcNow - _cachedAislePilotMealCountRefreshedUtc.Value <= AislePilotMealCountCacheTtl)
+        {
+            return _cachedAislePilotMealCount.Value;
+        }
+
+        await AislePilotMealCountCacheLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_cachedAislePilotMealCount.HasValue &&
+                _cachedAislePilotMealCountRefreshedUtc.HasValue &&
+                DateTime.UtcNow - _cachedAislePilotMealCountRefreshedUtc.Value <= AislePilotMealCountCacheTtl)
+            {
+                return _cachedAislePilotMealCount.Value;
+            }
+
+            var aiMealSnapshot = await firestore.Collection("aislePilotAiMeals").GetSnapshotAsync(cancellationToken);
+            var aiMealCount = aiMealSnapshot.Documents.Count;
+
+            _cachedAislePilotMealCount = aiMealCount;
+            _cachedAislePilotMealCountRefreshedUtc = DateTime.UtcNow;
+            return aiMealCount;
+        }
+        finally
+        {
+            AislePilotMealCountCacheLock.Release();
+        }
     }
 }

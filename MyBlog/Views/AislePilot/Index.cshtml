@@ -757,6 +757,7 @@
                     <div class="aislepilot-meal-grid"
                          data-meal-image-poll-root
                          data-fallback-meal-image-url="@fallbackMealImageUrl"
+                         data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
                          data-meal-image-poll-url="@mealImagesPollUrl">
                         @for (var mealIndex = 0; mealIndex < result.MealPlan.Count; mealIndex++)
                         {
@@ -935,6 +936,10 @@
                             {
                                 <input type="hidden" name="Request.DietaryModes" value="@mode" />
                             }
+                            @foreach (var existingMeal in result.MealPlan)
+                            {
+                                <input type="hidden" name="currentPlanMealNames" value="@existingMeal.MealName" />
+                            }
                             <button type="submit" class="aislepilot-export-btn" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
                         </form>
 
@@ -955,6 +960,10 @@
                             @foreach (var mode in Model.Request.DietaryModes)
                             {
                                 <input type="hidden" name="Request.DietaryModes" value="@mode" />
+                            }
+                            @foreach (var existingMeal in result.MealPlan)
+                            {
+                                <input type="hidden" name="currentPlanMealNames" value="@existingMeal.MealName" />
                             }
                             <button type="submit" class="aislepilot-export-btn" data-loading-label="Building checklist...">Download shopping checklist (.txt)</button>
                         </form>

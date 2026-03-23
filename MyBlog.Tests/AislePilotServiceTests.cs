@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -708,6 +709,36 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_WithCurrentPlanMealNames_PreservesThatSequence()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 200m,
+            HouseholdSize = 2,
+            CookDays = 7,
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Chicken stir fry with rice",
+            "Salmon, potatoes, and broccoli",
+            "Turkey chilli with beans",
+            "Veggie lentil curry",
+            "Tofu noodle bowls",
+            "Greek yogurt chicken wraps",
+            "Egg fried rice"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var resultMealNames = result.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(currentPlanMealNames.Count, resultMealNames.Count);
+        Assert.True(resultMealNames.SequenceEqual(currentPlanMealNames, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ValidateAndMapAiMeal_NormalizesInflatedBaseCostAgainstIngredientTotals()
     {
         var payloadJson = """
@@ -1210,6 +1241,50 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void AddMealsToAiPool_WhenEntryCountExceedsCap_EvictsOldestEntries()
+    {
+        ClearAiPool();
+
+        var maxEntries = GetPrivateStaticInt("MaxAiMealPoolEntries");
+        var seedMealTemplate = GetMealTemplateSeed();
+        var olderMealNames = Enumerable.Range(0, 40)
+            .Select(index => $"Pool old {index}-{Guid.NewGuid():N}")
+            .ToList();
+        var newerMealNames = Enumerable.Range(0, maxEntries)
+            .Select(index => $"Pool new {index}-{Guid.NewGuid():N}")
+            .ToList();
+
+        InvokeAddMealsToAiPool(CreateMealTemplatesFromSeed(seedMealTemplate, olderMealNames));
+        Thread.Sleep(20);
+        InvokeAddMealsToAiPool(CreateMealTemplatesFromSeed(seedMealTemplate, newerMealNames));
+
+        Assert.True(GetAiPoolCount() <= maxEntries);
+        Assert.All(olderMealNames, mealName => Assert.False(AiPoolContains(mealName)));
+        Assert.True(AiPoolContains(newerMealNames[^1]));
+    }
+
+    [Fact]
+    public void PruneAiMealPool_WhenEntryIsPastTtl_RemovesStaleEntry()
+    {
+        ClearAiPool();
+
+        var seedMealTemplate = GetMealTemplateSeed();
+        var staleMealName = $"Pool stale-{Guid.NewGuid():N}";
+        var freshMealName = $"Pool fresh-{Guid.NewGuid():N}";
+        var ttl = GetPrivateStaticTimeSpan("AiMealPoolEntryTtl");
+        var nowUtc = DateTime.UtcNow;
+
+        InvokeAddMealsToAiPool(
+            CreateMealTemplatesFromSeed(seedMealTemplate, [staleMealName, freshMealName]));
+        SetAiPoolTouchedUtc(staleMealName, nowUtc - ttl - TimeSpan.FromMinutes(1));
+        SetAiPoolTouchedUtc(freshMealName, nowUtc);
+        InvokePruneAiMealPool(nowUtc);
+
+        Assert.False(AiPoolContains(staleMealName));
+        Assert.True(AiPoolContains(freshMealName));
+    }
+
+    [Fact]
     public async Task WarmupAiMealPoolAsync_GeneratesAtMostConfiguredMeals()
     {
         var configuration = new ConfigurationBuilder()
@@ -1279,38 +1354,163 @@ public class AislePilotServiceTests
 
     private static void RemoveAiPoolMeal(string mealName)
     {
-        var field = typeof(AislePilotService).GetField("AiMealPool", BindingFlags.NonPublic | BindingFlags.Static);
-        var pool = field?.GetValue(null);
-        if (pool is null)
-        {
-            return;
-        }
-
-        var tryRemove = pool.GetType()
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(method =>
-                method.Name == "TryRemove" &&
-                method.GetParameters().Length == 2);
-        if (tryRemove is null)
-        {
-            return;
-        }
-
-        var args = new object?[] { mealName, null };
-        _ = tryRemove.Invoke(pool, args);
+        RemoveFromConcurrentDictionary(GetRequiredStaticField("AiMealPool"), mealName);
+        RemoveFromConcurrentDictionary(GetRequiredStaticField("AiMealPoolLastTouchedUtc"), mealName);
     }
 
     private static void ClearAiPool()
     {
-        var field = typeof(AislePilotService).GetField("AiMealPool", BindingFlags.NonPublic | BindingFlags.Static);
-        var pool = field?.GetValue(null);
-        if (pool is null)
+        ClearConcurrentDictionary(GetRequiredStaticField("AiMealPool"));
+        ClearConcurrentDictionary(GetRequiredStaticField("AiMealPoolLastTouchedUtc"));
+    }
+
+    private static object GetMealTemplateSeed()
+    {
+        var mealTemplates = GetRequiredStaticField("MealTemplates") as IEnumerable;
+        Assert.NotNull(mealTemplates);
+
+        foreach (var template in mealTemplates!)
         {
-            return;
+            if (template is not null)
+            {
+                return template;
+            }
         }
 
-        var clear = pool.GetType().GetMethod("Clear", BindingFlags.Public | BindingFlags.Instance);
-        clear?.Invoke(pool, null);
+        throw new InvalidOperationException("AislePilot MealTemplates is empty.");
+    }
+
+    private static IReadOnlyList<object> CreateMealTemplatesFromSeed(object seedMealTemplate, IReadOnlyList<string> mealNames)
+    {
+        var mealType = seedMealTemplate.GetType();
+        var constructor = mealType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .FirstOrDefault(candidate =>
+            {
+                var parameters = candidate.GetParameters();
+                return parameters.Length == 5 &&
+                       parameters[0].ParameterType == typeof(string);
+            });
+        Assert.NotNull(constructor);
+        var baseCostForTwo = mealType.GetProperty("BaseCostForTwo")?.GetValue(seedMealTemplate)
+            ?? throw new InvalidOperationException("Missing BaseCostForTwo property.");
+        var isQuick = mealType.GetProperty("IsQuick")?.GetValue(seedMealTemplate)
+            ?? throw new InvalidOperationException("Missing IsQuick property.");
+        var tags = mealType.GetProperty("Tags")?.GetValue(seedMealTemplate)
+            ?? throw new InvalidOperationException("Missing Tags property.");
+        var ingredients = mealType.GetProperty("Ingredients")?.GetValue(seedMealTemplate)
+            ?? throw new InvalidOperationException("Missing Ingredients property.");
+
+        var templates = new List<object>(mealNames.Count);
+        foreach (var mealName in mealNames)
+        {
+            var template = constructor!.Invoke([mealName, baseCostForTwo, isQuick, tags, ingredients]);
+            templates.Add(template);
+        }
+
+        return templates;
+    }
+
+    private static void InvokeAddMealsToAiPool(IReadOnlyList<object> meals)
+    {
+        Assert.NotEmpty(meals);
+
+        var method = typeof(AislePilotService).GetMethod("AddMealsToAiPool", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var mealType = meals[0].GetType();
+        var mealArray = Array.CreateInstance(mealType, meals.Count);
+        for (var index = 0; index < meals.Count; index++)
+        {
+            mealArray.SetValue(meals[index], index);
+        }
+
+        method!.Invoke(null, [mealArray]);
+    }
+
+    private static void InvokePruneAiMealPool(DateTime nowUtc)
+    {
+        var method = typeof(AislePilotService).GetMethod("PruneAiMealPool", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        method!.Invoke(null, [nowUtc]);
+    }
+
+    private static int GetPrivateStaticInt(string fieldName)
+    {
+        var field = typeof(AislePilotService).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(field);
+        var value = field!.GetValue(null);
+        Assert.NotNull(value);
+        return (int)value!;
+    }
+
+    private static TimeSpan GetPrivateStaticTimeSpan(string fieldName)
+    {
+        var field = typeof(AislePilotService).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(field);
+        var value = field!.GetValue(null);
+        Assert.NotNull(value);
+        return (TimeSpan)value!;
+    }
+
+    private static void SetAiPoolTouchedUtc(string mealName, DateTime touchedUtc)
+    {
+        var touchedMap = GetRequiredStaticField("AiMealPoolLastTouchedUtc");
+        var indexer = touchedMap.GetType().GetProperty("Item");
+        Assert.NotNull(indexer);
+        indexer!.SetValue(touchedMap, touchedUtc, [mealName]);
+    }
+
+    private static bool AiPoolContains(string mealName)
+    {
+        var pool = GetRequiredStaticField("AiMealPool");
+        var containsKey = pool.GetType().GetMethod("ContainsKey", BindingFlags.Public | BindingFlags.Instance);
+        Assert.NotNull(containsKey);
+        var result = containsKey!.Invoke(pool, [mealName]);
+        Assert.NotNull(result);
+        return (bool)result!;
+    }
+
+    private static int GetAiPoolCount()
+    {
+        var pool = GetRequiredStaticField("AiMealPool");
+        var countProperty = pool.GetType().GetProperty("Count", BindingFlags.Public | BindingFlags.Instance);
+        Assert.NotNull(countProperty);
+        var count = countProperty!.GetValue(pool);
+        Assert.NotNull(count);
+        return (int)count!;
+    }
+
+    private static object GetRequiredStaticField(string fieldName)
+    {
+        var field = typeof(AislePilotService).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(field);
+        var value = field!.GetValue(null);
+        Assert.NotNull(value);
+        return value!;
+    }
+
+    private static void ClearConcurrentDictionary(object dictionary)
+    {
+        var clear = dictionary.GetType().GetMethod("Clear", BindingFlags.Public | BindingFlags.Instance);
+        Assert.NotNull(clear);
+        clear!.Invoke(dictionary, null);
+    }
+
+    private static void RemoveFromConcurrentDictionary(object dictionary, string key)
+    {
+        var tryRemove = dictionary.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(method =>
+                method.Name == "TryRemove" &&
+                method.GetParameters().Length == 2);
+        Assert.NotNull(tryRemove);
+
+        var valueParameterType = tryRemove!.GetParameters()[1].ParameterType.GetElementType();
+        var removedValue = valueParameterType is null || !valueParameterType.IsValueType
+            ? null
+            : Activator.CreateInstance(valueParameterType);
+        var args = new[] { (object?)key, removedValue };
+        _ = tryRemove.Invoke(dictionary, args);
     }
 
     private sealed class StaticResponseHandler(HttpStatusCode statusCode, string responseBody) : HttpMessageHandler

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace MyBlog.Tests;
@@ -88,6 +89,20 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("No meals match your dietary modes", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task MealImages_WhenAiImageGenerationDisabled_ReturnsCanGenerateImagesFalse()
+    {
+        using var client = CreateClient(allowAutoRedirect: false);
+
+        using var response = await client.GetAsync("/projects/aisle-pilot/meal-images?mealNames=Egg%20fried%20rice");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        Assert.True(document.RootElement.TryGetProperty("canGenerateImages", out var canGenerateImages));
+        Assert.False(canGenerateImages.GetBoolean());
     }
 
     [Fact]

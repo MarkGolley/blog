@@ -1229,6 +1229,11 @@
             return null;
         }
 
+        const pollEnabledValue = pollRoot.dataset.mealImagePollEnabled?.trim().toLowerCase();
+        if (pollEnabledValue === "false") {
+            return null;
+        }
+
         const imageElements = Array.from(pollRoot.querySelectorAll("img[data-meal-image][data-meal-name]"))
             .filter(node => node instanceof HTMLImageElement);
         if (imageElements.length === 0) {
@@ -1335,6 +1340,11 @@
             }
 
             const payload = await response.json();
+            if (payload?.canGenerateImages === false) {
+                stopMealImagePolling();
+                return;
+            }
+
             const images = Array.isArray(payload?.images) ? payload.images : [];
             if (images.length === 0) {
                 return;

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using MyBlog.Services;
 
@@ -23,6 +24,7 @@ public class AislePilotAdminController : Controller
     }
 
     [HttpPost("/admin/aisle-pilot/warmup")]
+    [EnableRateLimiting("aislePilotAdminWarmupWrites")]
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Warmup(
         [FromForm] string? adminKey,

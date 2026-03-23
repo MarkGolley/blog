@@ -223,8 +223,20 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: GetRateLimitPartitionKey(httpContext),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5000,
+                PermitLimit = 45,
                 Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("aislePilotAdminWarmupWrites", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 2,
+                Window = TimeSpan.FromMinutes(10),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,
                 AutoReplenishment = true

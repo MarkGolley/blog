@@ -47,7 +47,7 @@ public class AislePilotController(
     [HttpPost("")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
-    public IActionResult Index(AislePilotPageViewModel pageModel)
+    public async Task<IActionResult> Index(AislePilotPageViewModel pageModel, CancellationToken cancellationToken)
     {
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
@@ -61,7 +61,7 @@ public class AislePilotController(
 
         try
         {
-            var result = aislePilotService.BuildPlan(request);
+            var result = await aislePilotService.BuildPlanAsync(request, cancellationToken);
             return View(BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
         }
         catch (InvalidOperationException ex)
@@ -82,7 +82,10 @@ public class AislePilotController(
     [HttpPost("rebalance-budget")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
-    public IActionResult RebalanceBudget(AislePilotPageViewModel pageModel, List<string>? currentPlanMealNames)
+    public async Task<IActionResult> RebalanceBudget(
+        AislePilotPageViewModel pageModel,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
     {
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
@@ -96,9 +99,10 @@ public class AislePilotController(
 
         try
         {
-            var result = aislePilotService.BuildPlanWithBudgetRebalance(
+            var result = await aislePilotService.BuildPlanWithBudgetRebalanceAsync(
                 request,
-                currentPlanMealNames: currentPlanMealNames);
+                currentPlanMealNames: currentPlanMealNames,
+                cancellationToken: cancellationToken);
             return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
         }
         catch (InvalidOperationException ex)
@@ -155,7 +159,12 @@ public class AislePilotController(
     [HttpPost("swap-meal")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
-    public IActionResult SwapMeal(AislePilotPageViewModel pageModel, int dayIndex, string? currentMealName, List<string>? currentPlanMealNames)
+    public async Task<IActionResult> SwapMeal(
+        AislePilotPageViewModel pageModel,
+        int dayIndex,
+        string? currentMealName,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
     {
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
@@ -177,7 +186,13 @@ public class AislePilotController(
 
         try
         {
-            var result = aislePilotService.SwapMealForDay(request, dayIndex, currentMealName, currentPlanMealNames, seenMealNames);
+            var result = await aislePilotService.SwapMealForDayAsync(
+                request,
+                dayIndex,
+                currentMealName,
+                currentPlanMealNames,
+                seenMealNames,
+                cancellationToken);
             request.SwapHistoryState = UpdateSwapHistoryState(
                 request.SwapHistoryState,
                 dayIndex,
@@ -204,9 +219,10 @@ public class AislePilotController(
     [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> MealImages([FromQuery] List<string>? mealNames, CancellationToken cancellationToken)
     {
+        var canGenerateImages = aislePilotService.CanGenerateMealImages();
         if (mealNames is null || mealNames.Count == 0)
         {
-            return Ok(new { images = Array.Empty<object>() });
+            return Ok(new { images = Array.Empty<object>(), canGenerateImages });
         }
 
         var normalizedMealNames = mealNames
@@ -217,7 +233,7 @@ public class AislePilotController(
             .ToList();
         if (normalizedMealNames.Count == 0)
         {
-            return Ok(new { images = Array.Empty<object>() });
+            return Ok(new { images = Array.Empty<object>(), canGenerateImages });
         }
 
         var imageUrls = await aislePilotService.GetMealImageUrlsAsync(normalizedMealNames, cancellationToken);
@@ -229,13 +245,16 @@ public class AislePilotController(
             })
             .ToList();
 
-        return Ok(new { images });
+        return Ok(new { images, canGenerateImages });
     }
 
     [HttpPost("export/plan-pack")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
-    public IActionResult ExportPlanPack(AislePilotPageViewModel pageModel)
+    public async Task<IActionResult> ExportPlanPack(
+        AislePilotPageViewModel pageModel,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
     {
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
@@ -247,7 +266,7 @@ public class AislePilotController(
 
         try
         {
-            var result = aislePilotService.BuildPlan(request);
+            var result = await BuildExportResultAsync(request, currentPlanMealNames, cancellationToken);
             var bytes = BuildPlanPackPdf(request, result);
             var fileName = $"aislepilot-plan-pack-{DateTime.UtcNow:yyyyMMdd}.pdf";
             Response.Headers.ContentDisposition = $"inline; filename=\"{fileName}\"";
@@ -270,7 +289,10 @@ public class AislePilotController(
     [HttpPost("export/checklist")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
-    public IActionResult ExportChecklist(AislePilotPageViewModel pageModel)
+    public async Task<IActionResult> ExportChecklist(
+        AislePilotPageViewModel pageModel,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
     {
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
@@ -282,7 +304,7 @@ public class AislePilotController(
 
         try
         {
-            var result = aislePilotService.BuildPlan(request);
+            var result = await BuildExportResultAsync(request, currentPlanMealNames, cancellationToken);
             var content = BuildChecklistText(result);
             var bytes = Encoding.UTF8.GetBytes(content);
             var fileName = $"aislepilot-checklist-{DateTime.UtcNow:yyyyMMdd}.txt";
@@ -302,6 +324,20 @@ public class AislePilotController(
         }
     }
 
+    private async Task<AislePilotPlanResultViewModel> BuildExportResultAsync(
+        AislePilotRequestModel request,
+        IReadOnlyList<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
+    {
+        if (currentPlanMealNames is not null && currentPlanMealNames.Count > 0)
+        {
+            return await aislePilotService.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames, cancellationToken);
+        }
+
+        logger.LogWarning("AislePilot export request did not include currentPlanMealNames; regenerating plan.");
+        return await aislePilotService.BuildPlanAsync(request, cancellationToken);
+    }
+
     private AislePilotPageViewModel BuildPageModel(
         AislePilotRequestModel request,
         AislePilotPlanResultViewModel? result = null,
@@ -316,7 +352,8 @@ public class AislePilotController(
             PantrySuggestions = pantrySuggestions ?? [],
             SupermarketOptions = aislePilotService.GetSupportedSupermarkets(),
             PortionSizeOptions = aislePilotService.GetSupportedPortionSizes(),
-            DietaryOptions = aislePilotService.GetSupportedDietaryModes()
+            DietaryOptions = aislePilotService.GetSupportedDietaryModes(),
+            MealImagePollingEnabled = aislePilotService.CanGenerateMealImages()
         };
     }
 
