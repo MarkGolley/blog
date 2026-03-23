@@ -477,6 +477,39 @@ public sealed class AislePilotService : IAislePilotService
                 new IngredientTemplate("Chilli seasoning", "Spices & Sauces", 1m, "pack", 0.55m)
             ]),
         new(
+            "Smoky chickpea tomato stew",
+            5.30m,
+            IsQuick: false,
+            ["Vegan", "Gluten-Free"],
+            [
+                new IngredientTemplate("Chickpeas", "Tins & Dry Goods", 2m, "tins", 1.10m),
+                new IngredientTemplate("Chopped tomatoes", "Tins & Dry Goods", 2m, "tins", 1.00m),
+                new IngredientTemplate("Spinach", "Produce", 0.25m, "kg", 1.00m),
+                new IngredientTemplate("Paprika", "Spices & Sauces", 0.06m, "jar", 0.55m)
+            ]),
+        new(
+            "Tofu coconut veg curry",
+            5.90m,
+            IsQuick: true,
+            ["Vegan", "Gluten-Free"],
+            [
+                new IngredientTemplate("Firm tofu", "Dairy & Eggs", 0.40m, "kg", 1.60m),
+                new IngredientTemplate("Coconut milk", "Tins & Dry Goods", 2m, "tins", 1.60m),
+                new IngredientTemplate("Frozen mixed veg", "Frozen", 0.50m, "kg", 1.05m),
+                new IngredientTemplate("Curry paste", "Spices & Sauces", 1m, "jar", 0.80m)
+            ]),
+        new(
+            "Sesame tofu rice bowls",
+            5.70m,
+            IsQuick: true,
+            ["Vegan", "Gluten-Free"],
+            [
+                new IngredientTemplate("Firm tofu", "Dairy & Eggs", 0.40m, "kg", 1.60m),
+                new IngredientTemplate("Rice", "Tins & Dry Goods", 0.45m, "kg", 0.95m),
+                new IngredientTemplate("Carrots", "Produce", 4m, "pcs", 0.80m),
+                new IngredientTemplate("Soy sauce", "Spices & Sauces", 0.12m, "bottle", 0.45m)
+            ]),
+        new(
             "Halloumi couscous bowls",
             6.30m,
             IsQuick: true,
@@ -4209,7 +4242,9 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         // Treat explicitly selected dietary modes as hard constraints.
         if (strictModes.Count == 0)
         {
-            return baseFiltered;
+            return baseFiltered
+                .Where(meal => meal.Tags.Contains("Balanced", StringComparer.OrdinalIgnoreCase))
+                .ToList();
         }
 
         var strictFiltered = baseFiltered

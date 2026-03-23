@@ -143,6 +143,27 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_VeganWithSevenCookDays_DoesNotRepeatMealsWithinTheWeek()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegan"],
+            WeeklyBudget = 70m,
+            HouseholdSize = 2,
+            CookDays = 7
+        };
+
+        var result = _service.BuildPlan(request);
+        var distinctMealCount = result.MealPlan
+            .Select(meal => meal.MealName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        Assert.Equal(7, result.MealPlan.Count);
+        Assert.Equal(result.MealPlan.Count, distinctMealCount);
+    }
+
+    [Fact]
     public void BuildPlan_WhenUniqueMealsAreInsufficient_ReusesMealsOnlyAfterUsingAllAvailableOptions()
     {
         var request = new AislePilotRequestModel
