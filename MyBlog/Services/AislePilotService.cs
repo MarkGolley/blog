@@ -31,11 +31,20 @@ public sealed class AislePilotService : IAislePilotService
     private const int WarmupMealMaxTokens = 1000;
     private const string AiMealsCollection = "aislePilotAiMeals";
     private const string MealImagesCollection = "aislePilotMealImages";
+    private const string SupermarketLayoutsCollection = "aislePilotSupermarketLayouts";
     private const string OpenAiChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
+    private const string OpenAiResponsesEndpoint = "https://api.openai.com/v1/responses";
     private const string OpenAiImageGenerationsEndpoint = "https://api.openai.com/v1/images/generations";
     private const int OpenAiMaxAttempts = 1;
     private const int OpenAiImageMaxAttempts = 1;
     private const int MaxMealImageBytesForFirestore = 700_000;
+    private const int SupermarketLayoutCacheVersion = 2;
+    private const int SupermarketLayoutRefreshCooldownMinutes = 120;
+    private const int SupermarketLayoutStaleDays = 30;
+    private const decimal AiIngredientKnownUnitPriceMinFactor = 0.45m;
+    private const decimal AiIngredientKnownUnitPriceMaxFactor = 2.0m;
+    private const decimal AiMealBaseCostMinToIngredientFactor = 0.90m;
+    private const decimal AiMealBaseCostMaxToIngredientFactor = 1.35m;
     private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(22);
     private static readonly TimeSpan OpenAiImageRequestTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
@@ -44,11 +53,19 @@ public sealed class AislePilotService : IAislePilotService
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string> MealImagePool = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> MealImageGenerationInFlight = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, SupermarketLayoutCacheEntry> SupermarketLayoutCache =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, byte> SupermarketLayoutRefreshInFlight =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, DateTime> SupermarketLayoutLastAttemptUtc =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImagePoolRefreshLock = new(1, 1);
+    private static readonly SemaphoreSlim SupermarketLayoutRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim AiMealWarmupLock = new(1, 1);
     private static DateTime? _lastAiMealPoolRefreshUtc;
     private static DateTime? _lastMealImagePoolRefreshUtc;
+    private static DateTime? _lastSupermarketLayoutCacheRefreshUtc;
 
     private static readonly HashSet<string> GenericPantryTokens = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -242,6 +259,47 @@ public sealed class AislePilotService : IAislePilotService
         "Household",
         "Other"
     ];
+    private static readonly Dictionary<string, string> AisleOrderAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["produce"] = "Produce",
+        ["fresh produce"] = "Produce",
+        ["fruit and veg"] = "Produce",
+        ["fruit & veg"] = "Produce",
+        ["bakery"] = "Bakery",
+        ["bread"] = "Bakery",
+        ["meat"] = "Meat & Fish",
+        ["fish"] = "Meat & Fish",
+        ["meat and fish"] = "Meat & Fish",
+        ["meat & fish"] = "Meat & Fish",
+        ["dairy"] = "Dairy & Eggs",
+        ["dairy and eggs"] = "Dairy & Eggs",
+        ["dairy & eggs"] = "Dairy & Eggs",
+        ["eggs"] = "Dairy & Eggs",
+        ["frozen"] = "Frozen",
+        ["freezer"] = "Frozen",
+        ["tin"] = "Tins & Dry Goods",
+        ["tins"] = "Tins & Dry Goods",
+        ["tinned"] = "Tins & Dry Goods",
+        ["canned"] = "Tins & Dry Goods",
+        ["cupboard"] = "Tins & Dry Goods",
+        ["dry good"] = "Tins & Dry Goods",
+        ["dry goods"] = "Tins & Dry Goods",
+        ["tin and dry goods"] = "Tins & Dry Goods",
+        ["tins and dry goods"] = "Tins & Dry Goods",
+        ["tins & dry goods"] = "Tins & Dry Goods",
+        ["spice"] = "Spices & Sauces",
+        ["spices"] = "Spices & Sauces",
+        ["sauce"] = "Spices & Sauces",
+        ["sauces"] = "Spices & Sauces",
+        ["spices and sauces"] = "Spices & Sauces",
+        ["spices & sauces"] = "Spices & Sauces",
+        ["snack"] = "Snacks",
+        ["snacks"] = "Snacks",
+        ["drink"] = "Drinks",
+        ["drinks"] = "Drinks",
+        ["household"] = "Household",
+        ["other"] = "Other"
+    };
 
     private static readonly Dictionary<string, string[]> SupermarketAisleOrders = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -257,7 +315,7 @@ public sealed class AislePilotService : IAislePilotService
         ],
         ["Aldi"] =
         [
-            "Produce", "Bakery", "Meat & Fish", "Dairy & Eggs", "Tins & Dry Goods", "Frozen", "Spices & Sauces",
+            "Produce", "Tins & Dry Goods", "Meat & Fish", "Dairy & Eggs", "Frozen", "Bakery", "Spices & Sauces",
             "Snacks", "Drinks", "Household", "Other"
         ],
         ["Lidl"] =
@@ -451,6 +509,8 @@ public sealed class AislePilotService : IAislePilotService
                 new IngredientTemplate("Paprika", "Spices & Sauces", 0.06m, "jar", 0.55m)
             ])
     ];
+    private static readonly IReadOnlyList<IngredientUnitPriceReference> IngredientUnitPriceReferences =
+        BuildIngredientUnitPriceReferences();
 
     private readonly HttpClient? _httpClient;
     private readonly ILogger<AislePilotService>? _logger;
@@ -1728,7 +1788,7 @@ Return JSON only with this schema:
         return selectedMeals;
     }
 
-    private static PlanContext BuildPlanContext(AislePilotRequestModel request)
+    private PlanContext BuildPlanContext(AislePilotRequestModel request)
     {
         var supermarket = NormalizeSupermarket(request.Supermarket);
         var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
@@ -4019,6 +4079,142 @@ Return JSON only with this schema:
         return NormalizeCookDays(cookDays) <= 5;
     }
 
+    private static IReadOnlyList<IngredientUnitPriceReference> BuildIngredientUnitPriceReferences()
+    {
+        var references = new List<IngredientUnitPriceReference>();
+        foreach (var meal in MealTemplates)
+        {
+            foreach (var ingredient in meal.Ingredients)
+            {
+                if (ingredient.QuantityForTwo <= 0m || ingredient.EstimatedCostForTwo <= 0m)
+                {
+                    continue;
+                }
+
+                var normalizedName = NormalizePantryText(ingredient.Name);
+                var normalizedUnit = NormalizeAiUnitForPricing(ingredient.Unit);
+                if (string.IsNullOrWhiteSpace(normalizedName) || string.IsNullOrWhiteSpace(normalizedUnit))
+                {
+                    continue;
+                }
+
+                var unitPrice = ingredient.EstimatedCostForTwo / ingredient.QuantityForTwo;
+                references.Add(new IngredientUnitPriceReference(
+                    normalizedName,
+                    normalizedUnit,
+                    decimal.Round(unitPrice, 4, MidpointRounding.AwayFromZero)));
+            }
+        }
+
+        return references;
+    }
+
+    private static decimal NormalizeAiIngredientEstimatedCost(
+        string ingredientName,
+        string unit,
+        decimal quantityForTwo,
+        decimal estimatedCostForTwo)
+    {
+        if (quantityForTwo <= 0m || estimatedCostForTwo <= 0m)
+        {
+            return decimal.Round(estimatedCostForTwo, 2, MidpointRounding.AwayFromZero);
+        }
+
+        var normalizedUnit = NormalizeAiUnitForPricing(unit);
+        var adjustedUnitPrice = estimatedCostForTwo / quantityForTwo;
+        var genericMaxUnitPrice = ResolveGenericAiIngredientMaxUnitPrice(normalizedUnit);
+        if (adjustedUnitPrice > genericMaxUnitPrice)
+        {
+            adjustedUnitPrice = genericMaxUnitPrice;
+        }
+
+        if (TryGetTemplateIngredientUnitPriceBounds(ingredientName, normalizedUnit, out var minKnownUnitPrice, out var maxKnownUnitPrice))
+        {
+            var lowerBound = minKnownUnitPrice * AiIngredientKnownUnitPriceMinFactor;
+            var upperBound = maxKnownUnitPrice * AiIngredientKnownUnitPriceMaxFactor;
+            adjustedUnitPrice = Math.Clamp(adjustedUnitPrice, lowerBound, upperBound);
+        }
+
+        var adjustedCost = adjustedUnitPrice * quantityForTwo;
+        return decimal.Round(adjustedCost, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static bool TryGetTemplateIngredientUnitPriceBounds(
+        string ingredientName,
+        string normalizedUnit,
+        out decimal minKnownUnitPrice,
+        out decimal maxKnownUnitPrice)
+    {
+        minKnownUnitPrice = 0m;
+        maxKnownUnitPrice = 0m;
+        if (string.IsNullOrWhiteSpace(ingredientName) || string.IsNullOrWhiteSpace(normalizedUnit))
+        {
+            return false;
+        }
+
+        var normalizedIngredientName = NormalizePantryText(ingredientName);
+        if (string.IsNullOrWhiteSpace(normalizedIngredientName))
+        {
+            return false;
+        }
+
+        var matchedReferences = IngredientUnitPriceReferences
+            .Where(reference =>
+                reference.UnitNormalized.Equals(normalizedUnit, StringComparison.OrdinalIgnoreCase) &&
+                (reference.IngredientNameNormalized.Contains(normalizedIngredientName, StringComparison.OrdinalIgnoreCase) ||
+                 normalizedIngredientName.Contains(reference.IngredientNameNormalized, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        if (matchedReferences.Count == 0)
+        {
+            return false;
+        }
+
+        minKnownUnitPrice = matchedReferences.Min(reference => reference.UnitPrice);
+        maxKnownUnitPrice = matchedReferences.Max(reference => reference.UnitPrice);
+        return true;
+    }
+
+    private static decimal NormalizeAiMealBaseCost(decimal baseCostForTwo, decimal ingredientCostForTwo)
+    {
+        if (ingredientCostForTwo <= 0m)
+        {
+            return decimal.Round(baseCostForTwo, 2, MidpointRounding.AwayFromZero);
+        }
+
+        var lowerBound = ingredientCostForTwo * AiMealBaseCostMinToIngredientFactor;
+        var upperBound = ingredientCostForTwo * AiMealBaseCostMaxToIngredientFactor;
+        return decimal.Round(
+            Math.Clamp(baseCostForTwo, lowerBound, upperBound),
+            2,
+            MidpointRounding.AwayFromZero);
+    }
+
+    private static string NormalizeAiUnitForPricing(string? unit)
+    {
+        return (unit ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
+    private static decimal ResolveGenericAiIngredientMaxUnitPrice(string normalizedUnit)
+    {
+        return normalizedUnit switch
+        {
+            "kg" => 24m,
+            "g" => 0.024m,
+            "l" => 8m,
+            "ml" => 0.008m,
+            "pcs" => 1.20m,
+            "slice" or "slices" => 0.50m,
+            "tin" or "tins" => 2.80m,
+            "pack" or "packs" => 4m,
+            "jar" or "jars" => 4.50m,
+            "bottle" or "bottles" => 4.50m,
+            "head" => 2.50m,
+            "fillets" => 5.50m,
+            "balls" => 2.20m,
+            _ => 6m
+        };
+    }
+
     private static MealTemplate? ValidateAndMapAiMeal(
         AislePilotAiMealPayload? payload,
         IReadOnlyList<string> strictModes,
@@ -4076,7 +4272,8 @@ Return JSON only with this schema:
             ingredients.Sum(item => item.mapped!.EstimatedCostForTwo),
             2,
             MidpointRounding.AwayFromZero);
-        if (!IsAiMealCostProfileReasonable(baseCostForTwo, ingredientCostForTwo, out var mealCostReason))
+        var normalizedBaseCostForTwo = NormalizeAiMealBaseCost(baseCostForTwo, ingredientCostForTwo);
+        if (!IsAiMealCostProfileReasonable(normalizedBaseCostForTwo, ingredientCostForTwo, out var mealCostReason))
         {
             validationReason = $"meal_cost_profile_invalid:{mealCostReason ?? "unknown"}";
             return null;
@@ -4119,7 +4316,7 @@ Return JSON only with this schema:
 
         return new MealTemplate(
             name,
-            decimal.Round(baseCostForTwo, 2, MidpointRounding.AwayFromZero),
+            normalizedBaseCostForTwo,
             payload.IsQuick ?? false,
             tags,
             ingredients.Select(item => item.mapped!).ToList())
@@ -4146,15 +4343,20 @@ Return JSON only with this schema:
         var unit = ClampAndNormalize(payload.Unit, MaxAiUnitLength);
         var quantityForTwo = payload.QuantityForTwo ?? 0m;
         var estimatedCostForTwo = payload.EstimatedCostForTwo ?? 0m;
+        var normalizedEstimatedCostForTwo = NormalizeAiIngredientEstimatedCost(
+            name,
+            unit,
+            quantityForTwo,
+            estimatedCostForTwo);
 
         if (string.IsNullOrWhiteSpace(name) ||
             string.IsNullOrWhiteSpace(department) ||
             string.IsNullOrWhiteSpace(unit) ||
             quantityForTwo <= 0m ||
             !IsAiIngredientQuantityReasonable(unit, quantityForTwo) ||
-            estimatedCostForTwo <= 0m ||
-            estimatedCostForTwo > 20m ||
-            !IsAiIngredientPriceReasonable(unit, quantityForTwo, estimatedCostForTwo, out _))
+            normalizedEstimatedCostForTwo <= 0m ||
+            normalizedEstimatedCostForTwo > 20m ||
+            !IsAiIngredientPriceReasonable(unit, quantityForTwo, normalizedEstimatedCostForTwo, out _))
         {
             validationReason =
                 $"ingredient_fields_invalid(name='{name}',department='{department}',unit='{unit}',qty={quantityForTwo.ToString(CultureInfo.InvariantCulture)},cost={estimatedCostForTwo.ToString(CultureInfo.InvariantCulture)})";
@@ -4166,12 +4368,12 @@ Return JSON only with this schema:
             department,
             decimal.Round(quantityForTwo, 2, MidpointRounding.AwayFromZero),
             unit,
-            decimal.Round(estimatedCostForTwo, 2, MidpointRounding.AwayFromZero));
+            decimal.Round(normalizedEstimatedCostForTwo, 2, MidpointRounding.AwayFromZero));
     }
 
     private static bool IsAiIngredientQuantityReasonable(string unit, decimal quantity)
     {
-        var normalizedUnit = unit.Trim().ToLowerInvariant();
+        var normalizedUnit = NormalizeAiUnitForPricing(unit);
         var max = normalizedUnit switch
         {
             "g" => 5000m,
@@ -4179,6 +4381,8 @@ Return JSON only with this schema:
             "kg" => 15m,
             "l" => 10m,
             "pcs" => 60m,
+            "slice" => 40m,
+            "slices" => 40m,
             "tins" => 24m,
             "tin" => 24m,
             "pack" => 20m,
@@ -4208,7 +4412,7 @@ Return JSON only with this schema:
             return false;
         }
 
-        var normalizedUnit = unit.Trim().ToLowerInvariant();
+        var normalizedUnit = NormalizeAiUnitForPricing(unit);
         var unitPrice = estimatedCostForTwo / quantityForTwo;
         var minUnitPrice = normalizedUnit switch
         {
@@ -4217,6 +4421,7 @@ Return JSON only with this schema:
             "l" => 0.75m,
             "ml" => 0.00075m,
             "pcs" => 0.05m,
+            "slice" or "slices" => 0.04m,
             "tin" or "tins" => 0.40m,
             "pack" or "packs" => 0.50m,
             "jar" or "jars" => 0.65m,
@@ -4229,6 +4434,13 @@ Return JSON only with this schema:
         if (unitPrice < minUnitPrice)
         {
             validationReason = $"unit_price_too_low(unit={normalizedUnit},unit_price={unitPrice.ToString("0.####", CultureInfo.InvariantCulture)},min={minUnitPrice.ToString("0.####", CultureInfo.InvariantCulture)})";
+            return false;
+        }
+
+        var maxUnitPrice = ResolveGenericAiIngredientMaxUnitPrice(normalizedUnit);
+        if (unitPrice > maxUnitPrice)
+        {
+            validationReason = $"unit_price_too_high(unit={normalizedUnit},unit_price={unitPrice.ToString("0.####", CultureInfo.InvariantCulture)},max={maxUnitPrice.ToString("0.####", CultureInfo.InvariantCulture)})";
             return false;
         }
 
@@ -4747,6 +4959,26 @@ Return JSON only with this schema:
                ?? string.Empty;
     }
 
+    private static string ClampAndNormalizeDepartmentName(string? department)
+    {
+        var normalized = ClampAndNormalize(department, MaxAiDepartmentLength);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        var normalizedKey = NormalizePantryText(normalized);
+        if (!string.IsNullOrWhiteSpace(normalizedKey) &&
+            AisleOrderAliases.TryGetValue(normalizedKey, out var mappedAlias))
+        {
+            return mappedAlias;
+        }
+
+        return DefaultAisleOrder.FirstOrDefault(item =>
+                   item.Equals(normalized, StringComparison.OrdinalIgnoreCase))
+               ?? normalized;
+    }
+
     private static string ClampAndNormalize(string? input, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(input))
@@ -5013,7 +5245,7 @@ Return JSON only with this schema:
         return normalized;
     }
 
-    private static IReadOnlyList<string> ResolveAisleOrder(string supermarket, string customAisleOrder)
+    private IReadOnlyList<string> ResolveAisleOrder(string supermarket, string customAisleOrder)
     {
         if (supermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase))
         {
@@ -5026,21 +5258,484 @@ Return JSON only with this schema:
 
             if (custom.Count >= 3)
             {
-                if (!custom.Contains("Other", StringComparer.OrdinalIgnoreCase))
-                {
-                    custom.Add("Other");
-                }
-
-                return custom;
+                return NormalizeResolvedAisleOrder(custom);
             }
         }
 
-        if (SupermarketAisleOrders.TryGetValue(supermarket, out var predefined))
+        EnsureSupermarketLayoutCacheHydrated();
+        if (SupermarketLayoutCache.TryGetValue(supermarket, out var cachedLayout) &&
+            cachedLayout.AisleOrder.Count >= 3)
         {
-            return predefined;
+            if (!IsSupermarketLayoutStale(cachedLayout.UpdatedAtUtc))
+            {
+                return cachedLayout.AisleOrder;
+            }
+
+            var refreshedStaleOrder = TryRefreshSupermarketLayoutSynchronously(supermarket);
+            if (refreshedStaleOrder is not null)
+            {
+                return refreshedStaleOrder;
+            }
+
+            QueueSupermarketLayoutRefresh(supermarket);
+            return cachedLayout.AisleOrder;
         }
 
-        return DefaultAisleOrder;
+        var discoveredOrder = TryRefreshSupermarketLayoutSynchronously(supermarket);
+        if (discoveredOrder is not null)
+        {
+            return discoveredOrder;
+        }
+
+        QueueSupermarketLayoutRefresh(supermarket);
+
+        if (SupermarketAisleOrders.TryGetValue(supermarket, out var predefined))
+        {
+            return NormalizeResolvedAisleOrder(predefined);
+        }
+
+        return NormalizeResolvedAisleOrder(DefaultAisleOrder);
+    }
+
+    private void EnsureSupermarketLayoutCacheHydrated()
+    {
+        try
+        {
+            EnsureSupermarketLayoutCacheHydratedAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Unable to hydrate supermarket layout cache from Firestore.");
+        }
+    }
+
+    private async Task EnsureSupermarketLayoutCacheHydratedAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db is null)
+        {
+            return;
+        }
+
+        var shouldRefresh =
+            SupermarketLayoutCache.IsEmpty ||
+            !_lastSupermarketLayoutCacheRefreshUtc.HasValue ||
+            DateTime.UtcNow - _lastSupermarketLayoutCacheRefreshUtc.Value >
+            TimeSpan.FromMinutes(SupermarketLayoutRefreshCooldownMinutes);
+        if (!shouldRefresh)
+        {
+            return;
+        }
+
+        await SupermarketLayoutRefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            shouldRefresh =
+                SupermarketLayoutCache.IsEmpty ||
+                !_lastSupermarketLayoutCacheRefreshUtc.HasValue ||
+                DateTime.UtcNow - _lastSupermarketLayoutCacheRefreshUtc.Value >
+                TimeSpan.FromMinutes(SupermarketLayoutRefreshCooldownMinutes);
+            if (!shouldRefresh)
+            {
+                return;
+            }
+
+            var snapshot = await _db.Collection(SupermarketLayoutsCollection).GetSnapshotAsync(cancellationToken);
+            foreach (var doc in snapshot.Documents)
+            {
+                if (!doc.Exists)
+                {
+                    continue;
+                }
+
+                FirestoreAislePilotSupermarketLayout? mapped;
+                try
+                {
+                    mapped = doc.ConvertTo<FirestoreAislePilotSupermarketLayout>();
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(mapped.Supermarket))
+                {
+                    continue;
+                }
+
+                if (mapped.Version != SupermarketLayoutCacheVersion)
+                {
+                    continue;
+                }
+
+                var normalizedOrder = NormalizeResolvedAisleOrder(mapped.AisleOrder ?? []);
+                if (normalizedOrder.Count < 3)
+                {
+                    continue;
+                }
+
+                var updatedAtUtc = mapped.UpdatedAtUtc == default
+                    ? DateTime.UtcNow.AddDays(-SupermarketLayoutStaleDays - 1)
+                    : mapped.UpdatedAtUtc;
+                SupermarketLayoutCache[mapped.Supermarket.Trim()] = new SupermarketLayoutCacheEntry
+                {
+                    AisleOrder = normalizedOrder,
+                    UpdatedAtUtc = updatedAtUtc
+                };
+            }
+
+            _lastSupermarketLayoutCacheRefreshUtc = DateTime.UtcNow;
+        }
+        finally
+        {
+            SupermarketLayoutRefreshLock.Release();
+        }
+    }
+
+    private bool CanUseOnlineLayoutDiscovery()
+    {
+        return _db is not null &&
+               _enableAiGeneration &&
+               _httpClient is not null &&
+               !string.IsNullOrWhiteSpace(_apiKey);
+    }
+
+    private IReadOnlyList<string>? TryRefreshSupermarketLayoutSynchronously(string supermarket)
+    {
+        if (!CanUseOnlineLayoutDiscovery())
+        {
+            return null;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            return TryRefreshSupermarketLayoutAsync(supermarket, force: false, cts.Token)
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Synchronous supermarket layout refresh failed for '{Supermarket}'.", supermarket);
+            return null;
+        }
+    }
+
+    private async Task<IReadOnlyList<string>?> TryRefreshSupermarketLayoutAsync(
+        string supermarket,
+        bool force,
+        CancellationToken cancellationToken)
+    {
+        var normalizedSupermarket = NormalizeSupermarket(supermarket);
+        if (normalizedSupermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase) || !CanUseOnlineLayoutDiscovery())
+        {
+            return null;
+        }
+
+        if (!force &&
+            SupermarketLayoutLastAttemptUtc.TryGetValue(normalizedSupermarket, out var lastAttemptUtc) &&
+            DateTime.UtcNow - lastAttemptUtc < TimeSpan.FromMinutes(SupermarketLayoutRefreshCooldownMinutes))
+        {
+            return SupermarketLayoutCache.TryGetValue(normalizedSupermarket, out var recentCached)
+                ? recentCached.AisleOrder
+                : null;
+        }
+
+        if (!SupermarketLayoutRefreshInFlight.TryAdd(normalizedSupermarket, 1))
+        {
+            return SupermarketLayoutCache.TryGetValue(normalizedSupermarket, out var existingCached)
+                ? existingCached.AisleOrder
+                : null;
+        }
+
+        SupermarketLayoutLastAttemptUtc[normalizedSupermarket] = DateTime.UtcNow;
+        try
+        {
+            var discoveredOrder = await TryDiscoverSupermarketLayoutWithAiAsync(
+                normalizedSupermarket,
+                cancellationToken);
+            if (discoveredOrder is null || discoveredOrder.Count < 3)
+            {
+                return null;
+            }
+
+            var normalizedOrder = NormalizeResolvedAisleOrder(discoveredOrder);
+            SupermarketLayoutCache[normalizedSupermarket] = new SupermarketLayoutCacheEntry
+            {
+                AisleOrder = normalizedOrder,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            await PersistSupermarketLayoutAsync(
+                normalizedSupermarket,
+                normalizedOrder,
+                "openai-web-search",
+                cancellationToken);
+            return normalizedOrder;
+        }
+        finally
+        {
+            SupermarketLayoutRefreshInFlight.TryRemove(normalizedSupermarket, out _);
+        }
+    }
+
+    private void QueueSupermarketLayoutRefresh(string supermarket)
+    {
+        var normalizedSupermarket = NormalizeSupermarket(supermarket);
+        if (normalizedSupermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!CanUseOnlineLayoutDiscovery())
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await TryRefreshSupermarketLayoutAsync(
+                    normalizedSupermarket,
+                    force: false,
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to refresh supermarket layout for '{Supermarket}'.", normalizedSupermarket);
+            }
+        });
+    }
+
+    private async Task<IReadOnlyList<string>?> TryDiscoverSupermarketLayoutWithAiAsync(
+        string supermarket,
+        CancellationToken cancellationToken)
+    {
+        if (_httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
+        {
+            return null;
+        }
+
+        var aisleLabels = string.Join(", ", DefaultAisleOrder);
+        var inputPrompt =
+            "Find current online information for typical in-store aisle flow in a UK " + supermarket + " supermarket.\n" +
+            "Return JSON only with this exact schema:\n" +
+            "{\"aisleOrder\":[\"Produce\",\"Bakery\",\"Meat & Fish\",\"Dairy & Eggs\",\"Frozen\",\"Tins & Dry Goods\",\"Spices & Sauces\",\"Snacks\",\"Drinks\",\"Household\",\"Other\"]}\n\n" +
+            "Rules:\n" +
+            "- Use only these aisle labels: " + aisleLabels + ".\n" +
+            "- Order should reflect likely customer walking sequence in a typical UK branch.\n" +
+            "- If online sources disagree, choose the most common sequence and still return all labels.";
+
+        var requestBody = new
+        {
+            model = _model,
+            tools = new object[]
+            {
+                new
+                {
+                    type = "web_search_preview",
+                    search_context_size = "medium"
+                }
+            },
+            input = inputPrompt
+        };
+        var serializedBody = JsonSerializer.Serialize(requestBody);
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(OpenAiRequestTimeout);
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, OpenAiResponsesEndpoint)
+        {
+            Content = new StringContent(serializedBody, Encoding.UTF8, "application/json")
+        };
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+
+        try
+        {
+            using var response = await _httpClient.SendAsync(requestMessage, timeoutCts.Token);
+            var responseContent = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorSample = responseContent.Length <= 240 ? responseContent : responseContent[..240];
+                _logger?.LogWarning(
+                    "Supermarket layout lookup failed for '{Supermarket}' with status {StatusCode}. ResponseSample={ResponseSample}",
+                    supermarket,
+                    (int)response.StatusCode,
+                    errorSample);
+                return null;
+            }
+
+            return ParseSupermarketAisleOrderFromAiResponse(responseContent);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Supermarket layout lookup failed for '{Supermarket}'.", supermarket);
+            return null;
+        }
+    }
+
+    private static IReadOnlyList<string>? ParseSupermarketAisleOrderFromAiResponse(string responseContent)
+    {
+        if (string.IsNullOrWhiteSpace(responseContent))
+        {
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(responseContent);
+        if (doc.RootElement.TryGetProperty("output_text", out var outputTextElement) &&
+            outputTextElement.ValueKind == JsonValueKind.String)
+        {
+            var parsedFromOutputText = ParseSupermarketAisleOrderPayload(outputTextElement.GetString());
+            if (parsedFromOutputText is not null)
+            {
+                return parsedFromOutputText;
+            }
+        }
+
+        foreach (var textCandidate in EnumerateJsonStringValues(doc.RootElement))
+        {
+            var parsed = ParseSupermarketAisleOrderPayload(textCandidate);
+            if (parsed is not null)
+            {
+                return parsed;
+            }
+        }
+
+        if (doc.RootElement.TryGetProperty("aisleOrder", out var directOrderElement) &&
+            directOrderElement.ValueKind == JsonValueKind.Array)
+        {
+            var directOrder = directOrderElement
+                .EnumerateArray()
+                .Where(item => item.ValueKind == JsonValueKind.String)
+                .Select(item => item.GetString() ?? string.Empty)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .ToList();
+            return directOrder.Count >= 3 ? NormalizeResolvedAisleOrder(directOrder) : null;
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<string>? ParseSupermarketAisleOrderPayload(string? rawPayload)
+    {
+        if (string.IsNullOrWhiteSpace(rawPayload))
+        {
+            return null;
+        }
+
+        var normalized = NormalizeModelJson(rawPayload);
+        if (string.IsNullOrWhiteSpace(normalized) || !normalized.Contains("aisleOrder", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        try
+        {
+            var payload = JsonSerializer.Deserialize<SupermarketAisleOrderPayload>(normalized, JsonOptions);
+            var order = payload?.AisleOrder?
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .ToList();
+            return order is { Count: >= 3 } ? NormalizeResolvedAisleOrder(order) : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static IEnumerable<string> EnumerateJsonStringValues(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+            {
+                var value = element.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    yield return value;
+                }
+
+                break;
+            }
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    foreach (var value in EnumerateJsonStringValues(property.Value))
+                    {
+                        yield return value;
+                    }
+                }
+
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                {
+                    foreach (var value in EnumerateJsonStringValues(item))
+                    {
+                        yield return value;
+                    }
+                }
+
+                break;
+        }
+    }
+
+    private async Task PersistSupermarketLayoutAsync(
+        string supermarket,
+        IReadOnlyList<string> aisleOrder,
+        string source,
+        CancellationToken cancellationToken)
+    {
+        if (_db is null || string.IsNullOrWhiteSpace(supermarket) || aisleOrder.Count < 3)
+        {
+            return;
+        }
+
+        try
+        {
+            var docRef = _db.Collection(SupermarketLayoutsCollection).Document(ToAiMealDocumentId(supermarket));
+            await docRef.SetAsync(
+                new FirestoreAislePilotSupermarketLayout
+                {
+                    Supermarket = supermarket,
+                    AisleOrder = aisleOrder.ToList(),
+                    Version = SupermarketLayoutCacheVersion,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                    Source = source
+                },
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to persist supermarket layout cache for '{Supermarket}'.", supermarket);
+        }
+    }
+
+    private static bool IsSupermarketLayoutStale(DateTime updatedAtUtc)
+    {
+        if (updatedAtUtc == default)
+        {
+            return true;
+        }
+
+        return DateTime.UtcNow - updatedAtUtc > TimeSpan.FromDays(SupermarketLayoutStaleDays);
+    }
+
+    private static IReadOnlyList<string> NormalizeResolvedAisleOrder(IEnumerable<string> source)
+    {
+        var normalized = source
+            .Select(ClampAndNormalizeDepartmentName)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var department in DefaultAisleOrder)
+        {
+            if (!normalized.Contains(department, StringComparer.OrdinalIgnoreCase))
+            {
+                normalized.Add(department);
+            }
+        }
+
+        return normalized;
     }
 
     private sealed record WarmupProfile(
@@ -5097,6 +5792,11 @@ Return JSON only with this schema:
         decimal QuantityForTwo,
         string Unit,
         decimal EstimatedCostForTwo);
+
+    private sealed record IngredientUnitPriceReference(
+        string IngredientNameNormalized,
+        string UnitNormalized,
+        decimal UnitPrice);
 
     private sealed record NutritionReference(
         decimal CaloriesPer100g,
@@ -5161,6 +5861,17 @@ Return JSON only with this schema:
         public decimal? QuantityForTwo { get; set; }
         public string? Unit { get; set; }
         public decimal? EstimatedCostForTwo { get; set; }
+    }
+
+    private sealed class SupermarketAisleOrderPayload
+    {
+        public List<string>? AisleOrder { get; set; }
+    }
+
+    private sealed class SupermarketLayoutCacheEntry
+    {
+        public IReadOnlyList<string> AisleOrder { get; init; } = Array.Empty<string>();
+        public DateTime UpdatedAtUtc { get; init; }
     }
 
     [FirestoreData]
@@ -5246,6 +5957,25 @@ Return JSON only with this schema:
 
         [FirestoreProperty]
         public string ImageBase64 { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public DateTime UpdatedAtUtc { get; set; }
+
+        [FirestoreProperty]
+        public string Source { get; set; } = string.Empty;
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreAislePilotSupermarketLayout
+    {
+        [FirestoreProperty]
+        public string Supermarket { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public List<string> AisleOrder { get; set; } = [];
+
+        [FirestoreProperty]
+        public int Version { get; set; }
 
         [FirestoreProperty]
         public DateTime UpdatedAtUtc { get; set; }

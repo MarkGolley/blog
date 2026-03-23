@@ -336,6 +336,85 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_Aldi_UsesNormalizedAisleOrderWithoutDuplicates()
+    {
+        var request = new AislePilotRequestModel
+        {
+            Supermarket = "Aldi",
+            DietaryModes = ["Balanced"]
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal("Aldi", result.Supermarket);
+        Assert.Equal(
+            result.AisleOrderUsed.Count,
+            result.AisleOrderUsed.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Contains("Produce", result.AisleOrderUsed, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Bakery", result.AisleOrderUsed, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Other", result.AisleOrderUsed, StringComparer.OrdinalIgnoreCase);
+
+        var expectedPrefix = new[]
+        {
+            "Produce",
+            "Tins & Dry Goods",
+            "Meat & Fish",
+            "Dairy & Eggs",
+            "Frozen",
+            "Bakery"
+        };
+        for (var i = 0; i < expectedPrefix.Length; i++)
+        {
+            Assert.Equal(expectedPrefix[i], result.AisleOrderUsed[i]);
+        }
+    }
+
+    [Fact]
+    public void BuildPlan_ShoppingItems_FollowSelectedSupermarketAisleOrder()
+    {
+        var request = new AislePilotRequestModel
+        {
+            Supermarket = "Aldi",
+            WeeklyBudget = 75m,
+            HouseholdSize = 2,
+            CookDays = 7,
+            DietaryModes = ["Balanced"]
+        };
+
+        var result = _service.BuildPlan(request);
+        var aisleRanks = result.AisleOrderUsed
+            .Select((department, index) => new { department, index })
+            .ToDictionary(x => x.department, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+        var previousRank = -1;
+        foreach (var item in result.ShoppingItems)
+        {
+            var rank = aisleRanks.GetValueOrDefault(item.Department, int.MaxValue);
+            Assert.True(rank >= previousRank);
+            previousRank = rank;
+        }
+    }
+
+    [Fact]
+    public void BuildPlan_CustomAisleOrder_AliasNamesAreNormalized()
+    {
+        var request = new AislePilotRequestModel
+        {
+            Supermarket = "Custom",
+            CustomAisleOrder = "produce, tins, dairy, frozen, bakery",
+            DietaryModes = ["Balanced"]
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal("Produce", result.AisleOrderUsed[0]);
+        Assert.Equal("Tins & Dry Goods", result.AisleOrderUsed[1]);
+        Assert.Equal("Dairy & Eggs", result.AisleOrderUsed[2]);
+        Assert.Equal("Frozen", result.AisleOrderUsed[3]);
+        Assert.Equal("Bakery", result.AisleOrderUsed[4]);
+    }
+
+    [Fact]
     public void GetSupportedPortionSizes_ReturnsExpectedValues()
     {
         var options = _service.GetSupportedPortionSizes();
@@ -626,6 +705,59 @@ public class AislePilotServiceTests
 
         Assert.Equal(currentPlanMealNames.Count, resultMealNames.Count);
         Assert.True(resultMealNames.SequenceEqual(currentPlanMealNames, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ValidateAndMapAiMeal_NormalizesInflatedBaseCostAgainstIngredientTotals()
+    {
+        var payloadJson = """
+{
+  "name": "Egg and mushroom omelette",
+  "baseCostForTwo": 7.00,
+  "isQuick": true,
+  "tags": ["Balanced", "Vegetarian"],
+  "recipeSteps": [
+    "Crack eggs into a bowl and whisk with a pinch of salt.",
+    "Slice mushrooms and pan-fry for 4 minutes until softened.",
+    "Add butter, pour in eggs, and cook gently for 2-3 minutes.",
+    "Fold the omelette and toast bread while it finishes cooking.",
+    "Serve immediately with the mushrooms and toast."
+  ],
+  "ingredients": [
+    { "name": "Eggs", "department": "Dairy & Eggs", "quantityForTwo": 4, "unit": "pcs", "estimatedCostForTwo": 1.20 },
+    { "name": "Mushrooms", "department": "Produce", "quantityForTwo": 0.25, "unit": "kg", "estimatedCostForTwo": 1.00 },
+    { "name": "Bread", "department": "Bakery", "quantityForTwo": 0.20, "unit": "pack", "estimatedCostForTwo": 0.40 }
+  ]
+}
+""";
+        var payloadType = typeof(AislePilotService).GetNestedType(
+            "AislePilotAiMealPayload",
+            BindingFlags.NonPublic);
+        Assert.NotNull(payloadType);
+
+        var payload = JsonSerializer.Deserialize(
+            payloadJson,
+            payloadType!,
+            new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        Assert.NotNull(payload);
+
+        var validateMethod = typeof(AislePilotService).GetMethod(
+            "ValidateAndMapAiMeal",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(validateMethod);
+
+        var args = new object?[] { payload, Array.Empty<string>(), true, null };
+        var mapped = validateMethod!.Invoke(null, args);
+        Assert.NotNull(mapped);
+
+        var baseCostProperty = mapped!.GetType().GetProperty("BaseCostForTwo");
+        Assert.NotNull(baseCostProperty);
+
+        var normalizedBaseCostForTwo = (decimal)(baseCostProperty!.GetValue(mapped) ?? 0m);
+        Assert.True(normalizedBaseCostForTwo < 4.00m);
     }
 
     [Fact]
