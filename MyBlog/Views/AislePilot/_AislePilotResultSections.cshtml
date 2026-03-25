@@ -29,6 +29,32 @@
             return $"/projects/aisle-pilot/images/{normalized["/images/".Length..]}";
         }
 
+        normalized = normalized.Replace('\\', '/');
+        if (!normalized.StartsWith("/", StringComparison.Ordinal))
+        {
+            var trimmed = normalized.TrimStart('/');
+            if (trimmed.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"/projects/aisle-pilot/images/{trimmed["images/".Length..]}";
+            }
+
+            if (trimmed.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"/projects/aisle-pilot/images/{trimmed}";
+            }
+
+            var hasImageExtension =
+                trimmed.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+            if (hasImageExtension)
+            {
+                return $"/projects/aisle-pilot/images/aislepilot-meals/{trimmed}";
+            }
+        }
+
         return normalized;
     }
 

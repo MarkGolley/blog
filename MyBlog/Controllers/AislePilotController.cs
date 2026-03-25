@@ -770,6 +770,32 @@ public class AislePilotController(
             return $"{AislePilotImagePathPrefix}/{normalized["/images/".Length..]}";
         }
 
+        normalized = normalized.Replace('\\', '/');
+        if (!normalized.StartsWith("/", StringComparison.Ordinal))
+        {
+            var trimmed = normalized.TrimStart('/');
+            if (trimmed.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{AislePilotImagePathPrefix}/{trimmed["images/".Length..]}";
+            }
+
+            if (trimmed.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{AislePilotImagePathPrefix}/{trimmed}";
+            }
+
+            var hasImageExtension =
+                trimmed.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+            if (hasImageExtension)
+            {
+                return $"{AislePilotImagePathPrefix}/aislepilot-meals/{trimmed}";
+            }
+        }
+
         return normalized;
     }
 
