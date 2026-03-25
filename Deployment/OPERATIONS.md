@@ -66,6 +66,7 @@ Notes for split deployment:
 
 - `AppMode=AislePilotOnly` automatically skips `verify-production-auth.ps1` because that smoke check targets blog/admin routes.
 - Set `AislePilot__PublicBaseUrl` (or `AISLEPILOT_PUBLIC_BASE_URL`) on the blog service to route "Try AislePilot" CTA to the dedicated service.
+- If you want AislePilot under `markgolley.dev/projects/aisle-pilot` while keeping split services, use the Cloudflare path proxy guide at `Deployment/cloudflare/README.md`.
 
 What it does:
 
