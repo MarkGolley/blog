@@ -1,5 +1,7 @@
 using Google.Cloud.Firestore;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using MyBlog.Models;
 using MyBlog.Utilities;
 using System.Collections.Concurrent;

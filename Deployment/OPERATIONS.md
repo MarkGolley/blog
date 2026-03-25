@@ -43,19 +43,29 @@ Environment targets:
 
 - Production (default): `.\Deployment\deploy.ps1`
 - Staging: `.\Deployment\deploy.ps1 -EnvironmentName Staging`
+- Blog-only service: `.\Deployment\deploy-blog.ps1`
+- AislePilot-only service: `.\Deployment\deploy-aisle-pilot.ps1`
 
 Optional overrides for either target:
 
 - `-ProjectId` (defaults to `my-blog-website-470819`)
 - `-Region` (defaults to `europe-west2`)
-- `-Service` (defaults to `myblog-app` for Production, `myblog-app-staging` for Staging)
+- `-Service` (defaults to `myblog-app`/`myblog-app-staging`; or `myblog-aislepilot`/`myblog-aislepilot-staging` when `-AppMode AislePilotOnly`)
 - `-PublicBaseUrl` (defaults to `https://markgolley.dev` for Production; blank for Staging unless provided)
+- `-AppMode` (`Combined`, `BlogOnly`, `AislePilotOnly`)
+- `-AislePilotPublicBaseUrl` (sets `AislePilot__PublicBaseUrl` so blog CTA points to external AislePilot service)
+- `-Memory`, `-Cpu`, `-Concurrency`, `-MinInstances`, `-MaxInstances`, `-RequestTimeout`
 
 Optional deploy flags:
 
 - `-SkipPreDeployChecks` skips all pre-deploy checks.
 - `-SkipBrowserInstall` keeps checks enabled but skips Playwright browser install.
 - `-SkipProductionSmokeCheck` skips post-deploy auth/comment smoke checks.
+
+Notes for split deployment:
+
+- `AppMode=AislePilotOnly` automatically skips `verify-production-auth.ps1` because that smoke check targets blog/admin routes.
+- Set `AislePilot__PublicBaseUrl` (or `AISLEPILOT_PUBLIC_BASE_URL`) on the blog service to route "Try AislePilot" CTA to the dedicated service.
 
 What it does:
 

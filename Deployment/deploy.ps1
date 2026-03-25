@@ -2,10 +2,19 @@
 param(
     [ValidateSet("Production", "Staging")]
     [string]$EnvironmentName = "Production",
+    [ValidateSet("Combined", "BlogOnly", "AislePilotOnly")]
+    [string]$AppMode = "Combined",
     [string]$ProjectId = "my-blog-website-470819",
     [string]$Region = "europe-west2",
     [string]$Service = "",
     [string]$PublicBaseUrl = "",
+    [string]$AislePilotPublicBaseUrl = "",
+    [string]$Memory = "256Mi",
+    [string]$Cpu = "0.25",
+    [int]$Concurrency = 1,
+    [int]$MinInstances = 0,
+    [int]$MaxInstances = 1,
+    [string]$RequestTimeout = "10m",
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
     [switch]$SkipProductionSmokeCheck,
@@ -80,6 +89,8 @@ function Resolve-DeploymentTarget {
     param(
         [Parameter(Mandatory = $true)]
         [string]$EnvironmentName,
+        [Parameter(Mandatory = $true)]
+        [string]$AppMode,
         [Parameter(Mandatory = $false)]
         [string]$Service,
         [Parameter(Mandatory = $false)]
@@ -90,12 +101,12 @@ function Resolve-DeploymentTarget {
 
     switch ($normalizedEnvironment) {
         "production" {
-            $defaultService = "myblog-app"
-            $defaultPublicBaseUrl = "https://markgolley.dev"
+            $defaultService = if ($AppMode -eq "AislePilotOnly") { "myblog-aislepilot" } else { "myblog-app" }
+            $defaultPublicBaseUrl = if ($AppMode -eq "AislePilotOnly") { "" } else { "https://markgolley.dev" }
             $aspNetCoreEnvironment = "Production"
         }
         "staging" {
-            $defaultService = "myblog-app-staging"
+            $defaultService = if ($AppMode -eq "AislePilotOnly") { "myblog-aislepilot-staging" } else { "myblog-app-staging" }
             $defaultPublicBaseUrl = ""
             $aspNetCoreEnvironment = "Staging"
         }
@@ -117,6 +128,7 @@ function Resolve-DeploymentTarget {
 
 $deploymentTarget = Resolve-DeploymentTarget `
     -EnvironmentName $EnvironmentName `
+    -AppMode $AppMode `
     -Service $Service `
     -PublicBaseUrl $PublicBaseUrl
 
@@ -170,11 +182,15 @@ try {
 
     $envVars = @(
         "APP_VERSION=$tag",
-        "ASPNETCORE_ENVIRONMENT=$($deploymentTarget.AspNetCoreEnvironment)"
+        "ASPNETCORE_ENVIRONMENT=$($deploymentTarget.AspNetCoreEnvironment)",
+        "App__Mode=$AppMode"
     )
 
     if (-not [string]::IsNullOrWhiteSpace($deploymentTarget.PublicBaseUrl)) {
         $envVars += "Site__PublicBaseUrl=$($deploymentTarget.PublicBaseUrl)"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($AislePilotPublicBaseUrl)) {
+        $envVars += "AislePilot__PublicBaseUrl=$($AislePilotPublicBaseUrl.Trim())"
     }
 
     $envVarsArgument = [string]::Join(",", $envVars)
@@ -191,15 +207,16 @@ try {
             "--allow-unauthenticated",
             "--set-env-vars", $envVarsArgument,
             "--labels", "environment=$($deploymentTarget.EnvironmentName.ToLowerInvariant())",
-            "--memory=256Mi",
-            "--cpu=0.25",
-            "--concurrency=1",
-            "--min-instances=0",
-            "--max-instances=1",
-            "--timeout", "10m"
+            "--memory=$Memory",
+            "--cpu=$Cpu",
+            "--concurrency=$Concurrency",
+            "--min-instances=$MinInstances",
+            "--max-instances=$MaxInstances",
+            "--timeout", $RequestTimeout
         )
 
-    if (-not $SkipProductionSmokeCheck) {
+    $skipAuthSmokeChecks = $SkipProductionSmokeCheck -or $AppMode -eq "AislePilotOnly"
+    if (-not $skipAuthSmokeChecks) {
         $smokePublicBaseUrl = $deploymentTarget.PublicBaseUrl
         if ([string]::IsNullOrWhiteSpace($smokePublicBaseUrl)) {
             $resolvedDirectBaseUrl = & gcloud run services describe $deploymentTarget.Service --region $Region --project $ProjectId --format "value(status.url)"
@@ -224,11 +241,15 @@ try {
                 "-Region", $Region
             )
     }
+    elseif ($AppMode -eq "AislePilotOnly" -and -not $SkipProductionSmokeCheck) {
+        Write-Host "Skipping auth smoke checks for AppMode=AislePilotOnly (auth script targets blog/admin routes)."
+    }
     else {
         Write-Host "Skipping auth smoke checks because -SkipProductionSmokeCheck was provided."
     }
 
     Write-Host "Environment: $($deploymentTarget.EnvironmentName)"
+    Write-Host "App mode: $AppMode"
     Write-Host "Service: $($deploymentTarget.Service)"
     Write-Host "Deployed image: $image"
     Write-Host "APP_VERSION set to: $tag"

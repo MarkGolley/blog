@@ -3,6 +3,8 @@
     ViewData["MetaDescription"] =
         "Focused engineering roadmap from Mark Golley with active builds and clear delivery milestones.";
     ViewData["CanonicalPath"] = "/projects";
+    var aislePilotPublicUrl = ViewData["AislePilotPublicUrl"]?.ToString() ?? string.Empty;
+    var aislePilotLocalEnabled = ViewData["AislePilotLocalEnabled"] as bool? ?? true;
 }
 
 <section aria-labelledby="active-projects-title" data-reveal>
@@ -33,7 +35,10 @@
             WhatItShows = "Can build a useful AI-assisted product workflow, not just isolated model demos.",
             NextMilestone = "Add pricing provider integration and smarter pantry-aware substitutions.",
             CtaText = "Try AislePilot",
-            CtaController = "AislePilot",
+            CtaUrl = aislePilotPublicUrl,
+            CtaController = string.IsNullOrWhiteSpace(aislePilotPublicUrl) && aislePilotLocalEnabled
+                ? "AislePilot"
+                : string.Empty,
             CtaAction = "Index",
             CtaIconPath = "~/images/aislepilot-icon.svg"
         }' />
