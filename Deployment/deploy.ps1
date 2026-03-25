@@ -15,6 +15,7 @@ param(
     [int]$MinInstances = 0,
     [int]$MaxInstances = 1,
     [string]$RequestTimeout = "10m",
+    [switch]$UseLegacyDockerBuilder,
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
     [switch]$SkipProductionSmokeCheck,
@@ -162,7 +163,14 @@ try {
     Ensure-DockerRunning -TimeoutSeconds $DockerStartupTimeoutSeconds
 
     $previousBuildkit = $env:DOCKER_BUILDKIT
-    $env:DOCKER_BUILDKIT = "0"
+    $buildkitValue = if ($UseLegacyDockerBuilder) { "0" } else { "1" }
+    $env:DOCKER_BUILDKIT = $buildkitValue
+    if ($UseLegacyDockerBuilder) {
+        Write-Host "Using legacy Docker builder (DOCKER_BUILDKIT=0)."
+    }
+    else {
+        Write-Host "Using Docker BuildKit (DOCKER_BUILDKIT=1)."
+    }
     Invoke-External `
         -Label "Building Docker image" `
         -Command "docker" `

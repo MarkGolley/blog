@@ -24,7 +24,8 @@ public class ProjectsController(IConfiguration configuration) : Controller
             && (string.Equals(configuredUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(configuredUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)))
         {
-            ViewData["AislePilotPublicUrl"] = $"{configuredUri}/projects/aisle-pilot";
+            var normalizedBaseUrl = configuredUri.ToString().TrimEnd('/');
+            ViewData["AislePilotPublicUrl"] = $"{normalizedBaseUrl}/projects/aisle-pilot";
         }
 
         return View();

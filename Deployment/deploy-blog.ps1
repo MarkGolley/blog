@@ -26,7 +26,7 @@ $args = @(
     "-AppMode", "BlogOnly",
     "-Memory", "256Mi",
     "-Cpu", "0.25",
-    "-Concurrency", "10",
+    "-Concurrency", "1",
     "-MinInstances", "0",
     "-MaxInstances", "2",
     "-RequestTimeout", "10m",
