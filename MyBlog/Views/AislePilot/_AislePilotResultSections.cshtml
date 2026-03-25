@@ -14,11 +14,6 @@
             return "/projects/aisle-pilot/images/aislepilot-icon.svg";
         }
 
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out _))
-        {
-            return normalized;
-        }
-
         if (normalized.StartsWith("/projects/aisle-pilot/images/", StringComparison.OrdinalIgnoreCase))
         {
             return normalized;
@@ -53,6 +48,13 @@
             {
                 return $"/projects/aisle-pilot/images/aislepilot-meals/{trimmed}";
             }
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
+            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            return normalized;
         }
 
         return normalized;

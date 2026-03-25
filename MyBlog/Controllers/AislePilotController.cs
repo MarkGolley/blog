@@ -755,11 +755,6 @@ public class AislePilotController(
             return $"{AislePilotImagePathPrefix}/aislepilot-icon.svg";
         }
 
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out _))
-        {
-            return normalized;
-        }
-
         if (normalized.StartsWith($"{AislePilotImagePathPrefix}/", StringComparison.OrdinalIgnoreCase))
         {
             return normalized;
@@ -794,6 +789,13 @@ public class AislePilotController(
             {
                 return $"{AislePilotImagePathPrefix}/aislepilot-meals/{trimmed}";
             }
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
+            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            return normalized;
         }
 
         return normalized;

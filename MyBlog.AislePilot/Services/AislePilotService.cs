@@ -3445,10 +3445,6 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         }
 
         normalized = normalized.Replace('\\', '/');
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out _))
-        {
-            return normalized;
-        }
 
         if (normalized.StartsWith("~/", StringComparison.Ordinal))
         {
@@ -3485,6 +3481,13 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         if (hasImageExtension && !trimmed.Contains('/'))
         {
             return $"/images/aislepilot-meals/{trimmed}";
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
+            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            return normalized;
         }
 
         return normalized;
