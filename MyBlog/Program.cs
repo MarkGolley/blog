@@ -7,10 +7,8 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.WebUtilities;
 using MyBlog.Services;
-using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
-QuestPDF.Settings.License = LicenseType.Community;
 var secureCookiePolicy = builder.Environment.IsDevelopment()
     ? CookieSecurePolicy.SameAsRequest
     : CookieSecurePolicy.Always;
@@ -18,6 +16,12 @@ var appVersion =
     Environment.GetEnvironmentVariable("APP_VERSION")
     ?? builder.Configuration["App:Version"]
     ?? "unknown";
+if (!TryParseAppMode(
+        Environment.GetEnvironmentVariable("APP_MODE") ?? builder.Configuration["App:Mode"],
+        out var appMode))
+{
+    throw new InvalidOperationException("Invalid App:Mode value. Supported values are Combined, BlogOnly, AislePilotOnly.");
+}
 
 // ----------------------------
 // Cloud Run Port Binding
@@ -309,6 +313,22 @@ app.Use(async (context, next) =>
 
     await next();
 });
+app.Use(async (context, next) =>
+{
+    if (appMode == AppMode.Combined || IsRequestAllowedInMode(context.Request.Path, appMode))
+    {
+        await next();
+        return;
+    }
+
+    if (appMode == AppMode.AislePilotOnly && IsRootPath(context.Request.Path))
+    {
+        context.Response.Redirect("/projects/aisle-pilot");
+        return;
+    }
+
+    context.Response.StatusCode = StatusCodes.Status404NotFound;
+});
 
 app.UseStaticFiles();
 app.UseRouting();
@@ -487,6 +507,12 @@ static bool ShouldRecoverFromBadRequest(string requestPath)
            || requestPath.Equals("/Blog/AddComment", StringComparison.OrdinalIgnoreCase)
            || requestPath.Equals("/Blog/TogglePostLike", StringComparison.OrdinalIgnoreCase)
            || requestPath.Equals("/Blog/ToggleCommentLike", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/projects/aisle-pilot", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/projects/aisle-pilot/rebalance-budget", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/projects/aisle-pilot/suggest-from-pantry", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/projects/aisle-pilot/swap-meal", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/projects/aisle-pilot/export/plan-pack", StringComparison.OrdinalIgnoreCase)
+           || requestPath.Equals("/projects/aisle-pilot/export/checklist", StringComparison.OrdinalIgnoreCase)
            || requestPath.Equals("/Subscribe", StringComparison.OrdinalIgnoreCase);
 }
 
@@ -513,6 +539,11 @@ static string? ResolveBadRequestReturnPath(HttpRequest request, string requestPa
     if (requestPath.StartsWith("/ai-experiments", StringComparison.OrdinalIgnoreCase))
     {
         return "/ai-experiments";
+    }
+
+    if (requestPath.StartsWith("/projects/aisle-pilot", StringComparison.OrdinalIgnoreCase))
+    {
+        return "/projects/aisle-pilot";
     }
 
     if (requestPath.Equals("/Subscribe", StringComparison.OrdinalIgnoreCase))
@@ -579,11 +610,89 @@ static string AddOrReplaceQueryParameter(string path, string key, string value)
     return $"{basePath}{queryString}{anchor}";
 }
 
+static bool IsRequestAllowedInMode(PathString path, AppMode appMode)
+{
+    if (appMode == AppMode.Combined)
+    {
+        return true;
+    }
+
+    if (IsStaticAssetPath(path))
+    {
+        return true;
+    }
+
+    var value = path.Value ?? string.Empty;
+    if (value.Equals("/health", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    var isAislePilotPath =
+        value.Equals("/projects/aisle-pilot", StringComparison.OrdinalIgnoreCase)
+        || value.StartsWith("/projects/aisle-pilot/", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/admin/aisle-pilot/warmup", StringComparison.OrdinalIgnoreCase);
+
+    return appMode switch
+    {
+        AppMode.BlogOnly => !isAislePilotPath,
+        AppMode.AislePilotOnly => isAislePilotPath,
+        _ => true
+    };
+}
+
+static bool IsRootPath(PathString path)
+{
+    var value = path.Value ?? string.Empty;
+    return string.IsNullOrWhiteSpace(value) || value.Equals("/", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool IsStaticAssetPath(PathString path)
+{
+    var value = path.Value ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return false;
+    }
+
+    return value.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase)
+           || value.Equals("/myblog.styles.css", StringComparison.OrdinalIgnoreCase)
+           || value.StartsWith("/css/", StringComparison.OrdinalIgnoreCase)
+           || value.StartsWith("/js/", StringComparison.OrdinalIgnoreCase)
+           || value.StartsWith("/images/", StringComparison.OrdinalIgnoreCase)
+           || value.StartsWith("/lib/", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool TryParseAppMode(string? rawValue, out AppMode appMode)
+{
+    var normalized = rawValue?.Trim();
+    if (string.IsNullOrWhiteSpace(normalized))
+    {
+        appMode = AppMode.Combined;
+        return true;
+    }
+
+    if (Enum.TryParse(normalized, ignoreCase: true, out appMode))
+    {
+        return true;
+    }
+
+    appMode = AppMode.Combined;
+    return false;
+}
+
 enum CachePolicy
 {
     None,
     PrivateRevalidate,
     NoStore
+}
+
+enum AppMode
+{
+    Combined,
+    BlogOnly,
+    AislePilotOnly
 }
 
 public partial class Program;

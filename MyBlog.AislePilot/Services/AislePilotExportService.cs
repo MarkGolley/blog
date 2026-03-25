@@ -24,6 +24,11 @@ public sealed class AislePilotExportService : IAislePilotExportService
         </svg>
         """;
 
+    public AislePilotExportService()
+    {
+        QuestPDF.Settings.License = LicenseType.Community;
+    }
+
     public byte[] BuildPlanPackPdf(
         AislePilotRequestModel request,
         AislePilotPlanResultViewModel result)
