@@ -2805,6 +2805,12 @@ Return JSON only with this schema:
 
     private bool IsMealImageUrlUsable(string imageUrl)
     {
+        if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out _) &&
+            !imageUrl.StartsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         if (!imageUrl.StartsWith("/images/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
         {
             return true;
@@ -3432,7 +3438,59 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
 
     private static string NormalizeImageUrl(string? imageUrl)
     {
-        return imageUrl?.Trim() ?? string.Empty;
+        var normalized = imageUrl?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        normalized = normalized.Replace('\\', '/');
+
+        if (normalized.StartsWith("~/", StringComparison.Ordinal))
+        {
+            normalized = normalized[1..];
+        }
+
+        if (normalized.StartsWith("/projects/aisle-pilot/images/", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"/images/{normalized["/projects/aisle-pilot/images/".Length..]}";
+        }
+
+        if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized;
+        }
+
+        if (normalized.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"/{normalized}";
+        }
+
+        if (normalized.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"/images/{normalized}";
+        }
+
+        var trimmed = normalized.TrimStart('/');
+        var hasImageExtension =
+            trimmed.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+        if (hasImageExtension && !trimmed.Contains('/'))
+        {
+            return $"/images/aislepilot-meals/{trimmed}";
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
+            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            return normalized;
+        }
+
+        return normalized;
     }
 
     private static IReadOnlyList<string> SplitBase64IntoChunks(string base64, int chunkLength)

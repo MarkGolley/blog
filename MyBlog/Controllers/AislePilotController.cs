@@ -16,6 +16,7 @@ public class AislePilotController(
 {
     private const string SetupStateCookieName = "aislepilot.setup.v1";
     private const string CurrentPlanStateCookieName = "aislepilot.plan.v1";
+    private const string AislePilotImagePathPrefix = "/projects/aisle-pilot/images";
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -237,7 +238,7 @@ public class AislePilotController(
             .Select(name => new
             {
                 mealName = name,
-                imageUrl = imageUrls.GetValueOrDefault(name, string.Empty)
+                imageUrl = ResolveClientMealImageUrl(imageUrls.GetValueOrDefault(name, string.Empty))
             })
             .ToList();
 
@@ -744,6 +745,60 @@ public class AislePilotController(
             .Where(x => x.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static string ResolveClientMealImageUrl(string? imageUrl)
+    {
+        var normalized = imageUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return $"{AislePilotImagePathPrefix}/aislepilot-icon.svg";
+        }
+
+        if (normalized.StartsWith($"{AislePilotImagePathPrefix}/", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized;
+        }
+
+        if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{AislePilotImagePathPrefix}/{normalized["/images/".Length..]}";
+        }
+
+        normalized = normalized.Replace('\\', '/');
+        if (!normalized.StartsWith("/", StringComparison.Ordinal))
+        {
+            var trimmed = normalized.TrimStart('/');
+            if (trimmed.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{AislePilotImagePathPrefix}/{trimmed["images/".Length..]}";
+            }
+
+            if (trimmed.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{AislePilotImagePathPrefix}/{trimmed}";
+            }
+
+            var hasImageExtension =
+                trimmed.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+            if (hasImageExtension)
+            {
+                return $"{AislePilotImagePathPrefix}/aislepilot-meals/{trimmed}";
+            }
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
+            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            return normalized;
+        }
+
+        return normalized;
     }
 
     private sealed class AislePilotSetupStateCookieModel

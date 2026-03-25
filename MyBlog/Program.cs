@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.FileProviders;
 using MyBlog.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -331,6 +332,18 @@ app.Use(async (context, next) =>
 });
 
 app.UseStaticFiles();
+if (!string.IsNullOrWhiteSpace(app.Environment.WebRootPath))
+{
+    var aislePilotImageRoot = Path.Combine(app.Environment.WebRootPath, "images");
+    if (Directory.Exists(aislePilotImageRoot))
+    {
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(aislePilotImageRoot),
+            RequestPath = "/projects/aisle-pilot/images"
+        });
+    }
+}
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();

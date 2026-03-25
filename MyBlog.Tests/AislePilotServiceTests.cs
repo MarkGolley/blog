@@ -833,6 +833,29 @@ public class AislePilotServiceTests
         });
     }
 
+    [Theory]
+    [InlineData("vegan-mushroom-stroganoff.png", "/images/aislepilot-meals/vegan-mushroom-stroganoff.png")]
+    [InlineData("aislepilot-meals/chickpea-and-spinach-curry.png", "/images/aislepilot-meals/chickpea-and-spinach-curry.png")]
+    [InlineData("/projects/aisle-pilot/images/aislepilot-meals/quinoa-roasted-vegetable-salad.png", "/images/aislepilot-meals/quinoa-roasted-vegetable-salad.png")]
+    public void NormalizeImageUrl_NormalizesRelativeAndProxyImagePaths(string input, string expected)
+    {
+        var normalized = InvokeNormalizeImageUrl(input);
+
+        Assert.Equal(expected, normalized);
+    }
+
+    [Fact]
+    public void IsMealImageUrlUsable_RelativeFilename_ReturnsFalse()
+    {
+        var method = typeof(AislePilotService).GetMethod("IsMealImageUrlUsable", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        var isUsable = method!.Invoke(_service, ["vegan-mushroom-stroganoff.png"]);
+
+        Assert.NotNull(isUsable);
+        Assert.False((bool)isUsable!);
+    }
+
     [Fact]
     public void SuggestMealsFromPantry_WithKnownIngredients_RanksBestMatchFirst()
     {
@@ -1471,6 +1494,15 @@ public class AislePilotServiceTests
         var value = field!.GetValue(null);
         Assert.NotNull(value);
         return (TimeSpan)value!;
+    }
+
+    private static string InvokeNormalizeImageUrl(string? imageUrl)
+    {
+        var method = typeof(AislePilotService).GetMethod("NormalizeImageUrl", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var result = method!.Invoke(null, [imageUrl]);
+        Assert.NotNull(result);
+        return (string)result!;
     }
 
     private static void SetAiPoolTouchedUtc(string mealName, DateTime touchedUtc)

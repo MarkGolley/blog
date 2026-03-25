@@ -18,6 +18,7 @@ param(
     [switch]$UseLegacyDockerBuilder,
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
+    [switch]$SkipAislePilotSmokeCheck,
     [switch]$SkipProductionSmokeCheck,
     [int]$DockerStartupTimeoutSeconds = 120
 )
@@ -84,6 +85,50 @@ function Ensure-DockerRunning {
     }
 
     throw "Docker did not become ready within $TimeoutSeconds seconds. Check Docker Desktop and rerun deploy."
+}
+
+function Invoke-AislePilotMealImageSmokeCheck {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BaseUrl
+    )
+
+    $normalizedBaseUrl = $BaseUrl.Trim().TrimEnd("/")
+    if ([string]::IsNullOrWhiteSpace($normalizedBaseUrl)) {
+        throw "AislePilot smoke check base URL is empty."
+    }
+
+    $mealImagesUrl = "$normalizedBaseUrl/projects/aisle-pilot/meal-images?mealNames=Egg%20fried%20rice"
+    Write-Host "==> Running AislePilot meal image smoke check"
+    Write-Host "    URL: $mealImagesUrl"
+
+    $payload = Invoke-RestMethod -Method Get -Uri $mealImagesUrl -TimeoutSec 45
+    if ($null -eq $payload) {
+        throw "AislePilot meal image smoke check failed: empty response payload."
+    }
+
+    $images = @($payload.images)
+    if ($images.Count -eq 0) {
+        throw "AislePilot meal image smoke check failed: response did not include images."
+    }
+
+    $imageUrl = [string]$images[0].imageUrl
+    if ([string]::IsNullOrWhiteSpace($imageUrl)) {
+        throw "AislePilot meal image smoke check failed: imageUrl was blank."
+    }
+
+    if ($imageUrl.StartsWith("/projects/aisle-pilot/images/", [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Host "AislePilot smoke check passed. imageUrl='$imageUrl'"
+        return
+    }
+
+    if ($imageUrl.StartsWith("http://", [System.StringComparison]::OrdinalIgnoreCase) -or
+        $imageUrl.StartsWith("https://", [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Host "AislePilot smoke check passed with absolute URL. imageUrl='$imageUrl'"
+        return
+    }
+
+    throw "AislePilot meal image smoke check failed: unexpected imageUrl '$imageUrl'. Expected '/projects/aisle-pilot/images/...' or absolute URL."
 }
 
 function Resolve-DeploymentTarget {
@@ -223,16 +268,34 @@ try {
             "--timeout", $RequestTimeout
         )
 
+    $resolvedDirectBaseUrl = & gcloud run services describe $deploymentTarget.Service --region $Region --project $ProjectId --format "value(status.url)"
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resolvedDirectBaseUrl)) {
+        throw "Unable to resolve Cloud Run service URL after deploy."
+    }
+    $resolvedDirectBaseUrl = $resolvedDirectBaseUrl.Trim().TrimEnd("/")
+
+    if (-not $SkipAislePilotSmokeCheck -and $AppMode -ne "BlogOnly") {
+        $aislePilotSmokeBaseUrl = if ([string]::IsNullOrWhiteSpace($deploymentTarget.PublicBaseUrl)) {
+            $resolvedDirectBaseUrl
+        }
+        else {
+            $deploymentTarget.PublicBaseUrl
+        }
+
+        Invoke-AislePilotMealImageSmokeCheck -BaseUrl $aislePilotSmokeBaseUrl
+    }
+    elseif ($AppMode -eq "BlogOnly") {
+        Write-Host "Skipping AislePilot meal image smoke check for AppMode=BlogOnly."
+    }
+    else {
+        Write-Host "Skipping AislePilot meal image smoke check because -SkipAislePilotSmokeCheck was provided."
+    }
+
     $skipAuthSmokeChecks = $SkipProductionSmokeCheck -or $AppMode -eq "AislePilotOnly"
     if (-not $skipAuthSmokeChecks) {
         $smokePublicBaseUrl = $deploymentTarget.PublicBaseUrl
         if ([string]::IsNullOrWhiteSpace($smokePublicBaseUrl)) {
-            $resolvedDirectBaseUrl = & gcloud run services describe $deploymentTarget.Service --region $Region --project $ProjectId --format "value(status.url)"
-            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resolvedDirectBaseUrl)) {
-                throw "Unable to resolve Cloud Run service URL for smoke checks. Provide -PublicBaseUrl or check gcloud access."
-            }
-
-            $smokePublicBaseUrl = $resolvedDirectBaseUrl.Trim().TrimEnd("/")
+            $smokePublicBaseUrl = $resolvedDirectBaseUrl
             Write-Host "PublicBaseUrl not provided for $($deploymentTarget.EnvironmentName). Using direct Cloud Run URL for smoke checks: $smokePublicBaseUrl"
         }
 
