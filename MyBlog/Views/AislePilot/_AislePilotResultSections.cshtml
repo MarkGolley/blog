@@ -6,7 +6,33 @@
 {
     var result = Model.Result;
     var ukCulture = CultureInfo.GetCultureInfo("en-GB");
-    const string fallbackMealImageUrl = "/images/aislepilot-icon.svg";
+    string ResolveClientMealImageUrl(string? imageUrl)
+    {
+        var normalized = imageUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "/projects/aisle-pilot/images/aislepilot-icon.svg";
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out _))
+        {
+            return normalized;
+        }
+
+        if (normalized.StartsWith("/projects/aisle-pilot/images/", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized;
+        }
+
+        if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"/projects/aisle-pilot/images/{normalized["/images/".Length..]}";
+        }
+
+        return normalized;
+    }
+
+    var fallbackMealImageUrl = ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
     var mealImagesPollUrl = Url.Action("MealImages", "AislePilot") ?? "/projects/aisle-pilot/meal-images";
     var aisleRank = result.AisleOrderUsed
         .Select((department, index) => new { department, index })
@@ -259,7 +285,7 @@
                             <article class="@mealCardClass" data-leftover-day-card data-day-index="@mealIndex">
                                 <div class="aislepilot-meal-image-shell">
                                     <img class="aislepilot-meal-image"
-                                         src="@meal.MealImageUrl"
+                                         src="@ResolveClientMealImageUrl(meal.MealImageUrl)"
                                          data-meal-image
                                          data-meal-name="@meal.MealName"
                                          alt="@($"{meal.MealName} plated meal")"

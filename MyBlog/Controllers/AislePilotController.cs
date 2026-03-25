@@ -16,6 +16,7 @@ public class AislePilotController(
 {
     private const string SetupStateCookieName = "aislepilot.setup.v1";
     private const string CurrentPlanStateCookieName = "aislepilot.plan.v1";
+    private const string AislePilotImagePathPrefix = "/projects/aisle-pilot/images";
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -237,7 +238,7 @@ public class AislePilotController(
             .Select(name => new
             {
                 mealName = name,
-                imageUrl = imageUrls.GetValueOrDefault(name, string.Empty)
+                imageUrl = ResolveClientMealImageUrl(imageUrls.GetValueOrDefault(name, string.Empty))
             })
             .ToList();
 
@@ -744,6 +745,32 @@ public class AislePilotController(
             .Where(x => x.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static string ResolveClientMealImageUrl(string? imageUrl)
+    {
+        var normalized = imageUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return $"{AislePilotImagePathPrefix}/aislepilot-icon.svg";
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out _))
+        {
+            return normalized;
+        }
+
+        if (normalized.StartsWith($"{AislePilotImagePathPrefix}/", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalized;
+        }
+
+        if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{AislePilotImagePathPrefix}/{normalized["/images/".Length..]}";
+        }
+
+        return normalized;
     }
 
     private sealed class AislePilotSetupStateCookieModel

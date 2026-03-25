@@ -106,6 +106,24 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task MealImages_Response_UsesAislePilotImagePathPrefix()
+    {
+        using var client = CreateClient(allowAutoRedirect: false);
+
+        using var response = await client.GetAsync("/projects/aisle-pilot/meal-images?mealNames=Egg%20fried%20rice");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        var images = document.RootElement.GetProperty("images");
+        Assert.Equal(1, images.GetArrayLength());
+
+        var imageUrl = images[0].GetProperty("imageUrl").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(imageUrl));
+        Assert.StartsWith("/projects/aisle-pilot/images/", imageUrl, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SwapMeal_ValidRequest_ReturnsUpdatedPlanPage()
     {
         using var client = CreateClient(allowAutoRedirect: true);
