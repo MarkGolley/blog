@@ -248,6 +248,43 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithPlanLengthFiveAndFiveCookDays_ReturnsNoLeftovers()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 5,
+            CookDays = 5
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(5, result.PlanDays);
+        Assert.Equal(5, result.CookDays);
+        Assert.Equal(0, result.LeftoverDays);
+        Assert.Equal(5, result.MealPlan.Count);
+        Assert.Equal(5, result.MealPlan.Sum(meal => 1 + meal.LeftoverDaysCovered));
+    }
+
+    [Fact]
+    public void BuildPlan_WhenCookDaysExceedPlanLength_ClampsCookDaysToPlanLength()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 1,
+            CookDays = 6
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(1, result.PlanDays);
+        Assert.Equal(1, result.CookDays);
+        Assert.Equal(0, result.LeftoverDays);
+        Assert.Single(result.MealPlan);
+    }
+
+    [Fact]
     public void BuildPlan_WithRequestedLeftoverSourceDays_AppliesCustomDistribution()
     {
         var request = new AislePilotRequestModel
@@ -871,6 +908,49 @@ public class AislePilotServiceTests
         Assert.Equal("Egg fried rice", suggestions[0].MealName);
         Assert.Equal(100, suggestions[0].MatchPercent);
         Assert.Empty(suggestions[0].MissingIngredients);
+        Assert.Equal(0m, suggestions[0].MissingIngredientsEstimatedCost);
+    }
+
+    [Fact]
+    public void SuggestMealsFromPantry_WithKnownIngredients_FillsRequestedSuggestionCount()
+    {
+        var request = new AislePilotRequestModel
+        {
+            PantryItems = "eggs, rice, frozen mixed veg, soy sauce",
+            DietaryModes = ["Balanced"]
+        };
+
+        var suggestions = _service.SuggestMealsFromPantry(request, 3);
+
+        Assert.Equal(3, suggestions.Count);
+        Assert.Equal("Egg fried rice", suggestions[0].MealName);
+    }
+
+    [Fact]
+    public void SuggestMealsFromPantry_WithExcludedMealNames_DoesNotReturnExcludedMeals()
+    {
+        var request = new AislePilotRequestModel
+        {
+            PantryItems = "eggs, rice, frozen mixed veg, soy sauce, chicken",
+            DietaryModes = ["Balanced"]
+        };
+
+        var initialSuggestions = _service.SuggestMealsFromPantry(request, 3);
+        Assert.NotEmpty(initialSuggestions);
+
+        var excludedMealNames = initialSuggestions
+            .Select(suggestion => suggestion.MealName)
+            .ToList();
+        var refreshedSuggestions = _service.SuggestMealsFromPantry(
+            request,
+            3,
+            excludedMealNames,
+            generationNonce: "refresh-pass-1");
+
+        Assert.NotEmpty(refreshedSuggestions);
+        Assert.DoesNotContain(
+            refreshedSuggestions,
+            suggestion => excludedMealNames.Contains(suggestion.MealName, StringComparer.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -902,7 +982,7 @@ public class AislePilotServiceTests
     }
 
     [Fact]
-    public void SuggestMealsFromPantry_WithSpecificProteinAndStaple_ReturnsEmptyWhenMealIsNotFullyCovered()
+    public void SuggestMealsFromPantry_WithSpecificProteinAndStaple_ReturnsClosestMatch()
     {
         var request = new AislePilotRequestModel
         {
@@ -912,7 +992,11 @@ public class AislePilotServiceTests
 
         var suggestions = _service.SuggestMealsFromPantry(request, 8);
 
-        Assert.Empty(suggestions);
+        Assert.NotEmpty(suggestions);
+        Assert.Contains(suggestions, suggestion =>
+            suggestion.MealName.Equals("Chicken stir fry with rice", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(suggestions, suggestion => suggestion.MatchPercent < 100);
+        Assert.Contains(suggestions, suggestion => suggestion.MissingIngredientsEstimatedCost > 0m);
     }
 
     [Fact]
@@ -928,6 +1012,96 @@ public class AislePilotServiceTests
 
         Assert.Contains(suggestions, suggestion =>
             suggestion.MealName.Equals("Egg fried rice", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void SuggestMealsFromPantry_WithChickenLeakPastryPantry_ReturnsUsefulSuggestions()
+    {
+        var request = new AislePilotRequestModel
+        {
+            PantryItems = "chicken, leak, pastry, milk, cream, salt, pepper",
+            DietaryModes = ["Balanced"]
+        };
+
+        var suggestions = _service.SuggestMealsFromPantry(request, 3);
+
+        Assert.NotEmpty(suggestions);
+        Assert.Contains(suggestions, suggestion =>
+            suggestion.MealName.Equals("Chicken and leek cream pie", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void SuggestMealsFromPantry_WithRiceEggChickenPantry_PrioritizesRelevantMeals()
+    {
+        var request = new AislePilotRequestModel
+        {
+            PantryItems = "rice, eggs, peas, oil, chicken, various sauces",
+            DietaryModes = ["Balanced"]
+        };
+
+        var suggestions = _service.SuggestMealsFromPantry(request, 3);
+
+        Assert.Equal(3, suggestions.Count);
+        Assert.Contains(suggestions, suggestion =>
+            suggestion.MealName.Equals("Egg fried rice", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(suggestions, suggestion =>
+            suggestion.MealName.Equals("Chicken stir fry with rice", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(suggestions, suggestion =>
+            suggestion.MealName.Equals("Smoky chickpea tomato stew", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(suggestions, suggestion =>
+            suggestion.MealName.Equals("Chickpea quinoa salad bowls", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void SuggestMealsFromPantry_StrictCoreMode_WithCompleteCoreIngredients_ReturnsReadyMeal()
+    {
+        var request = new AislePilotRequestModel
+        {
+            PantryItems = "eggs, rice, frozen mixed veg, soy sauce",
+            DietaryModes = ["Balanced"],
+            RequireCorePantryIngredients = true
+        };
+
+        var suggestions = _service.SuggestMealsFromPantry(request, 6);
+
+        Assert.NotEmpty(suggestions);
+        Assert.Contains(suggestions, suggestion =>
+            suggestion.MealName.Equals("Egg fried rice", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void SuggestMealsFromPantry_StrictCoreMode_WithTrayBakeIngredients_ReturnsTrayBake()
+    {
+        var request = new AislePilotRequestModel
+        {
+            PantryItems = "chicken breasts, peppers, courgettes, sweet potatoes, oil, herbs",
+            DietaryModes = ["Balanced"],
+            RequireCorePantryIngredients = true
+        };
+
+        var suggestions = _service.SuggestMealsFromPantry(request, 3);
+
+        var trayBakeSuggestion = suggestions.FirstOrDefault(suggestion =>
+            suggestion.MealName.Equals("Roast chicken and veg tray bake", StringComparison.OrdinalIgnoreCase));
+
+        Assert.NotNull(trayBakeSuggestion);
+        Assert.True(trayBakeSuggestion!.CanCookNow);
+        Assert.Equal(0, trayBakeSuggestion.MissingCoreIngredientCount);
+    }
+
+    [Fact]
+    public void SuggestMealsFromPantry_StrictCoreMode_WhenCoreIngredientsMissing_ReturnsEmpty()
+    {
+        var request = new AislePilotRequestModel
+        {
+            PantryItems = "chicken, rice",
+            DietaryModes = ["Balanced"],
+            RequireCorePantryIngredients = true
+        };
+
+        var suggestions = _service.SuggestMealsFromPantry(request, 6);
+
+        Assert.Empty(suggestions);
     }
 
     [Fact]

@@ -16,6 +16,9 @@ public sealed class AislePilotRequestModel
     [Range(1, 7, ErrorMessage = "Choose between 1 and 7 cook days.")]
     public int CookDays { get; set; } = 7;
 
+    [Range(1, 7, ErrorMessage = "Choose a plan length between 1 and 7 days.")]
+    public int PlanDays { get; set; } = 7;
+
     public string PortionSize { get; set; } = "Medium";
 
     public List<string> DietaryModes { get; set; } = ["Balanced"];
@@ -29,11 +32,16 @@ public sealed class AislePilotRequestModel
     [StringLength(400, ErrorMessage = "Pantry notes must be 400 characters or fewer.")]
     public string? PantryItems { get; set; } = string.Empty;
 
+    public bool RequireCorePantryIngredients { get; set; }
+
     [StringLength(140, ErrorMessage = "Leftover day mapping is too long.")]
     public string? LeftoverCookDayIndexesCsv { get; set; } = string.Empty;
 
     [StringLength(2000, ErrorMessage = "Swap history is too long.")]
     public string? SwapHistoryState { get; set; } = string.Empty;
+
+    [StringLength(2800, ErrorMessage = "Pantry suggestion history is too long.")]
+    public string? PantrySuggestionHistoryState { get; set; } = string.Empty;
 
     public bool PreferQuickMeals { get; set; } = true;
 }

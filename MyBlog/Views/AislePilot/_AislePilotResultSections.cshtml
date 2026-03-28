@@ -69,9 +69,12 @@
         .GroupBy(item => item.Department)
         .OrderBy(group => aisleRank.GetValueOrDefault(group.Key, int.MaxValue))
         .ToList();
+    var planDays = Math.Clamp(result.PlanDays, 1, 7);
     var weekDayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
     var weekDayShortLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
-    var weekDayLookup = weekDayNames
+    var planWeekDayNames = weekDayNames.Take(planDays).ToArray();
+    var planWeekDayShortLabels = weekDayShortLabels.Take(planDays).ToArray();
+    var weekDayLookup = planWeekDayNames
         .Select((name, index) => new { name, index })
         .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
     var leftoverSourceWeekDayIndexes = result.MealPlan
@@ -195,6 +198,10 @@
                 </p>
             </article>
             <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Plan length</p>
+                <p class="aislepilot-stat-value">@result.PlanDays day(s)</p>
+            </article>
+            <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Cook days</p>
                 <p class="aislepilot-stat-value">@result.CookDays</p>
             </article>
@@ -281,7 +288,7 @@
                                              model="BuildHiddenRequestFields(includeLeftoverCsvDataAttribute: true)" />
                                 </form>
                                 <div class="aislepilot-leftover-planner" role="list" aria-label="Leftover day allocation">
-                                    @for (var dayIndex = 0; dayIndex < weekDayNames.Length; dayIndex++)
+                                    @for (var dayIndex = 0; dayIndex < planWeekDayNames.Length; dayIndex++)
                                     {
                                         var dayLeftoverCount = leftoverSourceWeekDayIndexes.Count(index => index == dayIndex);
                                         var dayChipClass = dayLeftoverCount > 0
@@ -292,9 +299,9 @@
                                                 data-leftover-day-zone
                                                 data-day-index="@dayIndex"
                                                 data-leftover-count="@dayLeftoverCount"
-                                                aria-label="Leftover allocation for @weekDayNames[dayIndex]"
+                                                aria-label="Leftover allocation for @planWeekDayNames[dayIndex]"
                                                 role="listitem">
-                                            <span class="aislepilot-leftover-day-name">@weekDayShortLabels[dayIndex]</span>
+                                            <span class="aislepilot-leftover-day-name">@planWeekDayShortLabels[dayIndex]</span>
                                         </button>
                                     }
                                 </div>

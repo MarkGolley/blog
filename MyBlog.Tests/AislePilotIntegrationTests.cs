@@ -170,9 +170,38 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Can make now", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Meal suggestions", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Egg fried rice", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Need to buy", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Need to buy", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Show 3 more ideas", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Swap idea", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(3, Regex.Matches(html, "data-meal-name=\"", RegexOptions.IgnoreCase).Count);
+    }
+
+    [Fact]
+    public async Task SwapPantrySuggestion_ValidRequest_ExcludesCurrentMealFromSuggestions()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/swap-pantry-suggestion", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "eggs, rice, frozen mixed veg, soy sauce, chicken",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["currentMealName"] = "Egg fried rice",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Meal suggestions", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-meal-name=\"Egg fried rice\"", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -220,11 +249,11 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("No full meals found", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("No close meals found", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task SuggestFromPantry_ChickenAndRice_DoesNotShowBeefMeal()
+    public async Task SuggestFromPantry_ChickenAndRice_ShowsClosestMatches()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -244,9 +273,86 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("No full meals found", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Beef and veg rice bowls", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Can make now", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Meal suggestions", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Chicken stir fry with rice", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Need to buy", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SuggestFromPantry_StrictCoreMode_ChickenAndRice_ShowsStrictModeNoMatchMessage()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "chicken, rice",
+            ["Request.RequireCorePantryIngredients"] = "true",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("No meals fit strict core mode", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SuggestFromPantry_StrictCoreMode_WithCompleteCoreIngredients_ShowsResult()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "eggs, rice, frozen mixed veg, soy sauce",
+            ["Request.RequireCorePantryIngredients"] = "true",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Meal suggestions", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Egg fried rice", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SuggestFromPantry_StrictCoreMode_WithTrayBakeCoreIngredients_ShowsTrayBake()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "chicken breasts, peppers, courgettes, sweet potatoes, oil, herbs",
+            ["Request.RequireCorePantryIngredients"] = "true",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Roast chicken and veg tray bake", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Cook now", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -270,8 +376,34 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Can make now", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Meal suggestions", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Egg fried rice", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SuggestFromPantry_ChickenLeakPastryInput_ShowsUsefulMeal()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "chicken, leak, pastry, milk, cream, salt, pepper",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Meal suggestions", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Chicken and leek cream pie", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("No close meals found", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -348,6 +480,43 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("Leftovers", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("2 day(s)", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Get_RendersPlanDaysSlider()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Contains("name=\"Request.PlanDays\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-plan-days-slider", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WhenCookDaysExceedPlanDays_ClampsCookDaysInRenderedState()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "1",
+            ["Request.CookDays"] = "5",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("name=\"Request.CookDays\" value=\"1\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("0 day(s)", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

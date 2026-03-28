@@ -112,37 +112,28 @@ public class AislePilotController(
     [HttpPost("suggest-from-pantry")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
-    public IActionResult SuggestFromPantry(AislePilotPageViewModel pageModel)
+    public IActionResult SuggestFromPantry(
+        AislePilotPageViewModel pageModel,
+        List<string>? excludedMealNames,
+        string? swapCurrentMealName = null)
     {
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
-        ValidateRequestForSuggestions(request);
+        return BuildPantrySuggestionResponse(request, resolvedReturnUrl, excludedMealNames, swapCurrentMealName);
+    }
 
-        if (!ModelState.IsValid)
-        {
-            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
-        }
-
-        try
-        {
-            var suggestions = aislePilotService.SuggestMealsFromPantry(request, 6);
-            if (suggestions.Count == 0)
-            {
-                ModelState.AddModelError("Request.PantryItems", "No full meals found from your current pantry items. Add more ingredients or generate a full weekly plan.");
-                return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
-            }
-
-            return View("Index", BuildPageModel(request, pantrySuggestions: suggestions, returnUrl: resolvedReturnUrl));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "AislePilot pantry suggestion failed unexpectedly.");
-            ModelState.AddModelError(
-                string.Empty,
-                "Meal generator hit a temporary issue. Please retry in a few seconds.");
-            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
-        }
+    [HttpPost("swap-pantry-suggestion")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public IActionResult SwapPantrySuggestion(
+        AislePilotPageViewModel pageModel,
+        string? currentMealName)
+    {
+        var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
+        return BuildPantrySuggestionResponse(request, resolvedReturnUrl, excludedMealNames: null, swapCurrentMealName: currentMealName);
     }
 
     [HttpPost("swap-meal")]
@@ -159,7 +150,7 @@ public class AislePilotController(
         PersistSetupState(request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequest(request);
-        var cookDays = Math.Clamp(request.CookDays, 1, 7);
+        var cookDays = Math.Clamp(request.CookDays, 1, Math.Clamp(request.PlanDays, 1, 7));
 
         if (dayIndex < 0 || dayIndex >= cookDays)
         {
@@ -434,11 +425,14 @@ public class AislePilotController(
         normalized.PantryItems = normalized.PantryItems?.Trim() ?? string.Empty;
         normalized.LeftoverCookDayIndexesCsv = normalized.LeftoverCookDayIndexesCsv?.Trim() ?? string.Empty;
         normalized.SwapHistoryState = normalized.SwapHistoryState?.Trim() ?? string.Empty;
+        normalized.PantrySuggestionHistoryState = normalized.PantrySuggestionHistoryState?.Trim() ?? string.Empty;
         normalized.DietaryModes = normalized.DietaryModes?
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList() ?? [];
+        normalized.PlanDays = Math.Clamp(normalized.PlanDays, 1, 7);
+        normalized.CookDays = Math.Clamp(normalized.CookDays, 1, normalized.PlanDays);
         return normalized;
     }
 
@@ -538,12 +532,14 @@ public class AislePilotController(
             WeeklyBudget = request.WeeklyBudget,
             HouseholdSize = request.HouseholdSize,
             CookDays = request.CookDays,
+            PlanDays = request.PlanDays,
             PortionSize = request.PortionSize,
             DietaryModes = request.DietaryModes.ToList(),
             DislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty,
             CustomAisleOrder = request.CustomAisleOrder ?? string.Empty,
             PantryItems = request.PantryItems ?? string.Empty,
-            PreferQuickMeals = request.PreferQuickMeals
+            PreferQuickMeals = request.PreferQuickMeals,
+            RequireCorePantryIngredients = request.RequireCorePantryIngredients
         };
 
         var payload = JsonSerializer.Serialize(state, SetupStateJsonOptions);
@@ -580,12 +576,15 @@ public class AislePilotController(
                 return null;
             }
 
+            var planDays = Math.Clamp(state.PlanDays, 1, 7);
+
             return new AislePilotRequestModel
             {
                 Supermarket = state.Supermarket ?? string.Empty,
                 WeeklyBudget = Math.Clamp(state.WeeklyBudget, 15m, 600m),
                 HouseholdSize = Math.Clamp(state.HouseholdSize, 1, 8),
-                CookDays = Math.Clamp(state.CookDays, 1, 7),
+                CookDays = Math.Clamp(state.CookDays, 1, planDays),
+                PlanDays = planDays,
                 PortionSize = state.PortionSize ?? string.Empty,
                 DietaryModes = state.DietaryModes?
                     .Where(mode => !string.IsNullOrWhiteSpace(mode))
@@ -595,7 +594,8 @@ public class AislePilotController(
                 DislikesOrAllergens = state.DislikesOrAllergens ?? string.Empty,
                 CustomAisleOrder = state.CustomAisleOrder ?? string.Empty,
                 PantryItems = state.PantryItems ?? string.Empty,
-                PreferQuickMeals = state.PreferQuickMeals
+                PreferQuickMeals = state.PreferQuickMeals,
+                RequireCorePantryIngredients = state.RequireCorePantryIngredients
             };
         }
         catch
@@ -682,6 +682,11 @@ public class AislePilotController(
             ModelState.AddModelError("Request.DietaryModes", "Choose at least one dietary mode.");
         }
 
+        if (request.CookDays > request.PlanDays)
+        {
+            ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
+        }
+
         if (string.Equals(request.Supermarket, "Custom", StringComparison.OrdinalIgnoreCase))
         {
             var customAisles = ParseCustomAisles(request.CustomAisleOrder);
@@ -731,10 +736,136 @@ public class AislePilotController(
             ModelState.AddModelError("Request.DietaryModes", "Choose at least one dietary mode.");
         }
 
+        if (request.CookDays > request.PlanDays)
+        {
+            ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.PantryItems))
         {
             ModelState.AddModelError("Request.PantryItems", "Add a few pantry ingredients to get meal suggestions.");
         }
+    }
+
+    private IActionResult BuildPantrySuggestionResponse(
+        AislePilotRequestModel request,
+        string resolvedReturnUrl,
+        IReadOnlyList<string>? excludedMealNames,
+        string? swapCurrentMealName)
+    {
+        ValidateRequestForSuggestions(request);
+
+        if (!ModelState.IsValid)
+        {
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        var normalizedExcludedMealNames = NormalizePantryMealNames(excludedMealNames);
+        var normalizedSwapCurrentMealName = string.IsNullOrWhiteSpace(swapCurrentMealName)
+            ? string.Empty
+            : swapCurrentMealName.Trim();
+        var isSwapRequest = normalizedSwapCurrentMealName.Length > 0;
+        var effectiveExcludedMealNames = new HashSet<string>(normalizedExcludedMealNames, StringComparer.OrdinalIgnoreCase);
+
+        if (isSwapRequest)
+        {
+            effectiveExcludedMealNames.Add(normalizedSwapCurrentMealName);
+        }
+        else
+        {
+            foreach (var historyMealName in ParsePantrySuggestionHistoryState(request.PantrySuggestionHistoryState))
+            {
+                effectiveExcludedMealNames.Add(historyMealName);
+            }
+        }
+
+        var generationNonce = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{Guid.NewGuid():N}"[..28];
+        try
+        {
+            var suggestions = aislePilotService.SuggestMealsFromPantry(
+                request,
+                3,
+                effectiveExcludedMealNames.ToList(),
+                generationNonce);
+            if (suggestions.Count == 0)
+            {
+                var noMatchMessage = isSwapRequest
+                    ? "Could not find a different meal right now. Try showing 3 more ideas."
+                    : request.RequireCorePantryIngredients
+                        ? "No meals fit strict core mode. Add more core ingredients or turn strict mode off."
+                        : "No close meals found from your current pantry items. Add more ingredients or generate a full weekly plan.";
+                ModelState.AddModelError("Request.PantryItems", noMatchMessage);
+                return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+            }
+
+            request.PantrySuggestionHistoryState = UpdatePantrySuggestionHistoryState(
+                request.PantrySuggestionHistoryState,
+                suggestions.Select(suggestion => suggestion.MealName));
+            return View("Index", BuildPageModel(request, pantrySuggestions: suggestions, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot pantry suggestion failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Meal generator hit a temporary issue. Please retry in a few seconds.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+    }
+
+    private static IReadOnlyList<string> NormalizePantryMealNames(IReadOnlyList<string>? mealNames)
+    {
+        return (mealNames ?? [])
+            .Where(mealName => !string.IsNullOrWhiteSpace(mealName))
+            .Select(mealName => mealName.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> ParsePantrySuggestionHistoryState(string? pantrySuggestionHistoryState)
+    {
+        if (string.IsNullOrWhiteSpace(pantrySuggestionHistoryState))
+        {
+            return [];
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<string>>(pantrySuggestionHistoryState, SetupStateJsonOptions);
+            return NormalizePantryMealNames(parsed);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static string UpdatePantrySuggestionHistoryState(
+        string? currentState,
+        IEnumerable<string> additionalMealNames)
+    {
+        const int MaxMealNames = 48;
+
+        var history = ParsePantrySuggestionHistoryState(currentState)
+            .ToList();
+        foreach (var mealName in additionalMealNames
+                     .Where(name => !string.IsNullOrWhiteSpace(name))
+                     .Select(name => name.Trim()))
+        {
+            if (!history.Contains(mealName, StringComparer.OrdinalIgnoreCase))
+            {
+                history.Add(mealName);
+            }
+        }
+
+        if (history.Count > MaxMealNames)
+        {
+            history = history
+                .Skip(history.Count - MaxMealNames)
+                .ToList();
+        }
+
+        return JsonSerializer.Serialize(history, SetupStateJsonOptions);
     }
 
     private static IReadOnlyList<string> ParseCustomAisles(string? customAisleOrder)
@@ -807,11 +938,13 @@ public class AislePilotController(
         public decimal WeeklyBudget { get; set; } = 65m;
         public int HouseholdSize { get; set; } = 2;
         public int CookDays { get; set; } = 7;
+        public int PlanDays { get; set; } = 7;
         public string? PortionSize { get; set; }
         public List<string> DietaryModes { get; set; } = [];
         public string? DislikesOrAllergens { get; set; }
         public string? CustomAisleOrder { get; set; }
         public string? PantryItems { get; set; }
         public bool PreferQuickMeals { get; set; } = true;
+        public bool RequireCorePantryIngredients { get; set; }
     }
 }
