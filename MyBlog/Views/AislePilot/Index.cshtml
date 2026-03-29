@@ -439,11 +439,11 @@
                                step="5"
                                class="aislepilot-slider-input"
                                data-number-slider-range
-                               data-number-slider-prefix="Â£"
+                               data-number-slider-prefix="&pound;"
                                data-number-slider-decimals="0" />
                         <div class="aislepilot-slider-meta">
                             <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
-                            <span class="aislepilot-slider-hint">Â£15 to Â£600</span>
+                            <span class="aislepilot-slider-hint">&pound;15 to &pound;600</span>
                         </div>
                         <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
                     </div>
@@ -550,11 +550,11 @@
                                    step="5"
                                    class="aislepilot-slider-input"
                                    data-number-slider-range
-                                   data-number-slider-prefix="£"
+                                   data-number-slider-prefix="&pound;"
                                    data-number-slider-decimals="0" />
                             <div class="aislepilot-slider-meta">
                                 <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
-                                <span class="aislepilot-slider-hint">£15 to £600</span>
+                                <span class="aislepilot-slider-hint">&pound;15 to &pound;600</span>
                             </div>
                             <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
                         </div>
@@ -800,6 +800,10 @@
                               class="aislepilot-swap-form aislepilot-card-action-inline">
                             @Html.AntiForgeryToken()
                             <partial name="_AislePilotHiddenRequestFields" model="BuildPantryHiddenRequestFields()" />
+                            @foreach (var mealName in currentSuggestionMealNames)
+                            {
+                                <input type="hidden" name="currentSuggestionMealNames" value="@mealName" />
+                            }
                             <input type="hidden" name="currentMealName" value="@suggestion.MealName" />
                             <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping...">
                                 <span class="aislepilot-btn-label">

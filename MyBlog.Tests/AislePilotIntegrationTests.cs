@@ -205,6 +205,150 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task SuggestFromPantry_KnownMeal_UsesBundledMealImagePath()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "eggs, rice, frozen mixed veg, soy sauce",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Egg fried rice", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "/projects/aisle-pilot/images/aislepilot-meals/egg-fried-rice.png",
+            html,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SwapPantrySuggestion_ReplacesOnlyClickedCard()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var initialResponse = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "eggs, rice, frozen mixed veg, soy sauce, chicken, spinach, noodles",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, initialResponse.StatusCode);
+        var initialHtml = await initialResponse.Content.ReadAsStringAsync();
+        var initialMealNames = ExtractRenderedMealNames(initialHtml);
+        Assert.True(initialMealNames.Count >= 3);
+
+        var pantryHistoryState = ExtractHiddenInputValue(initialHtml, "Request.PantrySuggestionHistoryState");
+        Assert.False(string.IsNullOrWhiteSpace(pantryHistoryState));
+
+        var swapFormValues = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PantryItems", "eggs, rice, frozen mixed veg, soy sauce, chicken, spinach, noodles"),
+            new("Request.PantrySuggestionHistoryState", pantryHistoryState),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("currentMealName", initialMealNames[0]),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in initialMealNames)
+        {
+            swapFormValues.Add(new KeyValuePair<string, string>("currentSuggestionMealNames", mealName));
+        }
+
+        using var swapResponse = await client.PostAsync("/projects/aisle-pilot/swap-pantry-suggestion", new FormUrlEncodedContent(swapFormValues));
+
+        Assert.Equal(HttpStatusCode.OK, swapResponse.StatusCode);
+        var swappedHtml = await swapResponse.Content.ReadAsStringAsync();
+        var swappedMealNames = ExtractRenderedMealNames(swappedHtml);
+        Assert.Equal(3, swappedMealNames.Count);
+        var overlapCount = swappedMealNames.Count(
+            mealName => initialMealNames.Contains(mealName, StringComparer.OrdinalIgnoreCase));
+        Assert.Equal(2, overlapCount);
+        Assert.Contains(
+            swappedMealNames,
+            mealName => !initialMealNames.Contains(mealName, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task SuggestFromPantry_ShowThreeMoreIdeas_ReplacesAllCards()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var initialResponse = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "eggs, rice, frozen mixed veg, soy sauce, chicken, spinach, noodles",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, initialResponse.StatusCode);
+        var initialHtml = await initialResponse.Content.ReadAsStringAsync();
+        var initialMealNames = ExtractRenderedMealNames(initialHtml);
+        Assert.Equal(3, initialMealNames.Count);
+
+        var pantryHistoryState = ExtractHiddenInputValue(initialHtml, "Request.PantrySuggestionHistoryState");
+        Assert.False(string.IsNullOrWhiteSpace(pantryHistoryState));
+
+        var refreshFormValues = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PantryItems", "eggs, rice, frozen mixed veg, soy sauce, chicken, spinach, noodles"),
+            new("Request.PantrySuggestionHistoryState", pantryHistoryState),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in initialMealNames)
+        {
+            refreshFormValues.Add(new KeyValuePair<string, string>("excludedMealNames", mealName));
+        }
+
+        using var refreshResponse = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(refreshFormValues));
+
+        Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
+        var refreshedHtml = await refreshResponse.Content.ReadAsStringAsync();
+        var refreshedMealNames = ExtractRenderedMealNames(refreshedHtml);
+        Assert.Equal(3, refreshedMealNames.Count);
+        Assert.DoesNotContain(
+            refreshedMealNames,
+            mealName => initialMealNames.Contains(mealName, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task SuggestFromPantry_EmptyPantry_ShowsValidationError()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -567,5 +711,27 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.True(match.Success, $"Anti-forgery token was not found in response for '{path}'.");
         return match.Groups[1].Value;
+    }
+
+    private static IReadOnlyList<string> ExtractRenderedMealNames(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return [];
+        }
+
+        return Regex.Matches(html, "data-meal-name=\"([^\"]+)\"", RegexOptions.IgnoreCase)
+            .Select(match => WebUtility.HtmlDecode(match.Groups[1].Value).Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string ExtractHiddenInputValue(string html, string inputName)
+    {
+        var pattern = $@"<input[^>]*name=""{Regex.Escape(inputName)}""[^>]*value=""([^""]*)""";
+        var match = Regex.Match(html, pattern, RegexOptions.IgnoreCase);
+        Assert.True(match.Success, $"Hidden input '{inputName}' was not found.");
+        return WebUtility.HtmlDecode(match.Groups[1].Value);
     }
 }

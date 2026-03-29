@@ -927,6 +927,35 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void OrderPantrySuggestionsByMatch_WhenMatchIsEqual_SortsByLowerTopUpCostFirst()
+    {
+        var seedMealTemplate = GetMealTemplateSeed();
+        var mealTemplates = CreateMealTemplatesFromSeed(seedMealTemplate, ["Higher top-up", "Lower top-up"]);
+        var suggestions = new[]
+        {
+            new AislePilotPantrySuggestionViewModel
+            {
+                MealName = "Higher top-up",
+                MatchPercent = 75,
+                MissingIngredientsEstimatedCost = 1.00m,
+                MissingCoreIngredientCount = 0
+            },
+            new AislePilotPantrySuggestionViewModel
+            {
+                MealName = "Lower top-up",
+                MatchPercent = 75,
+                MissingIngredientsEstimatedCost = 0.50m,
+                MissingCoreIngredientCount = 2
+            }
+        };
+
+        var ordered = InvokeOrderPantrySuggestionsByMatch(mealTemplates, suggestions);
+
+        Assert.Equal("Lower top-up", ordered[0].MealName);
+        Assert.Equal("Higher top-up", ordered[1].MealName);
+    }
+
+    [Fact]
     public void SuggestMealsFromPantry_WithExcludedMealNames_DoesNotReturnExcludedMeals()
     {
         var request = new AislePilotRequestModel
@@ -1650,6 +1679,43 @@ public class AislePilotServiceTests
         var method = typeof(AislePilotService).GetMethod("PruneAiMealPool", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
         method!.Invoke(null, [nowUtc]);
+    }
+
+    private static IReadOnlyList<AislePilotPantrySuggestionViewModel> InvokeOrderPantrySuggestionsByMatch(
+        IReadOnlyList<object> mealTemplates,
+        IReadOnlyList<AislePilotPantrySuggestionViewModel> suggestions)
+    {
+        Assert.Equal(mealTemplates.Count, suggestions.Count);
+
+        var method = typeof(AislePilotService).GetMethod("OrderPantrySuggestionsByMatch", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var parameterType = method!.GetParameters()[0].ParameterType;
+        var tupleType = parameterType.GetGenericArguments()[0];
+        var tupleArray = Array.CreateInstance(tupleType, mealTemplates.Count);
+
+        for (var index = 0; index < mealTemplates.Count; index++)
+        {
+            var entry = Activator.CreateInstance(tupleType, mealTemplates[index], suggestions[index]);
+            Assert.NotNull(entry);
+            tupleArray.SetValue(entry, index);
+        }
+
+        var ordered = method.Invoke(null, [tupleArray]) as IEnumerable;
+        Assert.NotNull(ordered);
+
+        var orderedSuggestions = new List<AislePilotPantrySuggestionViewModel>();
+        foreach (var entry in ordered!)
+        {
+            Assert.NotNull(entry);
+            var suggestionField = entry!.GetType().GetField("Item2", BindingFlags.Public | BindingFlags.Instance);
+            Assert.NotNull(suggestionField);
+            var suggestion = suggestionField!.GetValue(entry) as AislePilotPantrySuggestionViewModel;
+            Assert.NotNull(suggestion);
+            orderedSuggestions.Add(suggestion!);
+        }
+
+        return orderedSuggestions;
     }
 
     private static int GetPrivateStaticInt(string fieldName)

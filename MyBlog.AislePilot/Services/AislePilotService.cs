@@ -57,7 +57,7 @@ public sealed class AislePilotService : IAislePilotService
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
     private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan AiMealPoolEntryTtl = TimeSpan.FromHours(24);
-    private static readonly TimeSpan MealImageLookupMissTtl = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan MealImageLookupMissTtl = TimeSpan.FromSeconds(12);
 
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> AiMealPoolLastTouchedUtc =
@@ -757,6 +757,12 @@ public sealed class AislePilotService : IAislePilotService
                 continue;
             }
 
+            if (TryGetBundledMealImageUrl(mealName, out var bundledUrl))
+            {
+                resolved[mealName] = bundledUrl;
+                continue;
+            }
+
             var template = AiMealPool.TryGetValue(mealName, out var aiMeal)
                 ? aiMeal
                 : MealTemplates.FirstOrDefault(template =>
@@ -1063,6 +1069,7 @@ public sealed class AislePilotService : IAislePilotService
 
         return suggestions
             .OrderByDescending(entry => entry.Suggestion.MatchPercent)
+            .ThenBy(entry => entry.Suggestion.MissingIngredientsEstimatedCost)
             .ThenBy(entry => entry.Suggestion.MissingCoreIngredientCount)
             .ThenBy(entry => entry.Template.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -3154,6 +3161,12 @@ Return JSON only with this schema:
                 continue;
             }
 
+            if (TryGetBundledMealImageUrl(meal.Name, out var bundledUrl))
+            {
+                resolved[meal.Name] = bundledUrl;
+                continue;
+            }
+
             resolved[meal.Name] = GetFallbackMealImageUrl();
             QueueMealImageGeneration(meal);
         }
@@ -3178,6 +3191,26 @@ Return JSON only with this schema:
 
         imageUrl = normalized;
         ClearMealImageLookupMiss(mealName);
+        return true;
+    }
+
+    private bool TryGetBundledMealImageUrl(string mealName, out string imageUrl)
+    {
+        imageUrl = string.Empty;
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            return false;
+        }
+
+        var candidateUrl = $"/images/aislepilot-meals/{ToAiMealDocumentId(mealName)}.png";
+        if (!TryResolveMealImageDiskPath(candidateUrl, out var fullPath) || !File.Exists(fullPath))
+        {
+            return false;
+        }
+
+        MealImagePool[mealName] = candidateUrl;
+        ClearMealImageLookupMiss(mealName);
+        imageUrl = candidateUrl;
         return true;
     }
 
@@ -3340,6 +3373,11 @@ Return JSON only with this schema:
             foreach (var mealName in distinctMealNames)
             {
                 if (TryGetCachedMealImageUrl(mealName, out _))
+                {
+                    continue;
+                }
+
+                if (TryGetBundledMealImageUrl(mealName, out _))
                 {
                     continue;
                 }

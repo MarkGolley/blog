@@ -10,11 +10,21 @@ param(
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
     [switch]$SkipProductionSmokeCheck,
+    [switch]$AcknowledgeDriftRisk,
     [int]$DockerStartupTimeoutSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+
+if ($EnvironmentName -eq "Production" -and -not $AcknowledgeDriftRisk) {
+    $pairedService = "myblog-aislepilot"
+    throw "Production blog-only deploy can drift from '$pairedService'. Use .\Deployment\deploy-all.ps1, or rerun with -AcknowledgeDriftRisk."
+}
+
+if ($EnvironmentName -eq "Production") {
+    Write-Warning "Running blog-only deploy in Production. This can create version drift unless myblog-aislepilot is also redeployed."
+}
 
 $args = @(
     "-NoProfile",

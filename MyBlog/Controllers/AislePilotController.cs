@@ -128,12 +128,18 @@ public class AislePilotController(
     [ValidateAntiForgeryToken]
     public IActionResult SwapPantrySuggestion(
         AislePilotPageViewModel pageModel,
-        string? currentMealName)
+        string? currentMealName,
+        List<string>? currentSuggestionMealNames)
     {
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
-        return BuildPantrySuggestionResponse(request, resolvedReturnUrl, excludedMealNames: null, swapCurrentMealName: currentMealName);
+        return BuildPantrySuggestionResponse(
+            request,
+            resolvedReturnUrl,
+            excludedMealNames: null,
+            swapCurrentMealName: currentMealName,
+            currentSuggestionMealNames: currentSuggestionMealNames);
     }
 
     [HttpPost("swap-meal")]
@@ -751,7 +757,8 @@ public class AislePilotController(
         AislePilotRequestModel request,
         string resolvedReturnUrl,
         IReadOnlyList<string>? excludedMealNames,
-        string? swapCurrentMealName)
+        string? swapCurrentMealName,
+        IReadOnlyList<string>? currentSuggestionMealNames = null)
     {
         ValidateRequestForSuggestions(request);
 
@@ -765,28 +772,52 @@ public class AislePilotController(
             ? string.Empty
             : swapCurrentMealName.Trim();
         var isSwapRequest = normalizedSwapCurrentMealName.Length > 0;
-        var effectiveExcludedMealNames = new HashSet<string>(normalizedExcludedMealNames, StringComparer.OrdinalIgnoreCase);
+        var historyMealNames = ParsePantrySuggestionHistoryState(request.PantrySuggestionHistoryState);
+
+        var strictExcludedMealNames = new HashSet<string>(normalizedExcludedMealNames, StringComparer.OrdinalIgnoreCase);
+        foreach (var historyMealName in historyMealNames)
+        {
+            strictExcludedMealNames.Add(historyMealName);
+        }
 
         if (isSwapRequest)
         {
-            effectiveExcludedMealNames.Add(normalizedSwapCurrentMealName);
-        }
-        else
-        {
-            foreach (var historyMealName in ParsePantrySuggestionHistoryState(request.PantrySuggestionHistoryState))
-            {
-                effectiveExcludedMealNames.Add(historyMealName);
-            }
+            strictExcludedMealNames.Add(normalizedSwapCurrentMealName);
         }
 
         var generationNonce = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{Guid.NewGuid():N}"[..28];
         try
         {
-            var suggestions = aislePilotService.SuggestMealsFromPantry(
-                request,
-                3,
-                effectiveExcludedMealNames.ToList(),
-                generationNonce);
+            IReadOnlyList<AislePilotPantrySuggestionViewModel> suggestions;
+            if (isSwapRequest)
+            {
+                suggestions = BuildSingleCardSwapSuggestions(
+                    request,
+                    normalizedSwapCurrentMealName,
+                    currentSuggestionMealNames,
+                    historyMealNames,
+                    generationNonce);
+
+                if (suggestions.Count == 0)
+                {
+                    var relaxedExcludedMealNames = new HashSet<string>(normalizedExcludedMealNames, StringComparer.OrdinalIgnoreCase);
+                    relaxedExcludedMealNames.Add(normalizedSwapCurrentMealName);
+                    suggestions = aislePilotService.SuggestMealsFromPantry(
+                        request,
+                        3,
+                        relaxedExcludedMealNames.ToList(),
+                        generationNonce);
+                }
+            }
+            else
+            {
+                suggestions = aislePilotService.SuggestMealsFromPantry(
+                    request,
+                    3,
+                    strictExcludedMealNames.ToList(),
+                    generationNonce);
+            }
+
             if (suggestions.Count == 0)
             {
                 var noMatchMessage = isSwapRequest
@@ -866,6 +897,132 @@ public class AislePilotController(
         }
 
         return JsonSerializer.Serialize(history, SetupStateJsonOptions);
+    }
+
+    private IReadOnlyList<AislePilotPantrySuggestionViewModel> BuildSingleCardSwapSuggestions(
+        AislePilotRequestModel request,
+        string currentMealName,
+        IReadOnlyList<string>? currentSuggestionMealNames,
+        IReadOnlyList<string> historyMealNames,
+        string generationNonce)
+    {
+        var normalizedCurrentSuggestionMealNames = NormalizePantryMealNames(currentSuggestionMealNames);
+        if (normalizedCurrentSuggestionMealNames.Count == 0 || string.IsNullOrWhiteSpace(currentMealName))
+        {
+            return [];
+        }
+
+        if (!normalizedCurrentSuggestionMealNames.Contains(currentMealName, StringComparer.OrdinalIgnoreCase))
+        {
+            normalizedCurrentSuggestionMealNames = normalizedCurrentSuggestionMealNames
+                .Append(currentMealName.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        var unchangedMealNames = normalizedCurrentSuggestionMealNames
+            .Where(mealName => !mealName.Equals(currentMealName, StringComparison.OrdinalIgnoreCase))
+            .Take(2)
+            .ToList();
+
+        var strictReplacementExclusions = new HashSet<string>(historyMealNames, StringComparer.OrdinalIgnoreCase);
+        foreach (var mealName in normalizedCurrentSuggestionMealNames)
+        {
+            strictReplacementExclusions.Add(mealName);
+        }
+
+        var replacement = TrySelectPantrySwapReplacement(
+            request,
+            strictReplacementExclusions,
+            generationNonce);
+        if (replacement is null)
+        {
+            var relaxedReplacementExclusions = new HashSet<string>(normalizedCurrentSuggestionMealNames, StringComparer.OrdinalIgnoreCase);
+            replacement = TrySelectPantrySwapReplacement(
+                request,
+                relaxedReplacementExclusions,
+                generationNonce);
+        }
+
+        if (replacement is null)
+        {
+            var minimalReplacementExclusions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                currentMealName
+            };
+            replacement = TrySelectPantrySwapReplacement(
+                request,
+                minimalReplacementExclusions,
+                generationNonce);
+        }
+
+        if (replacement is null)
+        {
+            return [];
+        }
+
+        var targetMealNames = unchangedMealNames
+            .Append(replacement.MealName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(3)
+            .ToList();
+        if (targetMealNames.Count == 0)
+        {
+            return [];
+        }
+
+        var detailCandidates = aislePilotService.SuggestMealsFromPantry(
+            request,
+            12,
+            excludedMealNames: [],
+            generationNonce);
+        var detailByMealName = detailCandidates.ToDictionary(
+            suggestion => suggestion.MealName,
+            suggestion => suggestion,
+            StringComparer.OrdinalIgnoreCase);
+        detailByMealName[replacement.MealName] = replacement;
+
+        var finalSuggestions = new List<AislePilotPantrySuggestionViewModel>(targetMealNames.Count);
+        foreach (var mealName in targetMealNames)
+        {
+            if (!detailByMealName.TryGetValue(mealName, out var suggestion))
+            {
+                return [];
+            }
+
+            finalSuggestions.Add(suggestion);
+        }
+
+        return OrderPantrySuggestionsForDisplay(finalSuggestions);
+    }
+
+    private AislePilotPantrySuggestionViewModel? TrySelectPantrySwapReplacement(
+        AislePilotRequestModel request,
+        IReadOnlyCollection<string> excludedMealNames,
+        string generationNonce)
+    {
+        var replacements = aislePilotService.SuggestMealsFromPantry(
+            request,
+            12,
+            excludedMealNames.ToList(),
+            generationNonce);
+        return replacements.FirstOrDefault();
+    }
+
+    private static IReadOnlyList<AislePilotPantrySuggestionViewModel> OrderPantrySuggestionsForDisplay(
+        IReadOnlyList<AislePilotPantrySuggestionViewModel> suggestions)
+    {
+        if (suggestions.Count <= 1)
+        {
+            return suggestions;
+        }
+
+        return suggestions
+            .OrderByDescending(suggestion => suggestion.MatchPercent)
+            .ThenBy(suggestion => suggestion.MissingIngredientsEstimatedCost)
+            .ThenBy(suggestion => suggestion.MissingCoreIngredientCount)
+            .ThenBy(suggestion => suggestion.MealName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static IReadOnlyList<string> ParseCustomAisles(string? customAisleOrder)
