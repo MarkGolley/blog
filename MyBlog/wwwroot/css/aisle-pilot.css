@@ -1045,14 +1045,14 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-slider-field--compact .aislepilot-slider-input {
-    width: calc(100% - 0.82rem);
-    margin-left: 0.34rem;
-    margin-right: 0.48rem;
+    width: calc(100% - 0.84rem);
+    margin-left: 0.42rem;
+    margin-right: 0.42rem;
     justify-self: stretch;
 }
 
 .aislepilot-slider-field--compact {
-    --slider-value-edge-start-px: calc(var(--slider-value-width-px) * 0.5);
+    --slider-value-edge-start-px: 0px;
     --slider-value-edge-end-px: calc(var(--slider-value-width-px) * 0.5);
 }
 
@@ -1078,13 +1078,16 @@ html.aislepilot-restore-pending .aislepilot-app {
     gap: 0.24rem;
 }
 
-.aislepilot-slider-track-line .aislepilot-slider-boundary:first-child {
+.aislepilot-slider-track-line .aislepilot-slider-boundary {
     min-width: 1.08rem;
-    text-align: left;
+}
+
+.aislepilot-slider-track-line .aislepilot-slider-boundary:first-child {
+    text-align: right;
 }
 
 .aislepilot-slider-track-line .aislepilot-slider-boundary:last-child {
-    text-align: right;
+    text-align: left;
 }
 
 .aislepilot-slider-track-line .aislepilot-slider-input {
@@ -1345,23 +1348,31 @@ html.aislepilot-restore-pending .aislepilot-app {
     cursor: grabbing;
 }
 
-.aislepilot-slider-value::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: max(2.3rem, calc(100% + 0.8rem));
-    height: max(2.3rem, calc(100% + 0.8rem));
-    transform: translate(-50%, -50%);
-    border-radius: 999px;
-}
-
 .aislepilot-slider-hint {
     font-size: 0.66rem;
     color: var(--ink-soft);
     white-space: nowrap;
     opacity: 0.9;
     margin-left: auto;
+}
+
+.aislepilot-slider-field.is-limit-flash {
+    animation: aislepilot-limit-flash 0.46s ease;
+}
+
+.aislepilot-slider-field.is-limit-flash .aislepilot-slider-value {
+    background: linear-gradient(98deg, #c0392b 0%, #9f2d23 100%);
+}
+
+.aislepilot-slider-field.is-limit-flash .aislepilot-slider-boundary:last-child {
+    color: #b42e26;
+    font-weight: 800;
+}
+
+@keyframes aislepilot-limit-flash {
+    0% { box-shadow: 0 0 0 0 rgba(183, 58, 48, 0); }
+    40% { box-shadow: 0 0 0 3px rgba(183, 58, 48, 0.24); }
+    100% { box-shadow: 0 0 0 0 rgba(183, 58, 48, 0); }
 }
 
 .aislepilot-field-chip-inline {
@@ -2192,8 +2203,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 
     .aislepilot-slider-field--compact .aislepilot-slider-input {
-        width: calc(100% - 0.72rem);
-        margin-left: 0.34rem;
+        width: calc(100% - 0.84rem);
+        margin-left: 0.42rem;
         margin-right: 0.42rem;
         height: 1.2rem !important;
         min-height: 1.2rem !important;

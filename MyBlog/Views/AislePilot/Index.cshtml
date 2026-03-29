@@ -585,14 +585,14 @@
                                 <input asp-for="Request.CookDays"
                                        type="range"
                                        min="1"
-                                       max="@selectedPlanDays"
+                                       max="7"
                                        step="1"
                                        class="aislepilot-slider-input"
                                        aria-label="Cook days"
                                        data-number-slider-range
                                        data-number-slider-decimals="0"
                                        data-cook-days-slider />
-                                <span class="aislepilot-slider-boundary" data-cook-days-max>@selectedPlanDays</span>
+                                <span class="aislepilot-slider-boundary">7</span>
                             </div>
                             <div class="aislepilot-slider-meta">
                                 <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
@@ -736,13 +736,13 @@
                                 <input asp-for="Request.CookDays"
                                        type="range"
                                        min="1"
-                                       max="@selectedPlanDays"
+                                       max="7"
                                        step="1"
                                        class="aislepilot-slider-input"
                                        data-number-slider-range
                                        data-number-slider-decimals="0"
                                        data-cook-days-slider />
-                                <span class="aislepilot-slider-boundary" data-cook-days-max>@selectedPlanDays</span>
+                                <span class="aislepilot-slider-boundary">7</span>
                             </div>
                             <div class="aislepilot-slider-meta">
                                 <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>

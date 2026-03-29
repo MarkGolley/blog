@@ -422,7 +422,6 @@
 
             const planDaysSlider = form.querySelector("[data-plan-days-slider]");
             const cookDaysSlider = form.querySelector("[data-cook-days-slider]");
-            const cookDaysMax = form.querySelector("[data-cook-days-max]");
             const planDaysSliderField = planDaysSlider instanceof HTMLInputElement
                 ? planDaysSlider.closest(".aislepilot-slider-field")
                 : null;
@@ -431,8 +430,28 @@
                 : null;
             const planDaysValueOutput = planDaysSliderField?.querySelector("[data-number-slider-value]");
             const cookDaysValueOutput = cookDaysSliderField?.querySelector("[data-number-slider-value]");
+            let cookDaysLimitFlashTimer = 0;
 
-            const syncPlanDaysConstraint = () => {
+            const flashCookDaysLimit = () => {
+                if (!(cookDaysSliderField instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (cookDaysLimitFlashTimer > 0) {
+                    window.clearTimeout(cookDaysLimitFlashTimer);
+                    cookDaysLimitFlashTimer = 0;
+                }
+
+                cookDaysSliderField.classList.remove("is-limit-flash");
+                cookDaysSliderField.getBoundingClientRect();
+                cookDaysSliderField.classList.add("is-limit-flash");
+                cookDaysLimitFlashTimer = window.setTimeout(() => {
+                    cookDaysSliderField.classList.remove("is-limit-flash");
+                    cookDaysLimitFlashTimer = 0;
+                }, 460);
+            };
+
+            const syncPlanDaysConstraint = source => {
                 if (!(planDaysSlider instanceof HTMLInputElement) || !(cookDaysSlider instanceof HTMLInputElement)) {
                     return;
                 }
@@ -445,16 +464,21 @@
                 const rawCookDays = Number.parseInt(cookDaysSlider.value ?? "1", 10);
                 const cookMinRaw = Number.parseInt(cookDaysSlider.min ?? "1", 10);
                 const cookMin = Number.isInteger(cookMinRaw) ? Math.max(1, cookMinRaw) : 1;
-                const safeCookDays = Number.isInteger(rawCookDays)
+                const clampedCookDays = Number.isInteger(rawCookDays)
                     ? Math.max(cookMin, Math.min(safePlanDays, rawCookDays))
                     : Math.min(safePlanDays, Math.max(cookMin, 1));
+                const safeCookDays = source === "plan-change"
+                    ? safePlanDays
+                    : clampedCookDays;
+                const isOverCookDaysLimit = source === "cook-change" &&
+                    Number.isInteger(rawCookDays) &&
+                    rawCookDays > safePlanDays;
 
                 planDaysSlider.value = `${safePlanDays}`;
-                cookDaysSlider.max = `${safePlanDays}`;
                 cookDaysSlider.value = `${safeCookDays}`;
 
-                if (cookDaysMax instanceof HTMLElement) {
-                    cookDaysMax.textContent = `${safePlanDays}`;
+                if (isOverCookDaysLimit) {
+                    flashCookDaysLimit();
                 }
                 if (planDaysValueOutput instanceof HTMLElement) {
                     planDaysValueOutput.textContent = `${safePlanDays}`;
@@ -472,13 +496,21 @@
             if (planDaysSlider instanceof HTMLInputElement && cookDaysSlider instanceof HTMLInputElement) {
                 if (form.dataset.planDaysConstraintWired !== "true") {
                     form.dataset.planDaysConstraintWired = "true";
-                    planDaysSlider.addEventListener("input", syncPlanDaysConstraint);
-                    planDaysSlider.addEventListener("change", syncPlanDaysConstraint);
-                    cookDaysSlider.addEventListener("input", syncPlanDaysConstraint);
-                    cookDaysSlider.addEventListener("change", syncPlanDaysConstraint);
+                    planDaysSlider.addEventListener("input", () => {
+                        syncPlanDaysConstraint("plan-change");
+                    });
+                    planDaysSlider.addEventListener("change", () => {
+                        syncPlanDaysConstraint("plan-change");
+                    });
+                    cookDaysSlider.addEventListener("input", () => {
+                        syncPlanDaysConstraint("cook-change");
+                    });
+                    cookDaysSlider.addEventListener("change", () => {
+                        syncPlanDaysConstraint("cook-change");
+                    });
                 }
 
-                syncPlanDaysConstraint();
+                syncPlanDaysConstraint("init");
             }
         });
     };
