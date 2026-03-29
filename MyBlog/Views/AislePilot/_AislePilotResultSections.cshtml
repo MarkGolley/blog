@@ -110,6 +110,21 @@
         .Select(meal => meal.MealName)
         .ToList();
     var mealCount = result.MealPlan.Count;
+    HashSet<int> ParseIgnoredMealSlotIndexes(string? ignoredMealSlotIndexesCsv, int maxMealSlotIndex)
+    {
+        if (string.IsNullOrWhiteSpace(ignoredMealSlotIndexesCsv))
+        {
+            return [];
+        }
+
+        return ignoredMealSlotIndexesCsv
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(token => int.TryParse(token, out var index) ? index : -1)
+            .Where(index => index >= 0 && index <= maxMealSlotIndex)
+            .Distinct()
+            .ToHashSet();
+    }
+    var ignoredMealSlotIndexes = ParseIgnoredMealSlotIndexes(Model.Request.IgnoredMealSlotIndexesCsv, Math.Max(0, mealCount - 1));
     var dayCardCount = dayMealGroups.Count;
     var mealLabel = mealCount == 1 ? "meal" : "meals";
     var shoppingListNotesBuilder = new StringBuilder();
@@ -377,11 +392,12 @@
                                             var entry = dayGroup.Entries[slotIndex];
                                             var meal = entry.meal;
                                             var mealIndex = entry.index;
+                                            var isIgnored = ignoredMealSlotIndexes.Contains(mealIndex) || meal.IsIgnored;
                                             var panelLabelledBy = dayGroup.Entries.Count > 1
                                                 ? $"{tabPrefix}-tab-{slotIndex}"
                                                 : null;
                                             <section id="@($"{tabPrefix}-panel-{slotIndex}")"
-                                                     class="aislepilot-day-meal-panel"
+                                                     class="aislepilot-day-meal-panel@(isIgnored ? " is-ignored" : string.Empty)"
                                                      data-day-meal-panel
                                                      role="tabpanel"
                                                      aria-labelledby="@panelLabelledBy"
@@ -397,7 +413,14 @@
                                                 </div>
                                                 <div class="aislepilot-card-head">
                                                     <p class="aislepilot-card-kicker">@meal.MealType</p>
-                                                    <p class="aislepilot-cost">@meal.EstimatedCost.ToString("C", ukCulture)</p>
+                                                    @if (isIgnored)
+                                                    {
+                                                        <p class="aislepilot-cost is-ignored">Ignored</p>
+                                                    }
+                                                    else
+                                                    {
+                                                        <p class="aislepilot-cost">@meal.EstimatedCost.ToString("C", ukCulture)</p>
+                                                    }
                                                 </div>
                                                 <h3>@meal.MealName</h3>
                                                 <div class="aislepilot-card-compact-meta">
@@ -489,6 +512,40 @@
                                                                     </svg>
                                                                 </span>
                                                                 Swap meal
+                                                            </span>
+                                                        </button>
+                                                    </form>
+
+                                                    <form method="post"
+                                                          action="@Url.Action("IgnoreMeal", "AislePilot")#aislepilot-meals"
+                                                          class="aislepilot-swap-form aislepilot-ignore-form aislepilot-card-action-inline"
+                                                          data-preserve-scroll-form
+                                                          data-ajax-swap-form>
+                                                        @Html.AntiForgeryToken()
+                                                        <partial name="_AislePilotHiddenRequestFields"
+                                                                 model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                                                        <input type="hidden" name="dayIndex" value="@mealIndex" />
+                                                        @{
+                                                            var ignoreActionLabel = isIgnored ? "Include meal" : "Ignore meal";
+                                                        }
+                                                        <button type="submit"
+                                                                class="aislepilot-swap-btn is-secondary is-icon-only"
+                                                                data-loading-label="Updating..."
+                                                                data-loading-delay-ms="180"
+                                                                aria-label="@ignoreActionLabel"
+                                                                title="@ignoreActionLabel">
+                                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                                <svg viewBox="0 0 24 24" focusable="false">
+                                                                    @if (isIgnored)
+                                                                    {
+                                                                        <path d="M4 12h16"></path>
+                                                                        <path d="M12 4v16"></path>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <path d="M4 12h16"></path>
+                                                                    }
+                                                                </svg>
                                                             </span>
                                                         </button>
                                                     </form>

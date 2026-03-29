@@ -22,6 +22,8 @@ public sealed class AislePilotRequestModel
     [Range(1, 3, ErrorMessage = "Choose between 1 and 3 meals per day.")]
     public int MealsPerDay { get; set; } = 1;
 
+    public List<string> SelectedMealTypes { get; set; } = [];
+
     public string PortionSize { get; set; } = "Medium";
 
     public List<string> DietaryModes { get; set; } = ["Balanced"];
@@ -42,6 +44,9 @@ public sealed class AislePilotRequestModel
 
     [StringLength(2000, ErrorMessage = "Swap history is too long.")]
     public string? SwapHistoryState { get; set; } = string.Empty;
+
+    [StringLength(300, ErrorMessage = "Ignored meal list is too long.")]
+    public string? IgnoredMealSlotIndexesCsv { get; set; } = string.Empty;
 
     [StringLength(2800, ErrorMessage = "Pantry suggestion history is too long.")]
     public string? PantrySuggestionHistoryState { get; set; } = string.Empty;

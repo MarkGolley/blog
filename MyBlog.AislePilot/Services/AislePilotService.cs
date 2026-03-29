@@ -1329,6 +1329,7 @@ public sealed class AislePilotService : IAislePilotService
                 requestedCount,
                 requestedCount,
                 mealsPerDay: 1,
+                mealTypeSlots: ["Dinner"],
                 out var validationReason);
             if (aiMeals is null)
             {
@@ -1369,7 +1370,8 @@ public sealed class AislePilotService : IAislePilotService
             templates,
             mealMultipliers,
             dayMultipliers,
-            mealsPerDay: 1,
+            mealTypeSlots: ["Dinner"],
+            ignoredMealSlotIndexes: new HashSet<int>(),
             mealImageUrls,
             householdFactor,
             portionSizeFactor,
@@ -1406,7 +1408,8 @@ public sealed class AislePilotService : IAislePilotService
         var context = await BuildPlanContextAsync(request, cancellationToken);
         var planDays = NormalizePlanDays(request.PlanDays);
         var cookDays = NormalizeCookDays(request.CookDays, planDays);
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
         if (ShouldUseTemplateFallback())
         {
@@ -1448,7 +1451,8 @@ public sealed class AislePilotService : IAislePilotService
     {
         var planDays = NormalizePlanDays(request.PlanDays);
         var cookDays = NormalizeCookDays(request.CookDays, planDays);
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
         var normalizedMealNames = currentPlanMealNames
             .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -1497,7 +1501,8 @@ public sealed class AislePilotService : IAislePilotService
         var context = await BuildPlanContextAsync(request, cancellationToken);
         var planDays = NormalizePlanDays(request.PlanDays);
         var cookDays = NormalizeCookDays(request.CookDays, planDays);
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
 
         var selectedMealsFromCurrentPlan = BuildSelectedMealsFromCurrentPlanNames(currentPlanMealNames, totalMealCount);
@@ -1647,7 +1652,7 @@ public sealed class AislePilotService : IAislePilotService
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
-            NormalizeMealsPerDay(request.MealsPerDay));
+            BuildMealTypeSlots(request));
 
         // Keep swap behavior consistent by making fallback-selected meals available in the in-memory pool.
         AddMealsToAiPool(selectedMeals);
@@ -1753,7 +1758,7 @@ public sealed class AislePilotService : IAislePilotService
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
-            NormalizeMealsPerDay(request.MealsPerDay));
+            BuildMealTypeSlots(request));
 
         if (!HasUniqueMealNames(selectedMeals, totalMealCount))
         {
@@ -1795,13 +1800,15 @@ public sealed class AislePilotService : IAislePilotService
         CancellationToken cancellationToken)
     {
         var planDays = NormalizePlanDays(request.PlanDays);
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var prompt = BuildAiMealPlanPrompt(
             request,
             context,
             cookDays,
             planDays,
             mealsPerDay,
+            mealTypeSlots,
             totalMealCount,
             requestedMealCount,
             compactJson);
@@ -1863,6 +1870,7 @@ public sealed class AislePilotService : IAislePilotService
                 totalMealCount,
                 requestedMealCount,
                 mealsPerDay,
+                mealTypeSlots,
                 out var validationReason);
             if (aiMeals is null)
             {
@@ -1906,7 +1914,7 @@ public sealed class AislePilotService : IAislePilotService
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
-            NormalizeMealsPerDay(request.MealsPerDay));
+            BuildMealTypeSlots(request));
 
         if (!HasUniqueMealNames(selectedMeals, totalMealCount))
         {
@@ -1948,7 +1956,7 @@ public sealed class AislePilotService : IAislePilotService
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
-            NormalizeMealsPerDay(request.MealsPerDay));
+            BuildMealTypeSlots(request));
 
         if (!HasUniqueMealNames(selectedMeals, totalMealCount))
         {
@@ -1990,7 +1998,8 @@ public sealed class AislePilotService : IAislePilotService
     {
         var planDays = NormalizePlanDays(request.PlanDays);
         var cookDays = NormalizeCookDays(request.CookDays, planDays);
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
         if (dayIndex < 0 || dayIndex >= totalMealCount)
         {
@@ -2037,7 +2046,6 @@ public sealed class AislePilotService : IAislePilotService
             planDays);
         var mealDayIndex = dayIndex / mealsPerDay;
         var dayMultiplier = mealPortionMultipliers[Math.Clamp(mealDayIndex, 0, mealPortionMultipliers.Count - 1)];
-        var mealTypeSlots = BuildMealTypeSlots(mealsPerDay);
         var mealType = mealTypeSlots[dayIndex % mealTypeSlots.Count];
         var normalizedSeenMealNames = (seenMealNames ?? [])
             .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -2190,7 +2198,7 @@ public sealed class AislePilotService : IAislePilotService
             excludedMealNames,
             dayMultiplier,
             mealType,
-            NormalizeMealsPerDay(request.MealsPerDay));
+            BuildMealTypeSlots(request).Count);
         var requestBody = new
         {
             model = _model,
@@ -2773,6 +2781,7 @@ Return JSON only with this schema:
             CookDays = request.CookDays,
             PlanDays = request.PlanDays,
             MealsPerDay = request.MealsPerDay,
+            SelectedMealTypes = [.. request.SelectedMealTypes],
             PortionSize = request.PortionSize,
             DietaryModes = [.. request.DietaryModes],
             DislikesOrAllergens = request.DislikesOrAllergens,
@@ -2780,6 +2789,7 @@ Return JSON only with this schema:
             PantryItems = request.PantryItems,
             LeftoverCookDayIndexesCsv = request.LeftoverCookDayIndexesCsv,
             SwapHistoryState = request.SwapHistoryState,
+            IgnoredMealSlotIndexesCsv = request.IgnoredMealSlotIndexesCsv,
             PreferQuickMeals = request.PreferQuickMeals,
             RequireCorePantryIngredients = request.RequireCorePantryIngredients
         };
@@ -2842,7 +2852,8 @@ Return JSON only with this schema:
         IReadOnlyList<MealTemplate> baselineMeals,
         int cookDays)
     {
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
         if (baselineMeals.Count != totalMealCount)
         {
@@ -2900,7 +2911,7 @@ Return JSON only with this schema:
                     context.HouseholdFactor,
                     mealMultipliers[dayIndex],
                     request.PreferQuickMeals,
-                    mealsPerDay);
+                    mealTypeSlots);
                 if (replacement is null)
                 {
                     continue;
@@ -2958,7 +2969,8 @@ Return JSON only with this schema:
         int cookDays,
         CancellationToken cancellationToken = default)
     {
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
         if (baselineMeals.Count != totalMealCount)
         {
@@ -3016,7 +3028,7 @@ Return JSON only with this schema:
                     context.HouseholdFactor,
                     mealMultipliers[dayIndex],
                     request.PreferQuickMeals,
-                    mealsPerDay);
+                    mealTypeSlots);
                 if (replacement is null)
                 {
                     continue;
@@ -3075,7 +3087,7 @@ Return JSON only with this schema:
         decimal householdFactor,
         int dayMultiplier,
         bool preferQuickMeals,
-        int mealsPerDay)
+        IReadOnlyList<string> mealTypeSlots)
     {
         if (compatiblePool.Count == 0 || dayIndex < 0 || dayIndex >= selectedMeals.Count)
         {
@@ -3088,7 +3100,6 @@ Return JSON only with this schema:
             .Where((_, index) => index != dayIndex)
             .Select(meal => meal.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var mealTypeSlots = BuildMealTypeSlots(mealsPerDay);
         var slotMealType = mealTypeSlots[dayIndex % mealTypeSlots.Count];
         var normalizedPool = compatiblePool
             .Select(meal => EnsureMealTypeSuitability(meal))
@@ -3168,14 +3179,15 @@ Return JSON only with this schema:
                 "No meals match the selected dietary modes and dislikes/allergens.");
         }
 
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
         var selectedMeals = SelectLowestCostMeals(
             combinedSource,
             context.HouseholdFactor,
             request.PreferQuickMeals,
             totalMealCount,
-            mealsPerDay);
+            mealTypeSlots);
 
         return BuildPlanFromMeals(
             request,
@@ -3208,14 +3220,15 @@ Return JSON only with this schema:
                 "No meals match the selected dietary modes and dislikes/allergens.");
         }
 
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
         var selectedMeals = SelectLowestCostMeals(
             combinedSource,
             context.HouseholdFactor,
             request.PreferQuickMeals,
             totalMealCount,
-            mealsPerDay);
+            mealTypeSlots);
 
         return await BuildPlanFromMealsAsync(
             request,
@@ -3232,7 +3245,7 @@ Return JSON only with this schema:
         decimal householdFactor,
         bool preferQuickMeals,
         int requestedMealCount,
-        int mealsPerDay)
+        IReadOnlyList<string> mealTypeSlots)
     {
         if (mealSource.Count == 0)
         {
@@ -3249,10 +3262,10 @@ Return JSON only with this schema:
             .ToList();
 
         var selected = new List<MealTemplate>(normalizedMealCount);
-        var mealTypeSlots = BuildMealTypeSlots(mealsPerDay);
+        var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
         for (var i = 0; i < normalizedMealCount; i++)
         {
-            var slotMealType = mealTypeSlots[i % mealTypeSlots.Count];
+            var slotMealType = resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count];
             var usedMealNames = selected
                 .Select(meal => meal.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -3379,7 +3392,8 @@ Return JSON only with this schema:
     {
         var planDays = NormalizePlanDays(request.PlanDays);
         var normalizedCookDays = NormalizeCookDays(cookDays, planDays);
-        var mealsPerDay = NormalizeMealsPerDay(request.MealsPerDay);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var mealsPerDay = mealTypeSlots.Count;
         var expectedMealCount = NormalizeRequestedMealCount(normalizedCookDays * mealsPerDay);
         var leftoverDays = Math.Max(0, planDays - normalizedCookDays);
         var requestedLeftoverSourceDays = ParseRequestedLeftoverSourceDays(
@@ -3393,6 +3407,9 @@ Return JSON only with this schema:
             requestedLeftoverSourceDays,
             planDays);
         var normalizedSelectedMeals = NormalizeSelectedMealsForCount(selectedMeals, expectedMealCount);
+        var ignoredMealSlotIndexes = ParseIgnoredMealSlotIndexes(
+            request.IgnoredMealSlotIndexesCsv,
+            expectedMealCount);
         var mealPortionMultipliers = BuildPerMealPortionMultipliers(dayMultipliers, mealsPerDay);
         var mealImageUrls = await ResolveMealImageUrlsAsync(normalizedSelectedMeals, cancellationToken);
         var portionSizeFactor = ResolvePortionSizeFactor(context.PortionSize);
@@ -3400,7 +3417,8 @@ Return JSON only with this schema:
             normalizedSelectedMeals,
             mealPortionMultipliers,
             dayMultipliers,
-            mealsPerDay,
+            mealTypeSlots,
+            ignoredMealSlotIndexes,
             mealImageUrls,
             context.HouseholdFactor,
             portionSizeFactor,
@@ -3409,6 +3427,7 @@ Return JSON only with this schema:
         var shoppingItems = BuildShoppingList(
             normalizedSelectedMeals,
             mealPortionMultipliers,
+            ignoredMealSlotIndexes,
             context.HouseholdFactor,
             context.AisleOrder);
         var estimatedTotalCost = decimal.Round(dailyPlans.Sum(x => x.EstimatedCost), 2, MidpointRounding.AwayFromZero);
@@ -4452,15 +4471,16 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         IReadOnlyList<MealTemplate> selectedMeals,
         IReadOnlyList<int> mealPortionMultipliers,
         IReadOnlyList<int> dayPortionMultipliers,
-        int mealsPerDay,
+        IReadOnlyList<string> mealTypeSlots,
+        IReadOnlySet<int> ignoredMealSlotIndexes,
         IReadOnlyDictionary<string, string> mealImageUrls,
         decimal householdFactor,
         decimal portionSizeFactor,
         IReadOnlyList<string> dietaryModes,
         string dislikesOrAllergens)
     {
-        var safeMealsPerDay = NormalizeMealsPerDay(mealsPerDay);
-        var mealTypeSlots = BuildMealTypeSlots(safeMealsPerDay);
+        var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
+        var safeMealsPerDay = resolvedMealTypeSlots.Count;
         var normalizedMealCount = Math.Min(selectedMeals.Count, mealPortionMultipliers.Count);
         var cookDayNames = BuildCookDayNames(dayPortionMultipliers).Take(dayPortionMultipliers.Count).ToArray();
         var plans = new List<AislePilotMealDayViewModel>(normalizedMealCount);
@@ -4473,18 +4493,26 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             var cookDayName = cookDayNames.Length == 0
                 ? "Monday"
                 : cookDayNames[Math.Min(dayIndex, cookDayNames.Length - 1)];
-            var mealType = mealTypeSlots[i % mealTypeSlots.Count];
+            var mealType = resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count];
             var mealPortionMultiplier = Math.Max(1, mealPortionMultipliers[i]);
-            var estimatedCost = decimal.Round(
-                template.BaseCostForTwo * householdFactor * mealPortionMultiplier,
-                2,
-                MidpointRounding.AwayFromZero);
+            var isIgnored = ignoredMealSlotIndexes.Contains(i);
+            var estimatedCost = isIgnored
+                ? 0m
+                : decimal.Round(
+                    template.BaseCostForTwo * householdFactor * mealPortionMultiplier,
+                    2,
+                    MidpointRounding.AwayFromZero);
             var reason = template.IsQuick
                 ? "Quick prep for busy days."
                 : "Batch-friendly and good for leftovers.";
             if (safeMealsPerDay > 1)
             {
                 reason = $"{mealType} option. {reason}";
+            }
+
+            if (isIgnored)
+            {
+                reason = "Ignored in this plan. Cost and shopping list contributions are excluded.";
             }
 
             if (dietaryModes.Count > 1)
@@ -4520,6 +4548,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             {
                 Day = cookDayName,
                 MealType = mealType,
+                IsIgnored = isIgnored,
                 MealName = template.Name,
                 MealImageUrl = mealImageUrls.GetValueOrDefault(template.Name, GetFallbackMealImageUrl()),
                 MealReason = reason,
@@ -4987,6 +5016,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
     private static IReadOnlyList<AislePilotShoppingItemViewModel> BuildShoppingList(
         IReadOnlyList<MealTemplate> selectedMeals,
         IReadOnlyList<int> mealPortionMultipliers,
+        IReadOnlySet<int> ignoredMealSlotIndexes,
         decimal householdFactor,
         IReadOnlyList<string> aisleOrder)
     {
@@ -4994,6 +5024,11 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         var mealCount = Math.Min(selectedMeals.Count, mealPortionMultipliers.Count);
         for (var i = 0; i < mealCount; i++)
         {
+            if (ignoredMealSlotIndexes.Contains(i))
+            {
+                continue;
+            }
+
             var meal = selectedMeals[i];
             var mealPortionMultiplier = Math.Max(1, mealPortionMultipliers[i]);
             foreach (var ingredient in meal.Ingredients)
@@ -5041,7 +5076,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         bool preferQuickMeals,
         string dislikesOrAllergens,
         int requestedMealCount,
-        int mealsPerDay = 1)
+        IReadOnlyList<string>? mealTypeSlots = null)
     {
         var candidates = FilterMeals(dietaryModes, dislikesOrAllergens, mealSource)
             .Select(meal => EnsureMealTypeSuitability(meal))
@@ -5052,7 +5087,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                 "No meals match the selected dietary modes and dislikes/allergens.");
         }
 
-        var safeMealsPerDay = NormalizeMealsPerDay(mealsPerDay);
+        var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
+        var safeMealsPerDay = resolvedMealTypeSlots.Count;
         var targetMealCost = weeklyBudget / (7m * safeMealsPerDay);
         var scoredCandidates = candidates
             .Select(template =>
@@ -5068,7 +5104,6 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             .ToList();
 
         var normalizedMealCount = NormalizeRequestedMealCount(requestedMealCount);
-        var mealTypeSlots = BuildMealTypeSlots(safeMealsPerDay);
         var selected = new List<MealTemplate>(normalizedMealCount);
         var daySeed = DateOnly.FromDateTime(DateTime.UtcNow).DayNumber;
         var budgetSeed = (long)decimal.Truncate(Math.Abs(weeklyBudget) * 100m);
@@ -5082,7 +5117,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
 
         for (var i = 0; i < normalizedMealCount; i++)
         {
-            var slotMealType = mealTypeSlots[i % mealTypeSlots.Count];
+            var slotMealType = resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count];
             var usedMealNames = selected
                 .Select(meal => meal.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -5794,6 +5829,33 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         return Math.Clamp(requestedMealCount, 1, MaxPlanMealSlots);
     }
 
+    private static IReadOnlySet<int> ParseIgnoredMealSlotIndexes(
+        string? ignoredMealSlotIndexesCsv,
+        int expectedMealCount)
+    {
+        if (string.IsNullOrWhiteSpace(ignoredMealSlotIndexesCsv))
+        {
+            return new HashSet<int>();
+        }
+
+        var normalizedExpectedCount = NormalizeRequestedMealCount(expectedMealCount);
+        var parsed = ignoredMealSlotIndexesCsv
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(token => int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index)
+                ? index
+                : -1)
+            .Where(index => index >= 0 && index < normalizedExpectedCount)
+            .Distinct()
+            .ToHashSet();
+
+        return parsed;
+    }
+
+    private static IReadOnlyList<string> BuildMealTypeSlots(AislePilotRequestModel request)
+    {
+        return NormalizeMealTypeSlots(request.SelectedMealTypes, request.MealsPerDay);
+    }
+
     private static IReadOnlyList<string> BuildMealTypeSlots(int mealsPerDay)
     {
         var safeMealsPerDay = NormalizeMealsPerDay(mealsPerDay);
@@ -5803,6 +5865,56 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             2 => ["Dinner", "Lunch"],
             _ => ["Dinner", "Lunch", "Breakfast"]
         };
+    }
+
+    private static IReadOnlyList<string> NormalizeMealTypeSlots(
+        IReadOnlyList<string>? mealTypeSlots,
+        int fallbackMealsPerDay)
+    {
+        if (mealTypeSlots is null || mealTypeSlots.Count == 0)
+        {
+            return BuildMealTypeSlots(fallbackMealsPerDay);
+        }
+
+        var normalized = mealTypeSlots
+            .Select(NormalizeSelectedMealTypeSlot)
+            .Where(type => type is not null)
+            .Select(type => type!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(type => type.Equals("Dinner", StringComparison.OrdinalIgnoreCase)
+                ? 0
+                : type.Equals("Lunch", StringComparison.OrdinalIgnoreCase)
+                    ? 1
+                    : 2)
+            .ToList();
+
+        return normalized.Count == 0 ? BuildMealTypeSlots(fallbackMealsPerDay) : normalized;
+    }
+
+    private static string? NormalizeSelectedMealTypeSlot(string? mealType)
+    {
+        var normalized = mealType?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        if (normalized.Equals("Breakfast", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Breakfast";
+        }
+
+        if (normalized.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Lunch";
+        }
+
+        if (normalized.Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Dinner";
+        }
+
+        return null;
     }
 
     private static string NormalizeMealType(string? mealType)
@@ -6069,6 +6181,7 @@ Return JSON only with this schema:
         int cookDays,
         int planDays,
         int mealsPerDay,
+        IReadOnlyList<string> mealTypeSlots,
         int totalMealCount,
         int requestedMealCount,
         bool compactJson = false)
@@ -6085,8 +6198,8 @@ Return JSON only with this schema:
         var pantryText = string.IsNullOrWhiteSpace(request.PantryItems)
             ? "none supplied"
             : request.PantryItems!;
-        var mealTypeSlots = BuildMealTypeSlots(mealsPerDay);
-        var mealTypePattern = string.Join(" -> ", mealTypeSlots);
+        var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, mealsPerDay);
+        var mealTypePattern = string.Join(" -> ", resolvedMealTypeSlots);
 
         return $$"""
 Generate a weekly meal plan for a UK grocery-planning app.
@@ -6179,6 +6292,7 @@ Return JSON only with this schema:
         int cookDays,
         int requestedMealCount,
         int mealsPerDay,
+        IReadOnlyList<string>? mealTypeSlots,
         out string? validationReason)
     {
         validationReason = null;
@@ -6194,12 +6308,12 @@ Return JSON only with this schema:
             .ToArray();
         var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var meals = new List<MealTemplate>(cookDays);
-        var mealTypeSlots = BuildMealTypeSlots(mealsPerDay);
+        var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, mealsPerDay);
 
         for (var i = 0; i < rawMeals.Count; i++)
         {
             var rawMeal = rawMeals[i];
-            var mealType = mealTypeSlots[i % mealTypeSlots.Count];
+            var mealType = resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count];
             var meal = ValidateAndMapAiMeal(
                 rawMeal,
                 strictModes,

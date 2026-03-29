@@ -150,6 +150,55 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task IgnoreMeal_ValidRequest_TogglesMealToIgnoredState()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var formValues = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "120"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "3"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.IgnoredMealSlotIndexesCsv", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("dayIndex", "1"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+
+        var currentPlanMealNames = new[]
+        {
+            "Chicken stir fry with rice",
+            "Tuna sweetcorn pasta salad",
+            "Greek yogurt berry oat pots",
+            "Turkey chilli with beans",
+            "Mediterranean hummus wraps",
+            "Spinach and tomato egg muffins"
+        };
+        foreach (var mealName in currentPlanMealNames)
+        {
+            formValues.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/ignore-meal", new FormUrlEncodedContent(formValues));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Include meal", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Ignored in this plan", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "name=\"Request.IgnoredMealSlotIndexesCsv\" value=\"1\"",
+            html,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SuggestFromPantry_ValidRequest_ReturnsPantryIdeas()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -645,7 +694,14 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         var html = await client.GetStringAsync("/projects/aisle-pilot");
 
         Assert.Contains("name=\"Request.MealsPerDay\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("name=\"Request.MealsPerDay\" value=\"3\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                "name=\"Request\\.MealsPerDay\"[^>]*value=\"3\"|value=\"3\"[^>]*name=\"Request\\.MealsPerDay\"",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Contains("name=\"Request.SelectedMealTypes\" value=\"Breakfast\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("name=\"Request.SelectedMealTypes\" value=\"Lunch\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("name=\"Request.SelectedMealTypes\" value=\"Dinner\"", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -675,6 +731,36 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains(">Dinner<", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(">Lunch<", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(">Breakfast<", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithBreakfastOnlyMealSlot_RendersBreakfastCards()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Breakfast"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Equal(
+            2,
+            Regex.Matches(html, "class=\"aislepilot-card-kicker\">Breakfast</p>", RegexOptions.IgnoreCase).Count);
     }
 
     [Fact]

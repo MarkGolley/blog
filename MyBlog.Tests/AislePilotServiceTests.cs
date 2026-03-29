@@ -321,6 +321,48 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithBreakfastOnlySlot_ReturnsBreakfastMeals()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(1, result.MealsPerDay);
+        Assert.Equal(2, result.MealPlan.Count);
+        Assert.All(result.MealPlan, meal => Assert.Equal("Breakfast", meal.MealType));
+    }
+
+    [Fact]
+    public void BuildPlan_WithDinnerAndLunchSlots_ReturnsDinnerThenLunchPerCookDay()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 2,
+            SelectedMealTypes = ["Lunch", "Dinner"]
+        };
+
+        var result = _service.BuildPlan(request);
+        var groupedByDay = result.MealPlan
+            .GroupBy(meal => meal.Day)
+            .Select(group => group.Select(meal => meal.MealType).ToList())
+            .ToList();
+
+        Assert.Equal(2, result.MealsPerDay);
+        Assert.Equal(4, result.MealPlan.Count);
+        Assert.All(groupedByDay, mealTypes => Assert.Equal(["Dinner", "Lunch"], mealTypes));
+    }
+
+    [Fact]
     public void SwapMealForDay_WithThreeMealsPerDay_AllowsSwappingAnyMealSlotIndex()
     {
         var request = new AislePilotRequestModel
@@ -933,6 +975,59 @@ public class AislePilotServiceTests
 
         Assert.Equal(currentPlanMealNames.Count, resultMealNames.Count);
         Assert.True(resultMealNames.SequenceEqual(currentPlanMealNames, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_WithIgnoredMealSlot_ExcludesCostAndShoppingItemsForThatMeal()
+    {
+        var currentPlanMealNames = new List<string>
+        {
+            "Chicken stir fry with rice",
+            "Tuna sweetcorn pasta salad",
+            "Greek yogurt berry oat pots",
+            "Turkey chilli with beans",
+            "Mediterranean hummus wraps",
+            "Spinach and tomato egg muffins"
+        };
+        var baselineRequest = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 3,
+            DietaryModes = ["Balanced"]
+        };
+        var ignoredRequest = new AislePilotRequestModel
+        {
+            WeeklyBudget = baselineRequest.WeeklyBudget,
+            HouseholdSize = baselineRequest.HouseholdSize,
+            PlanDays = baselineRequest.PlanDays,
+            CookDays = baselineRequest.CookDays,
+            MealsPerDay = baselineRequest.MealsPerDay,
+            DietaryModes = [.. baselineRequest.DietaryModes],
+            IgnoredMealSlotIndexesCsv = "1"
+        };
+
+        var baseline = await _service.BuildPlanFromCurrentMealsAsync(baselineRequest, currentPlanMealNames);
+        var ignored = await _service.BuildPlanFromCurrentMealsAsync(ignoredRequest, currentPlanMealNames);
+
+        Assert.Equal("Tuna sweetcorn pasta salad", baseline.MealPlan[1].MealName, ignoreCase: true);
+        Assert.False(baseline.MealPlan[1].IsIgnored);
+        Assert.True(baseline.MealPlan[1].EstimatedCost > 0m);
+        Assert.Contains(
+            baseline.ShoppingItems,
+            item => item.Name.Equals("Tuna chunks", StringComparison.OrdinalIgnoreCase));
+
+        Assert.True(ignored.MealPlan[1].IsIgnored);
+        Assert.Equal(0m, ignored.MealPlan[1].EstimatedCost);
+        Assert.DoesNotContain(
+            ignored.ShoppingItems,
+            item => item.Name.Equals("Tuna chunks", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            ignored.ShoppingItems,
+            item => item.Name.Equals("Sweetcorn", StringComparison.OrdinalIgnoreCase));
+        Assert.True(ignored.EstimatedTotalCost < baseline.EstimatedTotalCost);
     }
 
     [Fact]

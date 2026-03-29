@@ -45,6 +45,7 @@ public sealed class AislePilotMealDayViewModel
 {
     public string Day { get; set; } = string.Empty;
     public string MealType { get; set; } = "Dinner";
+    public bool IsIgnored { get; set; }
     public string MealName { get; set; } = string.Empty;
     public string MealImageUrl { get; set; } = string.Empty;
     public string MealReason { get; set; } = string.Empty;

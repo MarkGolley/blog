@@ -21,6 +21,8 @@ public class AislePilotController(
     private const int MinMealsPerDay = 1;
     private const int MaxMealsPerDay = 3;
     private const int MaxSwapMealSlotIndex = 20;
+    private const int MaxIgnoredMealSlotIndex = 20;
+    private static readonly string[] MealTypeSlotOrder = ["Dinner", "Lunch", "Breakfast"];
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -213,6 +215,72 @@ public class AislePilotController(
             ModelState.AddModelError(
                 string.Empty,
                 "Meal swap hit a temporary issue. Please retry.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+    }
+
+    [HttpPost("ignore-meal")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> IgnoreMeal(
+        AislePilotPageViewModel pageModel,
+        int dayIndex,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
+    {
+        var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
+        ValidateRequest(request);
+        var cookDays = Math.Clamp(request.CookDays, 1, Math.Clamp(request.PlanDays, 1, 7));
+        var mealSlotCount = cookDays * Math.Clamp(request.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
+
+        if (dayIndex < 0 || dayIndex >= mealSlotCount)
+        {
+            ModelState.AddModelError(string.Empty, "Selected day was out of range. Try generating again.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        try
+        {
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+            if (resolvedCurrentPlanMealNames is null || resolvedCurrentPlanMealNames.Count != mealSlotCount)
+            {
+                throw new InvalidOperationException("Could not resolve the current plan for ignore changes. Generate a fresh plan and try again.");
+            }
+
+            request.IgnoredMealSlotIndexesCsv = ToggleIgnoredMealSlotIndex(
+                request.IgnoredMealSlotIndexesCsv,
+                dayIndex,
+                mealSlotCount);
+            var result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                resolvedCurrentPlanMealNames,
+                cancellationToken);
+            PersistCurrentPlanState(result);
+            var responseModel = BuildPageModel(request, result, returnUrl: resolvedReturnUrl);
+            if (IsAjaxRequest())
+            {
+                return PartialView("_AislePilotResultSections", responseModel);
+            }
+
+            return View("Index", responseModel);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot ignore meal failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Meal update hit a temporary issue. Please retry.");
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
     }
@@ -432,6 +500,8 @@ public class AislePilotController(
     private AislePilotRequestModel NormalizeRequest(AislePilotRequestModel? request)
     {
         var normalized = request ?? new AislePilotRequestModel();
+        var selectedMealTypesWereSubmitted = Request.HasFormContentType &&
+                                             Request.Form.ContainsKey("Request.SelectedMealTypes");
         normalized.Supermarket = normalized.Supermarket?.Trim() ?? string.Empty;
         normalized.PortionSize = normalized.PortionSize?.Trim() ?? string.Empty;
         normalized.CustomAisleOrder = normalized.CustomAisleOrder?.Trim() ?? string.Empty;
@@ -439,6 +509,8 @@ public class AislePilotController(
         normalized.PantryItems = normalized.PantryItems?.Trim() ?? string.Empty;
         normalized.LeftoverCookDayIndexesCsv = normalized.LeftoverCookDayIndexesCsv?.Trim() ?? string.Empty;
         normalized.SwapHistoryState = normalized.SwapHistoryState?.Trim() ?? string.Empty;
+        normalized.IgnoredMealSlotIndexesCsv =
+            NormalizeIgnoredMealSlotIndexesCsv(normalized.IgnoredMealSlotIndexesCsv);
         normalized.PantrySuggestionHistoryState = normalized.PantrySuggestionHistoryState?.Trim() ?? string.Empty;
         normalized.DietaryModes = normalized.DietaryModes?
             .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -447,8 +519,70 @@ public class AislePilotController(
             .ToList() ?? [];
         normalized.PlanDays = Math.Clamp(normalized.PlanDays, 1, 7);
         normalized.CookDays = Math.Clamp(normalized.CookDays, 1, normalized.PlanDays);
-        normalized.MealsPerDay = Math.Clamp(normalized.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
+        var normalizedSelectedMealTypes = NormalizeSelectedMealTypes(normalized.SelectedMealTypes);
+        if (normalizedSelectedMealTypes.Count == 0 && !selectedMealTypesWereSubmitted)
+        {
+            normalizedSelectedMealTypes = BuildMealTypeSlotsFromMealsPerDay(normalized.MealsPerDay).ToList();
+        }
+
+        normalized.SelectedMealTypes = normalizedSelectedMealTypes;
+        normalized.MealsPerDay = normalizedSelectedMealTypes.Count > 0
+            ? normalizedSelectedMealTypes.Count
+            : Math.Clamp(normalized.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
         return normalized;
+    }
+
+    private static List<string> NormalizeSelectedMealTypes(IReadOnlyList<string>? selectedMealTypes)
+    {
+        if (selectedMealTypes is null || selectedMealTypes.Count == 0)
+        {
+            return [];
+        }
+
+        return selectedMealTypes
+            .Select(NormalizeSelectedMealType)
+            .Where(type => type is not null)
+            .Select(type => type!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(type => Array.IndexOf(MealTypeSlotOrder, type))
+            .ToList();
+    }
+
+    private static string? NormalizeSelectedMealType(string? mealType)
+    {
+        var normalized = mealType?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        if (normalized.Equals("Breakfast", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Breakfast";
+        }
+
+        if (normalized.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Lunch";
+        }
+
+        if (normalized.Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Dinner";
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<string> BuildMealTypeSlotsFromMealsPerDay(int mealsPerDay)
+    {
+        var safeMealsPerDay = Math.Clamp(mealsPerDay, MinMealsPerDay, MaxMealsPerDay);
+        return safeMealsPerDay switch
+        {
+            1 => ["Dinner"],
+            2 => ["Dinner", "Lunch"],
+            _ => ["Dinner", "Lunch", "Breakfast"]
+        };
     }
 
     private static IReadOnlyList<string> GetSeenMealsForDay(string? swapHistoryState, int dayIndex, string? currentMealName)
@@ -495,6 +629,68 @@ public class AislePilotController(
         }
 
         return SerializeSwapHistoryState(history);
+    }
+
+    private static string NormalizeIgnoredMealSlotIndexesCsv(string? ignoredMealSlotIndexesCsv)
+    {
+        var ignoredIndexes = ParseIgnoredMealSlotIndexes(
+            ignoredMealSlotIndexesCsv,
+            maxAllowedIndex: MaxIgnoredMealSlotIndex);
+        return SerializeIgnoredMealSlotIndexes(ignoredIndexes);
+    }
+
+    private static string ToggleIgnoredMealSlotIndex(
+        string? currentState,
+        int dayIndex,
+        int mealSlotCount)
+    {
+        var maxIndex = Math.Clamp(mealSlotCount - 1, 0, MaxIgnoredMealSlotIndex);
+        var ignoredIndexes = ParseIgnoredMealSlotIndexes(currentState, maxIndex);
+        if (ignoredIndexes.Contains(dayIndex))
+        {
+            ignoredIndexes.Remove(dayIndex);
+        }
+        else
+        {
+            ignoredIndexes.Add(dayIndex);
+        }
+
+        return SerializeIgnoredMealSlotIndexes(ignoredIndexes);
+    }
+
+    private static HashSet<int> ParseIgnoredMealSlotIndexes(
+        string? ignoredMealSlotIndexesCsv,
+        int maxAllowedIndex)
+    {
+        var result = new HashSet<int>();
+        if (string.IsNullOrWhiteSpace(ignoredMealSlotIndexesCsv))
+        {
+            return result;
+        }
+
+        foreach (var token in ignoredMealSlotIndexesCsv.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!int.TryParse(token, out var slotIndex) ||
+                slotIndex < 0 ||
+                slotIndex > maxAllowedIndex)
+            {
+                continue;
+            }
+
+            result.Add(slotIndex);
+        }
+
+        return result;
+    }
+
+    private static string SerializeIgnoredMealSlotIndexes(IEnumerable<int> ignoredIndexes)
+    {
+        return string.Join(
+            ",",
+            ignoredIndexes
+                .Distinct()
+                .Where(index => index >= 0 && index <= MaxIgnoredMealSlotIndex)
+                .OrderBy(index => index));
     }
 
     private static Dictionary<int, List<string>> ParseSwapHistoryState(string? swapHistoryState)
@@ -552,6 +748,7 @@ public class AislePilotController(
             CookDays = request.CookDays,
             PlanDays = request.PlanDays,
             MealsPerDay = request.MealsPerDay,
+            SelectedMealTypes = request.SelectedMealTypes.ToList(),
             PortionSize = request.PortionSize,
             DietaryModes = request.DietaryModes.ToList(),
             DislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty,
@@ -596,7 +793,13 @@ public class AislePilotController(
             }
 
             var planDays = Math.Clamp(state.PlanDays, 1, 7);
-            var mealsPerDay = Math.Clamp(state.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
+            var selectedMealTypes = NormalizeSelectedMealTypes(state.SelectedMealTypes);
+            if (selectedMealTypes.Count == 0)
+            {
+                selectedMealTypes = BuildMealTypeSlotsFromMealsPerDay(state.MealsPerDay).ToList();
+            }
+
+            var mealsPerDay = selectedMealTypes.Count;
 
             return new AislePilotRequestModel
             {
@@ -606,6 +809,7 @@ public class AislePilotController(
                 CookDays = Math.Clamp(state.CookDays, 1, planDays),
                 PlanDays = planDays,
                 MealsPerDay = mealsPerDay,
+                SelectedMealTypes = selectedMealTypes,
                 PortionSize = state.PortionSize ?? string.Empty,
                 DietaryModes = state.DietaryModes?
                     .Where(mode => !string.IsNullOrWhiteSpace(mode))
@@ -707,10 +911,7 @@ public class AislePilotController(
         {
             ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
         }
-        if (request.MealsPerDay < MinMealsPerDay || request.MealsPerDay > MaxMealsPerDay)
-        {
-            ModelState.AddModelError("Request.MealsPerDay", "Choose between 1 and 3 meals per day.");
-        }
+        ValidateMealTypeSelection(request);
 
         if (string.Equals(request.Supermarket, "Custom", StringComparison.OrdinalIgnoreCase))
         {
@@ -728,6 +929,23 @@ public class AislePilotController(
             ModelState.AddModelError(
                 "Request.DietaryModes",
                 "No meals match your dietary modes and dislike/allergen notes. Remove one constraint and try again.");
+        }
+    }
+
+    private void ValidateMealTypeSelection(AislePilotRequestModel request)
+    {
+        var selectedMealTypes = NormalizeSelectedMealTypes(request.SelectedMealTypes);
+        request.SelectedMealTypes = selectedMealTypes;
+        if (selectedMealTypes.Count > 0)
+        {
+            request.MealsPerDay = selectedMealTypes.Count;
+        }
+
+        if (selectedMealTypes.Count < MinMealsPerDay || selectedMealTypes.Count > MaxMealsPerDay)
+        {
+            ModelState.AddModelError(
+                "Request.SelectedMealTypes",
+                "Choose 1 to 3 meal slots (Breakfast, Lunch, Dinner).");
         }
     }
 
@@ -765,10 +983,7 @@ public class AislePilotController(
         {
             ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
         }
-        if (request.MealsPerDay < MinMealsPerDay || request.MealsPerDay > MaxMealsPerDay)
-        {
-            ModelState.AddModelError("Request.MealsPerDay", "Choose between 1 and 3 meals per day.");
-        }
+        ValidateMealTypeSelection(request);
 
         if (string.IsNullOrWhiteSpace(request.PantryItems))
         {
@@ -1120,6 +1335,7 @@ public class AislePilotController(
         public int CookDays { get; set; } = 7;
         public int PlanDays { get; set; } = 7;
         public int MealsPerDay { get; set; } = 3;
+        public List<string> SelectedMealTypes { get; set; } = [];
         public string? PortionSize { get; set; }
         public List<string> DietaryModes { get; set; } = [];
         public string? DislikesOrAllergens { get; set; }
