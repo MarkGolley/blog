@@ -369,16 +369,19 @@
                                     <div class="aislepilot-day-meal-tabs" role="tablist" aria-label="Meal slots for @dayGroup.Day">
                                         @for (var slotIndex = 0; slotIndex < dayGroup.Entries.Count; slotIndex++)
                                         {
-                                            var slotMeal = dayGroup.Entries[slotIndex].meal;
+                                            var slotEntry = dayGroup.Entries[slotIndex];
+                                            var slotMeal = slotEntry.meal;
+                                            var slotIsIgnored = ignoredMealSlotIndexes.Contains(slotEntry.index) || slotMeal.IsIgnored;
                                             var slotTabId = $"{tabPrefix}-tab-{slotIndex}";
                                             <button type="button"
                                                     id="@slotTabId"
-                                                    class="aislepilot-day-meal-tab@(slotIndex == 0 ? " is-active" : string.Empty)"
+                                                    class="aislepilot-day-meal-tab@(slotIndex == 0 ? " is-active" : string.Empty)@(slotIsIgnored ? " is-ignored" : string.Empty)"
                                                     data-day-meal-tab
                                                     data-slot-index="@slotIndex"
                                                     role="tab"
                                                     aria-controls="@($"{tabPrefix}-panel-{slotIndex}")"
-                                                    aria-selected="@(slotIndex == 0 ? "true" : "false")">
+                                                    aria-selected="@(slotIndex == 0 ? "true" : "false")"
+                                                    aria-label="@(slotIsIgnored ? $"{slotMeal.MealType} (removed)" : slotMeal.MealType)">
                                                 @slotMeal.MealType
                                             </button>
                                         }
