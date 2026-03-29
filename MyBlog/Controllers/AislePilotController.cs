@@ -178,7 +178,7 @@ public class AislePilotController(
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
 
-        var seenMealNames = GetSeenMealsForDay(request.SwapHistoryState, dayIndex, currentMealName);
+        var seenMealNames = GetSeenMealsForSwap(request.SwapHistoryState, currentMealName);
 
         try
         {
@@ -585,22 +585,27 @@ public class AislePilotController(
         };
     }
 
-    private static IReadOnlyList<string> GetSeenMealsForDay(string? swapHistoryState, int dayIndex, string? currentMealName)
+    private static IReadOnlyList<string> GetSeenMealsForSwap(string? swapHistoryState, string? currentMealName)
     {
         var history = ParseSwapHistoryState(swapHistoryState);
-        var seenMeals = history.TryGetValue(dayIndex, out var names)
-            ? names
-            : [];
+        var seenMeals = history.Values
+            .SelectMany(static meals => meals)
+            .Where(meal => !string.IsNullOrWhiteSpace(meal))
+            .Select(meal => meal.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         if (string.IsNullOrWhiteSpace(currentMealName))
         {
             return seenMeals;
         }
 
-        return seenMeals
-            .Append(currentMealName.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        if (!seenMeals.Contains(currentMealName.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            seenMeals.Add(currentMealName.Trim());
+        }
+
+        return seenMeals;
     }
 
     private static string UpdateSwapHistoryState(
