@@ -2149,18 +2149,122 @@
         });
     };
 
-    const applyAjaxSwapResponse = responseText => {
+    const findMealCardBySlotIndex = (scope, slotIndex) => {
+        if (!(scope instanceof Document || scope instanceof Element) || !Number.isInteger(slotIndex) || slotIndex < 0) {
+            return null;
+        }
+
+        const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${slotIndex}']`;
+        const dayInput = scope.querySelector(selector);
+        if (!(dayInput instanceof HTMLInputElement)) {
+            return null;
+        }
+
+        const card = dayInput.closest("[data-day-meal-card]");
+        return card instanceof HTMLElement ? card : null;
+    };
+
+    const replaceSwappedMealCard = (responseDocument, slotIndex) => {
+        const currentCard = findMealCardBySlotIndex(document, slotIndex);
+        const nextCard = findMealCardBySlotIndex(responseDocument, slotIndex);
+        if (!(currentCard instanceof HTMLElement) || !(nextCard instanceof HTMLElement)) {
+            return false;
+        }
+
+        const replacement = nextCard.cloneNode(true);
+        if (!(replacement instanceof HTMLElement)) {
+            return false;
+        }
+
+        currentCard.replaceWith(replacement);
+        return true;
+    };
+
+    const readAjaxSwapFormSignature = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return "";
+        }
+
+        const dayInput = form.querySelector("input[name='dayIndex']");
+        if (!(dayInput instanceof HTMLInputElement)) {
+            return "";
+        }
+
+        const dayIndex = dayInput.value.trim();
+        if (!dayIndex) {
+            return "";
+        }
+
+        const formType = form.classList.contains("aislepilot-ignore-form")
+            ? "ignore"
+            : "swap";
+        return `${formType}:${dayIndex}`;
+    };
+
+    const syncAjaxSwapFormsFromResponse = responseDocument => {
+        if (!(responseDocument instanceof Document)) {
+            return;
+        }
+
+        const responseForms = Array.from(responseDocument.querySelectorAll("#aislepilot-meals [data-ajax-swap-form]"));
+        if (responseForms.length === 0) {
+            return;
+        }
+
+        const responseFormsBySignature = new Map();
+        responseForms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const signature = readAjaxSwapFormSignature(form);
+            if (!signature || responseFormsBySignature.has(signature)) {
+                return;
+            }
+
+            responseFormsBySignature.set(signature, form);
+        });
+
+        const currentForms = Array.from(document.querySelectorAll("#aislepilot-meals [data-ajax-swap-form]"));
+        currentForms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const signature = readAjaxSwapFormSignature(form);
+            if (!signature) {
+                return;
+            }
+
+            const nextForm = responseFormsBySignature.get(signature);
+            if (!(nextForm instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const replacement = nextForm.cloneNode(true);
+            if (!(replacement instanceof HTMLFormElement)) {
+                return;
+            }
+
+            form.replaceWith(replacement);
+        });
+    };
+
+    const applyAjaxSwapResponse = (responseText, slotIndex) => {
         if (typeof DOMParser === "undefined") {
             return false;
         }
 
         rememberDayMealSlots(document);
         const responseDocument = new DOMParser().parseFromString(responseText, "text/html");
-        const didReplaceMeals = replaceSectionContent(responseDocument, "#aislepilot-meals");
+        const didReplaceMeals =
+            replaceSwappedMealCard(responseDocument, slotIndex) ||
+            replaceSectionContent(responseDocument, "#aislepilot-meals");
         if (!didReplaceMeals) {
             return false;
         }
 
+        syncAjaxSwapFormsFromResponse(responseDocument);
         replaceSectionContent(responseDocument, "#aislepilot-overview");
         replaceSectionContent(responseDocument, "#aislepilot-shop");
         replaceSectionContent(responseDocument, "#aislepilot-export");
@@ -2183,16 +2287,6 @@
     };
 
     const animateSwappedMeal = dayIndex => {
-        const mealsGrid = document.querySelector("#aislepilot-meals .aislepilot-meal-grid");
-        if (mealsGrid instanceof HTMLElement) {
-            mealsGrid.classList.remove("is-swap-fading-in");
-            mealsGrid.getBoundingClientRect();
-            mealsGrid.classList.add("is-swap-fading-in");
-            window.setTimeout(() => {
-                mealsGrid.classList.remove("is-swap-fading-in");
-            }, 260);
-        }
-
         if (!Number.isInteger(dayIndex) || dayIndex < 0) {
             return;
         }
@@ -2268,7 +2362,7 @@
                     responseText.includes("<!DOCTYPE html");
 
                 if (isHtmlResponse) {
-                    if (!applyAjaxSwapResponse(responseText)) {
+                    if (!applyAjaxSwapResponse(responseText, swapDayIndex)) {
                         replaceDocumentWithHtml(responseText);
                         return;
                     }
