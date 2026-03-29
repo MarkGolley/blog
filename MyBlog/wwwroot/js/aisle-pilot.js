@@ -1466,6 +1466,94 @@
         });
     };
 
+    const wireDayMealCards = scope => {
+        const cards = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-meal-card]"))
+            : Array.from(document.querySelectorAll("[data-day-meal-card]"));
+
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement) || card.dataset.dayMealCardWired === "true") {
+                return;
+            }
+
+            const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
+            const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
+            const track = card.querySelector("[data-day-meal-track]");
+            const slider = card.querySelector("[data-day-meal-slider]");
+            if (!(track instanceof HTMLElement) || !(slider instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
+                return;
+            }
+
+            card.dataset.dayMealCardWired = "true";
+            let currentSlotIndex = 0;
+            let touchStartX = 0;
+            let touchStartY = 0;
+
+            const syncSlot = nextIndex => {
+                const slotCount = Math.min(tabs.length, panels.length);
+                if (slotCount <= 0) {
+                    return;
+                }
+
+                currentSlotIndex = ((nextIndex % slotCount) + slotCount) % slotCount;
+                track.style.transform = `translateX(-${currentSlotIndex * 100}%)`;
+
+                tabs.forEach((tab, index) => {
+                    if (!(tab instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    const isActive = index === currentSlotIndex;
+                    tab.classList.toggle("is-active", isActive);
+                    tab.setAttribute("aria-selected", isActive ? "true" : "false");
+                });
+
+                panels.forEach((panel, index) => {
+                    if (!(panel instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    panel.setAttribute("aria-hidden", index === currentSlotIndex ? "false" : "true");
+                });
+
+                updateViewportHeight(true);
+            };
+
+            tabs.forEach((tab, index) => {
+                if (!(tab instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                tab.addEventListener("click", () => {
+                    syncSlot(index);
+                });
+            });
+
+            slider.addEventListener("touchstart", event => {
+                const touch = event.changedTouches[0];
+                touchStartX = touch.clientX;
+                touchStartY = touch.clientY;
+            }, { passive: true });
+
+            slider.addEventListener("touchend", event => {
+                const touch = event.changedTouches[0];
+                const deltaX = touch.clientX - touchStartX;
+                const deltaY = touch.clientY - touchStartY;
+                if (Math.abs(deltaX) < 32 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+                    return;
+                }
+
+                if (deltaX < 0) {
+                    syncSlot(currentSlotIndex + 1);
+                } else {
+                    syncSlot(currentSlotIndex - 1);
+                }
+            }, { passive: true });
+
+            syncSlot(0);
+        });
+    };
+
     const applyAjaxSwapResponse = responseText => {
         if (typeof DOMParser === "undefined") {
             return false;
@@ -1487,6 +1575,7 @@
         wirePreserveScrollHandlers(document);
         wireSetupToggleHandlers(document);
         wireLeftoverPlanner(document);
+        wireDayMealCards(document);
         wireAjaxSwapHandlers(document);
         wireNotesExportButtons(document);
         startMealImagePolling();
@@ -1623,6 +1712,7 @@
     wireSetupToggleHandlers(document);
     wirePreserveScrollHandlers(document);
     wireLeftoverPlanner(document);
+    wireDayMealCards(document);
     wireAjaxSwapHandlers(document);
     startMealImagePolling();
 

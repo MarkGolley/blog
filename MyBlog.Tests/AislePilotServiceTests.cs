@@ -248,6 +248,145 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithThreeMealsPerDay_ReturnsBreakfastLunchDinnerPerCookDay()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 3,
+            CookDays = 3,
+            MealsPerDay = 3
+        };
+
+        var result = _service.BuildPlan(request);
+        var groupedByDay = result.MealPlan
+            .GroupBy(meal => meal.Day)
+            .Select(group => group.Select(meal => meal.MealType).ToList())
+            .ToList();
+
+        Assert.Equal(3, result.MealsPerDay);
+        Assert.Equal(9, result.MealPlan.Count);
+        Assert.Equal(3, groupedByDay.Count);
+        Assert.All(groupedByDay, mealTypes =>
+            Assert.Equal(["Dinner", "Lunch", "Breakfast"], mealTypes));
+    }
+
+    [Fact]
+    public void BuildPlan_WithThreeMealsPerDay_UsesBreakfastAndLunchAppropriateMeals()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 3,
+            CookDays = 3,
+            MealsPerDay = 3
+        };
+
+        var result = _service.BuildPlan(request);
+        var breakfastFriendlyMeals = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Greek yogurt berry oat pots",
+            "Spinach and tomato egg muffins",
+            "Tofu spinach breakfast scramble",
+            "Smoked salmon scrambled eggs on toast"
+        };
+        var lunchFriendlyMeals = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Greek yogurt chicken wraps",
+            "Chickpea quinoa salad bowls",
+            "Egg fried rice",
+            "Halloumi couscous bowls",
+            "Spinach and tomato egg muffins",
+            "Tofu spinach breakfast scramble",
+            "Smoked salmon scrambled eggs on toast",
+            "Mediterranean hummus wraps",
+            "Tuna sweetcorn pasta salad",
+            "Chicken couscous lunch bowls",
+            "Lentil vegetable soup bowls"
+        };
+
+        var breakfastMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Breakfast", StringComparison.OrdinalIgnoreCase))
+            .Select(meal => meal.MealName)
+            .ToList();
+        var lunchMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(3, breakfastMeals.Count);
+        Assert.Equal(3, lunchMeals.Count);
+        Assert.All(breakfastMeals, mealName => Assert.Contains(mealName, breakfastFriendlyMeals));
+        Assert.All(lunchMeals, mealName => Assert.Contains(mealName, lunchFriendlyMeals));
+    }
+
+    [Fact]
+    public void SwapMealForDay_WithThreeMealsPerDay_AllowsSwappingAnyMealSlotIndex()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 3
+        };
+
+        var initialPlan = _service.BuildPlan(request);
+        var currentMealName = initialPlan.MealPlan[4].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        var swappedPlan = _service.SwapMealForDay(
+            request,
+            dayIndex: 4,
+            currentMealName,
+            currentPlanMealNames,
+            seenMealNames: []);
+
+        Assert.Equal(6, swappedPlan.MealPlan.Count);
+        Assert.NotEqual(currentMealName, swappedPlan.MealPlan[4].MealName);
+    }
+
+    [Fact]
+    public void SwapMealForDay_WithThreeMealsPerDay_KeepsBreakfastSwapBreakfastAppropriate()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 3
+        };
+        var breakfastFriendlyMeals = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Greek yogurt berry oat pots",
+            "Spinach and tomato egg muffins",
+            "Tofu spinach breakfast scramble",
+            "Smoked salmon scrambled eggs on toast"
+        };
+
+        var initialPlan = _service.BuildPlan(request);
+        var breakfastSlotIndex = 2;
+        var currentMealName = initialPlan.MealPlan[breakfastSlotIndex].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        var swappedPlan = _service.SwapMealForDay(
+            request,
+            dayIndex: breakfastSlotIndex,
+            currentMealName,
+            currentPlanMealNames,
+            seenMealNames: [currentMealName]);
+
+        Assert.Equal(6, swappedPlan.MealPlan.Count);
+        Assert.NotEqual(currentMealName, swappedPlan.MealPlan[breakfastSlotIndex].MealName);
+        Assert.Equal("Breakfast", swappedPlan.MealPlan[breakfastSlotIndex].MealType);
+        Assert.Contains(swappedPlan.MealPlan[breakfastSlotIndex].MealName, breakfastFriendlyMeals);
+    }
+
+    [Fact]
     public void BuildPlan_WithPlanLengthFiveAndFiveCookDays_ReturnsNoLeftovers()
     {
         var request = new AislePilotRequestModel
@@ -835,7 +974,16 @@ public class AislePilotServiceTests
 
         var validateMethod = typeof(AislePilotService).GetMethod(
             "ValidateAndMapAiMeal",
-            BindingFlags.NonPublic | BindingFlags.Static);
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            types:
+            [
+                payloadType!,
+                typeof(IReadOnlyList<string>),
+                typeof(bool),
+                typeof(string).MakeByRefType()
+            ],
+            modifiers: null);
         Assert.NotNull(validateMethod);
 
         var args = new object?[] { payload, Array.Empty<string>(), true, null };

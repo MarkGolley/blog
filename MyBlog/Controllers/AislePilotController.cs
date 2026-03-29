@@ -17,6 +17,10 @@ public class AislePilotController(
     private const string SetupStateCookieName = "aislepilot.setup.v1";
     private const string CurrentPlanStateCookieName = "aislepilot.plan.v1";
     private const string AislePilotImagePathPrefix = "/projects/aisle-pilot/images";
+    private const int DefaultMealsPerDay = 3;
+    private const int MinMealsPerDay = 1;
+    private const int MaxMealsPerDay = 3;
+    private const int MaxSwapMealSlotIndex = 20;
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -25,7 +29,10 @@ public class AislePilotController(
     [HttpGet("")]
     public IActionResult Index(string? returnUrl = null)
     {
-        var request = NormalizeRequest(TryReadSavedSetupState() ?? new AislePilotRequestModel());
+        var request = NormalizeRequest(TryReadSavedSetupState() ?? new AislePilotRequestModel
+        {
+            MealsPerDay = DefaultMealsPerDay
+        });
         var resolvedReturnUrl = ResolveReturnUrl(returnUrl);
         return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
     }
@@ -157,8 +164,9 @@ public class AislePilotController(
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
         ValidateRequest(request);
         var cookDays = Math.Clamp(request.CookDays, 1, Math.Clamp(request.PlanDays, 1, 7));
+        var mealSlotCount = cookDays * Math.Clamp(request.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
 
-        if (dayIndex < 0 || dayIndex >= cookDays)
+        if (dayIndex < 0 || dayIndex >= mealSlotCount)
         {
             ModelState.AddModelError(string.Empty, "Selected day was out of range. Try generating again.");
         }
@@ -439,6 +447,7 @@ public class AislePilotController(
             .ToList() ?? [];
         normalized.PlanDays = Math.Clamp(normalized.PlanDays, 1, 7);
         normalized.CookDays = Math.Clamp(normalized.CookDays, 1, normalized.PlanDays);
+        normalized.MealsPerDay = Math.Clamp(normalized.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
         return normalized;
     }
 
@@ -500,7 +509,10 @@ public class AislePilotController(
         foreach (var entry in dayEntries)
         {
             var segments = entry.Split(':', 2, StringSplitOptions.TrimEntries);
-            if (segments.Length != 2 || !int.TryParse(segments[0], out var dayIndex) || dayIndex < 0 || dayIndex > 6)
+            if (segments.Length != 2 ||
+                !int.TryParse(segments[0], out var dayIndex) ||
+                dayIndex < 0 ||
+                dayIndex > MaxSwapMealSlotIndex)
             {
                 continue;
             }
@@ -539,6 +551,7 @@ public class AislePilotController(
             HouseholdSize = request.HouseholdSize,
             CookDays = request.CookDays,
             PlanDays = request.PlanDays,
+            MealsPerDay = request.MealsPerDay,
             PortionSize = request.PortionSize,
             DietaryModes = request.DietaryModes.ToList(),
             DislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty,
@@ -583,6 +596,7 @@ public class AislePilotController(
             }
 
             var planDays = Math.Clamp(state.PlanDays, 1, 7);
+            var mealsPerDay = Math.Clamp(state.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
 
             return new AislePilotRequestModel
             {
@@ -591,6 +605,7 @@ public class AislePilotController(
                 HouseholdSize = Math.Clamp(state.HouseholdSize, 1, 8),
                 CookDays = Math.Clamp(state.CookDays, 1, planDays),
                 PlanDays = planDays,
+                MealsPerDay = mealsPerDay,
                 PortionSize = state.PortionSize ?? string.Empty,
                 DietaryModes = state.DietaryModes?
                     .Where(mode => !string.IsNullOrWhiteSpace(mode))
@@ -692,6 +707,10 @@ public class AislePilotController(
         {
             ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
         }
+        if (request.MealsPerDay < MinMealsPerDay || request.MealsPerDay > MaxMealsPerDay)
+        {
+            ModelState.AddModelError("Request.MealsPerDay", "Choose between 1 and 3 meals per day.");
+        }
 
         if (string.Equals(request.Supermarket, "Custom", StringComparison.OrdinalIgnoreCase))
         {
@@ -745,6 +764,10 @@ public class AislePilotController(
         if (request.CookDays > request.PlanDays)
         {
             ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
+        }
+        if (request.MealsPerDay < MinMealsPerDay || request.MealsPerDay > MaxMealsPerDay)
+        {
+            ModelState.AddModelError("Request.MealsPerDay", "Choose between 1 and 3 meals per day.");
         }
 
         if (string.IsNullOrWhiteSpace(request.PantryItems))
@@ -1096,6 +1119,7 @@ public class AislePilotController(
         public int HouseholdSize { get; set; } = 2;
         public int CookDays { get; set; } = 7;
         public int PlanDays { get; set; } = 7;
+        public int MealsPerDay { get; set; } = 3;
         public string? PortionSize { get; set; }
         public List<string> DietaryModes { get; set; } = [];
         public string? DislikesOrAllergens { get; set; }

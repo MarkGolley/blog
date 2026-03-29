@@ -1436,6 +1436,63 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin-bottom: 0.24rem;
 }
 
+.aislepilot-day-card-meta {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.aislepilot-day-meal-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 0.2rem;
+    padding: 0.2rem;
+    margin-top: 0.18rem;
+    border: 1px solid rgba(16, 63, 101, 0.18);
+    border-radius: 999px;
+    background: rgba(16, 63, 101, 0.08);
+}
+
+.aislepilot-day-meal-tab {
+    min-height: 1.68rem !important;
+    border: 1px solid rgba(16, 63, 101, 0.16) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    color: var(--ink-soft) !important;
+    padding: 0.16rem 0.38rem !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.aislepilot-day-meal-tab.is-active {
+    border: none !important;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14) !important;
+}
+
+.aislepilot-day-meal-slider {
+    overflow: hidden;
+    margin-top: 0.22rem;
+}
+
+.aislepilot-day-meal-track {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    transition: transform 0.24s ease;
+}
+
+.aislepilot-day-meal-panel {
+    flex: 0 0 100%;
+    min-width: 100%;
+}
+
 .aislepilot-card-kicker {
     margin: 0;
     font-size: 0.76rem;
@@ -1687,6 +1744,10 @@ html.aislepilot-restore-pending .aislepilot-app {
     .aislepilot-setup-mode {
         animation: none;
     }
+
+    .aislepilot-day-meal-track {
+        transition: none;
+    }
 }
 
 @media (min-width: 640px) {
@@ -1837,6 +1898,12 @@ html.aislepilot-restore-pending .aislepilot-app {
     .aislepilot-slider-input::-moz-range-thumb {
         width: 1.12rem;
         height: 1.12rem;
+    }
+
+    .aislepilot-day-meal-tab {
+        font-size: 0.68rem !important;
+        min-height: 1.86rem !important;
+        padding: 0.16rem 0.24rem !important;
     }
 
     .aislepilot-card-action-row {

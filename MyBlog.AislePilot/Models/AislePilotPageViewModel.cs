@@ -25,6 +25,7 @@ public sealed class AislePilotPlanResultViewModel
     public string PlanSourceLabel { get; set; } = string.Empty;
     public int PlanDays { get; set; } = 7;
     public int CookDays { get; set; } = 7;
+    public int MealsPerDay { get; set; } = 1;
     public int LeftoverDays { get; set; }
     public decimal WeeklyBudget { get; set; }
     public decimal EstimatedTotalCost { get; set; }
@@ -43,6 +44,7 @@ public sealed class AislePilotPlanResultViewModel
 public sealed class AislePilotMealDayViewModel
 {
     public string Day { get; set; } = string.Empty;
+    public string MealType { get; set; } = "Dinner";
     public string MealName { get; set; } = string.Empty;
     public string MealImageUrl { get; set; } = string.Empty;
     public string MealReason { get; set; } = string.Empty;

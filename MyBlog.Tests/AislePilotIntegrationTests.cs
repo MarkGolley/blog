@@ -638,6 +638,46 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task Index_Get_RendersMealsPerDayControl_DefaultingToThree()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Contains("name=\"Request.MealsPerDay\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("name=\"Request.MealsPerDay\" value=\"3\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithThreeMealsPerDay_RendersMealSlotTabsOnDayCards()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "3",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("data-day-meal-tab", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Dinner<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Lunch<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Breakfast<", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Post_WhenCookDaysExceedPlanDays_ClampsCookDaysInRenderedState()
     {
         using var client = CreateClient(allowAutoRedirect: true);

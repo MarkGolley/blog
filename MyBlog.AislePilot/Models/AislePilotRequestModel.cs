@@ -19,6 +19,9 @@ public sealed class AislePilotRequestModel
     [Range(1, 7, ErrorMessage = "Choose a plan length between 1 and 7 days.")]
     public int PlanDays { get; set; } = 7;
 
+    [Range(1, 3, ErrorMessage = "Choose between 1 and 3 meals per day.")]
+    public int MealsPerDay { get; set; } = 1;
+
     public string PortionSize { get; set; } = "Medium";
 
     public List<string> DietaryModes { get; set; } = ["Balanced"];
