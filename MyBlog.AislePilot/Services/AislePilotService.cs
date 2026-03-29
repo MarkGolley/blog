@@ -721,7 +721,7 @@ public sealed class AislePilotService : IAislePilotService
             "Spinach and tomato egg muffins",
             4.70m,
             IsQuick: false,
-            ["Balanced", "Vegetarian", "High-Protein"],
+            ["Balanced", "Vegetarian", "High-Protein", "Gluten-Free"],
             [
                 new IngredientTemplate("Eggs", "Dairy & Eggs", 8m, "pcs", 1.70m),
                 new IngredientTemplate("Spinach", "Produce", 0.20m, "kg", 0.85m),
@@ -735,12 +735,26 @@ public sealed class AislePilotService : IAislePilotService
             "Tofu spinach breakfast scramble",
             4.55m,
             IsQuick: true,
-            ["Balanced", "Vegan", "High-Protein"],
+            ["Balanced", "Vegan", "High-Protein", "Gluten-Free"],
             [
                 new IngredientTemplate("Firm tofu", "Dairy & Eggs", 0.40m, "kg", 1.60m),
                 new IngredientTemplate("Spinach", "Produce", 0.20m, "kg", 0.85m),
                 new IngredientTemplate("Cherry tomatoes", "Produce", 0.25m, "kg", 0.95m),
                 new IngredientTemplate("Sweet potatoes", "Produce", 0.60m, "kg", 1.15m)
+            ])
+        {
+            SuitableMealTypes = ["Breakfast", "Lunch"]
+        },
+        new(
+            "Smoked salmon spinach egg scramble",
+            5.90m,
+            IsQuick: true,
+            ["Balanced", "High-Protein", "Pescatarian", "Gluten-Free"],
+            [
+                new IngredientTemplate("Smoked salmon", "Meat & Fish", 0.18m, "kg", 2.95m),
+                new IngredientTemplate("Eggs", "Dairy & Eggs", 6m, "pcs", 1.30m),
+                new IngredientTemplate("Spinach", "Produce", 0.18m, "kg", 0.80m),
+                new IngredientTemplate("Milk", "Dairy & Eggs", 0.18m, "l", 0.45m)
             ])
         {
             SuitableMealTypes = ["Breakfast", "Lunch"]
@@ -1035,15 +1049,50 @@ public sealed class AislePilotService : IAislePilotService
     {
         var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
         var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
-        var candidates = FilterMeals(dietaryModes, dislikesOrAllergens)
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var templateCandidates = FilterMeals(dietaryModes, dislikesOrAllergens)
             .Select(meal => EnsureMealTypeSuitability(meal))
             .ToList();
-        if (candidates.Count == 0)
+        if (HasSlotCoverageForMealTypes(templateCandidates, mealTypeSlots))
+        {
+            return true;
+        }
+
+        var pooledCandidates = FilterMeals(dietaryModes, dislikesOrAllergens, AiMealPool.Values.ToList())
+            .Select(meal => EnsureMealTypeSuitability(meal))
+            .ToList();
+        if (HasSlotCoverageForMealTypes(pooledCandidates, mealTypeSlots))
+        {
+            return true;
+        }
+
+        if (CanAttemptAiGenerationForPlanRequest())
+        {
+            _logger?.LogInformation(
+                "AislePilot compatibility pre-check found no local slot coverage; allowing AI generation attempt for MealTypes={MealTypes}.",
+                string.Join(",", mealTypeSlots));
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool CanAttemptAiGenerationForPlanRequest()
+    {
+        return _enableAiGeneration &&
+               _httpClient is not null &&
+               !string.IsNullOrWhiteSpace(_apiKey);
+    }
+
+    private static bool HasSlotCoverageForMealTypes(
+        IReadOnlyList<MealTemplate> candidates,
+        IReadOnlyList<string> mealTypeSlots)
+    {
+        if (candidates.Count == 0 || mealTypeSlots.Count == 0)
         {
             return false;
         }
 
-        var mealTypeSlots = BuildMealTypeSlots(request);
         return mealTypeSlots.All(mealType =>
             candidates.Any(meal => SupportsMealType(meal, mealType)));
     }
@@ -1765,6 +1814,14 @@ public sealed class AislePilotService : IAislePilotService
         }
 
         var aiMeals = aiBatch.Meals;
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        if (!HasSlotCoverageForMealTypes(aiMeals, mealTypeSlots))
+        {
+            _logger?.LogWarning(
+                "AislePilot AI generation returned meals without required slot coverage for {MealTypes}; falling back.",
+                string.Join(",", mealTypeSlots));
+            return null;
+        }
 
         var selectedMeals = SelectMeals(
             aiMeals,
@@ -1774,9 +1831,9 @@ public sealed class AislePilotService : IAislePilotService
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
-            BuildMealTypeSlots(request));
+            mealTypeSlots);
 
-        if (!HasUniqueMealNames(selectedMeals, totalMealCount, BuildMealTypeSlots(request)))
+        if (!HasUniqueMealNames(selectedMeals, totalMealCount, mealTypeSlots))
         {
             _logger?.LogWarning(
                 "AislePilot AI generation did not yield enough slot-compatible meals for {MealCount} requested meals.",
@@ -1922,6 +1979,15 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        if (!HasSlotCoverageForMealTypes(pooledMeals, mealTypeSlots))
+        {
+            _logger?.LogInformation(
+                "AislePilot AI meal pool lacked slot coverage for requested meal types {MealTypes}; requesting fresh AI meals.",
+                string.Join(",", mealTypeSlots));
+            return null;
+        }
+
         var selectedMeals = SelectMeals(
             pooledMeals,
             context.DietaryModes,
@@ -1930,9 +1996,9 @@ public sealed class AislePilotService : IAislePilotService
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
-            BuildMealTypeSlots(request));
+            mealTypeSlots);
 
-        if (!HasUniqueMealNames(selectedMeals, totalMealCount, BuildMealTypeSlots(request)))
+        if (!HasUniqueMealNames(selectedMeals, totalMealCount, mealTypeSlots))
         {
             _logger?.LogInformation(
                 "AislePilot AI meal pool did not contain enough slot-compatible meals for {MealCount} requested meals; requesting fresh AI meals.",
@@ -1964,6 +2030,15 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        if (!HasSlotCoverageForMealTypes(pooledMeals, mealTypeSlots))
+        {
+            _logger?.LogInformation(
+                "AislePilot AI meal pool lacked slot coverage for requested meal types {MealTypes}; requesting fresh AI meals.",
+                string.Join(",", mealTypeSlots));
+            return null;
+        }
+
         var selectedMeals = SelectMeals(
             pooledMeals,
             context.DietaryModes,
@@ -1972,9 +2047,9 @@ public sealed class AislePilotService : IAislePilotService
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
-            BuildMealTypeSlots(request));
+            mealTypeSlots);
 
-        if (!HasUniqueMealNames(selectedMeals, totalMealCount, BuildMealTypeSlots(request)))
+        if (!HasUniqueMealNames(selectedMeals, totalMealCount, mealTypeSlots))
         {
             _logger?.LogInformation(
                 "AislePilot AI meal pool did not contain enough slot-compatible meals for {MealCount} requested meals; requesting fresh AI meals.",

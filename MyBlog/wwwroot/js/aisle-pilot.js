@@ -1850,6 +1850,66 @@
         document.close();
     };
 
+    const dayMealSlotState = new Map();
+
+    const readCardDayKey = card => {
+        if (!(card instanceof HTMLElement)) {
+            return "";
+        }
+
+        return (card.dataset.dayIndex ?? "").trim();
+    };
+
+    const readActiveDayMealSlotIndex = card => {
+        if (!(card instanceof HTMLElement)) {
+            return 0;
+        }
+
+        const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
+        if (tabs.length <= 1) {
+            return 0;
+        }
+
+        const activeIndex = tabs.findIndex(tab => {
+            if (!(tab instanceof HTMLElement)) {
+                return false;
+            }
+
+            return tab.classList.contains("is-active") || tab.getAttribute("aria-selected") === "true";
+        });
+
+        return activeIndex >= 0 ? activeIndex : 0;
+    };
+
+    const rememberDayMealSlots = scope => {
+        const cards = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-meal-card]"))
+            : Array.from(document.querySelectorAll("[data-day-meal-card]"));
+
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+
+            const dayKey = readCardDayKey(card);
+            if (!dayKey) {
+                return;
+            }
+
+            dayMealSlotState.set(dayKey, readActiveDayMealSlotIndex(card));
+        });
+    };
+
+    const readRememberedDayMealSlot = card => {
+        const dayKey = readCardDayKey(card);
+        if (!dayKey || !dayMealSlotState.has(dayKey)) {
+            return 0;
+        }
+
+        const stored = dayMealSlotState.get(dayKey);
+        return Number.isInteger(stored) ? stored : 0;
+    };
+
     const wireLeftoverPlanner = scope => {
         const plannerShells = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-leftover-planner]"))
@@ -2046,6 +2106,11 @@
                     panel.setAttribute("aria-hidden", index === currentSlotIndex ? "false" : "true");
                 });
 
+                const dayKey = readCardDayKey(card);
+                if (dayKey) {
+                    dayMealSlotState.set(dayKey, currentSlotIndex);
+                }
+
                 updateViewportHeight(true);
             };
 
@@ -2080,7 +2145,7 @@
                 }
             }, { passive: true });
 
-            syncSlot(0);
+            syncSlot(readRememberedDayMealSlot(card));
         });
     };
 
@@ -2089,6 +2154,7 @@
             return false;
         }
 
+        rememberDayMealSlots(document);
         const responseDocument = new DOMParser().parseFromString(responseText, "text/html");
         const didReplaceMeals = replaceSectionContent(responseDocument, "#aislepilot-meals");
         if (!didReplaceMeals) {

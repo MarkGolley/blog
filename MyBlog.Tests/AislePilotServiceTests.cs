@@ -288,6 +288,7 @@ public class AislePilotServiceTests
             "Greek yogurt berry oat pots",
             "Spinach and tomato egg muffins",
             "Tofu spinach breakfast scramble",
+            "Smoked salmon spinach egg scramble",
             "Smoked salmon scrambled eggs on toast"
         };
         var lunchFriendlyMeals = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -445,7 +446,41 @@ public class AislePilotServiceTests
     }
 
     [Fact]
-    public void HasCompatibleMeals_WithBreakfastOnly_WhenNoBreakfastMatchesExist_ReturnsFalse()
+    public void HasCompatibleMeals_WithHighProteinGlutenFreeBreakfastOnly_ReturnsTrue()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["High-Protein", "Gluten-Free"],
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var hasCompatibleMeals = _service.HasCompatibleMeals(request);
+
+        Assert.True(hasCompatibleMeals);
+    }
+
+    [Fact]
+    public void BuildPlan_WithHighProteinGlutenFreeBreakfastOnlySlot_ReturnsBreakfastMeals()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["High-Protein", "Gluten-Free"],
+            PlanDays = 3,
+            CookDays = 3,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(1, result.MealsPerDay);
+        Assert.Equal(3, result.MealPlan.Count);
+        Assert.All(result.MealPlan, meal => Assert.Equal("Breakfast", meal.MealType));
+    }
+
+    [Fact]
+    public void HasCompatibleMeals_WithPescatarianGlutenFreeBreakfastOnly_ReturnsTrue()
     {
         var request = new AislePilotRequestModel
         {
@@ -456,7 +491,116 @@ public class AislePilotServiceTests
 
         var hasCompatibleMeals = _service.HasCompatibleMeals(request);
 
+        Assert.True(hasCompatibleMeals);
+    }
+
+    [Fact]
+    public void BuildPlan_WithPescatarianGlutenFreeBreakfastOnlySlot_ReturnsBreakfastMeals()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Pescatarian", "Gluten-Free"],
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(1, result.MealsPerDay);
+        Assert.Equal(2, result.MealPlan.Count);
+        Assert.All(result.MealPlan, meal => Assert.Equal("Breakfast", meal.MealType));
+    }
+
+    [Fact]
+    public void HasCompatibleMeals_WithBreakfastOnly_WhenHardModesConflict_ReturnsFalse()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegan", "Pescatarian"],
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var hasCompatibleMeals = _service.HasCompatibleMeals(request);
+
         Assert.False(hasCompatibleMeals);
+    }
+
+    [Fact]
+    public void HasCompatibleMeals_WithBreakfastOnlyAndAiAvailable_AllowsAiAttemptWhenTemplatesDontMatch()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true"
+            })
+            .Build();
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, "{}");
+        using var httpClient = new HttpClient(handler);
+        var aiCapableService = new AislePilotService(httpClient, configuration);
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["High-Protein", "Pescatarian", "Gluten-Free"],
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var hasCompatibleMeals = aiCapableService.HasCompatibleMeals(request);
+
+        Assert.True(hasCompatibleMeals);
+    }
+
+    [Fact]
+    public void BuildPlan_WithBreakfastOnlyAndDinnerOnlyAiPool_FallsBackWithoutConstraintFailure()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "true"
+            })
+            .Build();
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, "{}");
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var seedMealTemplate = GetMealTemplateSeed();
+        var dinnerOnlyPoolNames = new[]
+        {
+            $"Weeknight roast bowl {Guid.NewGuid():N}",
+            $"Hearty skillet supper {Guid.NewGuid():N}",
+            $"Oven-baked comfort plate {Guid.NewGuid():N}"
+        };
+
+        InvokeAddMealsToAiPool(CreateMealTemplatesFromSeed(seedMealTemplate, dinnerOnlyPoolNames));
+
+        try
+        {
+            var request = new AislePilotRequestModel
+            {
+                DietaryModes = ["High-Protein"],
+                PlanDays = 2,
+                CookDays = 2,
+                MealsPerDay = 1,
+                SelectedMealTypes = ["Breakfast"]
+            };
+
+            var result = service.BuildPlan(request);
+
+            Assert.Equal(1, result.MealsPerDay);
+            Assert.Equal(2, result.MealPlan.Count);
+            Assert.All(result.MealPlan, meal => Assert.Equal("Breakfast", meal.MealType));
+        }
+        finally
+        {
+            ClearAiPool();
+        }
     }
 
     [Fact]
@@ -525,6 +669,7 @@ public class AislePilotServiceTests
             "Greek yogurt berry oat pots",
             "Spinach and tomato egg muffins",
             "Tofu spinach breakfast scramble",
+            "Smoked salmon spinach egg scramble",
             "Smoked salmon scrambled eggs on toast"
         };
 
