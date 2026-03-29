@@ -85,6 +85,11 @@
                         // Ignore storage failures in private modes.
                     }
                 }
+
+                modeSwitch.dispatchEvent(new CustomEvent("aislepilot:setup-mode-change", {
+                    bubbles: true,
+                    detail: { mode: nextMode }
+                }));
             };
 
             buttons.forEach(button => {

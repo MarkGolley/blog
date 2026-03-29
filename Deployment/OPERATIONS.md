@@ -41,10 +41,13 @@ Deployment now runs these checks automatically before image build/push when you 
 
 Environment targets:
 
-- Production (default): `.\Deployment\deploy.ps1`
+- Production safest default (deploy both services + parity checks): `.\Deployment\deploy-all.ps1`
+- Production single-service fallback (requires explicit risk acknowledgement):
+- Blog-only: `.\Deployment\deploy-blog.ps1 -AcknowledgeDriftRisk`
+- AislePilot-only: `.\Deployment\deploy-aisle-pilot.ps1 -AcknowledgeDriftRisk`
+- Production legacy single target: `.\Deployment\deploy.ps1`
 - Staging: `.\Deployment\deploy.ps1 -EnvironmentName Staging`
-- Blog-only service: `.\Deployment\deploy-blog.ps1`
-- AislePilot-only service: `.\Deployment\deploy-aisle-pilot.ps1`
+- Staging deploy-all: `.\Deployment\deploy-all.ps1 -EnvironmentName Staging`
 
 Optional overrides for either target:
 
@@ -61,12 +64,14 @@ Optional deploy flags:
 - `-SkipPreDeployChecks` skips all pre-deploy checks.
 - `-SkipBrowserInstall` keeps checks enabled but skips Playwright browser install.
 - `-SkipProductionSmokeCheck` skips post-deploy auth/comment smoke checks.
+- `-SkipVersionParityCheck` (deploy-all only) skips post-deploy APP_VERSION comparison across direct/public AislePilot URLs.
 
 Notes for split deployment:
 
 - `AppMode=AislePilotOnly` automatically skips `verify-production-auth.ps1` because that smoke check targets blog/admin routes.
 - Set `AislePilot__PublicBaseUrl` (or `AISLEPILOT_PUBLIC_BASE_URL`) on the blog service to route "Try AislePilot" CTA to the dedicated service.
 - If you want AislePilot under `markgolley.dev/projects/aisle-pilot` while keeping split services, use the Cloudflare path proxy guide at `Deployment/cloudflare/README.md`.
+- `deploy-all.ps1` deploys `myblog-app` first, then deploys `myblog-aislepilot` using the exact same image digest and APP_VERSION to prevent drift.
 
 What it does:
 

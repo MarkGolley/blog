@@ -246,10 +246,187 @@
                 rangeInput.addEventListener("change", applyNumberValue);
                 applyNumberValue();
             });
+
+            const planDaysSlider = form.querySelector("[data-plan-days-slider]");
+            const cookDaysSlider = form.querySelector("[data-cook-days-slider]");
+            const cookDaysHint = form.querySelector("[data-cook-days-hint]");
+            const planDaysSliderField = planDaysSlider instanceof HTMLInputElement
+                ? planDaysSlider.closest(".aislepilot-slider-field")
+                : null;
+            const cookDaysSliderField = cookDaysSlider instanceof HTMLInputElement
+                ? cookDaysSlider.closest(".aislepilot-slider-field")
+                : null;
+            const planDaysValueOutput = planDaysSliderField?.querySelector("[data-number-slider-value]");
+            const cookDaysValueOutput = cookDaysSliderField?.querySelector("[data-number-slider-value]");
+
+            const syncPlanDaysConstraint = () => {
+                if (!(planDaysSlider instanceof HTMLInputElement) || !(cookDaysSlider instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                const rawPlanDays = Number.parseInt(planDaysSlider.value ?? "7", 10);
+                const safePlanDays = Number.isInteger(rawPlanDays)
+                    ? Math.max(1, Math.min(7, rawPlanDays))
+                    : 7;
+
+                const rawCookDays = Number.parseInt(cookDaysSlider.value ?? "1", 10);
+                const cookMinRaw = Number.parseInt(cookDaysSlider.min ?? "1", 10);
+                const cookMin = Number.isInteger(cookMinRaw) ? Math.max(1, cookMinRaw) : 1;
+                const safeCookDays = Number.isInteger(rawCookDays)
+                    ? Math.max(cookMin, Math.min(safePlanDays, rawCookDays))
+                    : Math.min(safePlanDays, Math.max(cookMin, 1));
+
+                planDaysSlider.value = `${safePlanDays}`;
+                cookDaysSlider.max = `${safePlanDays}`;
+                cookDaysSlider.value = `${safeCookDays}`;
+
+                if (cookDaysHint instanceof HTMLElement) {
+                    cookDaysHint.textContent = `1 to ${safePlanDays}`;
+                }
+                if (planDaysValueOutput instanceof HTMLElement) {
+                    planDaysValueOutput.textContent = `${safePlanDays}`;
+                }
+                if (cookDaysValueOutput instanceof HTMLElement) {
+                    cookDaysValueOutput.textContent = `${safeCookDays}`;
+                }
+
+                planDaysSlider.setAttribute("aria-valuetext", `${safePlanDays}`);
+                cookDaysSlider.setAttribute("aria-valuetext", `${safeCookDays}`);
+                syncSliderProgress(planDaysSlider);
+                syncSliderProgress(cookDaysSlider);
+            };
+
+            if (planDaysSlider instanceof HTMLInputElement && cookDaysSlider instanceof HTMLInputElement) {
+                if (form.dataset.planDaysConstraintWired !== "true") {
+                    form.dataset.planDaysConstraintWired = "true";
+                    planDaysSlider.addEventListener("input", syncPlanDaysConstraint);
+                    planDaysSlider.addEventListener("change", syncPlanDaysConstraint);
+                    cookDaysSlider.addEventListener("input", syncPlanDaysConstraint);
+                    cookDaysSlider.addEventListener("change", syncPlanDaysConstraint);
+                }
+
+                syncPlanDaysConstraint();
+            }
         });
     };
 
     wirePlanBasicsSliders(document);
+
+    const wireSharedPreferenceSummaries = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        const trimSummary = (value, maxLength = 64) => {
+            const normalized = (value ?? "").trim();
+            if (normalized.length <= maxLength) {
+                return normalized;
+            }
+
+            return `${normalized.slice(0, maxLength)}...`;
+        };
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const servingSummary = form.querySelector("[data-serving-summary]");
+            const dietarySummary = form.querySelector("[data-dietary-summary]");
+            const cookingSummary = form.querySelector("[data-cooking-summary]");
+            const exclusionSummary = form.querySelector("[data-exclusion-summary]");
+            if (!(servingSummary instanceof HTMLElement) &&
+                !(dietarySummary instanceof HTMLElement) &&
+                !(cookingSummary instanceof HTMLElement) &&
+                !(exclusionSummary instanceof HTMLElement)) {
+                return;
+            }
+
+            const householdInput = form.querySelector("input[name='Request.HouseholdSize']");
+            const portionInput = form.querySelector("input[name='Request.PortionSize']");
+            const dietaryInputs = Array.from(form.querySelectorAll("input[name='Request.DietaryModes']"));
+            const quickMealsInput = form.querySelector("input[name='Request.PreferQuickMeals']");
+            const exclusionsInput = form.querySelector("input[name='Request.DislikesOrAllergens']");
+
+            const updateServingSummary = () => {
+                if (!(servingSummary instanceof HTMLElement)) {
+                    return;
+                }
+
+                const peopleValue = Number.parseInt(householdInput?.value ?? "2", 10);
+                const safePeople = Number.isInteger(peopleValue) ? Math.max(1, Math.min(8, peopleValue)) : 2;
+                const portionValue = (portionInput?.value ?? "Medium").trim() || "Medium";
+                servingSummary.textContent = `${safePeople} people - ${portionValue} portions`;
+            };
+
+            const updateDietarySummary = () => {
+                if (!(dietarySummary instanceof HTMLElement)) {
+                    return;
+                }
+
+                const selectedModes = dietaryInputs
+                    .filter(input => input instanceof HTMLInputElement && input.checked)
+                    .map(input => input.value.trim())
+                    .filter(value => value.length > 0);
+                dietarySummary.textContent = selectedModes.length > 0
+                    ? selectedModes.join(", ")
+                    : "No dietary filters";
+            };
+
+            const updateCookingSummary = () => {
+                if (!(cookingSummary instanceof HTMLElement) || !(quickMealsInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                cookingSummary.textContent = quickMealsInput.checked ? "Quick meals on" : "Quick meals off";
+            };
+
+            const updateExclusionSummary = () => {
+                if (!(exclusionSummary instanceof HTMLElement)) {
+                    return;
+                }
+
+                const exclusionsValue = trimSummary(exclusionsInput?.value ?? "");
+                exclusionSummary.textContent = exclusionsValue.length > 0
+                    ? exclusionsValue
+                    : "No exclusions set";
+            };
+
+            if (form.dataset.sharedSummaryWired !== "true") {
+                if (householdInput instanceof HTMLInputElement) {
+                    householdInput.addEventListener("input", updateServingSummary);
+                    householdInput.addEventListener("change", updateServingSummary);
+                }
+                if (portionInput instanceof HTMLInputElement) {
+                    portionInput.addEventListener("input", updateServingSummary);
+                    portionInput.addEventListener("change", updateServingSummary);
+                }
+
+                dietaryInputs.forEach(input => {
+                    if (input instanceof HTMLInputElement) {
+                        input.addEventListener("change", updateDietarySummary);
+                    }
+                });
+
+                if (quickMealsInput instanceof HTMLInputElement) {
+                    quickMealsInput.addEventListener("change", updateCookingSummary);
+                }
+                if (exclusionsInput instanceof HTMLInputElement) {
+                    exclusionsInput.addEventListener("input", updateExclusionSummary);
+                    exclusionsInput.addEventListener("change", updateExclusionSummary);
+                }
+
+                form.dataset.sharedSummaryWired = "true";
+            }
+
+            updateServingSummary();
+            updateDietarySummary();
+            updateCookingSummary();
+            updateExclusionSummary();
+        });
+    };
+
+    wireSharedPreferenceSummaries(document);
 
     const getSelectedSupermarket = form => {
         if (!(form instanceof HTMLFormElement)) {
@@ -484,6 +661,98 @@
 
     wireSetupModeSwitches(document);
 
+    const wireModeScopedPreferenceVisibility = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const generatorOnlyPreferences = Array.from(form.querySelectorAll("[data-generator-only-preference]"))
+                .filter(preference => preference instanceof HTMLElement);
+            const plannerOnlyPreferences = Array.from(form.querySelectorAll("[data-planner-only-preference]"))
+                .filter(preference => preference instanceof HTMLElement);
+            if (generatorOnlyPreferences.length === 0 && plannerOnlyPreferences.length === 0) {
+                return;
+            }
+
+            const setupModeValueInput = form.querySelector("[data-setup-mode-value]");
+            const resolveActiveMode = () => {
+                if (setupModeValueInput instanceof HTMLInputElement) {
+                    const explicitMode = setupModeValueInput.value.trim().toLowerCase();
+                    if (explicitMode.length > 0) {
+                        return explicitMode;
+                    }
+                }
+
+                const activePanel = form.querySelector("[data-setup-mode-panel]:not([hidden])");
+                if (activePanel instanceof HTMLElement) {
+                    return (activePanel.dataset.setupModePanel ?? "").trim().toLowerCase();
+                }
+
+                return "";
+            };
+
+            const syncModeScopedPreferenceVisibility = () => {
+                const activeMode = resolveActiveMode();
+                const shouldShowGeneratorOnly = activeMode === "generator";
+                const shouldShowPlannerOnly = activeMode === "planner";
+
+                generatorOnlyPreferences.forEach(preference => {
+                    if (!(preference instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    if (shouldShowGeneratorOnly) {
+                        preference.removeAttribute("hidden");
+                        preference.setAttribute("aria-hidden", "false");
+                    } else {
+                        preference.setAttribute("hidden", "hidden");
+                        preference.setAttribute("aria-hidden", "true");
+                    }
+
+                    const checkbox = preference.querySelector("input[type='checkbox']");
+                    if (checkbox instanceof HTMLInputElement) {
+                        checkbox.disabled = !shouldShowGeneratorOnly;
+                    }
+                });
+
+                plannerOnlyPreferences.forEach(preference => {
+                    if (!(preference instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    if (shouldShowPlannerOnly) {
+                        preference.removeAttribute("hidden");
+                        preference.setAttribute("aria-hidden", "false");
+                    } else {
+                        preference.setAttribute("hidden", "hidden");
+                        preference.setAttribute("aria-hidden", "true");
+                    }
+                });
+            };
+
+            if (form.dataset.modeScopedPreferenceVisibilityWired !== "true") {
+                const setupModeSwitch = form.querySelector("[data-setup-mode-switch]");
+                if (setupModeSwitch instanceof HTMLElement) {
+                    setupModeSwitch.addEventListener(
+                        "aislepilot:setup-mode-change",
+                        syncModeScopedPreferenceVisibility
+                    );
+                }
+
+                form.dataset.modeScopedPreferenceVisibilityWired = "true";
+            }
+
+            syncModeScopedPreferenceVisibility();
+        });
+    };
+
+    wireModeScopedPreferenceVisibility(document);
+
     const resetSubmittingState = () => {
         getAislePilotForms().forEach(form => {
             clearSubmitLoadingDelay(form);
@@ -528,6 +797,34 @@
     const clearRestorePending = () => {
         document.documentElement.classList.remove("aislepilot-restore-pending");
     };
+    const mealImagePollingController = window.AislePilotMealImagePolling?.createController({
+        documentRef: document,
+        intervalMs: 5000,
+        maxAttempts: 48
+    });
+    const pollMealImagesOnce = async () => {
+        if (!mealImagePollingController || typeof mealImagePollingController.pollOnce !== "function") {
+            return;
+        }
+
+        await mealImagePollingController.pollOnce();
+    };
+    const startMealImagePolling = () => {
+        if (!mealImagePollingController || typeof mealImagePollingController.start !== "function") {
+            return;
+        }
+
+        mealImagePollingController.start();
+    };
+
+    // Image polling must run for both planner and generator-only pages.
+    startMealImagePolling();
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            void pollMealImagesOnce();
+        }
+    });
+
     const root = document.querySelector("[data-aislepilot-window]");
     if (!root) {
         clearRestorePending();
@@ -551,11 +848,6 @@
     let touchStartX = 0;
     let touchStartY = 0;
     let activePanelResizeObserver = null;
-    const mealImagePollingController = window.AislePilotMealImagePolling?.createController({
-        documentRef: document,
-        intervalMs: 5000,
-        maxAttempts: 48
-    });
 
     const hideTabHint = () => {
         if (tabHint instanceof HTMLElement) {
@@ -1010,22 +1302,6 @@
         forms.forEach(wirePreserveScrollForm);
     };
 
-    const pollMealImagesOnce = async () => {
-        if (!mealImagePollingController || typeof mealImagePollingController.pollOnce !== "function") {
-            return;
-        }
-
-        await mealImagePollingController.pollOnce();
-    };
-
-    const startMealImagePolling = () => {
-        if (!mealImagePollingController || typeof mealImagePollingController.start !== "function") {
-            return;
-        }
-
-        mealImagePollingController.start();
-    };
-
     const replaceSectionContent = (responseDocument, selector) => {
         const currentSection = document.querySelector(selector);
         const nextSection = responseDocument.querySelector(selector);
@@ -1349,12 +1625,6 @@
     wireLeftoverPlanner(document);
     wireAjaxSwapHandlers(document);
     startMealImagePolling();
-
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") {
-            void pollMealImagesOnce();
-        }
-    });
 
     viewport.addEventListener("touchstart", event => {
         const touch = event.changedTouches[0];

@@ -23,6 +23,7 @@ public sealed class AislePilotPlanResultViewModel
     public IReadOnlyList<string> AppliedDietaryModes { get; set; } = Array.Empty<string>();
     public bool UsedAiGeneratedMeals { get; set; }
     public string PlanSourceLabel { get; set; } = string.Empty;
+    public int PlanDays { get; set; } = 7;
     public int CookDays { get; set; } = 7;
     public int LeftoverDays { get; set; }
     public decimal WeeklyBudget { get; set; }
@@ -70,6 +71,10 @@ public sealed class AislePilotPantrySuggestionViewModel
 {
     public string MealName { get; set; } = string.Empty;
     public int MatchPercent { get; set; }
+    public int MissingCoreIngredientCount { get; set; }
+    public decimal MissingIngredientsEstimatedCost { get; set; }
+    public bool CanCookNow { get; set; }
+    public AislePilotMealDayViewModel? MealCard { get; set; }
     public IReadOnlyList<string> MatchedIngredients { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> MissingIngredients { get; set; } = Array.Empty<string>();
 }

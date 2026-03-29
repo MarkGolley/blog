@@ -79,6 +79,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
             ("Supermarket", result.Supermarket),
             ("Portion size", result.PortionSize),
             ("Household size", request.HouseholdSize.ToString(ukCulture)),
+            ("Plan length", result.PlanDays.ToString(ukCulture)),
             ("Cook days", result.CookDays.ToString(ukCulture)),
             ("Leftover days", result.LeftoverDays.ToString(ukCulture)),
             ("Dietary requirements", dietaryModesText),

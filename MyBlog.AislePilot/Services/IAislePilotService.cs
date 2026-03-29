@@ -11,7 +11,9 @@ public interface IAislePilotService
     bool HasCompatibleMeals(AislePilotRequestModel request);
     IReadOnlyList<AislePilotPantrySuggestionViewModel> SuggestMealsFromPantry(
         AislePilotRequestModel request,
-        int maxResults = 5);
+        int maxResults = 5,
+        IReadOnlyList<string>? excludedMealNames = null,
+        string? generationNonce = null);
     AislePilotPlanResultViewModel BuildPlan(AislePilotRequestModel request);
     Task<AislePilotPlanResultViewModel> BuildPlanAsync(
         AislePilotRequestModel request,
