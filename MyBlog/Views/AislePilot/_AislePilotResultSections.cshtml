@@ -74,18 +74,35 @@
     var weekDayShortLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
     var planWeekDayNames = weekDayNames.Take(planDays).ToArray();
     var planWeekDayShortLabels = weekDayShortLabels.Take(planDays).ToArray();
+    var mealTypeOrder = new[] { "Dinner", "Lunch", "Breakfast" };
+    var mealTypeRank = mealTypeOrder
+        .Select((type, index) => new { type, index })
+        .ToDictionary(x => x.type, x => x.index, StringComparer.OrdinalIgnoreCase);
+    var dayMealGroups = result.MealPlan
+        .Select((meal, index) => new { meal, index })
+        .GroupBy(entry => entry.meal.Day)
+        .Select(group => new
+        {
+            Day = group.Key,
+            Entries = group
+                .OrderBy(entry => mealTypeRank.GetValueOrDefault(entry.meal.MealType ?? string.Empty, int.MaxValue))
+                .ThenBy(entry => entry.index)
+                .ToList(),
+            LeftoverDaysCovered = group.Max(entry => entry.meal.LeftoverDaysCovered)
+        })
+        .ToList();
     var weekDayLookup = planWeekDayNames
         .Select((name, index) => new { name, index })
         .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
-    var leftoverSourceWeekDayIndexes = result.MealPlan
-        .SelectMany(meal =>
+    var leftoverSourceWeekDayIndexes = dayMealGroups
+        .SelectMany(dayGroup =>
         {
-            if (!weekDayLookup.TryGetValue(meal.Day, out var weekDayIndex))
+            if (!weekDayLookup.TryGetValue(dayGroup.Day, out var weekDayIndex))
             {
                 return Enumerable.Empty<int>();
             }
 
-            return Enumerable.Repeat(weekDayIndex, meal.LeftoverDaysCovered);
+            return Enumerable.Repeat(weekDayIndex, dayGroup.LeftoverDaysCovered);
         })
         .ToList();
     var leftoverSourceDayIndexesCsv = string.Join(",", leftoverSourceWeekDayIndexes);
@@ -93,9 +110,23 @@
         .Select(meal => meal.MealName)
         .ToList();
     var mealCount = result.MealPlan.Count;
+    HashSet<int> ParseIgnoredMealSlotIndexes(string? ignoredMealSlotIndexesCsv, int maxMealSlotIndex)
+    {
+        if (string.IsNullOrWhiteSpace(ignoredMealSlotIndexesCsv))
+        {
+            return [];
+        }
+
+        return ignoredMealSlotIndexesCsv
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(token => int.TryParse(token, out var index) ? index : -1)
+            .Where(index => index >= 0 && index <= maxMealSlotIndex)
+            .Distinct()
+            .ToHashSet();
+    }
+    var ignoredMealSlotIndexes = ParseIgnoredMealSlotIndexes(Model.Request.IgnoredMealSlotIndexesCsv, Math.Max(0, mealCount - 1));
+    var dayCardCount = dayMealGroups.Count;
     var mealLabel = mealCount == 1 ? "meal" : "meals";
-    var totalShopItems = result.ShoppingItems.Count;
-    var departmentCount = groupedItems.Count;
     var shoppingListNotesBuilder = new StringBuilder();
     shoppingListNotesBuilder.AppendLine("AislePilot Shopping List");
     shoppingListNotesBuilder.AppendLine($"Supermarket: {result.Supermarket}");
@@ -206,6 +237,10 @@
                 <p class="aislepilot-stat-value">@result.CookDays</p>
             </article>
             <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Meals per day</p>
+                <p class="aislepilot-stat-value">@result.MealsPerDay</p>
+            </article>
+            <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Leftovers</p>
                 <p class="aislepilot-stat-value">@result.LeftoverDays day(s)</p>
             </article>
@@ -216,7 +251,7 @@
         <div class="aislepilot-window-head">
             <h2 id="aislepilot-window-title" class="aislepilot-section-title">
                 Weekly plan
-                <span class="aislepilot-window-title-meta">@mealCount @mealLabel generated</span>
+                <span class="aislepilot-window-title-meta">@mealCount @mealLabel across @dayCardCount day card(s)</span>
             </h2>
             <div class="aislepilot-window-nav">
                 <p class="aislepilot-window-nav-hint" data-window-hint>Tap a tab to switch between meals, shopping list, and exports.</p>
@@ -313,117 +348,218 @@
                          data-fallback-meal-image-url="@fallbackMealImageUrl"
                          data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
                          data-meal-image-poll-url="@mealImagesPollUrl">
-                        @for (var mealIndex = 0; mealIndex < result.MealPlan.Count; mealIndex++)
+                        @foreach (var dayGroup in dayMealGroups)
                         {
-                            var meal = result.MealPlan[mealIndex];
-                            var mealCardClass = meal.LeftoverDaysCovered > 0 ? "aislepilot-card is-leftover-source" : "aislepilot-card";
-                            <article class="@mealCardClass" data-leftover-day-card data-day-index="@mealIndex">
-                                <div class="aislepilot-meal-image-shell">
-                                    <img class="aislepilot-meal-image"
-                                         src="@ResolveClientMealImageUrl(meal.MealImageUrl)"
-                                         data-meal-image
-                                         data-meal-name="@meal.MealName"
-                                         alt="@($"{meal.MealName} plated meal")"
-                                         loading="lazy"
-                                         decoding="async" />
-                                </div>
+                            var firstMealIndex = dayGroup.Entries[0].index;
+                            var mealCardClass = dayGroup.LeftoverDaysCovered > 0
+                                ? "aislepilot-card aislepilot-day-card is-leftover-source"
+                                : "aislepilot-card aislepilot-day-card";
+                            var tabPrefix = $"meal-slot-{firstMealIndex}";
+                            <article class="@mealCardClass" data-leftover-day-card data-day-index="@firstMealIndex" data-day-meal-card>
                                 <div class="aislepilot-card-head">
-                                    <p class="aislepilot-card-kicker">@meal.Day</p>
-                                    <p class="aislepilot-cost">@meal.EstimatedCost.ToString("C", ukCulture)</p>
-                                </div>
-                                <h3>@meal.MealName</h3>
-                                <div class="aislepilot-card-compact-meta">
-                                    <span class="aislepilot-card-meta-pill">
-                                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                            <svg viewBox="0 0 24 24" focusable="false">
-                                                <circle cx="12" cy="12" r="7"></circle>
-                                                <path d="M12 8v4l3 2"></path>
-                                            </svg>
-                                        </span>
-                                        Prep @meal.EstimatedPrepMinutes mins
-                                    </span>
-                                    @if (meal.LeftoverDaysCovered > 0)
+                                    <p class="aislepilot-card-kicker">@dayGroup.Day</p>
+                                    @if (dayGroup.Entries.Count > 1)
                                     {
-                                        <span class="aislepilot-card-meta-pill">
-                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                <svg viewBox="0 0 24 24" focusable="false">
-                                                    <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
-                                                    <path d="M20 4v6h-6"></path>
-                                                </svg>
-                                            </span>
-                                            Makes extra for @meal.LeftoverDaysCovered leftover day(s)
-                                        </span>
+                                        <p class="aislepilot-day-card-meta">@dayGroup.Entries.Count meals</p>
                                     }
                                 </div>
-                                <div class="aislepilot-card-action-row">
-                                    <details class="aislepilot-meal-details">
-                                        <summary>
-                                            <span class="aislepilot-btn-label">
-                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                    <svg viewBox="0 0 24 24" focusable="false">
-                                                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                                                        <circle cx="12" cy="12" r="2.5"></circle>
-                                                    </svg>
-                                                </span>
-                                                View details
-                                            </span>
-                                        </summary>
-                                        <div class="aislepilot-meal-details-panel">
-                                            <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
-                                            <div class="aislepilot-meal-details-grid">
-                                                <div class="aislepilot-nutrition-details">
-                                                    <p class="aislepilot-card-kicker">Est. calories + macros</p>
-                                                    <ul class="aislepilot-nutrition-list">
-                                                        <li>@meal.CaloriesPerServing kcal per serving</li>
-                                                        <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                                        <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                                        <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                                    </ul>
-                                                </div>
-                                                <div class="aislepilot-recipe-details">
-                                                    <p class="aislepilot-card-kicker">Ingredients</p>
-                                                    <ul class="case-list">
-                                                        @foreach (var ingredientLine in meal.IngredientLines)
-                                                        {
-                                                            <li>@ingredientLine</li>
-                                                        }
-                                                    </ul>
-                                                    <p class="aislepilot-card-kicker">Method</p>
-                                                    <ol class="case-list">
-                                                        @foreach (var step in meal.RecipeSteps)
-                                                        {
-                                                            <li>@step</li>
-                                                        }
-                                                    </ol>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </details>
 
-                                    <form method="post"
-                                          action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
-                                          class="aislepilot-swap-form aislepilot-card-action-inline"
-                                          data-preserve-scroll-form
-                                          data-ajax-swap-form>
-                                        @Html.AntiForgeryToken()
-                                        <partial name="_AislePilotHiddenRequestFields"
-                                                 model="BuildHiddenRequestFields()" />
-                                        <input type="hidden" name="dayIndex" value="@mealIndex" />
-                                        <input type="hidden" name="currentMealName" value="@meal.MealName" />
-                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping..." data-loading-delay-ms="220">
-                                            <span class="aislepilot-btn-label">
-                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                    <svg viewBox="0 0 24 24" focusable="false">
-                                                        <path d="M16 3h5v5"></path>
-                                                        <path d="M21 3 9 15"></path>
-                                                        <path d="M8 21H3v-5"></path>
-                                                        <path d="M3 21 15 9"></path>
-                                                    </svg>
-                                                </span>
-                                                Swap meal
-                                            </span>
-                                        </button>
-                                    </form>
+                                @if (dayGroup.Entries.Count > 1)
+                                {
+                                    <div class="aislepilot-day-meal-tabs" role="tablist" aria-label="Meal slots for @dayGroup.Day">
+                                        @for (var slotIndex = 0; slotIndex < dayGroup.Entries.Count; slotIndex++)
+                                        {
+                                            var slotEntry = dayGroup.Entries[slotIndex];
+                                            var slotMeal = slotEntry.meal;
+                                            var slotIsIgnored = ignoredMealSlotIndexes.Contains(slotEntry.index) || slotMeal.IsIgnored;
+                                            var slotTabId = $"{tabPrefix}-tab-{slotIndex}";
+                                            <button type="button"
+                                                    id="@slotTabId"
+                                                    class="aislepilot-day-meal-tab@(slotIndex == 0 ? " is-active" : string.Empty)@(slotIsIgnored ? " is-ignored" : string.Empty)"
+                                                    data-day-meal-tab
+                                                    data-slot-index="@slotIndex"
+                                                    role="tab"
+                                                    aria-controls="@($"{tabPrefix}-panel-{slotIndex}")"
+                                                    aria-selected="@(slotIndex == 0 ? "true" : "false")"
+                                                    aria-label="@(slotIsIgnored ? $"{slotMeal.MealType} (removed)" : slotMeal.MealType)">
+                                                @slotMeal.MealType
+                                            </button>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="aislepilot-day-meal-slider" data-day-meal-slider>
+                                    <div class="aislepilot-day-meal-track" data-day-meal-track>
+                                        @for (var slotIndex = 0; slotIndex < dayGroup.Entries.Count; slotIndex++)
+                                        {
+                                            var entry = dayGroup.Entries[slotIndex];
+                                            var meal = entry.meal;
+                                            var mealIndex = entry.index;
+                                            var isIgnored = ignoredMealSlotIndexes.Contains(mealIndex) || meal.IsIgnored;
+                                            var panelLabelledBy = dayGroup.Entries.Count > 1
+                                                ? $"{tabPrefix}-tab-{slotIndex}"
+                                                : null;
+                                            <section id="@($"{tabPrefix}-panel-{slotIndex}")"
+                                                     class="aislepilot-day-meal-panel@(isIgnored ? " is-ignored" : string.Empty)"
+                                                     data-day-meal-panel
+                                                     role="tabpanel"
+                                                     aria-labelledby="@panelLabelledBy"
+                                                     aria-hidden="@(slotIndex == 0 ? "false" : "true")">
+                                                @if (isIgnored)
+                                                {
+                                                    <span class="aislepilot-meal-removed-watermark" aria-hidden="true">Removed</span>
+                                                }
+                                                <div class="aislepilot-meal-image-shell">
+                                                    <img class="aislepilot-meal-image"
+                                                         src="@ResolveClientMealImageUrl(meal.MealImageUrl)"
+                                                         data-meal-image
+                                                         data-meal-name="@meal.MealName"
+                                                         alt="@($"{meal.MealName} plated meal")"
+                                                         loading="lazy"
+                                                         decoding="async" />
+                                                </div>
+                                                <div class="aislepilot-card-head">
+                                                    <p class="aislepilot-card-kicker">@meal.MealType</p>
+                                                    @if (isIgnored)
+                                                    {
+                                                        <p class="aislepilot-cost is-ignored">Removed</p>
+                                                    }
+                                                    else
+                                                    {
+                                                        <p class="aislepilot-cost">@meal.EstimatedCost.ToString("C", ukCulture)</p>
+                                                    }
+                                                </div>
+                                                <h3>@meal.MealName</h3>
+                                                <div class="aislepilot-card-compact-meta">
+                                                    <span class="aislepilot-card-meta-pill">
+                                                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                            <svg viewBox="0 0 24 24" focusable="false">
+                                                                <circle cx="12" cy="12" r="7"></circle>
+                                                                <path d="M12 8v4l3 2"></path>
+                                                            </svg>
+                                                        </span>
+                                                        Prep @meal.EstimatedPrepMinutes mins
+                                                    </span>
+                                                    @if (dayGroup.LeftoverDaysCovered > 0)
+                                                    {
+                                                        <span class="aislepilot-card-meta-pill">
+                                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                                <svg viewBox="0 0 24 24" focusable="false">
+                                                                    <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
+                                                                    <path d="M20 4v6h-6"></path>
+                                                                </svg>
+                                                            </span>
+                                                            Makes extra for @dayGroup.LeftoverDaysCovered leftover day(s)
+                                                        </span>
+                                                    }
+                                                </div>
+                                                <div class="aislepilot-card-action-row">
+                                                    <details class="aislepilot-meal-details">
+                                                        <summary>
+                                                            <span class="aislepilot-btn-label">
+                                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                                                                        <circle cx="12" cy="12" r="2.5"></circle>
+                                                                    </svg>
+                                                                </span>
+                                                                View details
+                                                            </span>
+                                                        </summary>
+                                                        <div class="aislepilot-meal-details-panel">
+                                                            <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
+                                                            <div class="aislepilot-meal-details-grid">
+                                                                <div class="aislepilot-nutrition-details">
+                                                                    <p class="aislepilot-card-kicker">Est. calories + macros</p>
+                                                                    <ul class="aislepilot-nutrition-list">
+                                                                        <li>@meal.CaloriesPerServing kcal per serving</li>
+                                                                        <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                                                        <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                                                        <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g</li>
+                                                                    </ul>
+                                                                </div>
+                                                                <div class="aislepilot-recipe-details">
+                                                                    <p class="aislepilot-card-kicker">Ingredients</p>
+                                                                    <ul class="case-list">
+                                                                        @foreach (var ingredientLine in meal.IngredientLines)
+                                                                        {
+                                                                            <li>@ingredientLine</li>
+                                                                        }
+                                                                    </ul>
+                                                                    <p class="aislepilot-card-kicker">Method</p>
+                                                                    <ol class="case-list">
+                                                                        @foreach (var step in meal.RecipeSteps)
+                                                                        {
+                                                                            <li>@step</li>
+                                                                        }
+                                                                    </ol>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </details>
+
+                                                    <form method="post"
+                                                          action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
+                                                          class="aislepilot-swap-form aislepilot-card-action-inline"
+                                                          data-preserve-scroll-form
+                                                          data-ajax-swap-form>
+                                                        @Html.AntiForgeryToken()
+                                                        <partial name="_AislePilotHiddenRequestFields"
+                                                                 model="BuildHiddenRequestFields()" />
+                                                        <input type="hidden" name="dayIndex" value="@mealIndex" />
+                                                        <input type="hidden" name="currentMealName" value="@meal.MealName" />
+                                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping..." data-loading-delay-ms="220">
+                                                            <span class="aislepilot-btn-label">
+                                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                                        <path d="M16 3h5v5"></path>
+                                                                        <path d="M21 3 9 15"></path>
+                                                                        <path d="M8 21H3v-5"></path>
+                                                                        <path d="M3 21 15 9"></path>
+                                                                    </svg>
+                                                                </span>
+                                                                Swap meal
+                                                            </span>
+                                                        </button>
+                                                    </form>
+
+                                                    <form method="post"
+                                                          action="@Url.Action("IgnoreMeal", "AislePilot")#aislepilot-meals"
+                                                          class="aislepilot-swap-form aislepilot-ignore-form aislepilot-card-action-inline"
+                                                          data-preserve-scroll-form
+                                                          data-ajax-swap-form>
+                                                        @Html.AntiForgeryToken()
+                                                        <partial name="_AislePilotHiddenRequestFields"
+                                                                 model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                                                        <input type="hidden" name="dayIndex" value="@mealIndex" />
+                                                        @{
+                                                            var ignoreActionLabel = isIgnored ? "Include meal" : "Ignore meal";
+                                                        }
+                                                        <button type="submit"
+                                                                class="aislepilot-swap-btn is-secondary is-icon-only"
+                                                                data-loading-label="Updating..."
+                                                                data-loading-delay-ms="180"
+                                                                aria-label="@ignoreActionLabel"
+                                                                title="@ignoreActionLabel">
+                                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                                <svg viewBox="0 0 24 24" focusable="false">
+                                                                    @if (isIgnored)
+                                                                    {
+                                                                        <path d="M4 12h16"></path>
+                                                                        <path d="M12 4v16"></path>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <path d="M4 12h16"></path>
+                                                                    }
+                                                                </svg>
+                                                            </span>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </section>
+                                        }
+                                    </div>
                                 </div>
                             </article>
                         }

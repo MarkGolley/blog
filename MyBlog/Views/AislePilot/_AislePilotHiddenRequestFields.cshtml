@@ -1,6 +1,7 @@
 @model AislePilotHiddenRequestFieldsViewModel
 @{
     var dietaryModes = Model.Request.DietaryModes ?? [];
+    var selectedMealTypes = Model.Request.SelectedMealTypes ?? [];
 }
 
 <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
@@ -10,6 +11,7 @@
 <input type="hidden" name="Request.PortionSize" value="@Model.Request.PortionSize" />
 <input type="hidden" name="Request.PlanDays" value="@Model.Request.PlanDays" />
 <input type="hidden" name="Request.CookDays" value="@Model.Request.CookDays" />
+<input type="hidden" name="Request.MealsPerDay" value="@Model.Request.MealsPerDay" />
 <input type="hidden" name="Request.DislikesOrAllergens" value="@Model.Request.DislikesOrAllergens" />
 <input type="hidden" name="Request.CustomAisleOrder" value="@Model.Request.CustomAisleOrder" />
 <input type="hidden" name="Request.PantryItems" value="@Model.Request.PantryItems" />
@@ -26,11 +28,16 @@ else
 <input type="hidden" name="Request.LeftoverCookDayIndexesCsv" value="@Model.LeftoverCookDayIndexesCsv" />
 }
 <input type="hidden" name="Request.SwapHistoryState" value="@Model.Request.SwapHistoryState" />
+<input type="hidden" name="Request.IgnoredMealSlotIndexesCsv" value="@Model.Request.IgnoredMealSlotIndexesCsv" />
 <input type="hidden" name="Request.PantrySuggestionHistoryState" value="@Model.Request.PantrySuggestionHistoryState" />
 <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
 @foreach (var mode in dietaryModes)
 {
     <input type="hidden" name="Request.DietaryModes" value="@mode" />
+}
+@foreach (var mealType in selectedMealTypes)
+{
+    <input type="hidden" name="Request.SelectedMealTypes" value="@mealType" />
 }
 
 @if (Model.IncludeCurrentPlanMealNames)

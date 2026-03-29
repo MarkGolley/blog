@@ -1,5 +1,4 @@
 @using System.Globalization
-@using System.Text
 @model AislePilotPageViewModel
 @{
     Layout = "_AislePilotLayout";
@@ -29,6 +28,54 @@
     var selectedPortionSize = portionSizeOptions[selectedPortionSizeIndex];
     var selectedPlanDays = Math.Clamp(Model.Request.PlanDays, 1, 7);
     var selectedCookDays = Math.Clamp(Model.Request.CookDays, 1, selectedPlanDays);
+    var selectedMealTypes = (Model.Request.SelectedMealTypes ?? [])
+        .Where(type => !string.IsNullOrWhiteSpace(type))
+        .Select(type =>
+        {
+            var normalized = type.Trim();
+            if (normalized.Equals("Breakfast", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Breakfast";
+            }
+
+            if (normalized.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Lunch";
+            }
+
+            if (normalized.Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Dinner";
+            }
+
+            return string.Empty;
+        })
+        .Where(type => type.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(type => type.Equals("Dinner", StringComparison.OrdinalIgnoreCase)
+            ? 0
+            : type.Equals("Lunch", StringComparison.OrdinalIgnoreCase)
+                ? 1
+                : 2)
+        .ToList();
+    if (selectedMealTypes.Count == 0)
+    {
+        selectedMealTypes = Math.Clamp(Model.Request.MealsPerDay, 1, 3) switch
+        {
+            1 => ["Dinner"],
+            2 => ["Dinner", "Lunch"],
+            _ => ["Dinner", "Lunch", "Breakfast"]
+        };
+    }
+
+    var selectedMealTypesSet = selectedMealTypes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var selectedMealsPerDay = selectedMealTypes.Count;
+    var selectedMealTypesSummary = new[] { "Breakfast", "Lunch", "Dinner" }
+        .Where(type => selectedMealTypesSet.Contains(type))
+        .ToList();
+    var selectedMealTypesSummaryText = selectedMealTypesSummary.Count == 0
+        ? "None selected"
+        : string.Join(", ", selectedMealTypesSummary);
     var isCustomSupermarketSelected = string.Equals(selectedSupermarket, "Custom", StringComparison.OrdinalIgnoreCase);
     var selectedDietary = Model.Request.DietaryModes.ToHashSet(StringComparer.OrdinalIgnoreCase);
     var hasResult = Model.HasResult && Model.Result is not null;
@@ -296,37 +343,45 @@
                     </summary>
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
                         <div class="aislepilot-inline-fields">
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
                                 <label asp-for="Request.HouseholdSize">People</label>
-                                <input asp-for="Request.HouseholdSize"
-                                       type="range"
-                                       min="1"
-                                       max="8"
-                                       step="1"
-                                       class="aislepilot-slider-input"
-                                       data-number-slider-range
-                                       data-number-slider-decimals="0" />
+                                <div class="aislepilot-slider-track-line">
+                                    <span class="aislepilot-slider-boundary">1</span>
+                                    <input asp-for="Request.HouseholdSize"
+                                           type="range"
+                                           min="1"
+                                           max="8"
+                                           step="1"
+                                           class="aislepilot-slider-input"
+                                           aria-label="People"
+                                           data-number-slider-range
+                                           data-number-slider-decimals="0" />
+                                    <span class="aislepilot-slider-boundary">8</span>
+                                </div>
                                 <div class="aislepilot-slider-meta">
                                     <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.HouseholdSize</span>
-                                    <span class="aislepilot-slider-hint">1 to 8</span>
                                 </div>
                                 <span asp-validation-for="Request.HouseholdSize" class="text-danger"></span>
                             </div>
 
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field" data-option-slider>
+                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact" data-option-slider>
                                 <label asp-for="Request.PortionSize">Portion size</label>
                                 <input asp-for="Request.PortionSize" type="hidden" data-option-slider-hidden />
-                                <input type="range"
-                                       min="0"
-                                       max="@Math.Max(0, portionSizeOptions.Length - 1)"
-                                       step="1"
-                                       value="@selectedPortionSizeIndex"
-                                       class="aislepilot-slider-input"
-                                       data-option-slider-range
-                                       data-option-slider-values="@portionSizeSliderValues" />
+                                <div class="aislepilot-slider-track-line">
+                                    <span class="aislepilot-slider-boundary">@portionSizeOptions.First()</span>
+                                    <input type="range"
+                                           min="0"
+                                           max="@Math.Max(0, portionSizeOptions.Length - 1)"
+                                           step="1"
+                                           value="@selectedPortionSizeIndex"
+                                           class="aislepilot-slider-input"
+                                           aria-label="Portion size"
+                                           data-option-slider-range
+                                           data-option-slider-values="@portionSizeSliderValues" />
+                                    <span class="aislepilot-slider-boundary">@portionSizeOptions.Last()</span>
+                                </div>
                                 <div class="aislepilot-slider-meta">
                                     <span class="aislepilot-slider-value" data-option-slider-value>@selectedPortionSize</span>
-                                    <span class="aislepilot-slider-hint">@portionSizeOptions.First() to @portionSizeOptions.Last()</span>
                                 </div>
                                 <span asp-validation-for="Request.PortionSize" class="text-danger"></span>
                             </div>
@@ -408,81 +463,172 @@
                     </span>
                 </legend>
                 <div class="aislepilot-inline-fields">
-                    <div class="aislepilot-field aislepilot-field-chip aislepilot-field--full">
-                        <label asp-for="Request.Supermarket">Supermarket</label>
-                        <div class="aislepilot-supermarket-options">
-                            @foreach (var store in supermarketOptions)
-                            {
-                                var isSelectedStore = store.Equals(selectedSupermarket, StringComparison.OrdinalIgnoreCase);
-                                <label class="aislepilot-supermarket-option">
-                                    @if (isSelectedStore)
+                    <details class="aislepilot-field aislepilot-field-chip aislepilot-field--full aislepilot-plan-basic-item"
+                             data-plan-basic-item="supermarket"
+                             open>
+                        <summary class="aislepilot-plan-basic-summary-row">
+                            <span class="aislepilot-plan-basic-summary-label">Supermarket</span>
+                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@FormatSetupOptionLabel(selectedSupermarket)</span>
+                        </summary>
+                        <div class="aislepilot-plan-basic-content">
+                            <label asp-for="Request.Supermarket" class="sr-only">Supermarket</label>
+                            <div class="aislepilot-supermarket-options" role="group" aria-label="Supermarket">
+                                @foreach (var store in supermarketOptions)
+                                {
+                                    var isSelectedStore = store.Equals(selectedSupermarket, StringComparison.OrdinalIgnoreCase);
+                                    <label class="aislepilot-supermarket-option">
+                                        @if (isSelectedStore)
+                                        {
+                                            <input type="radio" name="Request.Supermarket" value="@store" checked data-supermarket-option />
+                                        }
+                                        else
+                                        {
+                                            <input type="radio" name="Request.Supermarket" value="@store" data-supermarket-option />
+                                        }
+                                        <span>@FormatSetupOptionLabel(store)</span>
+                                    </label>
+                                }
+                            </div>
+                            <span asp-validation-for="Request.Supermarket" class="text-danger"></span>
+                        </div>
+                    </details>
+
+                    <details class="aislepilot-field aislepilot-field-chip aislepilot-field--full aislepilot-meals-per-day-field aislepilot-plan-basic-item"
+                             data-plan-basic-item="meal-types">
+                        <summary class="aislepilot-plan-basic-summary-row">
+                            <span class="aislepilot-plan-basic-summary-label">Meals to include</span>
+                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@selectedMealTypesSummaryText</span>
+                        </summary>
+                        <div class="aislepilot-plan-basic-content">
+                            <label asp-for="Request.MealsPerDay" class="sr-only">Meals to include</label>
+                            <input asp-for="Request.MealsPerDay" type="hidden" value="@selectedMealsPerDay" />
+                            <input type="hidden" name="Request.SelectedMealTypes" value="" />
+                            <div class="aislepilot-meals-per-day-options" role="group" aria-label="Meals to include">
+                                <label class="aislepilot-meals-per-day-option">
+                                    @if (selectedMealTypesSet.Contains("Breakfast"))
                                     {
-                                        <input type="radio" name="Request.Supermarket" value="@store" checked data-supermarket-option />
+                                        <input type="checkbox" name="Request.SelectedMealTypes" value="Breakfast" checked />
                                     }
                                     else
                                     {
-                                        <input type="radio" name="Request.Supermarket" value="@store" data-supermarket-option />
+                                        <input type="checkbox" name="Request.SelectedMealTypes" value="Breakfast" />
                                     }
-                                    <span>@FormatSetupOptionLabel(store)</span>
+                                    <span>Breakfast</span>
                                 </label>
-                            }
+                                <label class="aislepilot-meals-per-day-option">
+                                    @if (selectedMealTypesSet.Contains("Lunch"))
+                                    {
+                                        <input type="checkbox" name="Request.SelectedMealTypes" value="Lunch" checked />
+                                    }
+                                    else
+                                    {
+                                        <input type="checkbox" name="Request.SelectedMealTypes" value="Lunch" />
+                                    }
+                                    <span>Lunch</span>
+                                </label>
+                                <label class="aislepilot-meals-per-day-option">
+                                    @if (selectedMealTypesSet.Contains("Dinner"))
+                                    {
+                                        <input type="checkbox" name="Request.SelectedMealTypes" value="Dinner" checked />
+                                    }
+                                    else
+                                    {
+                                        <input type="checkbox" name="Request.SelectedMealTypes" value="Dinner" />
+                                    }
+                                    <span>Dinner</span>
+                                </label>
+                            </div>
+                            <span asp-validation-for="Request.SelectedMealTypes" class="text-danger"></span>
+                            <span asp-validation-for="Request.MealsPerDay" class="text-danger"></span>
                         </div>
-                        <span asp-validation-for="Request.Supermarket" class="text-danger"></span>
-                    </div>
+                    </details>
 
-                    <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
-                        <label asp-for="Request.WeeklyBudget">Weekly budget</label>
-                        <input asp-for="Request.WeeklyBudget"
-                               type="range"
-                               min="15"
-                               max="600"
-                               step="5"
-                               class="aislepilot-slider-input"
-                               data-number-slider-range
-                               data-number-slider-prefix="&pound;"
-                               data-number-slider-decimals="0" />
-                        <div class="aislepilot-slider-meta">
-                            <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
-                            <span class="aislepilot-slider-hint">&pound;15 to &pound;600</span>
+                    <details class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-plan-basic-item"
+                             data-plan-basic-item="plan-days">
+                        <summary class="aislepilot-plan-basic-summary-row">
+                            <span class="aislepilot-plan-basic-summary-label">Plan length</span>
+                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@($"{selectedPlanDays} day{(selectedPlanDays == 1 ? string.Empty : "s")}")</span>
+                        </summary>
+                        <div class="aislepilot-plan-basic-content">
+                            <label asp-for="Request.PlanDays" class="sr-only">Plan length</label>
+                            <div class="aislepilot-slider-track-line">
+                                <span class="aislepilot-slider-boundary">1</span>
+                                <input asp-for="Request.PlanDays"
+                                       type="range"
+                                       min="1"
+                                       max="7"
+                                       step="1"
+                                       class="aislepilot-slider-input"
+                                       aria-label="Plan length"
+                                       data-number-slider-range
+                                       data-number-slider-decimals="0"
+                                       data-plan-days-slider />
+                                <span class="aislepilot-slider-boundary">7</span>
+                            </div>
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-number-slider-value>@selectedPlanDays</span>
+                            </div>
+                            <span asp-validation-for="Request.PlanDays" class="text-danger"></span>
                         </div>
-                        <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
-                    </div>
+                    </details>
 
-                    <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
-                        <label asp-for="Request.PlanDays">Plan length</label>
-                        <input asp-for="Request.PlanDays"
-                               type="range"
-                               min="1"
-                               max="7"
-                               step="1"
-                               class="aislepilot-slider-input"
-                               data-number-slider-range
-                               data-number-slider-decimals="0"
-                               data-plan-days-slider />
-                        <div class="aislepilot-slider-meta">
-                            <span class="aislepilot-slider-value" data-number-slider-value>@selectedPlanDays</span>
-                            <span class="aislepilot-slider-hint">1 to 7 days</span>
+                    <details class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-plan-basic-item"
+                             data-plan-basic-item="cook-days">
+                        <summary class="aislepilot-plan-basic-summary-row">
+                            <span class="aislepilot-plan-basic-summary-label">Cook days</span>
+                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@($"{selectedCookDays} day{(selectedCookDays == 1 ? string.Empty : "s")}")</span>
+                        </summary>
+                        <div class="aislepilot-plan-basic-content">
+                            <label asp-for="Request.CookDays" class="sr-only">Cook days</label>
+                            <div class="aislepilot-slider-track-line">
+                                <span class="aislepilot-slider-boundary">1</span>
+                                <input asp-for="Request.CookDays"
+                                       type="range"
+                                       min="1"
+                                       max="7"
+                                       step="1"
+                                       class="aislepilot-slider-input"
+                                       aria-label="Cook days"
+                                       data-number-slider-range
+                                       data-number-slider-decimals="0"
+                                       data-cook-days-slider />
+                                <span class="aislepilot-slider-boundary">7</span>
+                            </div>
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
+                            </div>
+                            <span asp-validation-for="Request.CookDays" class="text-danger"></span>
                         </div>
-                        <span asp-validation-for="Request.PlanDays" class="text-danger"></span>
-                    </div>
+                    </details>
 
-                    <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
-                        <label asp-for="Request.CookDays">Cook days</label>
-                        <input asp-for="Request.CookDays"
-                               type="range"
-                               min="1"
-                               max="@selectedPlanDays"
-                               step="1"
-                               class="aislepilot-slider-input"
-                               data-number-slider-range
-                               data-number-slider-decimals="0"
-                               data-cook-days-slider />
-                        <div class="aislepilot-slider-meta">
-                            <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
-                            <span class="aislepilot-slider-hint" data-cook-days-hint>1 to @selectedPlanDays</span>
+                    <details class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-plan-basic-item"
+                             data-plan-basic-item="budget">
+                        <summary class="aislepilot-plan-basic-summary-row">
+                            <span class="aislepilot-plan-basic-summary-label">Weekly budget</span>
+                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@Model.Request.WeeklyBudget.ToString("C0", ukCulture)</span>
+                        </summary>
+                        <div class="aislepilot-plan-basic-content">
+                            <label asp-for="Request.WeeklyBudget" class="sr-only">Weekly budget</label>
+                            <div class="aislepilot-slider-track-line">
+                                <span class="aislepilot-slider-boundary">&pound;15</span>
+                                <input asp-for="Request.WeeklyBudget"
+                                       type="range"
+                                       min="15"
+                                       max="600"
+                                       step="5"
+                                       class="aislepilot-slider-input"
+                                       aria-label="Weekly budget"
+                                       data-number-slider-range
+                                       data-number-slider-prefix="&pound;"
+                                       data-number-slider-decimals="0" />
+                                <span class="aislepilot-slider-boundary">&pound;600</span>
+                            </div>
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
+                            </div>
+                            <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
                         </div>
-                        <span asp-validation-for="Request.CookDays" class="text-danger"></span>
-                    </div>
+                    </details>
                 </div>
             </fieldset>
 
@@ -541,56 +687,65 @@
                             <span asp-validation-for="Request.Supermarket" class="text-danger"></span>
                         </div>
 
-                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
                             <label asp-for="Request.WeeklyBudget">Weekly budget</label>
-                            <input asp-for="Request.WeeklyBudget"
-                                   type="range"
-                                   min="15"
-                                   max="600"
-                                   step="5"
-                                   class="aislepilot-slider-input"
-                                   data-number-slider-range
-                                   data-number-slider-prefix="&pound;"
-                                   data-number-slider-decimals="0" />
+                            <div class="aislepilot-slider-track-line">
+                                <span class="aislepilot-slider-boundary">&pound;15</span>
+                                <input asp-for="Request.WeeklyBudget"
+                                       type="range"
+                                       min="15"
+                                       max="600"
+                                       step="5"
+                                       class="aislepilot-slider-input"
+                                       data-number-slider-range
+                                       data-number-slider-prefix="&pound;"
+                                       data-number-slider-decimals="0" />
+                                <span class="aislepilot-slider-boundary">&pound;600</span>
+                            </div>
                             <div class="aislepilot-slider-meta">
                                 <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
-                                <span class="aislepilot-slider-hint">&pound;15 to &pound;600</span>
                             </div>
                             <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
                         </div>
 
-                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
                             <label asp-for="Request.PlanDays">Plan length</label>
-                            <input asp-for="Request.PlanDays"
-                                   type="range"
-                                   min="1"
-                                   max="7"
-                                   step="1"
-                                   class="aislepilot-slider-input"
-                                   data-number-slider-range
-                                   data-number-slider-decimals="0"
-                                   data-plan-days-slider />
+                            <div class="aislepilot-slider-track-line">
+                                <span class="aislepilot-slider-boundary">1</span>
+                                <input asp-for="Request.PlanDays"
+                                       type="range"
+                                       min="1"
+                                       max="7"
+                                       step="1"
+                                       class="aislepilot-slider-input"
+                                       data-number-slider-range
+                                       data-number-slider-decimals="0"
+                                       data-plan-days-slider />
+                                <span class="aislepilot-slider-boundary">7</span>
+                            </div>
                             <div class="aislepilot-slider-meta">
                                 <span class="aislepilot-slider-value" data-number-slider-value>@selectedPlanDays</span>
-                                <span class="aislepilot-slider-hint">1 to 7 days</span>
                             </div>
                             <span asp-validation-for="Request.PlanDays" class="text-danger"></span>
                         </div>
 
-                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
                             <label asp-for="Request.CookDays">Cook days</label>
-                            <input asp-for="Request.CookDays"
-                                   type="range"
-                                   min="1"
-                                   max="@selectedPlanDays"
-                                   step="1"
-                                   class="aislepilot-slider-input"
-                                   data-number-slider-range
-                                   data-number-slider-decimals="0"
-                                   data-cook-days-slider />
+                            <div class="aislepilot-slider-track-line">
+                                <span class="aislepilot-slider-boundary">1</span>
+                                <input asp-for="Request.CookDays"
+                                       type="range"
+                                       min="1"
+                                       max="7"
+                                       step="1"
+                                       class="aislepilot-slider-input"
+                                       data-number-slider-range
+                                       data-number-slider-decimals="0"
+                                       data-cook-days-slider />
+                                <span class="aislepilot-slider-boundary">7</span>
+                            </div>
                             <div class="aislepilot-slider-meta">
                                 <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
-                                <span class="aislepilot-slider-hint" data-cook-days-hint>1 to @selectedPlanDays</span>
                             </div>
                             <span asp-validation-for="Request.CookDays" class="text-danger"></span>
                         </div>
@@ -857,436 +1012,7 @@
     </section>
 }
 
-@if (hasResult)
-{
-    var result = Model.Result!;
-    var aisleRank = result.AisleOrderUsed
-        .Select((department, index) => new { department, index })
-        .ToDictionary(x => x.department, x => x.index, StringComparer.OrdinalIgnoreCase);
-    var groupedItems = result.ShoppingItems
-        .GroupBy(item => item.Department)
-        .OrderBy(group => aisleRank.GetValueOrDefault(group.Key, int.MaxValue))
-        .ToList();
-    var planDays = Math.Clamp(result.PlanDays, 1, 7);
-    var weekDayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
-    var weekDayShortLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
-    var planWeekDayNames = weekDayNames.Take(planDays).ToArray();
-    var planWeekDayShortLabels = weekDayShortLabels.Take(planDays).ToArray();
-    var weekDayLookup = planWeekDayNames
-        .Select((name, index) => new { name, index })
-        .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
-    var leftoverSourceWeekDayIndexes = result.MealPlan
-        .SelectMany(meal =>
-        {
-            if (!weekDayLookup.TryGetValue(meal.Day, out var weekDayIndex))
-            {
-                return Enumerable.Empty<int>();
-            }
-
-            return Enumerable.Repeat(weekDayIndex, meal.LeftoverDaysCovered);
-        })
-        .ToList();
-    var leftoverSourceDayIndexesCsv = string.Join(",", leftoverSourceWeekDayIndexes);
-    var currentPlanMealNames = result.MealPlan
-        .Select(meal => meal.MealName)
-        .ToList();
-    var mealCount = result.MealPlan.Count;
-    var mealLabel = mealCount == 1 ? "meal" : "meals";
-    var totalShopItems = result.ShoppingItems.Count;
-    var departmentCount = groupedItems.Count;
-    var shoppingListNotesBuilder = new StringBuilder();
-    shoppingListNotesBuilder.AppendLine("AislePilot Shopping List");
-    shoppingListNotesBuilder.AppendLine($"Supermarket: {result.Supermarket}");
-    shoppingListNotesBuilder.AppendLine($"Estimated total: {result.EstimatedTotalCost.ToString("C", ukCulture)}");
-    shoppingListNotesBuilder.AppendLine();
-    foreach (var department in groupedItems)
-    {
-        shoppingListNotesBuilder.AppendLine(department.Key);
-        foreach (var item in department)
-        {
-            shoppingListNotesBuilder.AppendLine(
-                $"[ ] {item.Name} ({item.QuantityDisplay}) - {item.EstimatedCost.ToString("C", ukCulture)}");
-        }
-        shoppingListNotesBuilder.AppendLine();
-    }
-    var shoppingListNotesText = shoppingListNotesBuilder.ToString().TrimEnd();
-    AislePilotHiddenRequestFieldsViewModel BuildHiddenRequestFields(
-        bool includeCurrentPlanMealNames = false,
-        bool includeLeftoverCsvDataAttribute = false)
-    {
-        return new AislePilotHiddenRequestFieldsViewModel
-        {
-            ReturnUrl = Model.ReturnUrl,
-            Request = Model.Request,
-            LeftoverCookDayIndexesCsv = leftoverSourceDayIndexesCsv,
-            CurrentPlanMealNames = includeCurrentPlanMealNames
-                ? currentPlanMealNames
-                : Array.Empty<string>(),
-            IncludeCurrentPlanMealNames = includeCurrentPlanMealNames,
-            IncludeLeftoverCsvDataAttribute = includeLeftoverCsvDataAttribute
-        };
-    }
-
-    <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-reveal>
-        <div class="aislepilot-section-head">
-            <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Overview</h2>
-            <div class="aislepilot-overview-actions">
-                <form method="post" action="@Url.Action("Index", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
-                    @Html.AntiForgeryToken()
-                    <partial name="_AislePilotHiddenRequestFields"
-                             model="BuildHiddenRequestFields()" />
-                    <button type="submit" class="aislepilot-overview-regenerate-btn" data-loading-label="Regenerating...">Regenerate plan</button>
-                </form>
-                <button
-                    type="button"
-                    class="aislepilot-edit-setup-btn"
-                    data-setup-toggle
-                    aria-controls="aislepilot-setup"
-                    aria-expanded="false">
-                    Edit setup
-                </button>
-            </div>
-        </div>
-        @if (result.IsOverBudget)
-        {
-            <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
-                <p class="aislepilot-overbudget-title">
-                    This plan is @Math.Abs(result.BudgetDelta).ToString("C", ukCulture) over your weekly budget.
-                </p>
-                <p class="aislepilot-overbudget-note">
-                    @(string.IsNullOrWhiteSpace(result.BudgetRebalanceStatusMessage)
-                        ? "Keep this plan if you are happy to spend more, or refresh with a lower-cost mix."
-                        : result.BudgetRebalanceStatusMessage)
-                </p>
-                <form method="post"
-                      action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"
-                      class="aislepilot-overview-regenerate-form">
-                    @Html.AntiForgeryToken()
-                    <partial name="_AislePilotHiddenRequestFields"
-                             model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                    <button type="submit"
-                            class="aislepilot-overview-regenerate-btn"
-                            data-loading-label="Refreshing lower-cost plan...">
-                        Refresh for lower cost
-                    </button>
-                </form>
-            </div>
-        }
-        <div class="aislepilot-budget-grid">
-            <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Supermarket</p>
-                <p class="aislepilot-stat-value">@result.Supermarket</p>
-            </article>
-            <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Portion size</p>
-                <p class="aislepilot-stat-value">@result.PortionSize</p>
-            </article>
-            <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Budget</p>
-                <p class="aislepilot-stat-value">@result.WeeklyBudget.ToString("C", ukCulture)</p>
-            </article>
-            <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Estimated total</p>
-                <p class="aislepilot-stat-value">@result.EstimatedTotalCost.ToString("C", ukCulture)</p>
-            </article>
-            <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Budget difference</p>
-                <p class="aislepilot-stat-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
-                    @result.BudgetDelta.ToString("C", ukCulture)
-                </p>
-            </article>
-            <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Plan length</p>
-                <p class="aislepilot-stat-value">@result.PlanDays day(s)</p>
-            </article>
-            <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Cook days</p>
-                <p class="aislepilot-stat-value">@result.CookDays</p>
-            </article>
-            <article class="aislepilot-stat-card">
-                <p class="aislepilot-stat-label">Leftovers</p>
-                <p class="aislepilot-stat-value">@result.LeftoverDays day(s)</p>
-            </article>
-        </div>
-
-    </section>
-
-    <section class="aislepilot-shell aislepilot-window-shell" aria-labelledby="aislepilot-window-title" data-aislepilot-window data-reveal>
-        <div class="aislepilot-window-head">
-            <h2 id="aislepilot-window-title" class="aislepilot-section-title">
-                Weekly plan
-                <span class="aislepilot-window-title-meta">@mealCount @mealLabel generated</span>
-            </h2>
-            <div class="aislepilot-window-nav">
-                <p class="aislepilot-window-nav-hint" data-window-hint>Tap a tab to switch between meals, shopping list, and exports.</p>
-                <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
-                    <button type="button" id="aislepilot-tab-meals" class="aislepilot-window-tab" data-window-tab="aislepilot-meals" role="tab" aria-controls="aislepilot-meals" aria-selected="true">
-                        <span class="aislepilot-tab-label">
-                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" focusable="false">
-                                    <circle cx="5" cy="7" r="1"></circle>
-                                    <circle cx="5" cy="12" r="1"></circle>
-                                    <circle cx="5" cy="17" r="1"></circle>
-                                    <path d="M8 7h11M8 12h11M8 17h11"></path>
-                                </svg>
-                            </span>
-                            Meals
-                        </span>
-                    </button>
-                    <button type="button" id="aislepilot-tab-shop" class="aislepilot-window-tab" data-window-tab="aislepilot-shop" role="tab" aria-controls="aislepilot-shop" aria-selected="false">
-                        <span class="aislepilot-tab-label">
-                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" focusable="false">
-                                    <circle cx="9" cy="19" r="1.5"></circle>
-                                    <circle cx="17" cy="19" r="1.5"></circle>
-                                    <path d="M3 4h2l2.4 10h10.8l1.8-7H7"></path>
-                                </svg>
-                            </span>
-                            Shopping
-                        </span>
-                    </button>
-                    <button type="button" id="aislepilot-tab-export" class="aislepilot-window-tab" data-window-tab="aislepilot-export" role="tab" aria-controls="aislepilot-export" aria-selected="false">
-                        <span class="aislepilot-tab-label">
-                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" focusable="false">
-                                    <path d="M12 16V6"></path>
-                                    <path d="m8 10 4-4 4 4"></path>
-                                    <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
-                                </svg>
-                            </span>
-                            Export
-                        </span>
-                    </button>
-                </div>
-            </div>
-        </div>
-        <div class="aislepilot-window-viewport" data-window-viewport>
-            <div class="aislepilot-window-track" data-window-track>
-                <section id="aislepilot-meals" aria-label="Meals" role="tabpanel" aria-labelledby="aislepilot-tab-meals" class="aislepilot-window-panel" data-window-name="Meals">
-                    @if (result.LeftoverDays > 0)
-                    {
-                        <div class="aislepilot-leftover-editor">
-                            <div class="aislepilot-leftover-editor-head">
-                                <p class="aislepilot-window-meta">@result.LeftoverDays leftover day(s) are allocated. Green days are double-cook days.</p>
-                                <button type="button"
-                                        class="aislepilot-leftover-toggle"
-                                        data-leftover-toggle
-                                        aria-expanded="false">
-                                    Rebalance leftovers
-                                </button>
-                            </div>
-                            <div class="aislepilot-leftover-planner-shell" data-leftover-planner hidden>
-                                <p class="aislepilot-leftover-helper">Tap a day with leftovers, then tap another day to move one leftover.</p>
-                                <form method="post"
-                                      action="@Url.Action("Index", "AislePilot")#aislepilot-meals"
-                                      class="aislepilot-leftover-rebalance-form"
-                                      data-leftover-rebalance-form
-                                      data-preserve-scroll-form>
-                                    @Html.AntiForgeryToken()
-                                    <partial name="_AislePilotHiddenRequestFields"
-                                             model="BuildHiddenRequestFields(includeLeftoverCsvDataAttribute: true)" />
-                                </form>
-                                <div class="aislepilot-leftover-planner" role="list" aria-label="Leftover day allocation">
-                                    @for (var dayIndex = 0; dayIndex < planWeekDayNames.Length; dayIndex++)
-                                    {
-                                        var dayLeftoverCount = leftoverSourceWeekDayIndexes.Count(index => index == dayIndex);
-                                        var dayChipClass = dayLeftoverCount > 0
-                                            ? "aislepilot-leftover-day-chip is-leftover-source"
-                                            : "aislepilot-leftover-day-chip";
-                                        <button type="button"
-                                                class="@dayChipClass"
-                                                data-leftover-day-zone
-                                                data-day-index="@dayIndex"
-                                                data-leftover-count="@dayLeftoverCount"
-                                                aria-label="Leftover allocation for @planWeekDayNames[dayIndex]"
-                                                role="listitem">
-                                            <span class="aislepilot-leftover-day-name">@planWeekDayShortLabels[dayIndex]</span>
-                                        </button>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    }
-                    <div class="aislepilot-meal-grid"
-                         data-meal-image-poll-root
-                         data-fallback-meal-image-url="@fallbackMealImageUrl"
-                         data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
-                         data-meal-image-poll-url="@mealImagesPollUrl">
-                        @for (var mealIndex = 0; mealIndex < result.MealPlan.Count; mealIndex++)
-                        {
-                            var meal = result.MealPlan[mealIndex];
-                            var mealCardClass = meal.LeftoverDaysCovered > 0 ? "aislepilot-card is-leftover-source" : "aislepilot-card";
-                            <article class="@mealCardClass" data-leftover-day-card data-day-index="@mealIndex">
-                                <div class="aislepilot-meal-image-shell">
-                                    <img class="aislepilot-meal-image"
-                                         src="@ResolveClientMealImageUrl(meal.MealImageUrl)"
-                                         data-meal-image
-                                         data-meal-name="@meal.MealName"
-                                         alt="@($"{meal.MealName} plated meal")"
-                                         loading="lazy"
-                                         decoding="async" />
-                                </div>
-                                <div class="aislepilot-card-head">
-                                    <p class="aislepilot-card-kicker">@meal.Day</p>
-                                    <p class="aislepilot-cost">@meal.EstimatedCost.ToString("C", ukCulture)</p>
-                                </div>
-                                <h3>@meal.MealName</h3>
-                                <div class="aislepilot-card-compact-meta">
-                                    <span class="aislepilot-card-meta-pill">
-                                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                            <svg viewBox="0 0 24 24" focusable="false">
-                                                <circle cx="12" cy="12" r="7"></circle>
-                                                <path d="M12 8v4l3 2"></path>
-                                            </svg>
-                                        </span>
-                                        Prep @meal.EstimatedPrepMinutes mins
-                                    </span>
-                                    @if (meal.LeftoverDaysCovered > 0)
-                                    {
-                                        <span class="aislepilot-card-meta-pill">
-                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                <svg viewBox="0 0 24 24" focusable="false">
-                                                    <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
-                                                    <path d="M20 4v6h-6"></path>
-                                                </svg>
-                                            </span>
-                                            Makes extra for @meal.LeftoverDaysCovered leftover day(s)
-                                        </span>
-                                    }
-                                </div>
-                                <div class="aislepilot-card-action-row">
-                                    <details class="aislepilot-meal-details">
-                                        <summary>
-                                            <span class="aislepilot-btn-label">
-                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                    <svg viewBox="0 0 24 24" focusable="false">
-                                                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                                                        <circle cx="12" cy="12" r="2.5"></circle>
-                                                    </svg>
-                                                </span>
-                                                View details
-                                            </span>
-                                        </summary>
-                                        <div class="aislepilot-meal-details-panel">
-                                            <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
-                                            <div class="aislepilot-meal-details-grid">
-                                                <div class="aislepilot-nutrition-details">
-                                                    <p class="aislepilot-card-kicker">Est. calories + macros</p>
-                                                    <ul class="aislepilot-nutrition-list">
-                                                        <li>@meal.CaloriesPerServing kcal per serving</li>
-                                                        <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                                        <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                                        <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g</li>
-                                                    </ul>
-                                                </div>
-                                                <div class="aislepilot-recipe-details">
-                                                    <p class="aislepilot-card-kicker">Ingredients</p>
-                                                    <ul class="case-list">
-                                                        @foreach (var ingredientLine in meal.IngredientLines)
-                                                        {
-                                                            <li>@ingredientLine</li>
-                                                        }
-                                                    </ul>
-                                                    <p class="aislepilot-card-kicker">Method</p>
-                                                    <ol class="case-list">
-                                                        @foreach (var step in meal.RecipeSteps)
-                                                        {
-                                                            <li>@step</li>
-                                                        }
-                                                    </ol>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </details>
-
-                                    <form method="post"
-                                          action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
-                                          class="aislepilot-swap-form aislepilot-card-action-inline"
-                                          data-preserve-scroll-form
-                                          data-ajax-swap-form>
-                                        @Html.AntiForgeryToken()
-                                        <partial name="_AislePilotHiddenRequestFields"
-                                                 model="BuildHiddenRequestFields()" />
-                                        <input type="hidden" name="dayIndex" value="@mealIndex" />
-                                        <input type="hidden" name="currentMealName" value="@meal.MealName" />
-                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping..." data-loading-delay-ms="220">
-                                            <span class="aislepilot-btn-label">
-                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                    <svg viewBox="0 0 24 24" focusable="false">
-                                                        <path d="M16 3h5v5"></path>
-                                                        <path d="M21 3 9 15"></path>
-                                                        <path d="M8 21H3v-5"></path>
-                                                        <path d="M3 21 15 9"></path>
-                                                    </svg>
-                                                </span>
-                                                Swap meal
-                                            </span>
-                                        </button>
-                                    </form>
-                                </div>
-                            </article>
-                        }
-                    </div>
-                </section>
-
-                <section id="aislepilot-shop" aria-label="Shopping" role="tabpanel" aria-labelledby="aislepilot-tab-shop" class="aislepilot-window-panel" data-window-name="Shopping">
-                    <div class="aislepilot-shopping-grid">
-                        @foreach (var department in groupedItems)
-                        {
-                            <article class="aislepilot-card">
-                                <h3>@department.Key</h3>
-                                <ul class="aislepilot-shop-list">
-                                    @foreach (var item in department)
-                                    {
-                                        <li>
-                                            <label class="aislepilot-checkbox-item">
-                                                <input type="checkbox" />
-                                                <span>@item.Name (@item.QuantityDisplay) - @item.EstimatedCost.ToString("C", ukCulture)</span>
-                                            </label>
-                                        </li>
-                                    }
-                                </ul>
-                            </article>
-                        }
-                    </div>
-                </section>
-
-                <section id="aislepilot-export" aria-label="Export" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel" data-window-name="Export">
-                    <div class="aislepilot-export-actions">
-                        <form method="post" asp-action="ExportPlanPack">
-                            @Html.AntiForgeryToken()
-                            <partial name="_AislePilotHiddenRequestFields"
-                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                            <button type="submit" class="aislepilot-export-btn" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
-                        </form>
-
-                        <form method="post" asp-action="ExportChecklist">
-                            @Html.AntiForgeryToken()
-                            <partial name="_AislePilotHiddenRequestFields"
-                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                            <button type="submit" class="aislepilot-export-btn" data-loading-label="Building checklist...">Download shopping checklist (.txt)</button>
-                        </form>
-
-                        <button type="button" class="aislepilot-export-btn" onclick="window.print()">Print current view</button>
-
-                        <div data-notes-export-shell>
-                            <textarea hidden data-notes-export-content>@shoppingListNotesText</textarea>
-                            <button type="button"
-                                    class="aislepilot-export-btn"
-                                    data-notes-export-trigger
-                                    data-notes-default-label="Share shopping list to iPhone Notes"
-                                    data-notes-shared-label="Share sheet opened. Choose Notes."
-                                    data-notes-copied-label="Shopping list copied. Paste into Notes."
-                                    data-notes-failed-label="Could not share. Try again.">
-                                Share shopping list to iPhone Notes
-                            </button>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </div>
-    </section>
-}
+<partial name="_AislePilotResultSections" model="Model" />
 </div>
 
 @section Head {

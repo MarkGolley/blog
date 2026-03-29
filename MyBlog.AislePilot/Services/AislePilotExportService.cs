@@ -81,6 +81,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
             ("Household size", request.HouseholdSize.ToString(ukCulture)),
             ("Plan length", result.PlanDays.ToString(ukCulture)),
             ("Cook days", result.CookDays.ToString(ukCulture)),
+            ("Meals per day", result.MealsPerDay.ToString(ukCulture)),
             ("Leftover days", result.LeftoverDays.ToString(ukCulture)),
             ("Dietary requirements", dietaryModesText),
             ("Weekly budget", result.WeeklyBudget.ToString("C", ukCulture)),
@@ -361,7 +362,10 @@ public sealed class AislePilotExportService : IAislePilotExportService
                                 section.Item().Border(0.7f).BorderColor(line).Background(panel).Padding(9).Column(card =>
                                 {
                                     card.Spacing(5);
-                                    card.Item().Text($"{meal.Day} - {meal.MealName}").FontSize(11.5f).SemiBold().FontColor(brandDeep);
+                                    var mealHeading = meal.IsIgnored
+                                        ? $"{meal.Day} - {meal.MealType}: {meal.MealName} (Ignored)"
+                                        : $"{meal.Day} - {meal.MealType}: {meal.MealName}";
+                                    card.Item().Text(mealHeading).FontSize(11.5f).SemiBold().FontColor(brandDeep);
 
                                     card.Item().Row(meta =>
                                     {

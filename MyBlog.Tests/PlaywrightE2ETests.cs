@@ -108,7 +108,8 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var swapButtons = page.Locator(".aislepilot-swap-btn");
+        var swapButtons = page.Locator(
+            ".aislepilot-day-meal-panel[aria-hidden='false'] form[action*='/swap-meal'] button.aislepilot-swap-btn:has-text('Swap meal')");
         var swapButtonCount = await swapButtons.CountAsync();
         Assert.True(swapButtonCount > 0, "Expected at least one swap meal button to be rendered.");
 

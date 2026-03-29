@@ -131,10 +131,177 @@
             ? Array.from(scope.querySelectorAll("form"))
             : getAislePilotForms();
 
+        const readStepDecimals = stepRaw => {
+            if (typeof stepRaw !== "string") {
+                return 0;
+            }
+
+            const normalized = stepRaw.trim();
+            if (normalized.length === 0 || normalized === "any") {
+                return 0;
+            }
+
+            const decimalPointIndex = normalized.indexOf(".");
+            if (decimalPointIndex < 0) {
+                return 0;
+            }
+
+            const decimalCount = normalized.length - decimalPointIndex - 1;
+            return Math.max(0, Math.min(6, decimalCount));
+        };
+
+        const setRangeValueFromClientX = (rangeInput, clientX) => {
+            if (!(rangeInput instanceof HTMLInputElement)) {
+                return false;
+            }
+
+            const inputRect = rangeInput.getBoundingClientRect();
+            if (inputRect.width <= 0) {
+                return false;
+            }
+
+            const parsedMin = Number.parseFloat(rangeInput.min ?? "0");
+            const parsedMax = Number.parseFloat(rangeInput.max ?? "100");
+            if (!Number.isFinite(parsedMin) || !Number.isFinite(parsedMax) || parsedMax <= parsedMin) {
+                return false;
+            }
+
+            const relative = (clientX - inputRect.left) / inputRect.width;
+            const ratio = Math.max(0, Math.min(1, Number.isFinite(relative) ? relative : 0));
+            let nextValue = parsedMin + ((parsedMax - parsedMin) * ratio);
+
+            const stepRaw = (rangeInput.step ?? "").trim();
+            if (stepRaw.length > 0 && stepRaw !== "any") {
+                const parsedStep = Number.parseFloat(stepRaw);
+                if (Number.isFinite(parsedStep) && parsedStep > 0) {
+                    const totalSteps = Math.round((nextValue - parsedMin) / parsedStep);
+                    nextValue = parsedMin + (totalSteps * parsedStep);
+                }
+            }
+
+            nextValue = Math.max(parsedMin, Math.min(parsedMax, nextValue));
+            const stepDecimals = readStepDecimals(rangeInput.step ?? "0");
+            const nextValueText = nextValue.toFixed(stepDecimals);
+            if (rangeInput.value === nextValueText) {
+                return false;
+            }
+
+            rangeInput.value = nextValueText;
+            return true;
+        };
+
+        const wireValueBubbleDrag = (sliderField, rangeInput) => {
+            if (!(sliderField instanceof HTMLElement) || !(rangeInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const valueBubble = sliderField.querySelector(".aislepilot-slider-value");
+            if (!(valueBubble instanceof HTMLElement) || valueBubble.dataset.sliderBubbleDragWired === "true") {
+                return;
+            }
+
+            valueBubble.dataset.sliderBubbleDragWired = "true";
+            let activePointerId = null;
+            let hasMoved = false;
+
+            const emitRangeInput = () => {
+                rangeInput.dispatchEvent(new Event("input", { bubbles: true }));
+            };
+
+            const emitRangeChange = () => {
+                rangeInput.dispatchEvent(new Event("change", { bubbles: true }));
+            };
+
+            const stopDragging = shouldCommit => {
+                if (activePointerId === null) {
+                    return;
+                }
+
+                if (shouldCommit && hasMoved) {
+                    emitRangeChange();
+                }
+
+                activePointerId = null;
+                hasMoved = false;
+                valueBubble.classList.remove("is-dragging");
+            };
+
+            valueBubble.addEventListener("pointerdown", event => {
+                if (event.pointerType === "mouse" && event.button !== 0) {
+                    return;
+                }
+
+                activePointerId = event.pointerId;
+                hasMoved = false;
+                valueBubble.classList.add("is-dragging");
+                valueBubble.setPointerCapture(event.pointerId);
+                if (setRangeValueFromClientX(rangeInput, event.clientX)) {
+                    hasMoved = true;
+                    emitRangeInput();
+                }
+
+                event.preventDefault();
+            });
+
+            valueBubble.addEventListener("pointermove", event => {
+                if (activePointerId === null || event.pointerId !== activePointerId) {
+                    return;
+                }
+
+                if (setRangeValueFromClientX(rangeInput, event.clientX)) {
+                    hasMoved = true;
+                    emitRangeInput();
+                }
+            });
+
+            valueBubble.addEventListener("pointerup", event => {
+                if (activePointerId === null || event.pointerId !== activePointerId) {
+                    return;
+                }
+
+                valueBubble.releasePointerCapture(event.pointerId);
+                stopDragging(true);
+            });
+
+            valueBubble.addEventListener("pointercancel", event => {
+                if (activePointerId === null || event.pointerId !== activePointerId) {
+                    return;
+                }
+
+                valueBubble.releasePointerCapture(event.pointerId);
+                stopDragging(false);
+            });
+        };
+
         const syncSliderProgress = rangeInput => {
             if (!(rangeInput instanceof HTMLInputElement)) {
                 return;
             }
+
+            const sliderField = rangeInput.closest(".aislepilot-slider-field");
+            const syncSliderFieldMetrics = progressPercent => {
+                if (!(sliderField instanceof HTMLElement)) {
+                    return;
+                }
+
+                const boundedProgress = Number.isFinite(progressPercent)
+                    ? Math.max(0, Math.min(100, progressPercent))
+                    : 0;
+                const inputRect = rangeInput.getBoundingClientRect();
+                const fieldRect = sliderField.getBoundingClientRect();
+                const trackWidth = Math.max(1, inputRect.width);
+                const trackOffset = Math.max(0, inputRect.left - fieldRect.left);
+                const valueBubble = sliderField.querySelector(".aislepilot-slider-value");
+                const valueBubbleWidth = valueBubble instanceof HTMLElement
+                    ? Math.max(1, valueBubble.getBoundingClientRect().width)
+                    : 36;
+
+                sliderField.style.setProperty("--slider-progress", `${boundedProgress}%`);
+                sliderField.style.setProperty("--slider-progress-ratio", `${boundedProgress / 100}`);
+                sliderField.style.setProperty("--slider-track-width-px", `${trackWidth}px`);
+                sliderField.style.setProperty("--slider-track-offset-px", `${trackOffset}px`);
+                sliderField.style.setProperty("--slider-value-width-px", `${valueBubbleWidth}px`);
+            };
 
             const min = Number.parseFloat(rangeInput.min ?? "0");
             const max = Number.parseFloat(rangeInput.max ?? "100");
@@ -142,12 +309,14 @@
             const span = max - min;
             if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(value) || span <= 0) {
                 rangeInput.style.setProperty("--slider-progress", "0%");
+                syncSliderFieldMetrics(0);
                 return;
             }
 
             const clamped = Math.min(max, Math.max(min, value));
             const progressPercent = ((clamped - min) / span) * 100;
             rangeInput.style.setProperty("--slider-progress", `${progressPercent}%`);
+            syncSliderFieldMetrics(progressPercent);
         };
 
         forms.forEach(form => {
@@ -211,6 +380,7 @@
                 rangeInput.addEventListener("change", () => {
                     applyOptionValue(true);
                 });
+                wireValueBubbleDrag(sliderField, rangeInput);
 
                 applyOptionValue(false);
             });
@@ -244,12 +414,14 @@
                 rangeInput.dataset.sliderWired = "true";
                 rangeInput.addEventListener("input", applyNumberValue);
                 rangeInput.addEventListener("change", applyNumberValue);
+                if (sliderField instanceof HTMLElement) {
+                    wireValueBubbleDrag(sliderField, rangeInput);
+                }
                 applyNumberValue();
             });
 
             const planDaysSlider = form.querySelector("[data-plan-days-slider]");
             const cookDaysSlider = form.querySelector("[data-cook-days-slider]");
-            const cookDaysHint = form.querySelector("[data-cook-days-hint]");
             const planDaysSliderField = planDaysSlider instanceof HTMLInputElement
                 ? planDaysSlider.closest(".aislepilot-slider-field")
                 : null;
@@ -258,8 +430,28 @@
                 : null;
             const planDaysValueOutput = planDaysSliderField?.querySelector("[data-number-slider-value]");
             const cookDaysValueOutput = cookDaysSliderField?.querySelector("[data-number-slider-value]");
+            let cookDaysLimitFlashTimer = 0;
 
-            const syncPlanDaysConstraint = () => {
+            const flashCookDaysLimit = () => {
+                if (!(cookDaysSliderField instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (cookDaysLimitFlashTimer > 0) {
+                    window.clearTimeout(cookDaysLimitFlashTimer);
+                    cookDaysLimitFlashTimer = 0;
+                }
+
+                cookDaysSliderField.classList.remove("is-limit-flash");
+                cookDaysSliderField.getBoundingClientRect();
+                cookDaysSliderField.classList.add("is-limit-flash");
+                cookDaysLimitFlashTimer = window.setTimeout(() => {
+                    cookDaysSliderField.classList.remove("is-limit-flash");
+                    cookDaysLimitFlashTimer = 0;
+                }, 460);
+            };
+
+            const syncPlanDaysConstraint = source => {
                 if (!(planDaysSlider instanceof HTMLInputElement) || !(cookDaysSlider instanceof HTMLInputElement)) {
                     return;
                 }
@@ -272,16 +464,21 @@
                 const rawCookDays = Number.parseInt(cookDaysSlider.value ?? "1", 10);
                 const cookMinRaw = Number.parseInt(cookDaysSlider.min ?? "1", 10);
                 const cookMin = Number.isInteger(cookMinRaw) ? Math.max(1, cookMinRaw) : 1;
-                const safeCookDays = Number.isInteger(rawCookDays)
+                const clampedCookDays = Number.isInteger(rawCookDays)
                     ? Math.max(cookMin, Math.min(safePlanDays, rawCookDays))
                     : Math.min(safePlanDays, Math.max(cookMin, 1));
+                const safeCookDays = source === "plan-change"
+                    ? safePlanDays
+                    : clampedCookDays;
+                const isOverCookDaysLimit = source === "cook-change" &&
+                    Number.isInteger(rawCookDays) &&
+                    rawCookDays > safePlanDays;
 
                 planDaysSlider.value = `${safePlanDays}`;
-                cookDaysSlider.max = `${safePlanDays}`;
                 cookDaysSlider.value = `${safeCookDays}`;
 
-                if (cookDaysHint instanceof HTMLElement) {
-                    cookDaysHint.textContent = `1 to ${safePlanDays}`;
+                if (isOverCookDaysLimit) {
+                    flashCookDaysLimit();
                 }
                 if (planDaysValueOutput instanceof HTMLElement) {
                     planDaysValueOutput.textContent = `${safePlanDays}`;
@@ -299,18 +496,346 @@
             if (planDaysSlider instanceof HTMLInputElement && cookDaysSlider instanceof HTMLInputElement) {
                 if (form.dataset.planDaysConstraintWired !== "true") {
                     form.dataset.planDaysConstraintWired = "true";
-                    planDaysSlider.addEventListener("input", syncPlanDaysConstraint);
-                    planDaysSlider.addEventListener("change", syncPlanDaysConstraint);
-                    cookDaysSlider.addEventListener("input", syncPlanDaysConstraint);
-                    cookDaysSlider.addEventListener("change", syncPlanDaysConstraint);
+                    planDaysSlider.addEventListener("input", () => {
+                        syncPlanDaysConstraint("plan-change");
+                    });
+                    planDaysSlider.addEventListener("change", () => {
+                        syncPlanDaysConstraint("plan-change");
+                    });
+                    cookDaysSlider.addEventListener("input", () => {
+                        syncPlanDaysConstraint("cook-change");
+                    });
+                    cookDaysSlider.addEventListener("change", () => {
+                        syncPlanDaysConstraint("cook-change");
+                    });
                 }
 
-                syncPlanDaysConstraint();
+                syncPlanDaysConstraint("init");
             }
         });
     };
 
     wirePlanBasicsSliders(document);
+
+    const refreshPlanBasicsSliders = scope => {
+        const sliderScope = scope instanceof Element ? scope : document;
+        const sliderInputs = Array.from(
+            sliderScope.querySelectorAll("[data-number-slider-range], [data-option-slider-range]")
+        );
+        sliderInputs.forEach(input => {
+            if (input instanceof HTMLInputElement) {
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+        });
+    };
+
+    const schedulePlanBasicsSliderRefresh = scope => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                refreshPlanBasicsSliders(scope);
+            });
+        });
+    };
+
+    const wirePlanBasicsAccordion = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+        const currencyFormatter = new Intl.NumberFormat("en-GB", {
+            style: "currency",
+            currency: "GBP",
+            maximumFractionDigits: 0
+        });
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const planBasicItems = Array.from(form.querySelectorAll("[data-plan-basic-item]"))
+                .filter(item => item instanceof HTMLDetailsElement);
+            if (planBasicItems.length === 0) {
+                return;
+            }
+
+            const getSelectedMealTypes = () => {
+                const selected = Array.from(
+                    form.querySelectorAll("input[type='checkbox'][name='Request.SelectedMealTypes']")
+                )
+                    .filter(input => input instanceof HTMLInputElement && input.checked)
+                    .map(input => input.value.trim())
+                    .filter(value => value.length > 0);
+
+                const order = ["Breakfast", "Lunch", "Dinner"];
+                return order.filter(type => selected.some(value => value.toLowerCase() === type.toLowerCase()));
+            };
+
+            const getSummaryText = item => {
+                if (!(item instanceof HTMLDetailsElement)) {
+                    return "";
+                }
+
+                const itemType = (item.dataset.planBasicItem ?? "").trim().toLowerCase();
+                switch (itemType) {
+                    case "supermarket": {
+                        const selectedSupermarket = getSelectedSupermarket(form).trim();
+                        return selectedSupermarket.length > 0
+                            ? selectedSupermarket.toUpperCase()
+                            : "Not set";
+                    }
+                    case "budget": {
+                        const budgetInput = form.querySelector("input[name='Request.WeeklyBudget']");
+                        const parsed = Number.parseFloat(budgetInput?.value ?? "0");
+                        const safeValue = Number.isFinite(parsed) ? parsed : 0;
+                        return currencyFormatter.format(safeValue);
+                    }
+                    case "plan-days": {
+                        const planDaysInput = form.querySelector("input[name='Request.PlanDays']");
+                        const rawValue = Number.parseInt(planDaysInput?.value ?? "1", 10);
+                        const safeValue = Number.isInteger(rawValue) ? Math.max(1, Math.min(7, rawValue)) : 1;
+                        return `${safeValue} day${safeValue === 1 ? "" : "s"}`;
+                    }
+                    case "cook-days": {
+                        const cookDaysInput = form.querySelector("input[name='Request.CookDays']");
+                        const rawValue = Number.parseInt(cookDaysInput?.value ?? "1", 10);
+                        const safeValue = Number.isInteger(rawValue) ? Math.max(1, rawValue) : 1;
+                        return `${safeValue} day${safeValue === 1 ? "" : "s"}`;
+                    }
+                    case "meal-types": {
+                        const selectedMealTypes = getSelectedMealTypes();
+                        return selectedMealTypes.length > 0
+                            ? selectedMealTypes.join(", ")
+                            : "None selected";
+                    }
+                    default:
+                        return "";
+                }
+            };
+
+            const isComplete = item => {
+                if (!(item instanceof HTMLDetailsElement)) {
+                    return false;
+                }
+
+                const itemType = (item.dataset.planBasicItem ?? "").trim().toLowerCase();
+                switch (itemType) {
+                    case "supermarket":
+                        return getSelectedSupermarket(form).trim().length > 0;
+                    case "budget":
+                        return Number.isFinite(Number.parseFloat(
+                            (form.querySelector("input[name='Request.WeeklyBudget']")?.value ?? "0")
+                        ));
+                    case "plan-days":
+                        return Number.isFinite(Number.parseInt(
+                            (form.querySelector("input[name='Request.PlanDays']")?.value ?? "0"),
+                            10
+                        ));
+                    case "cook-days":
+                        return Number.isFinite(Number.parseInt(
+                            (form.querySelector("input[name='Request.CookDays']")?.value ?? "0"),
+                            10
+                        ));
+                    case "meal-types":
+                        return getSelectedMealTypes().length > 0;
+                    default:
+                        return false;
+                }
+            };
+
+            const syncSummary = item => {
+                if (!(item instanceof HTMLDetailsElement)) {
+                    return;
+                }
+
+                const summaryOutput = item.querySelector("[data-plan-basic-summary]");
+                if (!(summaryOutput instanceof HTMLElement)) {
+                    return;
+                }
+
+                summaryOutput.textContent = getSummaryText(item);
+            };
+
+            const openOnlyItem = nextItem => {
+                if (!(nextItem instanceof HTMLDetailsElement)) {
+                    return;
+                }
+
+                planBasicItems.forEach(item => {
+                    if (!(item instanceof HTMLDetailsElement)) {
+                        return;
+                    }
+                    item.open = item === nextItem;
+                });
+
+                schedulePlanBasicsSliderRefresh(nextItem);
+            };
+
+            const cookDaysItem = planBasicItems.find(item =>
+                item instanceof HTMLDetailsElement &&
+                (item.dataset.planBasicItem ?? "").trim().toLowerCase() === "cook-days"
+            );
+
+            const hasValidationError = item => {
+                if (!(item instanceof HTMLElement)) {
+                    return false;
+                }
+
+                return Array.from(item.querySelectorAll(".text-danger"))
+                    .some(errorNode => (errorNode.textContent ?? "").trim().length > 0);
+            };
+
+            planBasicItems.forEach(item => {
+                if (!(item instanceof HTMLDetailsElement)) {
+                    return;
+                }
+
+                syncSummary(item);
+                if (item.dataset.planBasicAccordionWired === "true") {
+                    return;
+                }
+
+                item.dataset.planBasicAccordionWired = "true";
+                item.addEventListener("toggle", () => {
+                    syncSummary(item);
+                    if (item.open) {
+                        openOnlyItem(item);
+                    }
+                });
+
+                item.addEventListener("focusin", () => {
+                    if (!item.open) {
+                        openOnlyItem(item);
+                    }
+                });
+
+                const itemType = (item.dataset.planBasicItem ?? "").trim().toLowerCase();
+                if (itemType === "supermarket") {
+                    const supermarketInputs = Array.from(item.querySelectorAll("[data-supermarket-option]"))
+                        .filter(input => input instanceof HTMLInputElement);
+                    supermarketInputs.forEach(input => {
+                        input.addEventListener("change", () => {
+                            syncSummary(item);
+                        });
+                    });
+                }
+
+                if (itemType === "budget" || itemType === "plan-days" || itemType === "cook-days") {
+                    const rangeInput = item.querySelector("[data-number-slider-range]");
+                    if (rangeInput instanceof HTMLInputElement) {
+                        rangeInput.addEventListener("input", () => {
+                            syncSummary(item);
+                            if (itemType === "plan-days" && cookDaysItem instanceof HTMLDetailsElement) {
+                                syncSummary(cookDaysItem);
+                            }
+                        });
+                        rangeInput.addEventListener("change", () => {
+                            syncSummary(item);
+                            if (itemType === "plan-days" && cookDaysItem instanceof HTMLDetailsElement) {
+                                syncSummary(cookDaysItem);
+                            }
+                        });
+                    }
+                }
+
+                if (itemType === "meal-types") {
+                    const mealTypeCheckboxes = Array.from(
+                        item.querySelectorAll("input[type='checkbox'][name='Request.SelectedMealTypes']")
+                    ).filter(input => input instanceof HTMLInputElement);
+                    mealTypeCheckboxes.forEach(input => {
+                        input.addEventListener("change", () => {
+                            syncSummary(item);
+                        });
+                    });
+                }
+            });
+
+            const itemWithError = planBasicItems.find(item => hasValidationError(item));
+            if (itemWithError instanceof HTMLDetailsElement) {
+                openOnlyItem(itemWithError);
+            } else {
+                const firstIncompleteItem = planBasicItems.find(item => !isComplete(item));
+                const initialItem = firstIncompleteItem instanceof HTMLDetailsElement
+                    ? firstIncompleteItem
+                    : planBasicItems[0];
+                if (initialItem instanceof HTMLDetailsElement) {
+                    openOnlyItem(initialItem);
+                }
+            }
+
+            if (form.dataset.planBasicScrollWired !== "true") {
+                form.dataset.planBasicScrollWired = "true";
+                let scrollFrameId = 0;
+                const collapseScrolledPastItems = () => {
+                    scrollFrameId = 0;
+                    const activeElement = document.activeElement;
+                    planBasicItems.forEach(item => {
+                        if (!(item instanceof HTMLDetailsElement) || !item.open || !isComplete(item)) {
+                            return;
+                        }
+
+                        if (activeElement instanceof HTMLElement && item.contains(activeElement)) {
+                            return;
+                        }
+
+                        const bounds = item.getBoundingClientRect();
+                        const hasScrolledPast = bounds.bottom < 64;
+                        if (hasScrolledPast) {
+                            item.open = false;
+                        }
+                    });
+                };
+
+                window.addEventListener("scroll", () => {
+                    if (scrollFrameId !== 0) {
+                        return;
+                    }
+
+                    scrollFrameId = requestAnimationFrame(collapseScrolledPastItems);
+                }, { passive: true });
+            }
+        });
+    };
+
+    const wireMealTypeSelectors = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const selectedMealTypeInputs = Array.from(
+                form.querySelectorAll("input[type='checkbox'][name='Request.SelectedMealTypes']")
+            ).filter(input => input instanceof HTMLInputElement);
+            const mealsPerDayInput = form.querySelector("input[type='hidden'][name='Request.MealsPerDay']");
+            if (selectedMealTypeInputs.length === 0 || !(mealsPerDayInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const syncMealsPerDayValue = () => {
+                const selectedCount = selectedMealTypeInputs
+                    .filter(input => input instanceof HTMLInputElement && input.checked && input.value.trim().length > 0)
+                    .length;
+                mealsPerDayInput.value = `${Math.max(0, Math.min(3, selectedCount))}`;
+            };
+
+            if (form.dataset.mealTypeSelectorWired !== "true") {
+                selectedMealTypeInputs.forEach(input => {
+                    if (input instanceof HTMLInputElement) {
+                        input.addEventListener("change", syncMealsPerDayValue);
+                    }
+                });
+
+                form.dataset.mealTypeSelectorWired = "true";
+            }
+
+            syncMealsPerDayValue();
+        });
+    };
+
+    wireMealTypeSelectors(document);
 
     const wireSharedPreferenceSummaries = scope => {
         const forms = scope instanceof Element
@@ -529,6 +1054,7 @@
     };
 
     wireCustomAisleFieldVisibility(document);
+    wirePlanBasicsAccordion(document);
 
     const wireNotesExportButtons = scope => {
         const shells = scope instanceof Element
@@ -740,7 +1266,10 @@
                 if (setupModeSwitch instanceof HTMLElement) {
                     setupModeSwitch.addEventListener(
                         "aislepilot:setup-mode-change",
-                        syncModeScopedPreferenceVisibility
+                        () => {
+                            syncModeScopedPreferenceVisibility();
+                            schedulePlanBasicsSliderRefresh(form);
+                        }
                     );
                 }
 
@@ -1056,6 +1585,7 @@
 
                 if (setupPanel.hasAttribute("hidden")) {
                     setupPanel.removeAttribute("hidden");
+                    schedulePlanBasicsSliderRefresh(setupPanel);
                     setupPanel.scrollIntoView({ behavior: "smooth", block: "start" });
                 } else {
                     setupPanel.setAttribute("hidden", "hidden");
@@ -1320,6 +1850,66 @@
         document.close();
     };
 
+    const dayMealSlotState = new Map();
+
+    const readCardDayKey = card => {
+        if (!(card instanceof HTMLElement)) {
+            return "";
+        }
+
+        return (card.dataset.dayIndex ?? "").trim();
+    };
+
+    const readActiveDayMealSlotIndex = card => {
+        if (!(card instanceof HTMLElement)) {
+            return 0;
+        }
+
+        const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
+        if (tabs.length <= 1) {
+            return 0;
+        }
+
+        const activeIndex = tabs.findIndex(tab => {
+            if (!(tab instanceof HTMLElement)) {
+                return false;
+            }
+
+            return tab.classList.contains("is-active") || tab.getAttribute("aria-selected") === "true";
+        });
+
+        return activeIndex >= 0 ? activeIndex : 0;
+    };
+
+    const rememberDayMealSlots = scope => {
+        const cards = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-meal-card]"))
+            : Array.from(document.querySelectorAll("[data-day-meal-card]"));
+
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+
+            const dayKey = readCardDayKey(card);
+            if (!dayKey) {
+                return;
+            }
+
+            dayMealSlotState.set(dayKey, readActiveDayMealSlotIndex(card));
+        });
+    };
+
+    const readRememberedDayMealSlot = card => {
+        const dayKey = readCardDayKey(card);
+        if (!dayKey || !dayMealSlotState.has(dayKey)) {
+            return 0;
+        }
+
+        const stored = dayMealSlotState.get(dayKey);
+        return Number.isInteger(stored) ? stored : 0;
+    };
+
     const wireLeftoverPlanner = scope => {
         const plannerShells = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-leftover-planner]"))
@@ -1466,11 +2056,105 @@
         });
     };
 
+    const wireDayMealCards = scope => {
+        const cards = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-meal-card]"))
+            : Array.from(document.querySelectorAll("[data-day-meal-card]"));
+
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement) || card.dataset.dayMealCardWired === "true") {
+                return;
+            }
+
+            const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
+            const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
+            const track = card.querySelector("[data-day-meal-track]");
+            const slider = card.querySelector("[data-day-meal-slider]");
+            if (!(track instanceof HTMLElement) || !(slider instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
+                return;
+            }
+
+            card.dataset.dayMealCardWired = "true";
+            let currentSlotIndex = 0;
+            let touchStartX = 0;
+            let touchStartY = 0;
+
+            const syncSlot = nextIndex => {
+                const slotCount = Math.min(tabs.length, panels.length);
+                if (slotCount <= 0) {
+                    return;
+                }
+
+                currentSlotIndex = ((nextIndex % slotCount) + slotCount) % slotCount;
+                track.style.transform = `translateX(-${currentSlotIndex * 100}%)`;
+
+                tabs.forEach((tab, index) => {
+                    if (!(tab instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    const isActive = index === currentSlotIndex;
+                    tab.classList.toggle("is-active", isActive);
+                    tab.setAttribute("aria-selected", isActive ? "true" : "false");
+                });
+
+                panels.forEach((panel, index) => {
+                    if (!(panel instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    panel.setAttribute("aria-hidden", index === currentSlotIndex ? "false" : "true");
+                });
+
+                const dayKey = readCardDayKey(card);
+                if (dayKey) {
+                    dayMealSlotState.set(dayKey, currentSlotIndex);
+                }
+
+                updateViewportHeight(true);
+            };
+
+            tabs.forEach((tab, index) => {
+                if (!(tab instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                tab.addEventListener("click", () => {
+                    syncSlot(index);
+                });
+            });
+
+            slider.addEventListener("touchstart", event => {
+                const touch = event.changedTouches[0];
+                touchStartX = touch.clientX;
+                touchStartY = touch.clientY;
+            }, { passive: true });
+
+            slider.addEventListener("touchend", event => {
+                const touch = event.changedTouches[0];
+                const deltaX = touch.clientX - touchStartX;
+                const deltaY = touch.clientY - touchStartY;
+                if (Math.abs(deltaX) < 32 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+                    return;
+                }
+
+                if (deltaX < 0) {
+                    syncSlot(currentSlotIndex + 1);
+                } else {
+                    syncSlot(currentSlotIndex - 1);
+                }
+            }, { passive: true });
+
+            syncSlot(readRememberedDayMealSlot(card));
+        });
+    };
+
     const applyAjaxSwapResponse = responseText => {
         if (typeof DOMParser === "undefined") {
             return false;
         }
 
+        rememberDayMealSlots(document);
         const responseDocument = new DOMParser().parseFromString(responseText, "text/html");
         const didReplaceMeals = replaceSectionContent(responseDocument, "#aislepilot-meals");
         if (!didReplaceMeals) {
@@ -1483,10 +2167,12 @@
 
         wireSubmitLoadingHandlers(document);
         wirePlanBasicsSliders(document);
+        wireMealTypeSelectors(document);
         wireCustomAisleFieldVisibility(document);
         wirePreserveScrollHandlers(document);
         wireSetupToggleHandlers(document);
         wireLeftoverPlanner(document);
+        wireDayMealCards(document);
         wireAjaxSwapHandlers(document);
         wireNotesExportButtons(document);
         startMealImagePolling();
@@ -1623,6 +2309,7 @@
     wireSetupToggleHandlers(document);
     wirePreserveScrollHandlers(document);
     wireLeftoverPlanner(document);
+    wireDayMealCards(document);
     wireAjaxSwapHandlers(document);
     startMealImagePolling();
 
@@ -1652,6 +2339,7 @@
 
     window.addEventListener("resize", () => {
         updateViewportHeight(false);
+        schedulePlanBasicsSliderRefresh(document);
     });
 
     viewport.addEventListener("toggle", event => {
