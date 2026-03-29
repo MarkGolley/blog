@@ -343,37 +343,45 @@
                     </summary>
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
                         <div class="aislepilot-inline-fields">
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field">
+                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
                                 <label asp-for="Request.HouseholdSize">People</label>
-                                <input asp-for="Request.HouseholdSize"
-                                       type="range"
-                                       min="1"
-                                       max="8"
-                                       step="1"
-                                       class="aislepilot-slider-input"
-                                       data-number-slider-range
-                                       data-number-slider-decimals="0" />
+                                <div class="aislepilot-slider-track-line">
+                                    <span class="aislepilot-slider-boundary">1</span>
+                                    <input asp-for="Request.HouseholdSize"
+                                           type="range"
+                                           min="1"
+                                           max="8"
+                                           step="1"
+                                           class="aislepilot-slider-input"
+                                           aria-label="People"
+                                           data-number-slider-range
+                                           data-number-slider-decimals="0" />
+                                    <span class="aislepilot-slider-boundary">8</span>
+                                </div>
                                 <div class="aislepilot-slider-meta">
                                     <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.HouseholdSize</span>
-                                    <span class="aislepilot-slider-hint">1 to 8</span>
                                 </div>
                                 <span asp-validation-for="Request.HouseholdSize" class="text-danger"></span>
                             </div>
 
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field" data-option-slider>
+                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact" data-option-slider>
                                 <label asp-for="Request.PortionSize">Portion size</label>
                                 <input asp-for="Request.PortionSize" type="hidden" data-option-slider-hidden />
-                                <input type="range"
-                                       min="0"
-                                       max="@Math.Max(0, portionSizeOptions.Length - 1)"
-                                       step="1"
-                                       value="@selectedPortionSizeIndex"
-                                       class="aislepilot-slider-input"
-                                       data-option-slider-range
-                                       data-option-slider-values="@portionSizeSliderValues" />
+                                <div class="aislepilot-slider-track-line">
+                                    <span class="aislepilot-slider-boundary">@portionSizeOptions.First()</span>
+                                    <input type="range"
+                                           min="0"
+                                           max="@Math.Max(0, portionSizeOptions.Length - 1)"
+                                           step="1"
+                                           value="@selectedPortionSizeIndex"
+                                           class="aislepilot-slider-input"
+                                           aria-label="Portion size"
+                                           data-option-slider-range
+                                           data-option-slider-values="@portionSizeSliderValues" />
+                                    <span class="aislepilot-slider-boundary">@portionSizeOptions.Last()</span>
+                                </div>
                                 <div class="aislepilot-slider-meta">
                                     <span class="aislepilot-slider-value" data-option-slider-value>@selectedPortionSize</span>
-                                    <span class="aislepilot-slider-hint">@portionSizeOptions.First() to @portionSizeOptions.Last()</span>
                                 </div>
                                 <span asp-validation-for="Request.PortionSize" class="text-danger"></span>
                             </div>

@@ -1052,7 +1052,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-slider-field--compact {
-    --slider-value-edge-start-px: calc(var(--slider-value-width-px) * 0.44);
+    --slider-value-edge-start-px: calc(var(--slider-value-width-px) * 0.5);
     --slider-value-edge-end-px: calc(var(--slider-value-width-px) * 0.5);
 }
 
@@ -1062,19 +1062,13 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-slider-field--compact .aislepilot-slider-value {
-    min-width: 1.48rem;
-    min-height: 1.12rem;
-    font-size: 0.67rem;
-    padding: 0.08rem 0.28rem;
+    min-width: 1.64rem;
+    min-height: 1.22rem;
+    font-size: 0.7rem;
+    padding: 0.1rem 0.3rem;
     top: -0.08rem;
     border-radius: 8px;
     box-shadow: 0 7px 14px rgba(16, 63, 101, 0.15);
-}
-
-.aislepilot-slider-field--compact .aislepilot-slider-value::after {
-    bottom: -0.15rem;
-    width: 0.24rem;
-    height: 0.24rem;
 }
 
 .aislepilot-slider-track-line {
@@ -1082,6 +1076,15 @@ html.aislepilot-restore-pending .aislepilot-app {
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.24rem;
+}
+
+.aislepilot-slider-track-line .aislepilot-slider-boundary:first-child {
+    min-width: 1.08rem;
+    text-align: left;
+}
+
+.aislepilot-slider-track-line .aislepilot-slider-boundary:last-child {
+    text-align: right;
 }
 
 .aislepilot-slider-track-line .aislepilot-slider-input {
@@ -1342,16 +1345,15 @@ html.aislepilot-restore-pending .aislepilot-app {
     cursor: grabbing;
 }
 
-.aislepilot-slider-value::after {
+.aislepilot-slider-value::before {
     content: "";
     position: absolute;
     left: 50%;
-    bottom: -0.2rem;
-    width: 0.34rem;
-    height: 0.34rem;
-    transform: translateX(-50%) rotate(45deg);
-    border-radius: 0 0 0.1rem 0;
-    background: var(--brand-deep);
+    top: 50%;
+    width: max(2.3rem, calc(100% + 0.8rem));
+    height: max(2.3rem, calc(100% + 0.8rem));
+    transform: translate(-50%, -50%);
+    border-radius: 999px;
 }
 
 .aislepilot-slider-hint {
@@ -2191,17 +2193,17 @@ html.aislepilot-restore-pending .aislepilot-app {
 
     .aislepilot-slider-field--compact .aislepilot-slider-input {
         width: calc(100% - 0.72rem);
-        margin-left: 0.3rem;
+        margin-left: 0.34rem;
         margin-right: 0.42rem;
-        height: 0.96rem !important;
-        min-height: 0.96rem !important;
+        height: 1.2rem !important;
+        min-height: 1.2rem !important;
     }
 
     .aislepilot-slider-value {
-        min-width: 1.58rem;
-        min-height: 1.24rem;
+        min-width: 1.72rem;
+        min-height: 1.34rem;
         font-size: 0.72rem;
-        padding: 0.1rem 0.3rem;
+        padding: 0.12rem 0.34rem;
     }
 
     .aislepilot-slider-input::-webkit-slider-thumb {
