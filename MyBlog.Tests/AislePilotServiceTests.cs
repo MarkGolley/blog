@@ -321,6 +321,77 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithThreeMealsPerDay_DinnerSlotsRemainUniqueAcrossCookDays()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 7,
+            CookDays = 7,
+            MealsPerDay = 3
+        };
+
+        var result = _service.BuildPlan(request);
+        var dinnerMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(7, dinnerMeals.Count);
+        Assert.Equal(dinnerMeals.Count, dinnerMeals.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
+    [Fact]
+    public void BuildPlan_WithThreeMealsPerDay_Vegan_KeepsBreakfastAndLunchSlotAppropriate()
+    {
+        static bool IsBreakfastLike(string mealName)
+        {
+            var keywords = new[]
+            {
+                "breakfast", "oat", "porridge", "granola", "muesli", "omelette", "omelet",
+                "scrambled egg", "yogurt", "yoghurt", "toast", "pancake", "chia"
+            };
+
+            return keywords.Any(keyword => mealName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        }
+
+        static bool IsLunchLike(string mealName)
+        {
+            var keywords = new[]
+            {
+                "lunch", "salad", "pasta salad", "wrap", "wraps", "sandwich", "toastie",
+                "panini", "soup", "couscous bowl", "couscous bowls", "grain bowl",
+                "grain bowls", "poke bowl", "poke bowls"
+            };
+
+            return keywords.Any(keyword => mealName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegan"],
+            PlanDays = 4,
+            CookDays = 4,
+            MealsPerDay = 3
+        };
+
+        var result = _service.BuildPlan(request);
+        var breakfastMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Breakfast", StringComparison.OrdinalIgnoreCase))
+            .Select(meal => meal.MealName)
+            .ToList();
+        var lunchMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(4, breakfastMeals.Count);
+        Assert.Equal(4, lunchMeals.Count);
+        Assert.All(breakfastMeals, mealName => Assert.True(IsBreakfastLike(mealName)));
+        Assert.All(lunchMeals, mealName => Assert.True(IsLunchLike(mealName) || IsBreakfastLike(mealName)));
+    }
+
+    [Fact]
     public void BuildPlan_WithBreakfastOnlySlot_ReturnsBreakfastMeals()
     {
         var request = new AislePilotRequestModel
@@ -337,6 +408,21 @@ public class AislePilotServiceTests
         Assert.Equal(1, result.MealsPerDay);
         Assert.Equal(2, result.MealPlan.Count);
         Assert.All(result.MealPlan, meal => Assert.Equal("Breakfast", meal.MealType));
+    }
+
+    [Fact]
+    public void HasCompatibleMeals_WithBreakfastOnly_WhenNoBreakfastMatchesExist_ReturnsFalse()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Pescatarian", "Gluten-Free"],
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var hasCompatibleMeals = _service.HasCompatibleMeals(request);
+
+        Assert.False(hasCompatibleMeals);
     }
 
     [Fact]

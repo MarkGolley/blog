@@ -1759,10 +1759,54 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-day-meal-panel {
     flex: 0 0 100%;
     min-width: 100%;
+    position: relative;
+    transition: filter 0.18s ease;
 }
 
 .aislepilot-day-meal-panel.is-ignored {
-    opacity: 0.82;
+    filter: saturate(0.62);
+}
+
+.aislepilot-day-meal-panel.is-ignored::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: rgba(239, 244, 250, 0.56);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.aislepilot-day-meal-panel.is-ignored .aislepilot-meal-image {
+    filter: grayscale(0.95) brightness(0.84);
+}
+
+.aislepilot-day-meal-panel.is-ignored .aislepilot-card-kicker,
+.aislepilot-day-meal-panel.is-ignored .aislepilot-card-meta,
+.aislepilot-day-meal-panel.is-ignored h3,
+.aislepilot-day-meal-panel.is-ignored .aislepilot-card-meta-pill,
+.aislepilot-day-meal-panel.is-ignored .aislepilot-meal-details summary {
+    color: var(--ink-soft);
+}
+
+.aislepilot-day-meal-panel.is-ignored .aislepilot-card-meta-pill {
+    border-color: rgba(16, 63, 101, 0.16);
+    background: rgba(245, 249, 255, 0.88);
+}
+
+.aislepilot-meal-removed-watermark {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 2;
+    pointer-events: none;
+    font-size: clamp(1.22rem, 1.8vw, 1.44rem);
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(16, 63, 101, 0.34);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .aislepilot-card-kicker {

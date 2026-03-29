@@ -402,6 +402,10 @@
                                                      role="tabpanel"
                                                      aria-labelledby="@panelLabelledBy"
                                                      aria-hidden="@(slotIndex == 0 ? "false" : "true")">
+                                                @if (isIgnored)
+                                                {
+                                                    <span class="aislepilot-meal-removed-watermark" aria-hidden="true">Removed</span>
+                                                }
                                                 <div class="aislepilot-meal-image-shell">
                                                     <img class="aislepilot-meal-image"
                                                          src="@ResolveClientMealImageUrl(meal.MealImageUrl)"
@@ -415,7 +419,7 @@
                                                     <p class="aislepilot-card-kicker">@meal.MealType</p>
                                                     @if (isIgnored)
                                                     {
-                                                        <p class="aislepilot-cost is-ignored">Ignored</p>
+                                                        <p class="aislepilot-cost is-ignored">Removed</p>
                                                     }
                                                     else
                                                     {
