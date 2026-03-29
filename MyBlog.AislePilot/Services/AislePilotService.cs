@@ -2096,6 +2096,7 @@ public sealed class AislePilotService : IAislePilotService
                     request.WeeklyBudget,
                     context.HouseholdFactor,
                     request.PreferQuickMeals,
+                    IsHighProteinPreferred(context.DietaryModes),
                     mealType,
                     dayMultiplier,
                     mealsPerDay);
@@ -2255,9 +2256,7 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
-        var strictModes = context.DietaryModes
-            .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        var strictModes = ResolveHardDietaryModes(context.DietaryModes);
         var replacement = ValidateAndMapAiMeal(
             aiPayload,
             strictModes,
@@ -2320,6 +2319,7 @@ public sealed class AislePilotService : IAislePilotService
             weeklyBudget,
             context.HouseholdFactor,
             preferQuickMeals,
+            IsHighProteinPreferred(context.DietaryModes),
             mealType,
             dayMultiplier,
             mealsPerDay);
@@ -2927,6 +2927,7 @@ Return JSON only with this schema:
                     context.HouseholdFactor,
                     mealMultipliers[dayIndex],
                     request.PreferQuickMeals,
+                    IsHighProteinPreferred(context.DietaryModes),
                     mealTypeSlots);
                 if (replacement is null)
                 {
@@ -3044,6 +3045,7 @@ Return JSON only with this schema:
                     context.HouseholdFactor,
                     mealMultipliers[dayIndex],
                     request.PreferQuickMeals,
+                    IsHighProteinPreferred(context.DietaryModes),
                     mealTypeSlots);
                 if (replacement is null)
                 {
@@ -3103,6 +3105,7 @@ Return JSON only with this schema:
         decimal householdFactor,
         int dayMultiplier,
         bool preferQuickMeals,
+        bool preferHighProtein,
         IReadOnlyList<string> mealTypeSlots)
     {
         if (compatiblePool.Count == 0 || dayIndex < 0 || dayIndex >= selectedMeals.Count)
@@ -3139,6 +3142,11 @@ Return JSON only with this schema:
             })
             .Where(x => x.Cost < currentMealCost)
             .OrderBy(x => x.Cost)
+            .ThenBy(x =>
+                preferHighProtein &&
+                !x.Meal.Tags.Contains("High-Protein", StringComparer.OrdinalIgnoreCase)
+                    ? 1
+                    : 0)
             .ThenBy(x => preferQuickMeals && !x.Meal.IsQuick ? 1 : 0)
             .ThenBy(x => x.Meal.Name, StringComparer.OrdinalIgnoreCase)
             .Select(x => x.Meal)
@@ -3205,6 +3213,7 @@ Return JSON only with this schema:
             combinedSource,
             context.HouseholdFactor,
             request.PreferQuickMeals,
+            IsHighProteinPreferred(context.DietaryModes),
             totalMealCount,
             mealTypeSlots);
 
@@ -3246,6 +3255,7 @@ Return JSON only with this schema:
             combinedSource,
             context.HouseholdFactor,
             request.PreferQuickMeals,
+            IsHighProteinPreferred(context.DietaryModes),
             totalMealCount,
             mealTypeSlots);
 
@@ -3263,6 +3273,7 @@ Return JSON only with this schema:
         IReadOnlyList<MealTemplate> mealSource,
         decimal householdFactor,
         bool preferQuickMeals,
+        bool preferHighProtein,
         int requestedMealCount,
         IReadOnlyList<string> mealTypeSlots)
     {
@@ -3276,6 +3287,11 @@ Return JSON only with this schema:
         var orderedCandidates = mealSource
             .Select(meal => EnsureMealTypeSuitability(meal))
             .OrderBy(meal => decimal.Round(meal.BaseCostForTwo * householdFactor, 4, MidpointRounding.AwayFromZero))
+            .ThenBy(meal =>
+                preferHighProtein &&
+                !meal.Tags.Contains("High-Protein", StringComparer.OrdinalIgnoreCase)
+                    ? 1
+                    : 0)
             .ThenBy(meal => preferQuickMeals && !meal.IsQuick ? 1 : 0)
             .ThenBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -4339,6 +4355,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         decimal weeklyBudget,
         decimal householdFactor,
         bool preferQuickMeals,
+        bool preferHighProtein,
         string mealType,
         int dayMultiplier,
         int mealsPerDay)
@@ -4388,6 +4405,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                     targetMealCost,
                     householdFactor,
                     preferQuickMeals,
+                    preferHighProtein,
                     normalizedDayMultiplier,
                     previousName,
                     nextName)
@@ -4482,6 +4500,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         decimal targetMealCost,
         decimal householdFactor,
         bool preferQuickMeals,
+        bool preferHighProtein,
         int dayMultiplier = 1,
         string? previousName = null,
         string? nextName = null)
@@ -4490,13 +4509,18 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         var scaledCost = template.BaseCostForTwo * householdFactor * normalizedDayMultiplier;
         var budgetDistance = Math.Abs(scaledCost - targetMealCost);
         var quickPenalty = preferQuickMeals && !template.IsQuick ? 0.8m : 0m;
+        var highProteinPenalty =
+            preferHighProtein &&
+            !template.Tags.Contains("High-Protein", StringComparer.OrdinalIgnoreCase)
+                ? 0.45m
+                : 0m;
         var adjacencyPenalty =
             (previousName is not null && template.Name.Equals(previousName, StringComparison.OrdinalIgnoreCase)) ||
             (nextName is not null && template.Name.Equals(nextName, StringComparison.OrdinalIgnoreCase))
                 ? 1.2m
                 : 0m;
 
-        return budgetDistance + quickPenalty + adjacencyPenalty;
+        return budgetDistance + quickPenalty + highProteinPenalty + adjacencyPenalty;
     }
 
     private static IReadOnlyList<AislePilotMealDayViewModel> BuildDailyPlans(
@@ -5122,13 +5146,19 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
         var safeMealsPerDay = resolvedMealTypeSlots.Count;
         var targetMealCost = weeklyBudget / (7m * safeMealsPerDay);
+        var preferHighProtein = IsHighProteinPreferred(dietaryModes);
         var scoredCandidates = candidates
             .Select(template =>
             {
                 var scaledCost = template.BaseCostForTwo * householdFactor;
                 var budgetDistance = Math.Abs(scaledCost - targetMealCost);
                 var quickPenalty = preferQuickMeals && !template.IsQuick ? 0.8m : 0m;
-                return new { template, score = budgetDistance + quickPenalty };
+                var highProteinPenalty =
+                    preferHighProtein &&
+                    !template.Tags.Contains("High-Protein", StringComparer.OrdinalIgnoreCase)
+                        ? 0.45m
+                        : 0m;
+                return new { template, score = budgetDistance + quickPenalty + highProteinPenalty };
             })
             .OrderBy(item => item.score)
             .ThenBy(item => item.template.Name, StringComparer.OrdinalIgnoreCase)
@@ -5170,6 +5200,21 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         return selected;
     }
 
+    private static IReadOnlyList<string> ResolveHardDietaryModes(IReadOnlyList<string> dietaryModes)
+    {
+        return dietaryModes
+            .Where(mode =>
+                !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase) &&
+                !mode.Equals("High-Protein", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static bool IsHighProteinPreferred(IReadOnlyList<string> dietaryModes)
+    {
+        return dietaryModes.Any(mode => mode.Equals("High-Protein", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static List<MealTemplate> FilterMeals(
         IReadOnlyList<string> dietaryModes,
         string dislikesOrAllergens,
@@ -5181,9 +5226,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             .Where(x => x.Length >= 3)
             .ToList();
 
-        var strictModes = dietaryModes
-            .Where(x => !x.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var hardModes = ResolveHardDietaryModes(dietaryModes);
+        var preferHighProtein = IsHighProteinPreferred(dietaryModes);
 
         var source = mealSource ?? MealTemplates;
 
@@ -5191,16 +5235,18 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             .Where(meal => disallowedTokens.All(token => !ContainsToken(meal, token)))
             .ToList();
 
-        // Treat explicitly selected dietary modes as hard constraints.
-        if (strictModes.Count == 0)
+        // Balanced is the default baseline; High-Protein is a preference, not a hard blocker.
+        if (hardModes.Count == 0)
         {
             return baseFiltered
-                .Where(meal => meal.Tags.Contains("Balanced", StringComparer.OrdinalIgnoreCase))
+                .Where(meal =>
+                    meal.Tags.Contains("Balanced", StringComparer.OrdinalIgnoreCase) ||
+                    (preferHighProtein && meal.Tags.Contains("High-Protein", StringComparer.OrdinalIgnoreCase)))
                 .ToList();
         }
 
         var strictFiltered = baseFiltered
-            .Where(meal => strictModes.All(mode => meal.Tags.Contains(mode, StringComparer.OrdinalIgnoreCase)))
+            .Where(meal => hardModes.All(mode => meal.Tags.Contains(mode, StringComparer.OrdinalIgnoreCase)))
             .ToList();
 
         return strictFiltered;
@@ -6412,9 +6458,7 @@ Return JSON only with this schema:
             return null;
         }
 
-        var strictModes = dietaryModes
-            .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        var strictModes = ResolveHardDietaryModes(dietaryModes);
         var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var meals = new List<MealTemplate>(cookDays);
         var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, mealsPerDay);

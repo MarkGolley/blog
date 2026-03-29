@@ -411,6 +411,40 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void HasCompatibleMeals_WithHighProteinBreakfastOnly_ReturnsTrue()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["High-Protein"],
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var hasCompatibleMeals = _service.HasCompatibleMeals(request);
+
+        Assert.True(hasCompatibleMeals);
+    }
+
+    [Fact]
+    public void BuildPlan_WithHighProteinBreakfastOnlySlot_ReturnsBreakfastMeals()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["High-Protein"],
+            PlanDays = 3,
+            CookDays = 3,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var result = _service.BuildPlan(request);
+
+        Assert.Equal(1, result.MealsPerDay);
+        Assert.Equal(3, result.MealPlan.Count);
+        Assert.All(result.MealPlan, meal => Assert.Equal("Breakfast", meal.MealType));
+    }
+
+    [Fact]
     public void HasCompatibleMeals_WithBreakfastOnly_WhenNoBreakfastMatchesExist_ReturnsFalse()
     {
         var request = new AislePilotRequestModel
