@@ -744,24 +744,27 @@
                             <span class="aislepilot-collapsible-value" data-special-options-summary>@specialOptionsSummaryText</span>
                         </summary>
                         <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                            <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
-                                <input asp-for="Request.IncludeSpecialTreatMeal" type="checkbox" />
-                                <span>Include one special treat meal</span>
-                            </label>
-                            <div class="aislepilot-field aislepilot-field-chip"
-                                 data-special-treat-day-field
-                                 hidden="@(!Model.Request.IncludeSpecialTreatMeal)">
-                                <label asp-for="Request.SelectedSpecialTreatCookDayIndex">Special treat day</label>
-                                <select asp-for="Request.SelectedSpecialTreatCookDayIndex"
-                                        class="aislepilot-select"
-                                        data-special-treat-day-select>
-                                    @for (var cookDayIndex = 0; cookDayIndex < specialTreatCookDayLabels.Count; cookDayIndex++)
-                                    {
-                                        <option value="@cookDayIndex">@specialTreatCookDayLabels[cookDayIndex]</option>
-                                    }
-                                </select>
-                                <span asp-validation-for="Request.SelectedSpecialTreatCookDayIndex" class="text-danger"></span>
+                            <div class="aislepilot-special-option-row">
+                                <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                                    <input asp-for="Request.IncludeSpecialTreatMeal" type="checkbox" />
+                                    <span>Special treat dinner on</span>
+                                </label>
+                                <div class="aislepilot-field aislepilot-field-chip aislepilot-special-treat-day-inline"
+                                     data-special-treat-day-field
+                                     hidden="@(!Model.Request.IncludeSpecialTreatMeal)">
+                                    <label asp-for="Request.SelectedSpecialTreatCookDayIndex" class="sr-only">Special treat day</label>
+                                    <select asp-for="Request.SelectedSpecialTreatCookDayIndex"
+                                            class="aislepilot-special-treat-day-select"
+                                            data-special-treat-day-select
+                                            aria-label="Special treat day">
+                                        @for (var cookDayIndex = 0; cookDayIndex < specialTreatCookDayLabels.Count; cookDayIndex++)
+                                        {
+                                            <option value="@cookDayIndex">@specialTreatCookDayLabels[cookDayIndex]</option>
+                                        }
+                                    </select>
+                                </div>
                             </div>
+                            <span asp-validation-for="Request.SelectedSpecialTreatCookDayIndex" class="text-danger"></span>
                             <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
                                 <input asp-for="Request.IncludeDessertAddOn" type="checkbox" />
                                 <span>Add desert</span>
