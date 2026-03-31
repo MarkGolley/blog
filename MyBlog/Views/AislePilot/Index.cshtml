@@ -291,12 +291,12 @@
                             data-setup-toggle
                             aria-controls="aislepilot-setup"
                             aria-expanded="false">
-                        Edit setup first
+                        Edit settings first
                     </button>
                 }
                 else
                 {
-                    <a href="#aislepilot-setup" class="aislepilot-alert-btn is-secondary">Review setup</a>
+                    <a href="#aislepilot-setup" class="aislepilot-alert-btn is-secondary">Review settings</a>
                 }
             </div>
         </section>
@@ -304,7 +304,7 @@
 
     <section id="aislepilot-setup" aria-labelledby="aislepilot-form-title" class="aislepilot-shell" data-reveal data-setup-panel @setupHiddenAttribute>
         <div class="aislepilot-section-head aislepilot-section-head-row">
-            <h2 id="aislepilot-form-title" class="aislepilot-section-title">Setup</h2>
+            <h2 id="aislepilot-form-title" class="aislepilot-section-title">Settings</h2>
         </div>
 
         <form method="post" asp-action="Index" id="aislepilot-setup-form" class="contact-form aislepilot-form">
@@ -319,7 +319,7 @@
 
             <div class="aislepilot-setup-mode-switch"
                  role="tablist"
-                 aria-label="Setup mode"
+                 aria-label="Settings mode"
                  data-setup-mode-switch
                  data-setup-mode-default="@defaultSetupMode"
                  data-setup-mode-force-default="@forceDefaultSetupMode">
@@ -615,7 +615,7 @@
                             <span class="aislepilot-collapsible-value" data-plan-basic-summary>@Model.Request.WeeklyBudget.ToString("C0", ukCulture)</span>
                         </summary>
                         <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
+                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-budget-slider-field">
                                 <label asp-for="Request.WeeklyBudget">Weekly budget</label>
                                 <div class="aislepilot-slider-track-line">
                                     <span class="aislepilot-slider-boundary" data-budget-min-label>&pound;15</span>
@@ -634,7 +634,15 @@
                                 </div>
                                 <div class="aislepilot-slider-meta aislepilot-budget-meta">
                                     <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
-                                    <span class="aislepilot-budget-precision">
+                                    <button type="button"
+                                            class="aislepilot-budget-precision-trigger"
+                                            data-budget-precision-trigger
+                                            hidden>
+                                        Need exact amount?
+                                    </button>
+                                    <span class="aislepilot-budget-precision"
+                                          data-budget-precision-shell
+                                          hidden>
                                         <span class="aislepilot-budget-precision-currency" aria-hidden="true">&pound;</span>
                                         <input type="number"
                                                inputmode="numeric"
@@ -647,7 +655,6 @@
                                                aria-label="Set weekly budget exactly" />
                                     </span>
                                 </div>
-                                <p class="aislepilot-budget-range-hint" data-budget-range-hint></p>
                                 <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
                             </div>
                         </fieldset>

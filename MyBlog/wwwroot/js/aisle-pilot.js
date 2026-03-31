@@ -515,9 +515,10 @@
 
             const budgetSlider = form.querySelector("[data-budget-slider]");
             const budgetPrecisionInput = form.querySelector("[data-budget-precision-input]");
+            const budgetPrecisionShell = form.querySelector("[data-budget-precision-shell]");
+            const budgetPrecisionTrigger = form.querySelector("[data-budget-precision-trigger]");
             const budgetMinLabel = form.querySelector("[data-budget-min-label]");
             const budgetMaxLabel = form.querySelector("[data-budget-max-label]");
-            const budgetRangeHint = form.querySelector("[data-budget-range-hint]");
             const householdInput = form.querySelector("input[name='Request.HouseholdSize']");
             const portionInput = form.querySelector("input[name='Request.PortionSize']");
             const mealsPerDayInput = form.querySelector("input[type='hidden'][name='Request.MealsPerDay']");
@@ -565,6 +566,53 @@
 
                 const formatPounds = value => `\u00a3${Math.round(value)}`;
                 let isSyncingBudgetValue = false;
+                let budgetMaxHitCount = 0;
+                const budgetMaxHitThreshold = 3;
+
+                const showBudgetPrecisionInput = () => {
+                    if (budgetPrecisionShell instanceof HTMLElement) {
+                        budgetPrecisionShell.removeAttribute("hidden");
+                        budgetPrecisionShell.setAttribute("aria-hidden", "false");
+                    }
+
+                    if (budgetPrecisionTrigger instanceof HTMLElement) {
+                        budgetPrecisionTrigger.setAttribute("hidden", "hidden");
+                        budgetPrecisionTrigger.setAttribute("aria-hidden", "true");
+                    }
+                };
+
+                const maybeRevealBudgetPrecisionTrigger = () => {
+                    if (
+                        budgetPrecisionShell instanceof HTMLElement &&
+                        !budgetPrecisionShell.hasAttribute("hidden")
+                    ) {
+                        return;
+                    }
+
+                    if (budgetPrecisionTrigger instanceof HTMLElement) {
+                        budgetPrecisionTrigger.removeAttribute("hidden");
+                        budgetPrecisionTrigger.setAttribute("aria-hidden", "false");
+                    }
+                };
+
+                const trackBudgetMaxHit = () => {
+                    const currentValue = Number.parseFloat(budgetSlider.value ?? "0");
+                    const maxValue = Number.parseFloat(budgetSlider.max ?? "600");
+                    if (!Number.isFinite(currentValue) || !Number.isFinite(maxValue)) {
+                        return;
+                    }
+
+                    const atMax = Math.abs(currentValue - maxValue) <= 0.001;
+                    if (!atMax) {
+                        budgetMaxHitCount = 0;
+                        return;
+                    }
+
+                    budgetMaxHitCount += 1;
+                    if (budgetMaxHitCount >= budgetMaxHitThreshold) {
+                        maybeRevealBudgetPrecisionTrigger();
+                    }
+                };
 
                 const syncBudgetSliderValue = (nextValue, emitChangeEvent) => {
                     if (isSyncingBudgetValue) {
@@ -634,10 +682,6 @@
                     if (budgetMaxLabel instanceof HTMLElement) {
                         budgetMaxLabel.textContent = formatPounds(adaptiveMax);
                     }
-                    if (budgetRangeHint instanceof HTMLElement) {
-                        budgetRangeHint.textContent =
-                            `Range tuned for ${safePeople} people, ${safeMealsPerDay} meal${safeMealsPerDay === 1 ? "" : "s"} per day, ${safePlanDays} day${safePlanDays === 1 ? "" : "s"}.`;
-                    }
 
                     const currentValue = Number.parseFloat(budgetSlider.value ?? `${adaptiveMin}`);
                     syncBudgetSliderValue(currentValue, false);
@@ -662,6 +706,20 @@
                             )}`;
                         }
                     });
+                    budgetSlider.addEventListener("change", () => {
+                        if (isSyncingBudgetValue) {
+                            return;
+                        }
+
+                        trackBudgetMaxHit();
+                    });
+                    budgetSlider.addEventListener("pointerup", () => {
+                        if (isSyncingBudgetValue) {
+                            return;
+                        }
+
+                        trackBudgetMaxHit();
+                    });
 
                     if (budgetPrecisionInput instanceof HTMLInputElement) {
                         const onPrecisionInput = emitChangeEvent => {
@@ -678,6 +736,16 @@
                         });
                         budgetPrecisionInput.addEventListener("change", () => {
                             onPrecisionInput(true);
+                        });
+                    }
+
+                    if (budgetPrecisionTrigger instanceof HTMLButtonElement) {
+                        budgetPrecisionTrigger.addEventListener("click", () => {
+                            showBudgetPrecisionInput();
+                            if (budgetPrecisionInput instanceof HTMLInputElement) {
+                                budgetPrecisionInput.focus({ preventScroll: true });
+                                budgetPrecisionInput.select();
+                            }
                         });
                     }
 
@@ -1798,7 +1866,7 @@
 
         const isHidden = setupPanel.hasAttribute("hidden");
         setupToggleButtons.forEach(button => {
-            button.textContent = isHidden ? "Edit setup" : "Hide setup";
+            button.textContent = isHidden ? "Edit settings" : "Hide settings";
             button.setAttribute("aria-expanded", isHidden ? "false" : "true");
         });
     };
