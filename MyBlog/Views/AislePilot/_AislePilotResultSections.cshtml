@@ -176,7 +176,7 @@
                     data-setup-toggle
                     aria-controls="aislepilot-setup"
                     aria-expanded="false">
-                    Edit setup
+                    Edit settings
                 </button>
             </div>
         </div>
@@ -593,10 +593,11 @@
 
                 <section id="aislepilot-export" aria-label="Export" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel" data-window-name="Export">
                     <div class="aislepilot-export-actions">
-                        <form method="post" asp-action="ExportPlanPack">
+                        <form method="post" asp-action="ExportPlanPack" data-export-theme-form>
                             @Html.AntiForgeryToken()
                             <partial name="_AislePilotHiddenRequestFields"
                                      model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                            <input type="hidden" name="exportTheme" value="light" data-export-theme-input />
                             <button type="submit" class="aislepilot-export-btn" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
                         </form>
 

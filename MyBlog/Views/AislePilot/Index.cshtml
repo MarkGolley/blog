@@ -114,8 +114,17 @@
         : exclusionsSummaryRaw;
     var hasPantryValidationErrors = ViewData.ModelState.TryGetValue("Request.PantryItems", out var pantryFieldState) &&
         pantryFieldState.Errors.Count > 0;
+    var pantrySummaryRaw = string.IsNullOrWhiteSpace(Model.Request.PantryItems)
+        ? "No foods listed"
+        : Model.Request.PantryItems.Trim();
+    var pantrySummaryText = pantrySummaryRaw.Length > 64
+        ? $"{pantrySummaryRaw[..64]}..."
+        : pantrySummaryRaw;
+    var generatorCoreSummaryText = Model.Request.RequireCorePantryIngredients
+        ? "Strict core on"
+        : "Strict core off";
     var shouldShowGeneratorMode = Model.PantrySuggestions.Count > 0 || hasPantryValidationErrors;
-    var strictCorePreferenceHiddenAttribute = shouldShowGeneratorMode ? null : "hidden";
+    var generatorOnlyPreferenceHiddenAttribute = shouldShowGeneratorMode ? null : "hidden";
     var plannerOnlyPreferenceHiddenAttribute = shouldShowGeneratorMode ? "hidden" : null;
     var defaultSetupMode = shouldShowGeneratorMode ? "generator" : "planner";
     var forceDefaultSetupMode = shouldShowGeneratorMode ? "true" : "false";
@@ -283,12 +292,12 @@
                             data-setup-toggle
                             aria-controls="aislepilot-setup"
                             aria-expanded="false">
-                        Edit setup first
+                        Edit settings first
                     </button>
                 }
                 else
                 {
-                    <a href="#aislepilot-setup" class="aislepilot-alert-btn is-secondary">Review setup</a>
+                    <a href="#aislepilot-setup" class="aislepilot-alert-btn is-secondary">Review settings</a>
                 }
             </div>
         </section>
@@ -296,7 +305,7 @@
 
     <section id="aislepilot-setup" aria-labelledby="aislepilot-form-title" class="aislepilot-shell" data-reveal data-setup-panel @setupHiddenAttribute>
         <div class="aislepilot-section-head aislepilot-section-head-row">
-            <h2 id="aislepilot-form-title" class="aislepilot-section-title">Setup</h2>
+            <h2 id="aislepilot-form-title" class="aislepilot-section-title">Settings</h2>
         </div>
 
         <form method="post" asp-action="Index" id="aislepilot-setup-form" class="contact-form aislepilot-form">
@@ -311,7 +320,7 @@
 
             <div class="aislepilot-setup-mode-switch"
                  role="tablist"
-                 aria-label="Setup mode"
+                 aria-label="Settings mode"
                  data-setup-mode-switch
                  data-setup-mode-default="@defaultSetupMode"
                  data-setup-mode-force-default="@forceDefaultSetupMode">
@@ -424,12 +433,6 @@
                             <input asp-for="Request.PreferQuickMeals" type="checkbox" />
                             <span>Prioritise quick meals</span>
                         </label>
-                        <label class="aislepilot-checkbox-item aislepilot-toggle-chip"
-                               data-generator-only-preference
-                               @strictCorePreferenceHiddenAttribute>
-                            <input asp-for="Request.RequireCorePantryIngredients" type="checkbox" disabled="@(!shouldShowGeneratorMode)" />
-                            <span>Strict core ingredients</span>
-                        </label>
                     </fieldset>
                 </details>
 
@@ -448,10 +451,10 @@
                 </details>
             </div>
 
-            <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics"
-                      data-planner-only-preference
-                      @plannerOnlyPreferenceHiddenAttribute>
-                <legend>
+            <section class="aislepilot-planner-settings"
+                     data-planner-only-preference
+                     @plannerOnlyPreferenceHiddenAttribute>
+                <h2 class="aislepilot-planner-settings-title">
                     <span class="aislepilot-symbol-label">
                         <span class="aislepilot-symbol-glyph" aria-hidden="true">
                             <svg viewBox="0 0 24 24" focusable="false">
@@ -459,18 +462,19 @@
                                 <path d="M3.5 10h17M9 4.5v15M15 4.5v15"></path>
                             </svg>
                         </span>
-                        Plan basics
+                        Planner settings
                     </span>
-                </legend>
-                <div class="aislepilot-inline-fields">
-                    <details class="aislepilot-field aislepilot-field-chip aislepilot-field--full aislepilot-plan-basic-item"
+                </h2>
+
+                <div class="aislepilot-planner-settings-list">
+                    <details class="aislepilot-collapsible"
                              data-plan-basic-item="supermarket"
                              open>
-                        <summary class="aislepilot-plan-basic-summary-row">
-                            <span class="aislepilot-plan-basic-summary-label">Supermarket</span>
-                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@FormatSetupOptionLabel(selectedSupermarket)</span>
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Supermarket</span>
+                            <span class="aislepilot-collapsible-value" data-plan-basic-summary>@FormatSetupOptionLabel(selectedSupermarket)</span>
                         </summary>
-                        <div class="aislepilot-plan-basic-content">
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
                             <label asp-for="Request.Supermarket" class="sr-only">Supermarket</label>
                             <div class="aislepilot-supermarket-options" role="group" aria-label="Supermarket">
                                 @foreach (var store in supermarketOptions)
@@ -490,16 +494,16 @@
                                 }
                             </div>
                             <span asp-validation-for="Request.Supermarket" class="text-danger"></span>
-                        </div>
+                        </fieldset>
                     </details>
 
-                    <details class="aislepilot-field aislepilot-field-chip aislepilot-field--full aislepilot-meals-per-day-field aislepilot-plan-basic-item"
+                    <details class="aislepilot-collapsible"
                              data-plan-basic-item="meal-types">
-                        <summary class="aislepilot-plan-basic-summary-row">
-                            <span class="aislepilot-plan-basic-summary-label">Meals to include</span>
-                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@selectedMealTypesSummaryText</span>
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Meals to include</span>
+                            <span class="aislepilot-collapsible-value" data-plan-basic-summary>@selectedMealTypesSummaryText</span>
                         </summary>
-                        <div class="aislepilot-plan-basic-content">
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
                             <label asp-for="Request.MealsPerDay" class="sr-only">Meals to include</label>
                             <input asp-for="Request.MealsPerDay" type="hidden" value="@selectedMealsPerDay" />
                             <input type="hidden" name="Request.SelectedMealTypes" value="" />
@@ -540,103 +544,170 @@
                             </div>
                             <span asp-validation-for="Request.SelectedMealTypes" class="text-danger"></span>
                             <span asp-validation-for="Request.MealsPerDay" class="text-danger"></span>
-                        </div>
+                        </fieldset>
                     </details>
 
-                    <details class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-plan-basic-item"
+                    <details class="aislepilot-collapsible"
                              data-plan-basic-item="plan-days">
-                        <summary class="aislepilot-plan-basic-summary-row">
-                            <span class="aislepilot-plan-basic-summary-label">Plan length</span>
-                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@($"{selectedPlanDays} day{(selectedPlanDays == 1 ? string.Empty : "s")}")</span>
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Plan length</span>
+                            <span class="aislepilot-collapsible-value" data-plan-basic-summary>@($"{selectedPlanDays} day{(selectedPlanDays == 1 ? string.Empty : "s")}")</span>
                         </summary>
-                        <div class="aislepilot-plan-basic-content">
-                            <label asp-for="Request.PlanDays" class="sr-only">Plan length</label>
-                            <div class="aislepilot-slider-track-line">
-                                <span class="aislepilot-slider-boundary">1</span>
-                                <input asp-for="Request.PlanDays"
-                                       type="range"
-                                       min="1"
-                                       max="7"
-                                       step="1"
-                                       class="aislepilot-slider-input"
-                                       aria-label="Plan length"
-                                       data-number-slider-range
-                                       data-number-slider-decimals="0"
-                                       data-plan-days-slider />
-                                <span class="aislepilot-slider-boundary">7</span>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
+                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
+                                <label asp-for="Request.PlanDays">Plan length</label>
+                                <div class="aislepilot-slider-track-line">
+                                    <span class="aislepilot-slider-boundary">1</span>
+                                    <input asp-for="Request.PlanDays"
+                                           type="range"
+                                           min="1"
+                                           max="7"
+                                           step="1"
+                                           class="aislepilot-slider-input"
+                                           aria-label="Plan length"
+                                           data-number-slider-range
+                                           data-number-slider-decimals="0"
+                                           data-plan-days-slider />
+                                    <span class="aislepilot-slider-boundary">7</span>
+                                </div>
+                                <div class="aislepilot-slider-meta">
+                                    <span class="aislepilot-slider-value" data-number-slider-value>@selectedPlanDays</span>
+                                </div>
+                                <span asp-validation-for="Request.PlanDays" class="text-danger"></span>
                             </div>
-                            <div class="aislepilot-slider-meta">
-                                <span class="aislepilot-slider-value" data-number-slider-value>@selectedPlanDays</span>
-                            </div>
-                            <span asp-validation-for="Request.PlanDays" class="text-danger"></span>
-                        </div>
+                        </fieldset>
                     </details>
 
-                    <details class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-plan-basic-item"
+                    <details class="aislepilot-collapsible"
                              data-plan-basic-item="cook-days">
-                        <summary class="aislepilot-plan-basic-summary-row">
-                            <span class="aislepilot-plan-basic-summary-label">Cook days</span>
-                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@($"{selectedCookDays} day{(selectedCookDays == 1 ? string.Empty : "s")}")</span>
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Cook days</span>
+                            <span class="aislepilot-collapsible-value" data-plan-basic-summary>@($"{selectedCookDays} day{(selectedCookDays == 1 ? string.Empty : "s")}")</span>
                         </summary>
-                        <div class="aislepilot-plan-basic-content">
-                            <label asp-for="Request.CookDays" class="sr-only">Cook days</label>
-                            <div class="aislepilot-slider-track-line">
-                                <span class="aislepilot-slider-boundary">1</span>
-                                <input asp-for="Request.CookDays"
-                                       type="range"
-                                       min="1"
-                                       max="7"
-                                       step="1"
-                                       class="aislepilot-slider-input"
-                                       aria-label="Cook days"
-                                       data-number-slider-range
-                                       data-number-slider-decimals="0"
-                                       data-cook-days-slider />
-                                <span class="aislepilot-slider-boundary">7</span>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
+                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
+                                <label asp-for="Request.CookDays">Cook days</label>
+                                <div class="aislepilot-slider-track-line">
+                                    <span class="aislepilot-slider-boundary">1</span>
+                                    <input asp-for="Request.CookDays"
+                                           type="range"
+                                           min="1"
+                                           max="7"
+                                           step="1"
+                                           class="aislepilot-slider-input"
+                                           aria-label="Cook days"
+                                           data-number-slider-range
+                                           data-number-slider-decimals="0"
+                                           data-cook-days-slider />
+                                    <span class="aislepilot-slider-boundary">7</span>
+                                </div>
+                                <div class="aislepilot-slider-meta">
+                                    <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
+                                </div>
+                                <span asp-validation-for="Request.CookDays" class="text-danger"></span>
                             </div>
-                            <div class="aislepilot-slider-meta">
-                                <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
-                            </div>
-                            <span asp-validation-for="Request.CookDays" class="text-danger"></span>
-                        </div>
+                        </fieldset>
                     </details>
 
-                    <details class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-plan-basic-item"
+                    <details class="aislepilot-collapsible"
                              data-plan-basic-item="budget">
-                        <summary class="aislepilot-plan-basic-summary-row">
-                            <span class="aislepilot-plan-basic-summary-label">Weekly budget</span>
-                            <span class="aislepilot-plan-basic-summary-value" data-plan-basic-summary>@Model.Request.WeeklyBudget.ToString("C0", ukCulture)</span>
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Weekly budget</span>
+                            <span class="aislepilot-collapsible-value" data-plan-basic-summary>@Model.Request.WeeklyBudget.ToString("C0", ukCulture)</span>
                         </summary>
-                        <div class="aislepilot-plan-basic-content">
-                            <label asp-for="Request.WeeklyBudget" class="sr-only">Weekly budget</label>
-                            <div class="aislepilot-slider-track-line">
-                                <span class="aislepilot-slider-boundary">&pound;15</span>
-                                <input asp-for="Request.WeeklyBudget"
-                                       type="range"
-                                       min="15"
-                                       max="600"
-                                       step="5"
-                                       class="aislepilot-slider-input"
-                                       aria-label="Weekly budget"
-                                       data-number-slider-range
-                                       data-number-slider-prefix="&pound;"
-                                       data-number-slider-decimals="0" />
-                                <span class="aislepilot-slider-boundary">&pound;600</span>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
+                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-budget-slider-field">
+                                <label asp-for="Request.WeeklyBudget">Weekly budget</label>
+                                <div class="aislepilot-slider-track-line">
+                                    <span class="aislepilot-slider-boundary" data-budget-min-label>&pound;15</span>
+                                    <input asp-for="Request.WeeklyBudget"
+                                           type="range"
+                                           min="15"
+                                           max="600"
+                                           step="5"
+                                           class="aislepilot-slider-input"
+                                           aria-label="Weekly budget"
+                                           data-budget-slider
+                                           data-number-slider-range
+                                           data-number-slider-prefix="&pound;"
+                                           data-number-slider-decimals="0" />
+                                    <span class="aislepilot-slider-boundary" data-budget-max-label>&pound;600</span>
+                                </div>
+                                <div class="aislepilot-slider-meta aislepilot-budget-meta">
+                                    <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
+                                    <button type="button"
+                                            class="aislepilot-budget-precision-trigger"
+                                            data-budget-precision-trigger
+                                            hidden>
+                                        Need exact amount?
+                                    </button>
+                                    <span class="aislepilot-budget-precision"
+                                          data-budget-precision-shell
+                                          hidden>
+                                        <span class="aislepilot-budget-precision-currency" aria-hidden="true">&pound;</span>
+                                        <input type="number"
+                                               inputmode="numeric"
+                                               min="15"
+                                               max="600"
+                                               step="5"
+                                               value="@Model.Request.WeeklyBudget.ToString("0", ukCulture)"
+                                               class="aislepilot-budget-precision-input"
+                                               data-budget-precision-input
+                                               aria-label="Set weekly budget exactly" />
+                                    </span>
+                                </div>
+                                <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
                             </div>
-                            <div class="aislepilot-slider-meta">
-                                <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.WeeklyBudget.ToString("0", ukCulture)</span>
-                            </div>
-                            <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
-                        </div>
+                        </fieldset>
                     </details>
                 </div>
-            </fieldset>
+            </section>
 
-            <p class="aislepilot-generator-intro"
-               data-generator-only-preference
-               @strictCorePreferenceHiddenAttribute>
-                Generate 3 meal ideas from pantry items.
-            </p>
+            <section class="aislepilot-planner-settings"
+                     data-generator-only-preference
+                     @generatorOnlyPreferenceHiddenAttribute>
+                <h2 class="aislepilot-planner-settings-title">
+                    <span class="aislepilot-symbol-label">
+                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" focusable="false">
+                                <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
+                                <path d="M20 4v6h-6"></path>
+                            </svg>
+                        </span>
+                        Generator settings
+                    </span>
+                </h2>
+
+                <div class="aislepilot-planner-settings-list">
+                    <details class="aislepilot-collapsible" open>
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Foods on hand</span>
+                            <span class="aislepilot-collapsible-value" data-pantry-summary>@pantrySummaryText</span>
+                        </summary>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-generator-pantry-panel aislepilot-field aislepilot-field-optional aislepilot-pantry-entry-field">
+                            <label asp-for="Request.PantryItems" class="sr-only">Pantry items</label>
+                            <textarea asp-for="Request.PantryItems"
+                                      class="aislepilot-pantry-entry-input"
+                                      rows="3"
+                                      placeholder="Example: rice, eggs, chicken breast, frozen peas, spinach, olive oil"></textarea>
+                            <span asp-validation-for="Request.PantryItems" class="text-danger"></span>
+                        </fieldset>
+                    </details>
+
+                    <details class="aislepilot-collapsible">
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Core ingredient mode</span>
+                            <span class="aislepilot-collapsible-value" data-generator-core-summary>@generatorCoreSummaryText</span>
+                        </summary>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                            <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                                <input asp-for="Request.RequireCorePantryIngredients" type="checkbox" disabled="@(!shouldShowGeneratorMode)" />
+                                <span>Strict core ingredients</span>
+                            </label>
+                        </fieldset>
+                    </details>
+                </div>
+            </section>
 
             <section id="aislepilot-planner-mode"
                      class="aislepilot-setup-mode"
@@ -661,7 +732,7 @@
                                     <path d="M3.5 10h17M9 4.5v15M15 4.5v15"></path>
                                 </svg>
                             </span>
-                            Plan basics
+                            Planner settings
                         </span>
                     </legend>
                     <div class="aislepilot-inline-fields">
@@ -795,16 +866,6 @@
                      role="tabpanel"
                      data-setup-mode-panel="generator"
                      @generatorModeHiddenAttribute>
-                <section class="aislepilot-setup-section aislepilot-generator-pantry-panel" aria-label="Foods on hand">
-                    <div class="aislepilot-field aislepilot-field-optional aislepilot-pantry-entry-field">
-                        <label asp-for="Request.PantryItems">Foods on hand</label>
-                        <textarea asp-for="Request.PantryItems"
-                                  class="aislepilot-pantry-entry-input"
-                                  rows="3"
-                                  placeholder="Example: rice, eggs, chicken breast, frozen peas, spinach, olive oil"></textarea>
-                        <span asp-validation-for="Request.PantryItems" class="text-danger"></span>
-                    </div>
-                </section>
                 <div class="aislepilot-submit-actions aislepilot-generator-submit-actions">
                     <button
                         type="submit"

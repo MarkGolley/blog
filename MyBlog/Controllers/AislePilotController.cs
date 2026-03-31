@@ -323,6 +323,7 @@ public class AislePilotController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ExportPlanPack(
         AislePilotPageViewModel pageModel,
+        string? exportTheme,
         List<string>? currentPlanMealNames,
         CancellationToken cancellationToken)
     {
@@ -337,7 +338,8 @@ public class AislePilotController(
         try
         {
             var result = await BuildExportResultAsync(request, currentPlanMealNames, cancellationToken);
-            var bytes = aislePilotExportService.BuildPlanPackPdf(request, result);
+            var useDarkTheme = string.Equals(exportTheme, "dark", StringComparison.OrdinalIgnoreCase);
+            var bytes = aislePilotExportService.BuildPlanPackPdf(request, result, useDarkTheme);
             var fileName = $"aislepilot-plan-pack-{DateTime.UtcNow:yyyyMMdd}.pdf";
             Response.Headers.ContentDisposition = $"inline; filename=\"{fileName}\"";
             return File(bytes, "application/pdf");

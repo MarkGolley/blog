@@ -6,7 +6,8 @@ public interface IAislePilotExportService
 {
     byte[] BuildPlanPackPdf(
         AislePilotRequestModel request,
-        AislePilotPlanResultViewModel result);
+        AislePilotPlanResultViewModel result,
+        bool useDarkTheme);
 
     string BuildChecklistText(AislePilotPlanResultViewModel result);
 }
