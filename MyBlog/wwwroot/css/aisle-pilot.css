@@ -525,6 +525,24 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin-block: 0.5rem 0.62rem;
 }
 
+.aislepilot-planner-settings {
+    display: grid;
+    gap: 0.36rem;
+    margin: 0.12rem 0 0.62rem;
+}
+
+.aislepilot-planner-settings-title {
+    margin: 0;
+    padding: 0 0.2rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.aislepilot-planner-settings-list {
+    display: grid;
+    gap: 0.36rem;
+}
+
 .aislepilot-collapsible {
     border: 1px solid rgba(16, 63, 101, 0.2);
     border-radius: 12px;
@@ -1312,6 +1330,56 @@ html.aislepilot-restore-pending .aislepilot-app {
     min-height: 1.16rem;
     padding-top: 0;
     position: relative;
+}
+
+.aislepilot-budget-meta {
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.aislepilot-budget-precision {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.24rem;
+    margin-left: auto;
+    padding: 0.12rem 0.42rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.95);
+    position: relative;
+    z-index: 1;
+}
+
+.aislepilot-budget-precision-currency {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+}
+
+.aislepilot-budget-precision-input {
+    width: 4.6rem !important;
+    min-height: 1.45rem !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    font-size: 0.84rem !important;
+    line-height: 1.2;
+    font-weight: 700;
+    text-align: right;
+    color: var(--ink) !important;
+}
+
+.aislepilot-budget-precision-input:focus {
+    box-shadow: none !important;
+    outline: none;
+}
+
+.aislepilot-budget-range-hint {
+    margin: 0.16rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.68rem;
+    line-height: 1.32;
 }
 
 .aislepilot-slider-value {
@@ -2286,6 +2354,10 @@ html.aislepilot-restore-pending .aislepilot-app {
         gap: 0.3rem;
     }
 
+    .aislepilot-budget-precision-input {
+        width: 4.1rem !important;
+    }
+
     .aislepilot-slider-input {
         height: 1.62rem !important;
         min-height: 1.62rem !important;
@@ -2457,6 +2529,15 @@ html.aislepilot-restore-pending .aislepilot-app {
 :root[data-theme="dark"] .aislepilot-toggle-chip span::before {
     background: rgba(10, 17, 27, 0.95);
     border-color: rgba(141, 207, 244, 0.42);
+}
+
+:root[data-theme="dark"] .aislepilot-budget-precision {
+    background: rgba(10, 17, 27, 0.95);
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .aislepilot-budget-precision-currency {
+    color: var(--ink-soft);
 }
 
 :root[data-theme="dark"] .aislepilot-supermarket-option input[type="radio"]:checked + span,

@@ -512,6 +512,195 @@
 
                 syncPlanDaysConstraint("init");
             }
+
+            const budgetSlider = form.querySelector("[data-budget-slider]");
+            const budgetPrecisionInput = form.querySelector("[data-budget-precision-input]");
+            const budgetMinLabel = form.querySelector("[data-budget-min-label]");
+            const budgetMaxLabel = form.querySelector("[data-budget-max-label]");
+            const budgetRangeHint = form.querySelector("[data-budget-range-hint]");
+            const householdInput = form.querySelector("input[name='Request.HouseholdSize']");
+            const portionInput = form.querySelector("input[name='Request.PortionSize']");
+            const mealsPerDayInput = form.querySelector("input[type='hidden'][name='Request.MealsPerDay']");
+            const selectedMealTypes = Array.from(
+                form.querySelectorAll("input[type='checkbox'][name='Request.SelectedMealTypes']")
+            ).filter(input => input instanceof HTMLInputElement);
+
+            if (budgetSlider instanceof HTMLInputElement) {
+                const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
+                const budgetIncrement = 5;
+                const roundToIncrement = value => Math.round(value / budgetIncrement) * budgetIncrement;
+                const snapBudgetValue = (value, min, max) => {
+                    const clamped = clampNumber(value, min, max);
+                    const snapped = roundToIncrement(clamped);
+                    return clampNumber(snapped, min, max);
+                };
+                const getMealCount = () => {
+                    if (selectedMealTypes.length > 0) {
+                        const selectedCount = selectedMealTypes
+                            .filter(input => input instanceof HTMLInputElement && input.checked)
+                            .length;
+                        if (selectedCount > 0) {
+                            return Math.max(1, Math.min(3, selectedCount));
+                        }
+                    }
+
+                    const parsedMealsPerDay = Number.parseInt(mealsPerDayInput?.value ?? "1", 10);
+                    return Number.isInteger(parsedMealsPerDay)
+                        ? Math.max(1, Math.min(3, parsedMealsPerDay))
+                        : 1;
+                };
+
+                const getPortionMultiplier = () => {
+                    const portionValue = (portionInput?.value ?? "").trim().toLowerCase();
+                    if (portionValue.startsWith("small")) {
+                        return 0.88;
+                    }
+
+                    if (portionValue.startsWith("large")) {
+                        return 1.24;
+                    }
+
+                    return 1;
+                };
+
+                const formatPounds = value => `\u00a3${Math.round(value)}`;
+                let isSyncingBudgetValue = false;
+
+                const syncBudgetSliderValue = (nextValue, emitChangeEvent) => {
+                    if (isSyncingBudgetValue) {
+                        return;
+                    }
+
+                    const min = Number.parseFloat(budgetSlider.min ?? "15");
+                    const max = Number.parseFloat(budgetSlider.max ?? "600");
+                    const safeMin = Number.isFinite(min) ? min : 15;
+                    const safeMax = Number.isFinite(max) ? max : 600;
+                    const normalizedValue = snapBudgetValue(
+                        Number.isFinite(nextValue) ? nextValue : safeMin,
+                        safeMin,
+                        safeMax
+                    );
+
+                    isSyncingBudgetValue = true;
+                    budgetSlider.value = `${normalizedValue}`;
+                    if (budgetPrecisionInput instanceof HTMLInputElement) {
+                        budgetPrecisionInput.value = `${normalizedValue}`;
+                    }
+                    budgetSlider.dispatchEvent(new Event("input", { bubbles: true }));
+                    if (emitChangeEvent) {
+                        budgetSlider.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                    isSyncingBudgetValue = false;
+                };
+
+                const syncAdaptiveBudgetRange = () => {
+                    const peopleValue = Number.parseInt(householdInput?.value ?? "2", 10);
+                    const safePeople = Number.isInteger(peopleValue) ? Math.max(1, Math.min(8, peopleValue)) : 2;
+                    const safeMealsPerDay = getMealCount();
+                    const planDaysValue = Number.parseInt(planDaysSlider?.value ?? "7", 10);
+                    const safePlanDays = Number.isInteger(planDaysValue) ? Math.max(1, Math.min(7, planDaysValue)) : 7;
+                    const portionMultiplier = getPortionMultiplier();
+
+                    const estimatedBaseline = safePeople * safeMealsPerDay * safePlanDays * 3.4 * portionMultiplier;
+                    let adaptiveMin = snapBudgetValue(estimatedBaseline * 0.72, 15, 600);
+                    let adaptiveMax = snapBudgetValue(estimatedBaseline * 1.75, 15, 600);
+
+                    if (adaptiveMax - adaptiveMin < 45) {
+                        adaptiveMax = snapBudgetValue(adaptiveMin + 45, 15, 600);
+                    }
+                    if (adaptiveMin > adaptiveMax - 25) {
+                        adaptiveMin = snapBudgetValue(adaptiveMax - 45, 15, 600);
+                    }
+                    if (adaptiveMin >= adaptiveMax) {
+                        adaptiveMin = snapBudgetValue(adaptiveMax - (budgetIncrement * 8), 15, 600);
+                        if (adaptiveMin >= adaptiveMax) {
+                            adaptiveMax = snapBudgetValue(adaptiveMin + budgetIncrement, 15, 600);
+                        }
+                    }
+
+                    budgetSlider.min = `${adaptiveMin}`;
+                    budgetSlider.max = `${adaptiveMax}`;
+                    budgetSlider.step = `${budgetIncrement}`;
+
+                    if (budgetPrecisionInput instanceof HTMLInputElement) {
+                        budgetPrecisionInput.min = `${adaptiveMin}`;
+                        budgetPrecisionInput.max = `${adaptiveMax}`;
+                        budgetPrecisionInput.step = `${budgetIncrement}`;
+                    }
+
+                    if (budgetMinLabel instanceof HTMLElement) {
+                        budgetMinLabel.textContent = formatPounds(adaptiveMin);
+                    }
+                    if (budgetMaxLabel instanceof HTMLElement) {
+                        budgetMaxLabel.textContent = formatPounds(adaptiveMax);
+                    }
+                    if (budgetRangeHint instanceof HTMLElement) {
+                        budgetRangeHint.textContent =
+                            `Range tuned for ${safePeople} people, ${safeMealsPerDay} meal${safeMealsPerDay === 1 ? "" : "s"} per day, ${safePlanDays} day${safePlanDays === 1 ? "" : "s"}.`;
+                    }
+
+                    const currentValue = Number.parseFloat(budgetSlider.value ?? `${adaptiveMin}`);
+                    syncBudgetSliderValue(currentValue, false);
+                };
+
+                if (form.dataset.adaptiveBudgetRangeWired !== "true") {
+                    form.dataset.adaptiveBudgetRangeWired = "true";
+
+                    budgetSlider.addEventListener("input", () => {
+                        if (isSyncingBudgetValue) {
+                            return;
+                        }
+
+                        const currentValue = Number.parseFloat(budgetSlider.value ?? "0");
+                        if (budgetPrecisionInput instanceof HTMLInputElement && Number.isFinite(currentValue)) {
+                            const safeMin = Number.parseFloat(budgetSlider.min ?? "15");
+                            const safeMax = Number.parseFloat(budgetSlider.max ?? "600");
+                            budgetPrecisionInput.value = `${snapBudgetValue(
+                                currentValue,
+                                Number.isFinite(safeMin) ? safeMin : 15,
+                                Number.isFinite(safeMax) ? safeMax : 600
+                            )}`;
+                        }
+                    });
+
+                    if (budgetPrecisionInput instanceof HTMLInputElement) {
+                        const onPrecisionInput = emitChangeEvent => {
+                            const rawValue = Number.parseFloat(budgetPrecisionInput.value ?? "");
+                            if (!Number.isFinite(rawValue)) {
+                                return;
+                            }
+
+                            syncBudgetSliderValue(rawValue, emitChangeEvent);
+                        };
+
+                        budgetPrecisionInput.addEventListener("input", () => {
+                            onPrecisionInput(false);
+                        });
+                        budgetPrecisionInput.addEventListener("change", () => {
+                            onPrecisionInput(true);
+                        });
+                    }
+
+                    if (householdInput instanceof HTMLInputElement) {
+                        householdInput.addEventListener("input", syncAdaptiveBudgetRange);
+                        householdInput.addEventListener("change", syncAdaptiveBudgetRange);
+                    }
+                    if (planDaysSlider instanceof HTMLInputElement) {
+                        planDaysSlider.addEventListener("input", syncAdaptiveBudgetRange);
+                        planDaysSlider.addEventListener("change", syncAdaptiveBudgetRange);
+                    }
+                    if (portionInput instanceof HTMLInputElement) {
+                        portionInput.addEventListener("change", syncAdaptiveBudgetRange);
+                    }
+                    selectedMealTypes.forEach(input => {
+                        if (input instanceof HTMLInputElement) {
+                            input.addEventListener("change", syncAdaptiveBudgetRange);
+                        }
+                    });
+                }
+
+                syncAdaptiveBudgetRange();
+            }
         });
     };
 
@@ -871,10 +1060,14 @@
             const dietarySummary = form.querySelector("[data-dietary-summary]");
             const cookingSummary = form.querySelector("[data-cooking-summary]");
             const exclusionSummary = form.querySelector("[data-exclusion-summary]");
+            const pantrySummary = form.querySelector("[data-pantry-summary]");
+            const generatorCoreSummary = form.querySelector("[data-generator-core-summary]");
             if (!(servingSummary instanceof HTMLElement) &&
                 !(dietarySummary instanceof HTMLElement) &&
                 !(cookingSummary instanceof HTMLElement) &&
-                !(exclusionSummary instanceof HTMLElement)) {
+                !(exclusionSummary instanceof HTMLElement) &&
+                !(pantrySummary instanceof HTMLElement) &&
+                !(generatorCoreSummary instanceof HTMLElement)) {
                 return;
             }
 
@@ -883,6 +1076,8 @@
             const dietaryInputs = Array.from(form.querySelectorAll("input[name='Request.DietaryModes']"));
             const quickMealsInput = form.querySelector("input[name='Request.PreferQuickMeals']");
             const exclusionsInput = form.querySelector("input[name='Request.DislikesOrAllergens']");
+            const pantryInput = form.querySelector("textarea[name='Request.PantryItems']");
+            const strictCoreInput = form.querySelector("input[name='Request.RequireCorePantryIngredients']");
 
             const updateServingSummary = () => {
                 if (!(servingSummary instanceof HTMLElement)) {
@@ -928,6 +1123,27 @@
                     : "No exclusions set";
             };
 
+            const updatePantrySummary = () => {
+                if (!(pantrySummary instanceof HTMLElement)) {
+                    return;
+                }
+
+                const pantryValue = trimSummary(pantryInput?.value ?? "");
+                pantrySummary.textContent = pantryValue.length > 0
+                    ? pantryValue
+                    : "No foods listed";
+            };
+
+            const updateGeneratorCoreSummary = () => {
+                if (!(generatorCoreSummary instanceof HTMLElement) || !(strictCoreInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                generatorCoreSummary.textContent = strictCoreInput.checked
+                    ? "Strict core on"
+                    : "Strict core off";
+            };
+
             if (form.dataset.sharedSummaryWired !== "true") {
                 if (householdInput instanceof HTMLInputElement) {
                     householdInput.addEventListener("input", updateServingSummary);
@@ -951,6 +1167,13 @@
                     exclusionsInput.addEventListener("input", updateExclusionSummary);
                     exclusionsInput.addEventListener("change", updateExclusionSummary);
                 }
+                if (pantryInput instanceof HTMLTextAreaElement) {
+                    pantryInput.addEventListener("input", updatePantrySummary);
+                    pantryInput.addEventListener("change", updatePantrySummary);
+                }
+                if (strictCoreInput instanceof HTMLInputElement) {
+                    strictCoreInput.addEventListener("change", updateGeneratorCoreSummary);
+                }
 
                 form.dataset.sharedSummaryWired = "true";
             }
@@ -959,6 +1182,8 @@
             updateDietarySummary();
             updateCookingSummary();
             updateExclusionSummary();
+            updatePantrySummary();
+            updateGeneratorCoreSummary();
         });
     };
 
