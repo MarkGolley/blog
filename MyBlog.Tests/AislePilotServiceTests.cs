@@ -1403,6 +1403,189 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithSpecialTreatMealEnabled_WhenBatchLacksTreat_UsesDedicatedAiTreatGeneration()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "true"
+            })
+            .Build();
+
+        var basePlanPayloadContent = """
+{
+  "meals": [
+    {
+      "name": "Chicken and peppers skillet",
+      "baseCostForTwo": 7.10,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat a pan over medium heat for two minutes.",
+        "Cook sliced chicken for 6 minutes until lightly browned.",
+        "Add peppers and onions and cook for 5 more minutes.",
+        "Stir in seasoning and a splash of water and simmer for 3 minutes.",
+        "Serve immediately with a simple side."
+      ],
+      "ingredients": [
+        { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 2.70 },
+        { "name": "Bell peppers", "department": "Produce", "quantityForTwo": 2, "unit": "pcs", "estimatedCostForTwo": 1.40 },
+        { "name": "Onions", "department": "Produce", "quantityForTwo": 0.3, "unit": "kg", "estimatedCostForTwo": 0.70 }
+      ]
+    }
+  ]
+}
+""";
+        var dedicatedTreatPayloadContent = """
+{
+  "name": "Creamy special treat chicken gratin",
+  "baseCostForTwo": 9.40,
+  "isQuick": false,
+  "tags": ["Balanced", "Special Treat"],
+  "recipeSteps": [
+    "Heat oven to 200C and butter a medium baking dish.",
+    "Brown chicken pieces in a pan for 6 minutes, then set aside.",
+    "Cook leeks and mushrooms in butter for 5 minutes until softened.",
+    "Stir in cream and mustard, then simmer gently for 3 minutes.",
+    "Layer chicken and sauce in dish, top with cheese, and bake for 18 minutes."
+  ],
+  "ingredients": [
+    { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.45, "unit": "kg", "estimatedCostForTwo": 3.40 },
+    { "name": "Leeks", "department": "Produce", "quantityForTwo": 2, "unit": "pcs", "estimatedCostForTwo": 1.20 },
+    { "name": "Chestnut mushrooms", "department": "Produce", "quantityForTwo": 0.3, "unit": "kg", "estimatedCostForTwo": 1.30 },
+    { "name": "Double cream", "department": "Dairy & Eggs", "quantityForTwo": 0.2, "unit": "kg", "estimatedCostForTwo": 1.40 },
+    { "name": "Cheddar", "department": "Dairy & Eggs", "quantityForTwo": 0.1, "unit": "kg", "estimatedCostForTwo": 1.10 }
+  ]
+}
+""";
+
+        var firstResponseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = basePlanPayloadContent
+                    }
+                }
+            }
+        });
+        var secondResponseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = dedicatedTreatPayloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new SequentialResponseHandler(
+            (HttpStatusCode.OK, firstResponseBody),
+            (HttpStatusCode.OK, secondResponseBody));
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 75m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            DietaryModes = ["Balanced"],
+            IncludeSpecialTreatMeal = true
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(2, handler.CallCount);
+        Assert.True(result.UsedAiGeneratedMeals);
+        Assert.Single(result.MealPlan);
+        Assert.True(result.MealPlan[0].IsSpecialTreat);
+        Assert.Contains("special treat", result.MealPlan[0].MealName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildPlan_WithLargeMealCountAndSpecialTreat_StillGeneratesDedicatedAiTreat()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "true"
+            })
+            .Build();
+
+        var dedicatedTreatPayloadContent = """
+{
+  "name": "Special treat creamy chicken gratin",
+  "baseCostForTwo": 9.40,
+  "isQuick": false,
+  "tags": ["Balanced", "Special Treat"],
+  "recipeSteps": [
+    "Heat oven to 200C and butter a medium baking dish.",
+    "Brown chicken pieces in a pan for 6 minutes, then set aside.",
+    "Cook leeks and mushrooms in butter for 5 minutes until softened.",
+    "Stir in cream and mustard, then simmer gently for 3 minutes.",
+    "Layer chicken and sauce in dish, top with cheese, and bake for 18 minutes."
+  ],
+  "ingredients": [
+    { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.45, "unit": "kg", "estimatedCostForTwo": 3.40 },
+    { "name": "Leeks", "department": "Produce", "quantityForTwo": 2, "unit": "pcs", "estimatedCostForTwo": 1.20 },
+    { "name": "Chestnut mushrooms", "department": "Produce", "quantityForTwo": 0.3, "unit": "kg", "estimatedCostForTwo": 1.30 },
+    { "name": "Double cream", "department": "Dairy & Eggs", "quantityForTwo": 0.2, "unit": "kg", "estimatedCostForTwo": 1.40 },
+    { "name": "Cheddar", "department": "Dairy & Eggs", "quantityForTwo": 0.1, "unit": "kg", "estimatedCostForTwo": 1.10 }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = dedicatedTreatPayloadContent
+                    }
+                }
+            }
+        });
+        using var handler = new SequentialResponseHandler((HttpStatusCode.OK, responseBody));
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 5,
+            CookDays = 5,
+            MealsPerDay = 2,
+            SelectedMealTypes = ["Dinner", "Lunch"],
+            DietaryModes = ["Balanced"],
+            IncludeSpecialTreatMeal = true
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(10, result.MealPlan.Count);
+        Assert.Contains(result.MealPlan, meal => meal.IsSpecialTreat);
+    }
+
+    [Fact]
     public void BuildPlan_WithSpecialTreatMealEnabled_WhenAiReturnsNoTreat_ThrowsInsteadOfUsingNormalDinnerFallback()
     {
         ClearAiPool();
@@ -2735,6 +2918,31 @@ public class AislePilotServiceTests
             return Task.FromResult(new HttpResponseMessage(_statusCode)
             {
                 Content = new StringContent(_responseBody)
+            });
+        }
+    }
+
+    private sealed class SequentialResponseHandler(params (HttpStatusCode StatusCode, string ResponseBody)[] responses) : HttpMessageHandler
+    {
+        private readonly (HttpStatusCode StatusCode, string ResponseBody)[] _responses =
+            responses is { Length: > 0 } ? responses : [(HttpStatusCode.OK, "{}")];
+        private int _responseIndex;
+
+        public int CallCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            CallCount++;
+            var index = Math.Clamp(_responseIndex, 0, _responses.Length - 1);
+            var response = _responses[index];
+            if (_responseIndex < _responses.Length - 1)
+            {
+                _responseIndex++;
+            }
+
+            return Task.FromResult(new HttpResponseMessage(response.StatusCode)
+            {
+                Content = new StringContent(response.ResponseBody)
             });
         }
     }

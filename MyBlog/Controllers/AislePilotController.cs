@@ -1024,6 +1024,13 @@ public class AislePilotController(
             ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
         }
         ValidateMealTypeSelection(request);
+        if (request.IncludeSpecialTreatMeal &&
+            !request.SelectedMealTypes.Contains("Dinner", StringComparer.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError(
+                "Request.IncludeSpecialTreatMeal",
+                "Special treat requires the Dinner meal slot.");
+        }
 
         if (string.Equals(request.Supermarket, "Custom", StringComparison.OrdinalIgnoreCase))
         {

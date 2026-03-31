@@ -31,6 +31,7 @@ public sealed class AislePilotService : IAislePilotService
     private const int PrimaryAiMealPlanMaxTokens = 3400;
     private const int RetryAiMealPlanMaxTokens = 2200;
     private const int WarmupMealMaxTokens = 1000;
+    private const int SpecialTreatMealMaxTokens = 1100;
     private const int MinMealsPerDay = 1;
     private const int MaxMealsPerDay = 3;
     private const int MaxPlanMealSlots = 21;
@@ -1629,10 +1630,13 @@ public sealed class AislePilotService : IAislePilotService
 
         if (request.IncludeSpecialTreatMeal)
         {
+            var aiGenerationUnavailable = !CanAttemptAiGenerationForPlanRequest();
             _logger?.LogWarning(
                 "AislePilot could not produce an AI special treat dinner for this request; not falling back to template dinners.");
             throw new InvalidOperationException(
-                "Couldn't generate a valid special treat dinner right now. Please try again in a moment.");
+                aiGenerationUnavailable
+                    ? "Couldn't generate a valid special treat dinner right now because AI generation is unavailable. Please try again in a moment."
+                    : "Couldn't generate a valid special treat dinner right now. Please try again in a moment.");
         }
 
         _logger?.LogWarning(
@@ -1904,7 +1908,17 @@ public sealed class AislePilotService : IAislePilotService
             _logger?.LogInformation(
                 "AislePilot skipping fresh AI meal generation for {MealCount} requested meals; using pool/template selection.",
                 totalMealCount);
-            return null;
+            if (!request.IncludeSpecialTreatMeal)
+            {
+                return null;
+            }
+
+            return await TryBuildPlanWithDedicatedSpecialTreatAsync(
+                request,
+                context,
+                cookDays,
+                totalMealCount,
+                cancellationToken);
         }
 
         using var generationBudgetCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -1945,7 +1959,7 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
-        var aiMeals = aiBatch.Meals;
+        var aiMeals = aiBatch.Meals.ToList();
         var mealTypeSlots = BuildMealTypeSlots(request);
         if (!HasSlotCoverageForMealTypes(aiMeals, mealTypeSlots))
         {
@@ -1953,6 +1967,21 @@ public sealed class AislePilotService : IAislePilotService
                 "AislePilot AI generation returned meals without required slot coverage for {MealTypes}; falling back.",
                 string.Join(",", mealTypeSlots));
             return null;
+        }
+
+        if (request.IncludeSpecialTreatMeal &&
+            mealTypeSlots.Any(slot => slot.Equals("Dinner", StringComparison.OrdinalIgnoreCase)) &&
+            !HasSpecialTreatDinner(aiMeals, mealTypeSlots))
+        {
+            var dedicatedSpecialTreatMeal = await TryGenerateSpecialTreatMealWithAiAsync(
+                request,
+                context,
+                aiMeals.Select(meal => meal.Name).ToArray(),
+                generationToken);
+            if (dedicatedSpecialTreatMeal is not null)
+            {
+                aiMeals.Add(dedicatedSpecialTreatMeal);
+            }
         }
 
         IReadOnlyList<MealTemplate> selectedMeals;
@@ -2002,6 +2031,101 @@ public sealed class AislePilotService : IAislePilotService
         }
 
         return BuildPlanFromMeals(request, context, selectedMeals, cookDays, usedAiGeneratedMeals: true);
+    }
+
+    private async Task<AislePilotPlanResultViewModel?> TryBuildPlanWithDedicatedSpecialTreatAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int cookDays,
+        int totalMealCount,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_enableAiGeneration || _httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
+        {
+            return null;
+        }
+
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        if (!mealTypeSlots.Any(slot => slot.Equals("Dinner", StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        await EnsureAiMealPoolHydratedAsync(cancellationToken);
+        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        var templateMeals = FilterMeals(context.DietaryModes, context.DislikesOrAllergens, MealTemplates);
+        var combinedCandidates = pooledMeals
+            .Concat(templateMeals)
+            .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderBy(meal => meal.BaseCostForTwo).First())
+            .ToList();
+        if (combinedCandidates.Count == 0)
+        {
+            return null;
+        }
+
+        IReadOnlyList<MealTemplate> selectedMeals;
+        try
+        {
+            selectedMeals = SelectMeals(
+                combinedCandidates,
+                context.DietaryModes,
+                request.WeeklyBudget,
+                context.HouseholdFactor,
+                request.PreferQuickMeals,
+                context.DislikesOrAllergens,
+                totalMealCount,
+                mealTypeSlots,
+                includeSpecialTreatMeal: false);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+
+        using var generationBudgetCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        generationBudgetCts.CancelAfter(OpenAiGenerationBudget);
+        var generationToken = generationBudgetCts.Token;
+
+        var dedicatedSpecialTreatMeal = await TryGenerateSpecialTreatMealWithAiAsync(
+            request,
+            context,
+            selectedMeals.Select(meal => meal.Name).ToArray(),
+            generationToken);
+        if (dedicatedSpecialTreatMeal is null)
+        {
+            return null;
+        }
+
+        var patchedMeals = selectedMeals.ToList();
+        var applied = ForceReplaceDinnerWithSpecialTreatMeal(
+            patchedMeals,
+            dedicatedSpecialTreatMeal,
+            mealTypeSlots,
+            context.HouseholdFactor);
+        if (!applied || !HasSpecialTreatDinner(patchedMeals, mealTypeSlots))
+        {
+            return null;
+        }
+
+        var persistedTreatMeals = await PersistAiMealsAsync([dedicatedSpecialTreatMeal], generationToken);
+        if (persistedTreatMeals.Count > 0)
+        {
+            AddMealsToAiPool(persistedTreatMeals);
+        }
+        else
+        {
+            AddMealsToAiPool([dedicatedSpecialTreatMeal]);
+        }
+
+        return await BuildPlanFromMealsAsync(
+            request,
+            context,
+            patchedMeals,
+            cookDays,
+            usedAiGeneratedMeals: true,
+            planSourceLabel: "Template + AI special treat",
+            cancellationToken: cancellationToken);
     }
 
     private async Task<AiMealBatchResult?> TryRequestAiMealBatchAsync(
@@ -2086,7 +2210,7 @@ public sealed class AislePilotService : IAislePilotService
                 requestedMealCount,
                 mealsPerDay,
                 mealTypeSlots,
-                request.IncludeSpecialTreatMeal,
+                requireSpecialTreatDinner: false,
                 out var validationReason);
             if (aiMeals is null)
             {
@@ -2627,6 +2751,89 @@ public sealed class AislePilotService : IAislePilotService
             .ToList();
     }
 
+    private async Task<MealTemplate?> TryGenerateSpecialTreatMealWithAiAsync(
+        AislePilotRequestModel request,
+        PlanContext context,
+        IReadOnlyList<string> excludedMealNames,
+        CancellationToken cancellationToken)
+    {
+        if (!_enableAiGeneration || _httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
+        {
+            return null;
+        }
+
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        if (!mealTypeSlots.Any(slot => slot.Equals("Dinner", StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        var strictModes = ResolveHardDietaryModes(context.DietaryModes);
+        var prompt = BuildAiSpecialTreatMealPrompt(request, context, mealTypeSlots.Count, excludedMealNames);
+        var requestBody = new
+        {
+            model = _model,
+            temperature = 0.85,
+            max_tokens = SpecialTreatMealMaxTokens,
+            response_format = new { type = "json_object" },
+            messages = new object[]
+            {
+                new
+                {
+                    role = "system",
+                    content = "You generate one indulgent special-treat dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English."
+                },
+                new
+                {
+                    role = "user",
+                    content = prompt
+                }
+            }
+        };
+
+        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+        if (string.IsNullOrWhiteSpace(responseContent))
+        {
+            return null;
+        }
+
+        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
+        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return null;
+        }
+
+        var normalizedJson = NormalizeModelJson(rawJson);
+        if (!TryParseAiMealPayloadWithRecovery(normalizedJson, out var aiPayload))
+        {
+            return null;
+        }
+
+        var specialTreatMeal = ValidateAndMapAiMeal(
+            aiPayload,
+            strictModes,
+            requireRecipeSteps: true,
+            suitableMealTypes: ["Dinner"],
+            out _);
+        if (specialTreatMeal is null)
+        {
+            return null;
+        }
+
+        if (excludedMealNames.Contains(specialTreatMeal.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (!IsSpecialTreatMealCandidate(specialTreatMeal))
+        {
+            return null;
+        }
+
+        return MarkMealAsSpecialTreat(specialTreatMeal);
+    }
+
     private async Task<MealTemplate?> TryGenerateWarmupMealWithAiAsync(
         IReadOnlyList<string> dietaryModes,
         IReadOnlyList<string> excludedMealNames,
@@ -2695,6 +2902,88 @@ public sealed class AislePilotService : IAislePilotService
         return excludedMealNames.Contains(meal.Name, StringComparer.OrdinalIgnoreCase)
             ? null
             : meal;
+    }
+
+    private static string BuildAiSpecialTreatMealPrompt(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int mealsPerDay,
+        IReadOnlyList<string> excludedMealNames)
+    {
+        var strictModes = context.DietaryModes
+            .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var strictModeText = strictModes.Length == 0 ? "Balanced" : string.Join(", ", strictModes);
+        var dislikesText = string.IsNullOrWhiteSpace(context.DislikesOrAllergens) ? "none" : context.DislikesOrAllergens;
+        var excludedText = excludedMealNames.Count == 0 ? "none" : string.Join(", ", excludedMealNames);
+        var targetMealBudget = decimal.Round(
+            request.WeeklyBudget / (7m * Math.Max(1, mealsPerDay)),
+            2,
+            MidpointRounding.AwayFromZero);
+
+        return $$"""
+Generate one indulgent dinner for a UK grocery-planning app.
+
+Planner inputs:
+- Supermarket: {{context.Supermarket}}
+- Target meal budget: {{targetMealBudget.ToString("0.##", CultureInfo.InvariantCulture)}} GBP for serving 2
+- Household size: {{request.HouseholdSize}}
+- Portion size: {{context.PortionSize}}
+- Dietary requirements: {{strictModeText}}
+- Dislikes or allergens: {{dislikesText}}
+- Avoid these meal names: {{excludedText}}
+
+Rules:
+- Return exactly one dinner object.
+- It must be clearly indulgent and feel like a special occasion dinner, not a normal weekday dinner.
+- It must be different from every excluded meal name.
+- Use UK English.
+- Keep it realistic for a UK supermarket shop.
+- Use typical UK non-promo shelf prices (no loyalty-only offers, markdowns, or extreme bulk discounts).
+- Respect dietary requirements and dislikes/allergens strictly.
+- Every meal must include 3-7 ingredients only.
+- Department must be one of: Produce, Bakery, Meat & Fish, Dairy & Eggs, Frozen, Tins & Dry Goods, Spices & Sauces, Snacks, Drinks, Household, Other
+- Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
+- `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
+- `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
+- Use realistic prices, avoid placeholder values, and keep all monetary values to 2 decimal places.
+- The sum of `estimatedCostForTwo` across ingredients should be broadly consistent with `baseCostForTwo`.
+- `quantityForTwo` must be a positive number.
+- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free, Special Treat
+- Include all requested dietary modes in `tags` (except Balanced is optional) and include `Special Treat` in `tags`.
+- `recipeSteps` must contain 5-6 concrete, meal-specific cooking steps in order.
+- Include `nutritionPerServing` for one medium serving (not household total), with calories and grams for protein/carbs/fat.
+
+Return JSON only with this schema:
+{
+  "name": "",
+  "baseCostForTwo": 0,
+  "isQuick": false,
+  "tags": ["Special Treat"],
+  "recipeSteps": [
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "nutritionPerServing": {
+    "calories": 0,
+    "proteinGrams": 0,
+    "carbsGrams": 0,
+    "fatGrams": 0
+  },
+  "ingredients": [
+    {
+      "name": "",
+      "department": "",
+      "quantityForTwo": 0,
+      "unit": "",
+      "estimatedCostForTwo": 0
+    }
+  ]
+}
+""";
     }
 
     private static string BuildAiWarmupMealPrompt(
@@ -6663,6 +6952,37 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             .Any(index => IsSpecialTreatMealCandidate(selectedMeals[index]));
     }
 
+    private static bool ForceReplaceDinnerWithSpecialTreatMeal(
+        IList<MealTemplate> selectedMeals,
+        MealTemplate specialTreatMeal,
+        IReadOnlyList<string> mealTypeSlots,
+        decimal householdFactor)
+    {
+        if (selectedMeals.Count == 0 || mealTypeSlots.Count == 0)
+        {
+            return false;
+        }
+
+        var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
+        var dinnerSlotIndexes = Enumerable.Range(0, selectedMeals.Count)
+            .Where(index =>
+                resolvedMealTypeSlots[index % resolvedMealTypeSlots.Count]
+                    .Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (dinnerSlotIndexes.Count == 0)
+        {
+            return false;
+        }
+
+        var targetDinnerIndex = dinnerSlotIndexes
+            .OrderBy(index => CalculateScaledMealCost(selectedMeals[index], householdFactor, dayMultiplier: 1))
+            .ThenBy(index => index)
+            .First();
+
+        selectedMeals[targetDinnerIndex] = MarkMealAsSpecialTreat(EnsureMealTypeSuitability(specialTreatMeal));
+        return true;
+    }
+
     private static MealTemplate MarkMealAsSpecialTreat(MealTemplate meal)
     {
         var tags = meal.Tags
@@ -7018,7 +7338,7 @@ Rules:
 - If pantry hints are sparse or mismatched, still return viable meals and never return an empty `meals` array.
 - If quick meals are preferred, most meals should be 30 minutes or less.
 - If special treat meal is enabled, include one clearly indulgent dinner (richer sauce/bake/roast style), not a standard weekday dinner.
-- Tag that indulgent dinner with `Special Treat` and include the phrase "special treat" in the meal name.
+- Tag that indulgent dinner with `Special Treat`; the meal name should clearly signal indulgence.
 - Do not include dessert-only meals in the meal slots unless a meal slot is explicitly dessert.
 - Every meal must include 3-7 ingredients only.
 - Department must be one of: Produce, Bakery, Meat & Fish, Dairy & Eggs, Frozen, Tins & Dry Goods, Spices & Sauces, Snacks, Drinks, Household, Other
