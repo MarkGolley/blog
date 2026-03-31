@@ -702,10 +702,21 @@
                     }
                 });
 
-                item.addEventListener("focusin", () => {
-                    if (!item.open) {
-                        openOnlyItem(item);
+                item.addEventListener("focusin", event => {
+                    if (item.open) {
+                        return;
                     }
+
+                    const summary = item.querySelector("summary");
+                    if (
+                        summary instanceof HTMLElement &&
+                        event.target instanceof Node &&
+                        summary.contains(event.target)
+                    ) {
+                        return;
+                    }
+
+                    openOnlyItem(item);
                 });
 
                 const itemType = (item.dataset.planBasicItem ?? "").trim().toLowerCase();

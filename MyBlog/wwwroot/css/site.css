@@ -190,7 +190,7 @@ body::before {
 
 .nav-shell {
     display: grid;
-    grid-template-columns: auto auto auto 1fr;
+    grid-template-columns: auto auto 1fr auto;
     align-items: center;
     gap: 1rem;
     padding: 0.7rem 0.95rem;
@@ -254,14 +254,20 @@ body::before {
     background: linear-gradient(96deg, var(--brand) 0%, var(--brand-deep) 100%);
 }
 
-.theme-toggle {
-    display: inline-flex;
+.nav-controls {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    width: 74px;
+    gap: 0.34rem;
+    justify-self: end;
+}
+
+.theme-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
     height: 40px;
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.76);
     padding: 0;
     cursor: pointer;
@@ -280,29 +286,22 @@ body::before {
 
 .theme-toggle-track {
     position: relative;
-    width: 64px;
-    height: 30px;
-    border-radius: 999px;
-    border: 1px solid rgba(16, 63, 101, 0.2);
-    background: linear-gradient(120deg, rgba(252, 234, 172, 0.78), rgba(229, 240, 255, 0.92));
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 8px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    width: 18px;
+    height: 18px;
+    display: block;
 }
 
 .theme-toggle-icon {
-    display: inline-flex;
-    width: 14px;
-    height: 14px;
-    z-index: 1;
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
     transition: opacity 0.18s ease, color 0.18s ease;
 }
 
 .theme-toggle-icon svg {
-    width: 100%;
-    height: 100%;
+    width: 18px;
+    height: 18px;
     stroke: currentColor;
     stroke-width: 1.9;
     stroke-linecap: round;
@@ -311,26 +310,17 @@ body::before {
 }
 
 .theme-toggle-icon-sun {
-    color: #c8821a;
+    color: #b9781a;
     opacity: 1;
 }
 
 .theme-toggle-icon-moon {
-    color: #5f7390;
-    opacity: 0.55;
+    color: #526783;
+    opacity: 0;
 }
 
 .theme-toggle-thumb {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 24px;
-    height: 24px;
-    border-radius: 999px;
-    background: #ffffff;
-    border: 1px solid rgba(16, 63, 101, 0.18);
-    box-shadow: 0 3px 8px rgba(12, 26, 45, 0.2);
-    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    display: none;
 }
 
 .nav-theme-toggle {
@@ -343,22 +333,25 @@ body::before {
 
 .nav-toggle {
     display: none;
-    justify-self: end;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     background: rgba(255, 255, 255, 0.76);
     border: 1px solid var(--line);
-    border-radius: 11px;
-    width: 44px;
+    border-radius: 12px;
+    width: 40px;
     height: 40px;
     cursor: pointer;
 }
 
 .nav-toggle .nav-toggle-bar {
     display: block;
-    width: 20px;
-    height: 2px;
-    margin: 4px auto;
-    background: var(--ink);
-    border-radius: 2px;
+    width: 16px;
+    height: 1.9px;
+    margin: 0;
+    background: currentColor;
+    border-radius: 999px;
 }
 
 .nav-capsule {
@@ -1979,22 +1972,48 @@ thead th {
     }
 
     .nav-shell {
-        grid-template-columns: 1fr auto auto;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
     }
 
-    .nav-theme-toggle {
-        order: 2;
+    .nav-brand {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .nav-controls {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+        padding: 0.2rem;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: rgba(255, 255, 255, 0.86);
+        gap: 0.22rem;
     }
 
     .nav-toggle {
-        display: block;
-        order: 3;
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+    }
+
+    .nav-theme-toggle {
+        width: 34px;
+        height: 34px;
+    }
+
+    .theme-toggle-track,
+    .theme-toggle-icon svg {
+        width: 16px;
+        height: 16px;
     }
 
     .nav-capsule {
         grid-column: 1 / -1;
-        order: 4;
+        grid-row: 2;
         width: 100%;
+        margin-top: 0.35rem;
     }
 
     .nav-capsule > summary {
@@ -2010,16 +2029,21 @@ thead th {
     }
 
     .nav-links {
-        order: 5;
         grid-column: 1 / -1;
+        grid-row: 3;
         justify-self: stretch;
         width: 100%;
         display: none;
-        margin-top: 0.4rem;
+        margin-top: 0.35rem;
         background: rgba(255, 255, 255, 0.88);
         border: 1px solid var(--line);
         border-radius: 14px;
         padding: 0.45rem;
+    }
+
+    :root[data-theme="dark"] .nav-controls {
+        background: rgba(20, 31, 48, 0.95);
+        border-color: var(--line);
     }
 
     .nav-links.is-open {
@@ -2157,26 +2181,13 @@ thead th {
     background: rgba(29, 43, 64, 0.96);
 }
 
-:root[data-theme="dark"] .theme-toggle-track {
-    border-color: rgba(178, 203, 236, 0.28);
-    background: linear-gradient(120deg, rgba(20, 39, 64, 0.95), rgba(38, 68, 106, 0.94));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-:root[data-theme="dark"] .theme-toggle-thumb {
-    transform: translateX(34px);
-    background: #0f1a2b;
-    border-color: rgba(178, 203, 236, 0.35);
-    box-shadow: 0 3px 8px rgba(2, 5, 10, 0.55);
-}
-
 :root[data-theme="dark"] .theme-toggle-icon-sun {
-    color: #93a9c3;
-    opacity: 0.42;
+    color: #93a8c1;
+    opacity: 0.22;
 }
 
 :root[data-theme="dark"] .theme-toggle-icon-moon {
-    color: #f0cf86;
+    color: #f2cf83;
     opacity: 1;
 }
 
