@@ -23,6 +23,20 @@ public sealed class AislePilotExportService : IAislePilotExportService
           <path d="M260 260 L360 220 L360 300 Z" fill="#E39C41" />
         </svg>
         """;
+    private const string AislePilotMarkSvgDark = """
+        <svg width="128" height="128" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="#A8DAFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M120 180 H320 L360 300 H160 Z" />
+            <circle cx="200" cy="360" r="20" fill="#A8DAFF" />
+            <circle cx="320" cy="360" r="20" fill="#A8DAFF" />
+          </g>
+          <rect x="98" y="220" width="90" height="12" rx="6" fill="#78D0CC" />
+          <rect x="86" y="250" width="108" height="12" rx="6" fill="#78D0CC" />
+          <rect x="170" y="220" width="120" height="12" rx="6" fill="#78D0CC" />
+          <rect x="180" y="250" width="100" height="12" rx="6" fill="#78D0CC" />
+          <path d="M260 260 L360 220 L360 300 Z" fill="#F6BE77" />
+        </svg>
+        """;
 
     public AislePilotExportService()
     {
@@ -31,20 +45,23 @@ public sealed class AislePilotExportService : IAislePilotExportService
 
     public byte[] BuildPlanPackPdf(
         AislePilotRequestModel request,
-        AislePilotPlanResultViewModel result)
+        AislePilotPlanResultViewModel result,
+        bool useDarkTheme)
     {
         var ukCulture = CultureInfo.GetCultureInfo("en-GB");
-        const string ink = "#142033";
-        const string inkSoft = "#45556D";
-        const string brandDeep = "#103F65";
-        const string panel = "#FFFFFF";
-        const string panelSoft = "#F0F6FF";
-        const string line = "#D8E3EF";
-        const string lineStrong = "#C9D8E8";
-        const string ok = "#166247";
-        const string okSoft = "#EAF7EF";
-        const string danger = "#92261F";
-        const string dangerSoft = "#FCEDEC";
+        var ink = useDarkTheme ? "#E7EFFD" : "#142033";
+        var inkSoft = useDarkTheme ? "#B7C7DE" : "#45556D";
+        var brandDeep = useDarkTheme ? "#9ED4FF" : "#103F65";
+        var panel = useDarkTheme ? "#131D2A" : "#FFFFFF";
+        var panelSoft = useDarkTheme ? "#1A2738" : "#F0F6FF";
+        var line = useDarkTheme ? "#2B3D55" : "#D8E3EF";
+        var lineStrong = useDarkTheme ? "#35506D" : "#C9D8E8";
+        var ok = useDarkTheme ? "#8AE5BB" : "#166247";
+        var okSoft = useDarkTheme ? "#1B3A2D" : "#EAF7EF";
+        var danger = useDarkTheme ? "#FF9E98" : "#92261F";
+        var dangerSoft = useDarkTheme ? "#3A2125" : "#FCEDEC";
+        var pageSurface = useDarkTheme ? "#0B1320" : "#FFFFFF";
+        var markSvg = useDarkTheme ? AislePilotMarkSvgDark : AislePilotMarkSvg;
 
         var generatedAt = DateTime.Now;
         var dietaryModesText = result.AppliedDietaryModes.Count == 0
@@ -106,6 +123,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
                 document.Page(page =>
                 {
                     page.Size(PageSizes.A4);
+                    page.PageColor(pageSurface);
                     page.MarginHorizontal(26);
                     page.MarginVertical(22);
                     page.DefaultTextStyle(style => style.FontSize(10).FontColor(ink));
@@ -126,7 +144,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
                                     .Width(34)
                                     .Height(34)
                                     .AlignMiddle()
-                                    .Svg(AislePilotMarkSvg);
+                                    .Svg(markSvg);
 
                                 row.RelativeItem().Column(column =>
                                 {
@@ -425,7 +443,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
                                 .Width(11)
                                 .Height(11)
                                 .AlignMiddle()
-                                .Svg(AislePilotMarkSvg);
+                                .Svg(markSvg);
 
                             row.RelativeItem().DefaultTextStyle(style => style.FontSize(8.5f)).Text(text =>
                             {

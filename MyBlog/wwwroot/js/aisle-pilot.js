@@ -124,7 +124,50 @@
         forms.forEach(wireSubmitLoading);
     };
 
+    const getActiveTheme = () => {
+        const documentTheme = (document.documentElement.dataset.theme ?? "").trim().toLowerCase();
+        if (documentTheme === "dark" || documentTheme === "light") {
+            return documentTheme;
+        }
+
+        if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            return "dark";
+        }
+
+        return "light";
+    };
+
+    const wireExportThemeForms = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-export-theme-form]"))
+            : Array.from(document.querySelectorAll("[data-export-theme-form]"));
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const themeInput = form.querySelector("[data-export-theme-input]");
+            if (!(themeInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const syncThemeInput = () => {
+                themeInput.value = getActiveTheme();
+            };
+
+            syncThemeInput();
+            if (form.dataset.exportThemeWired === "true") {
+                return;
+            }
+
+            form.dataset.exportThemeWired = "true";
+            form.addEventListener("submit", syncThemeInput);
+        });
+    };
+
     wireSubmitLoadingHandlers(document);
+    wireExportThemeForms(document);
 
     const wirePlanBasicsSliders = scope => {
         const forms = scope instanceof Element
@@ -1318,6 +1361,69 @@
         });
     };
 
+    const wireGeneratorSettingsAccordion = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const generatorItems = Array.from(
+                form.querySelectorAll("[data-generator-only-preference] .aislepilot-planner-settings-list > .aislepilot-collapsible")
+            ).filter(item => item instanceof HTMLDetailsElement);
+            if (generatorItems.length === 0) {
+                return;
+            }
+
+            const openOnlyItem = nextItem => {
+                if (!(nextItem instanceof HTMLDetailsElement)) {
+                    return;
+                }
+
+                generatorItems.forEach(item => {
+                    if (!(item instanceof HTMLDetailsElement)) {
+                        return;
+                    }
+
+                    item.open = item === nextItem;
+                });
+            };
+
+            generatorItems.forEach(item => {
+                if (!(item instanceof HTMLDetailsElement) || item.dataset.generatorAccordionWired === "true") {
+                    return;
+                }
+
+                item.dataset.generatorAccordionWired = "true";
+                item.addEventListener("toggle", () => {
+                    if (item.open) {
+                        openOnlyItem(item);
+                    }
+                });
+
+                item.addEventListener("focusin", event => {
+                    if (item.open) {
+                        return;
+                    }
+
+                    const summary = item.querySelector("summary");
+                    if (
+                        summary instanceof HTMLElement &&
+                        event.target instanceof Node &&
+                        summary.contains(event.target)
+                    ) {
+                        return;
+                    }
+
+                    openOnlyItem(item);
+                });
+            });
+        });
+    };
+
     wireSharedPreferenceSummaries(document);
 
     const getSelectedSupermarket = form => {
@@ -1423,6 +1529,7 @@
     wireCustomAisleFieldVisibility(document);
     wirePlanBasicsAccordion(document);
     wireSharedSetupAccordion(document);
+    wireGeneratorSettingsAccordion(document);
 
     const wireNotesExportButtons = scope => {
         const shells = scope instanceof Element
@@ -2638,6 +2745,7 @@
         replaceSectionContent(responseDocument, "#aislepilot-export");
 
         wireSubmitLoadingHandlers(document);
+        wireExportThemeForms(document);
         wirePlanBasicsSliders(document);
         wireMealTypeSelectors(document);
         wireCustomAisleFieldVisibility(document);
