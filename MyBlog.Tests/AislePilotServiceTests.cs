@@ -343,6 +343,34 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithThreeMealsPerDay_LunchSlotsDoNotRepeatSingleMealAcrossWholeWeek()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 7,
+            CookDays = 7,
+            MealsPerDay = 3
+        };
+
+        var result = _service.BuildPlan(request);
+        var lunchMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+            .Select(meal => meal.MealName)
+            .ToList();
+        var maxLunchRepeatCount = lunchMeals
+            .GroupBy(mealName => mealName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Count())
+            .DefaultIfEmpty(0)
+            .Max();
+
+        Assert.Equal(7, lunchMeals.Count);
+        Assert.True(
+            maxLunchRepeatCount <= 2,
+            $"Expected each lunch to appear at most twice, but found a repeat count of {maxLunchRepeatCount}.");
+    }
+
+    [Fact]
     public void BuildPlan_WithThreeMealsPerDay_Vegan_KeepsBreakfastAndLunchSlotAppropriate()
     {
         static bool IsBreakfastLike(string mealName)
@@ -1765,6 +1793,110 @@ public class AislePilotServiceTests
         Assert.False(result.UsedAiGeneratedMeals);
         Assert.Equal("Template fallback", result.PlanSourceLabel);
         Assert.Equal(7, result.MealPlan.Count);
+    }
+
+    [Fact]
+    public void BuildPlan_WhenAiRepeatsLunchTooOften_FallsBackAndPreservesLunchVariety()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var recipeSteps = new[]
+        {
+            "Heat a large non-stick pan over medium heat for two minutes.",
+            "Add oil and onions, then cook for five minutes until softened.",
+            "Stir in the main ingredients and cook until hot throughout.",
+            "Season, simmer briefly, and adjust texture if needed.",
+            "Serve immediately with a simple side."
+        };
+
+        object[] BuildIngredients(string primaryIngredient) =>
+        [
+            new { name = primaryIngredient, department = "Produce", quantityForTwo = 0.4m, unit = "kg", estimatedCostForTwo = 1.8m },
+            new { name = "Olive oil", department = "Spices & Sauces", quantityForTwo = 0.05m, unit = "bottle", estimatedCostForTwo = 0.3m },
+            new { name = "Chopped tomatoes", department = "Tins & Dry Goods", quantityForTwo = 1m, unit = "tin", estimatedCostForTwo = 0.8m }
+        ];
+
+        var aiMeals = new List<object>();
+        for (var day = 1; day <= 4; day++)
+        {
+            aiMeals.Add(new
+            {
+                name = $"Roasted chicken tray bake day {day}",
+                baseCostForTwo = 7.4m,
+                isQuick = day % 2 == 0,
+                tags = new[] { "Balanced" },
+                recipeSteps,
+                ingredients = BuildIngredients("Chicken breast")
+            });
+
+            aiMeals.Add(new
+            {
+                name = "Chicken wrap lunch special",
+                baseCostForTwo = 5.2m,
+                isQuick = true,
+                tags = new[] { "Balanced" },
+                recipeSteps,
+                ingredients = BuildIngredients("Chicken breast")
+            });
+        }
+
+        var payloadContent = JsonSerializer.Serialize(new { meals = aiMeals });
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 4,
+            CookDays = 4,
+            MealsPerDay = 2,
+            SelectedMealTypes = ["Lunch", "Dinner"],
+            WeeklyBudget = 95m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+        var lunchMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+            .Select(meal => meal.MealName)
+            .ToList();
+        var maxLunchRepeatCount = lunchMeals
+            .GroupBy(mealName => mealName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Count())
+            .DefaultIfEmpty(0)
+            .Max();
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.False(result.UsedAiGeneratedMeals);
+        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal(4, lunchMeals.Count);
+        Assert.True(
+            maxLunchRepeatCount <= 2,
+            $"Expected lunch repeats to be capped at two in fallback plan, but found {maxLunchRepeatCount}.");
     }
 
     [Fact]
