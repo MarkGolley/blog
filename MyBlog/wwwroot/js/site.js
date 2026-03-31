@@ -1,4 +1,95 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const themeStorageKey = "myblog:theme";
+    const themeMediaQuery =
+        typeof window.matchMedia === "function"
+            ? window.matchMedia("(prefers-color-scheme: dark)")
+            : null;
+    const themeToggleButtons = Array.from(document.querySelectorAll("[data-theme-toggle]"));
+
+    const getStoredTheme = () => {
+        try {
+            const storedTheme = localStorage.getItem(themeStorageKey);
+            return storedTheme === "light" || storedTheme === "dark" ? storedTheme : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const getPreferredTheme = () => {
+        if (themeMediaQuery instanceof MediaQueryList && themeMediaQuery.matches) {
+            return "dark";
+        }
+
+        return "light";
+    };
+
+    const applyTheme = (theme) => {
+        const activeTheme = theme === "dark" ? "dark" : "light";
+        document.documentElement.dataset.theme = activeTheme;
+        document.documentElement.style.colorScheme = activeTheme;
+        return activeTheme;
+    };
+
+    const saveTheme = (theme) => {
+        try {
+            localStorage.setItem(themeStorageKey, theme);
+        } catch {
+            // Ignore storage failures (e.g., strict privacy mode).
+        }
+    };
+
+    const setToggleState = (theme) => {
+        const nextThemeLabel = theme === "dark" ? "light mode" : "dark mode";
+
+        themeToggleButtons.forEach((button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            button.setAttribute("aria-pressed", String(theme === "dark"));
+            button.setAttribute("aria-label", `Switch to ${nextThemeLabel}`);
+
+            const label = button.querySelector("[data-theme-toggle-label]");
+            if (label instanceof HTMLElement) {
+                label.textContent = `Switch to ${nextThemeLabel}`;
+            }
+        });
+    };
+
+    if (themeToggleButtons.length > 0) {
+        let activeTheme = applyTheme(getStoredTheme() ?? getPreferredTheme());
+        setToggleState(activeTheme);
+
+        themeToggleButtons.forEach((button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            button.addEventListener("click", () => {
+                activeTheme = applyTheme(activeTheme === "dark" ? "light" : "dark");
+                saveTheme(activeTheme);
+                setToggleState(activeTheme);
+            });
+        });
+
+        if (themeMediaQuery instanceof MediaQueryList) {
+            const onThemePreferenceChanged = (event) => {
+                if (getStoredTheme() !== null) {
+                    return;
+                }
+
+                activeTheme = applyTheme(event.matches ? "dark" : "light");
+                setToggleState(activeTheme);
+            };
+
+            if (typeof themeMediaQuery.addEventListener === "function") {
+                themeMediaQuery.addEventListener("change", onThemePreferenceChanged);
+            } else if (typeof themeMediaQuery.addListener === "function") {
+                themeMediaQuery.addListener(onThemePreferenceChanged);
+            }
+        }
+    }
+
     const navToggle = document.querySelector("[data-nav-toggle]");
     const navMenu = document.querySelector("[data-nav-menu]");
     if (navToggle instanceof HTMLButtonElement && navMenu instanceof HTMLElement) {

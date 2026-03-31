@@ -1223,8 +1223,8 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-slider-input {
     width: 100%;
-    height: 1.02rem !important;
-    min-height: 1.02rem !important;
+    height: 1.28rem !important;
+    min-height: 1.28rem !important;
     margin: 0;
     padding: 0;
     border: none !important;
@@ -1237,7 +1237,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-slider-input::-webkit-slider-runnable-track {
-    height: 0.28rem;
+    height: 0.36rem;
     border-radius: 999px;
     background:
         linear-gradient(
@@ -1252,9 +1252,9 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-slider-input::-webkit-slider-thumb {
     appearance: none;
     -webkit-appearance: none;
-    width: 1.02rem;
-    height: 1.02rem;
-    margin-top: -0.37rem;
+    width: 1.16rem;
+    height: 1.16rem;
+    margin-top: -0.4rem;
     border-radius: 999px;
     border: none;
     background: transparent;
@@ -1263,21 +1263,21 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-slider-input::-moz-range-track {
-    height: 0.28rem;
+    height: 0.36rem;
     border-radius: 999px;
     border: none;
     background: rgba(16, 63, 101, 0.2);
 }
 
 .aislepilot-slider-input::-moz-range-progress {
-    height: 0.28rem;
+    height: 0.36rem;
     border-radius: 999px;
     background: var(--brand-deep);
 }
 
 .aislepilot-slider-input::-moz-range-thumb {
-    width: 1.02rem;
-    height: 1.02rem;
+    width: 1.16rem;
+    height: 1.16rem;
     border-radius: 999px;
     border: none;
     background: transparent;
@@ -2261,46 +2261,67 @@ html.aislepilot-restore-pending .aislepilot-app {
         gap: 0.16rem;
     }
 
+    .aislepilot-plan-basics .aislepilot-slider-field {
+        padding: 0.22rem 0.52rem 0.2rem;
+    }
+
+    .aislepilot-slider-field--compact {
+        padding: 0.16rem 0.4rem 0.18rem;
+    }
+
+    .aislepilot-slider-track-line {
+        gap: 0.3rem;
+    }
+
     .aislepilot-slider-input {
-        height: 1.06rem !important;
-        min-height: 1.06rem !important;
+        height: 1.62rem !important;
+        min-height: 1.62rem !important;
     }
 
     .aislepilot-slider-field--compact .aislepilot-slider-input {
-        width: calc(100% - 0.84rem);
-        margin-left: 0.42rem;
-        margin-right: 0.42rem;
-        height: 1.2rem !important;
-        min-height: 1.2rem !important;
+        width: calc(100% - 0.64rem);
+        margin-left: 0.32rem;
+        margin-right: 0.32rem;
+        height: 1.82rem !important;
+        min-height: 1.82rem !important;
+    }
+
+    .aislepilot-slider-input::-webkit-slider-runnable-track {
+        height: 0.46rem;
+    }
+
+    .aislepilot-slider-input::-moz-range-track,
+    .aislepilot-slider-input::-moz-range-progress {
+        height: 0.46rem;
     }
 
     .aislepilot-slider-value {
-        min-width: 1.72rem;
-        min-height: 1.34rem;
-        font-size: 0.72rem;
-        padding: 0.12rem 0.34rem;
+        min-width: 1.84rem;
+        min-height: 1.5rem;
+        font-size: 0.78rem;
+        padding: 0.16rem 0.4rem;
     }
 
     .aislepilot-slider-input::-webkit-slider-thumb {
-        width: 1.02rem;
-        height: 1.02rem;
-        margin-top: -0.37rem;
+        width: 1.38rem;
+        height: 1.38rem;
+        margin-top: -0.46rem;
     }
 
     .aislepilot-slider-field--compact .aislepilot-slider-input::-webkit-slider-thumb {
-        width: 0.96rem;
-        height: 0.96rem;
-        margin-top: -0.34rem;
+        width: 1.3rem;
+        height: 1.3rem;
+        margin-top: -0.42rem;
     }
 
     .aislepilot-slider-input::-moz-range-thumb {
-        width: 1.02rem;
-        height: 1.02rem;
+        width: 1.38rem;
+        height: 1.38rem;
     }
 
     .aislepilot-slider-field--compact .aislepilot-slider-input::-moz-range-thumb {
-        width: 0.96rem;
-        height: 0.96rem;
+        width: 1.3rem;
+        height: 1.3rem;
     }
 
     .aislepilot-day-meal-tab {
@@ -2351,6 +2372,154 @@ html.aislepilot-restore-pending .aislepilot-app {
     .aislepilot-pantry-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+}
+
+:root[data-theme="dark"] .aislepilot-app-head,
+:root[data-theme="dark"] .aislepilot-shell,
+:root[data-theme="dark"] .aislepilot-card,
+:root[data-theme="dark"] .aislepilot-field,
+:root[data-theme="dark"] .aislepilot-field-optional,
+:root[data-theme="dark"] .aislepilot-collapsible,
+:root[data-theme="dark"] .aislepilot-setup-mode,
+:root[data-theme="dark"] .aislepilot-setup-panel,
+:root[data-theme="dark"] .aislepilot-setup-strip,
+:root[data-theme="dark"] .aislepilot-leftover-editor,
+:root[data-theme="dark"] .aislepilot-leftover-day-chip,
+:root[data-theme="dark"] .aislepilot-pantry-refresh-tile,
+:root[data-theme="dark"] .aislepilot-stat-card,
+:root[data-theme="dark"] .aislepilot-shop-list .aislepilot-checkbox-item {
+    background: rgba(13, 22, 35, 0.94);
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .aislepilot-brand-lockup,
+:root[data-theme="dark"] .aislepilot-window-tabs,
+:root[data-theme="dark"] .aislepilot-section-head-row,
+:root[data-theme="dark"] .aislepilot-setup-mode-switch,
+:root[data-theme="dark"] .aislepilot-slider-value,
+:root[data-theme="dark"] .aislepilot-card-meta-pill,
+:root[data-theme="dark"] .aislepilot-overbudget-flag,
+:root[data-theme="dark"] .aislepilot-pantry-entry-field,
+:root[data-theme="dark"] .aislepilot-nutrition-details,
+:root[data-theme="dark"] .aislepilot-recipe-details,
+:root[data-theme="dark"] .aislepilot-meal-details-panel {
+    background: rgba(18, 30, 46, 0.94);
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .aislepilot-collapsible > .aislepilot-checkboxes,
+:root[data-theme="dark"] .aislepilot-checkboxes,
+:root[data-theme="dark"] .aislepilot-plan-basic-item,
+:root[data-theme="dark"] .aislepilot-plan-basic-content {
+    background: rgba(14, 23, 36, 0.94);
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .aislepilot-plan-basic-item > summary,
+:root[data-theme="dark"] .aislepilot-collapsible > summary {
+    background: rgba(16, 28, 42, 0.75);
+}
+
+:root[data-theme="dark"] .aislepilot-collapsible > summary::after,
+:root[data-theme="dark"] .aislepilot-plan-basic-item > summary::after {
+    border-right-color: rgba(186, 212, 240, 0.78);
+    border-bottom-color: rgba(186, 212, 240, 0.78);
+}
+
+:root[data-theme="dark"] .aislepilot-supermarket-option span,
+:root[data-theme="dark"] .aislepilot-mode-option span,
+:root[data-theme="dark"] .aislepilot-meals-per-day-option span {
+    background: rgba(15, 25, 39, 0.96);
+    border-color: var(--line);
+    color: var(--ink);
+}
+
+:root[data-theme="dark"] .aislepilot-supermarket-option input[type="radio"]:checked + span,
+:root[data-theme="dark"] .aislepilot-mode-option input[type="checkbox"]:checked + span,
+:root[data-theme="dark"] .aislepilot-meals-per-day-option input[type="checkbox"]:checked + span {
+    border-color: rgba(95, 163, 214, 0.68);
+    background: rgba(33, 64, 95, 0.95);
+    color: #f2f9ff;
+}
+
+:root[data-theme="dark"] .aislepilot-supermarket-select {
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23b7d7ef' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="dark"] .aislepilot-setup-section .aislepilot-field input,
+:root[data-theme="dark"] .aislepilot-setup-section .aislepilot-field select,
+:root[data-theme="dark"] .aislepilot-pantry-entry-input,
+:root[data-theme="dark"] .aislepilot-custom-aisle-input,
+:root[data-theme="dark"] .aislepilot-custom-aisle-order-input {
+    background: rgba(8, 14, 23, 0.95);
+    color: var(--ink);
+    border-color: var(--line-strong);
+}
+
+:root[data-theme="dark"] .aislepilot-setup-section .aislepilot-field input::placeholder,
+:root[data-theme="dark"] .aislepilot-setup-section .aislepilot-field select::placeholder,
+:root[data-theme="dark"] .aislepilot-pantry-entry-input::placeholder,
+:root[data-theme="dark"] .aislepilot-custom-aisle-input::placeholder,
+:root[data-theme="dark"] .aislepilot-custom-aisle-order-input::placeholder {
+    color: rgba(168, 183, 205, 0.8);
+}
+
+:root[data-theme="dark"] .aislepilot-form button,
+:root[data-theme="dark"] .aislepilot-window-tab.is-active,
+:root[data-theme="dark"] .aislepilot-leftover-day-chip.is-leftover-source,
+:root[data-theme="dark"] .aislepilot-overview-regenerate-btn,
+:root[data-theme="dark"] .aislepilot-edit-setup-btn,
+:root[data-theme="dark"] .aislepilot-setup-mode-toggle.is-active,
+:root[data-theme="dark"] .aislepilot-day-meal-tab.is-active,
+:root[data-theme="dark"] .aislepilot-swap-btn:not(.is-secondary),
+:root[data-theme="dark"] .aislepilot-export-btn,
+:root[data-theme="dark"] .aislepilot-alert-btn:not(.is-secondary) {
+    background: linear-gradient(98deg, #2e8dab 0%, #1f557c 100%) !important;
+    color: #f4faff !important;
+}
+
+:root[data-theme="dark"] .aislepilot-window-tab,
+:root[data-theme="dark"] .aislepilot-leftover-toggle,
+:root[data-theme="dark"] .aislepilot-day-meal-tab,
+:root[data-theme="dark"] .aislepilot-meal-details > summary,
+:root[data-theme="dark"] .aislepilot-alert-btn.is-secondary,
+:root[data-theme="dark"] .aislepilot-setup-mode-toggle {
+    background: rgba(21, 34, 52, 0.96) !important;
+    border-color: var(--line) !important;
+    color: var(--ink) !important;
+}
+
+:root[data-theme="dark"] .aislepilot-window-tab:hover,
+:root[data-theme="dark"] .aislepilot-leftover-day-chip:hover {
+    background: rgba(29, 45, 67, 0.96) !important;
+}
+
+:root[data-theme="dark"] .aislepilot-recipe-details,
+:root[data-theme="dark"] .aislepilot-nutrition-details,
+:root[data-theme="dark"] .aislepilot-meal-details-panel {
+    background: rgba(12, 20, 32, 0.95);
+}
+
+:root[data-theme="dark"] .aislepilot-day-meal-panel.is-ignored::before {
+    background: rgba(30, 36, 46, 0.56);
+}
+
+:root[data-theme="dark"] .aislepilot-meal-image-shell {
+    background: linear-gradient(145deg, rgba(26, 39, 58, 0.9), rgba(17, 28, 44, 0.95));
+}
+
+:root[data-theme="dark"] .aislepilot-alert-shell {
+    background: linear-gradient(150deg, rgba(56, 43, 22, 0.75), rgba(20, 31, 46, 0.92));
+}
+
+:root[data-theme="dark"] .aislepilot-overbudget-title {
+    color: #ffb1aa;
+}
+
+:root[data-theme="dark"] .aislepilot-meal-removed-watermark {
+    color: rgba(181, 201, 224, 0.36);
+    text-shadow: none;
 }
 
 @media print {
