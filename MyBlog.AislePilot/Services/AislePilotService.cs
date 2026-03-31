@@ -3389,7 +3389,8 @@ Return JSON only with this schema:
                 slotCompatibleCandidates,
                 selected,
                 resolvedMealTypeSlots,
-                i);
+                i,
+                normalizedMealCount);
             selected.Add(candidate);
         }
 
@@ -4504,7 +4505,14 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         if (mealTypeSlots is { Count: > 0 })
         {
             var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
-            var dinnerNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var slotTypeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < expectedMeals; i++)
+            {
+                var slotMealType = resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count];
+                slotTypeCounts[slotMealType] = slotTypeCounts.GetValueOrDefault(slotMealType, 0) + 1;
+            }
+
+            var slotTypeMealNameCounts = new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
             for (var i = 0; i < expectedMeals; i++)
             {
                 var meal = meals[i];
@@ -4514,8 +4522,18 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                     return false;
                 }
 
-                if (slotMealType.Equals("Dinner", StringComparison.OrdinalIgnoreCase) &&
-                    !dinnerNames.Add(meal.Name))
+                if (!slotTypeMealNameCounts.TryGetValue(slotMealType, out var mealNameCounts))
+                {
+                    mealNameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    slotTypeMealNameCounts[slotMealType] = mealNameCounts;
+                }
+
+                var nextCount = mealNameCounts.GetValueOrDefault(meal.Name, 0) + 1;
+                mealNameCounts[meal.Name] = nextCount;
+
+                var slotCount = slotTypeCounts.GetValueOrDefault(slotMealType, 0);
+                var maxRepeats = ResolveMaxMealRepeatsForSlotType(slotMealType, slotCount);
+                if (nextCount > maxRepeats)
                 {
                     return false;
                 }
@@ -5268,7 +5286,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                 slotCompatibleCandidates,
                 selected,
                 resolvedMealTypeSlots,
-                i);
+                i,
+                normalizedMealCount);
             selected.Add(candidate);
         }
 
@@ -6190,7 +6209,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         IReadOnlyList<MealTemplate> slotCompatibleCandidates,
         IReadOnlyList<MealTemplate> selectedMeals,
         IReadOnlyList<string> resolvedMealTypeSlots,
-        int slotIndex)
+        int slotIndex,
+        int totalSlotCount)
     {
         if (slotCompatibleCandidates.Count == 0)
         {
@@ -6199,6 +6219,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
 
         var slotMealType = resolvedMealTypeSlots[slotIndex % resolvedMealTypeSlots.Count];
         var isDinnerSlot = slotMealType.Equals("Dinner", StringComparison.OrdinalIgnoreCase);
+        var slotTypeSlotCount = CountSlotsForMealType(resolvedMealTypeSlots, slotMealType, totalSlotCount);
+        var maxRepeatsForSlotType = ResolveMaxMealRepeatsForSlotType(slotMealType, slotTypeSlotCount);
         var usedMealNames = selectedMeals
             .Select(meal => meal.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -6207,13 +6229,32 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                 resolvedMealTypeSlots[index % resolvedMealTypeSlots.Count].Equals("Dinner", StringComparison.OrdinalIgnoreCase))
             .Select(meal => meal.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var usedSlotMealTypeCounts = selectedMeals
+            .Where((_, index) =>
+                resolvedMealTypeSlots[index % resolvedMealTypeSlots.Count].Equals(slotMealType, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+        int GetSlotTypeRepeatCount(MealTemplate meal)
+        {
+            return usedSlotMealTypeCounts.TryGetValue(meal.Name, out var count) ? count : 0;
+        }
 
         var preferredCandidate = slotCompatibleCandidates.FirstOrDefault(meal =>
             !usedMealNames.Contains(meal.Name) &&
+            GetSlotTypeRepeatCount(meal) < maxRepeatsForSlotType &&
             (!isDinnerSlot || !usedDinnerMealNames.Contains(meal.Name)));
         if (preferredCandidate is not null)
         {
             return preferredCandidate;
+        }
+
+        var cappedRepeatCandidate = slotCompatibleCandidates.FirstOrDefault(meal =>
+            GetSlotTypeRepeatCount(meal) < maxRepeatsForSlotType &&
+            (!isDinnerSlot || !usedDinnerMealNames.Contains(meal.Name)));
+        if (cappedRepeatCandidate is not null)
+        {
+            return cappedRepeatCandidate;
         }
 
         if (!isDinnerSlot)
@@ -6221,7 +6262,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             var previousName = selectedMeals.Count > 0 ? selectedMeals[^1].Name : null;
             var nonAdjacentCandidate = slotCompatibleCandidates
                 .FirstOrDefault(meal =>
-                    previousName is null || !meal.Name.Equals(previousName, StringComparison.OrdinalIgnoreCase));
+                    GetSlotTypeRepeatCount(meal) < maxRepeatsForSlotType &&
+                    (previousName is null || !meal.Name.Equals(previousName, StringComparison.OrdinalIgnoreCase)));
             if (nonAdjacentCandidate is not null)
             {
                 return nonAdjacentCandidate;
@@ -6240,6 +6282,42 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         }
 
         return slotCompatibleCandidates[slotIndex % slotCompatibleCandidates.Count];
+    }
+
+    private static int CountSlotsForMealType(
+        IReadOnlyList<string> resolvedMealTypeSlots,
+        string mealType,
+        int totalSlotCount)
+    {
+        if (resolvedMealTypeSlots.Count == 0 || totalSlotCount <= 0)
+        {
+            return 0;
+        }
+
+        var normalizedTotalSlotCount = Math.Max(1, totalSlotCount);
+        var count = 0;
+        for (var i = 0; i < normalizedTotalSlotCount; i++)
+        {
+            if (resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count].Equals(mealType, StringComparison.OrdinalIgnoreCase))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static int ResolveMaxMealRepeatsForSlotType(string mealType, int slotCount)
+    {
+        var normalizedMealType = NormalizeMealType(mealType);
+        var normalizedSlotCount = Math.Max(0, slotCount);
+        if (normalizedMealType.Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+
+        // Breakfast/lunch can repeat, but avoid a single meal dominating the week.
+        return normalizedSlotCount >= 4 ? 2 : 1;
     }
 
     private static IReadOnlyList<int> BuildPerMealPortionMultipliers(
@@ -6534,9 +6612,16 @@ Return JSON only with this schema:
         }
 
         var strictModes = ResolveHardDietaryModes(dietaryModes);
-        var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var meals = new List<MealTemplate>(cookDays);
         var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, mealsPerDay);
+        var slotTypeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < rawMeals.Count; i++)
+        {
+            var slotMealType = resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count];
+            slotTypeCounts[slotMealType] = slotTypeCounts.GetValueOrDefault(slotMealType, 0) + 1;
+        }
+
+        var slotTypeMealNameCounts = new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase);
 
         for (var i = 0; i < rawMeals.Count; i++)
         {
@@ -6560,13 +6645,21 @@ Return JSON only with this schema:
                 return null;
             }
 
-            if (!usedNames.Add(meal.Name))
+            if (!slotTypeMealNameCounts.TryGetValue(mealType, out var mealNameCounts))
             {
-                if (mealType.Equals("Dinner", StringComparison.OrdinalIgnoreCase))
-                {
-                    validationReason = $"duplicate_dinner_meal_name:{meal.Name}";
-                    return null;
-                }
+                mealNameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                slotTypeMealNameCounts[mealType] = mealNameCounts;
+            }
+
+            var nextCount = mealNameCounts.GetValueOrDefault(meal.Name, 0) + 1;
+            mealNameCounts[meal.Name] = nextCount;
+
+            var slotCount = slotTypeCounts.GetValueOrDefault(mealType, 0);
+            var maxRepeats = ResolveMaxMealRepeatsForSlotType(mealType, slotCount);
+            if (nextCount > maxRepeats)
+            {
+                validationReason = $"repeat_cap_exceeded(meal={meal.Name},slot={mealType},count={nextCount},max={maxRepeats})";
+                return null;
             }
 
             meals.Add(meal);
