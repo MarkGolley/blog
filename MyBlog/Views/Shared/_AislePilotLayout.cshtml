@@ -12,6 +12,23 @@
     }
     <title>@metaTitle</title>
     <meta name="description" content="@metaDescription" />
+    <script>
+        (() => {
+            try {
+                const storageKey = "myblog:theme";
+                const storedTheme = localStorage.getItem(storageKey);
+                const hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+                const prefersDark = typeof window.matchMedia === "function"
+                    && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                const activeTheme = hasStoredTheme ? storedTheme : (prefersDark ? "dark" : "light");
+                document.documentElement.dataset.theme = activeTheme;
+                document.documentElement.style.colorScheme = activeTheme;
+            } catch {
+                document.documentElement.dataset.theme = "light";
+                document.documentElement.style.colorScheme = "light";
+            }
+        })();
+    </script>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/MyBlog.styles.css" asp-append-version="true" />
@@ -38,6 +55,28 @@
 <header class="app-shell-header">
     <div class="container app-shell-nav">
         <a class="btn btn-secondary app-shell-back" href="@returnUrl">Back</a>
+        <button
+            type="button"
+            class="theme-toggle app-theme-toggle"
+            data-theme-toggle
+            aria-label="Switch color theme"
+            aria-pressed="false">
+            <span class="theme-toggle-track" aria-hidden="true">
+                <span class="theme-toggle-icon theme-toggle-icon-sun">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                        <circle cx="12" cy="12" r="4.25"></circle>
+                        <path d="M12 2.5v2.3M12 19.2v2.3M21.5 12h-2.3M4.8 12H2.5M18.9 5.1l-1.6 1.6M6.7 17.3l-1.6 1.6M18.9 18.9l-1.6-1.6M6.7 6.7 5.1 5.1"></path>
+                    </svg>
+                </span>
+                <span class="theme-toggle-icon theme-toggle-icon-moon">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M16.5 3.5a8.7 8.7 0 1 0 4 16.2A9.4 9.4 0 0 1 16.5 3.5z"></path>
+                    </svg>
+                </span>
+                <span class="theme-toggle-thumb"></span>
+            </span>
+            <span class="sr-only" data-theme-toggle-label>Switch to dark mode</span>
+        </button>
     </div>
 </header>
 

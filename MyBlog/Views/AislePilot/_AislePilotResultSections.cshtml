@@ -534,9 +534,12 @@
                                                         <input type="hidden" name="dayIndex" value="@mealIndex" />
                                                         @{
                                                             var ignoreActionLabel = isIgnored ? "Include meal" : "Ignore meal";
+                                                            var ignoreButtonClass = isIgnored
+                                                                ? "aislepilot-swap-btn is-secondary is-icon-only"
+                                                                : "aislepilot-swap-btn is-secondary is-icon-only is-danger";
                                                         }
                                                         <button type="submit"
-                                                                class="aislepilot-swap-btn is-secondary is-icon-only"
+                                                                class="@ignoreButtonClass"
                                                                 data-loading-label="Updating..."
                                                                 data-loading-delay-ms="180"
                                                                 aria-label="@ignoreActionLabel"
