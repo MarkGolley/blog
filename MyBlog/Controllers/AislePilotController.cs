@@ -57,6 +57,9 @@ public class AislePilotController(
         try
         {
             var result = await aislePilotService.BuildPlanAsync(request, cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
             PersistCurrentPlanState(result);
             return View(BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
         }
@@ -100,6 +103,9 @@ public class AislePilotController(
                 request,
                 currentPlanMealNames: resolvedCurrentPlanMealNames,
                 cancellationToken: cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
             PersistCurrentPlanState(result);
             return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
         }
@@ -195,6 +201,9 @@ public class AislePilotController(
                 dayIndex,
                 currentMealName,
                 result.MealPlan.ElementAtOrDefault(dayIndex)?.MealName);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
             PersistCurrentPlanState(result);
             var responseModel = BuildPageModel(request, result, returnUrl: resolvedReturnUrl);
             if (IsAjaxRequest())
@@ -215,6 +224,80 @@ public class AislePilotController(
             ModelState.AddModelError(
                 string.Empty,
                 "Meal swap hit a temporary issue. Please retry.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+    }
+
+    [HttpPost("swap-dessert")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SwapDessert(
+        AislePilotPageViewModel pageModel,
+        string? currentDessertAddOnName,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
+    {
+        var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
+        ValidateRequest(request);
+        var cookDays = Math.Clamp(request.CookDays, 1, Math.Clamp(request.PlanDays, 1, 7));
+        var mealSlotCount = cookDays * Math.Clamp(request.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
+        if (!request.IncludeDessertAddOn)
+        {
+            ModelState.AddModelError(string.Empty, "Dessert add-on is not enabled for this plan.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        try
+        {
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+            if (resolvedCurrentPlanMealNames is null || resolvedCurrentPlanMealNames.Count != mealSlotCount)
+            {
+                throw new InvalidOperationException("Could not resolve the current plan for dessert swap. Generate a fresh plan and try again.");
+            }
+
+            var currentPlanResult = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                resolvedCurrentPlanMealNames,
+                cancellationToken);
+            var currentDessertName = string.IsNullOrWhiteSpace(currentDessertAddOnName)
+                ? string.IsNullOrWhiteSpace(request.SelectedDessertAddOnName)
+                    ? currentPlanResult.DessertAddOnName
+                    : request.SelectedDessertAddOnName
+                : currentDessertAddOnName.Trim();
+            request.SelectedDessertAddOnName = aislePilotService.ResolveNextDessertAddOnName(currentDessertName);
+            var result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                resolvedCurrentPlanMealNames,
+                cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
+            PersistCurrentPlanState(result);
+            var responseModel = BuildPageModel(request, result, returnUrl: resolvedReturnUrl);
+            if (IsAjaxRequest())
+            {
+                return PartialView("_AislePilotResultSections", responseModel);
+            }
+
+            return View("Index", responseModel);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot swap dessert failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Dessert swap hit a temporary issue. Please retry.");
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
     }
@@ -261,6 +344,9 @@ public class AislePilotController(
                 request,
                 resolvedCurrentPlanMealNames,
                 cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
             PersistCurrentPlanState(result);
             var responseModel = BuildPageModel(request, result, returnUrl: resolvedReturnUrl);
             if (IsAjaxRequest())
@@ -430,6 +516,18 @@ public class AislePilotController(
         };
     }
 
+    private static void SyncRequestWithResult(AislePilotRequestModel request, AislePilotPlanResultViewModel result)
+    {
+        request.SelectedDessertAddOnName = result.IncludeDessertAddOn
+            ? result.DessertAddOnName
+            : string.Empty;
+    }
+
+    private void RefreshResultModelState()
+    {
+        ModelState.Remove("Request.SelectedDessertAddOnName");
+    }
+
     private string ResolveReturnUrl(string? returnUrl)
     {
         var fallbackReturnUrl = Url.Action("Index", "Projects") ?? "/projects";
@@ -509,6 +607,7 @@ public class AislePilotController(
         normalized.CustomAisleOrder = normalized.CustomAisleOrder?.Trim() ?? string.Empty;
         normalized.DislikesOrAllergens = normalized.DislikesOrAllergens?.Trim() ?? string.Empty;
         normalized.PantryItems = normalized.PantryItems?.Trim() ?? string.Empty;
+        normalized.SelectedDessertAddOnName = normalized.SelectedDessertAddOnName?.Trim() ?? string.Empty;
         normalized.LeftoverCookDayIndexesCsv = normalized.LeftoverCookDayIndexesCsv?.Trim() ?? string.Empty;
         normalized.SwapHistoryState = normalized.SwapHistoryState?.Trim() ?? string.Empty;
         normalized.IgnoredMealSlotIndexesCsv =
@@ -762,7 +861,10 @@ public class AislePilotController(
             CustomAisleOrder = request.CustomAisleOrder ?? string.Empty,
             PantryItems = request.PantryItems ?? string.Empty,
             PreferQuickMeals = request.PreferQuickMeals,
-            RequireCorePantryIngredients = request.RequireCorePantryIngredients
+            RequireCorePantryIngredients = request.RequireCorePantryIngredients,
+            IncludeSpecialTreatMeal = request.IncludeSpecialTreatMeal,
+            IncludeDessertAddOn = request.IncludeDessertAddOn,
+            SelectedDessertAddOnName = request.SelectedDessertAddOnName
         };
 
         var payload = JsonSerializer.Serialize(state, SetupStateJsonOptions);
@@ -827,7 +929,10 @@ public class AislePilotController(
                 CustomAisleOrder = state.CustomAisleOrder ?? string.Empty,
                 PantryItems = state.PantryItems ?? string.Empty,
                 PreferQuickMeals = state.PreferQuickMeals,
-                RequireCorePantryIngredients = state.RequireCorePantryIngredients
+                RequireCorePantryIngredients = state.RequireCorePantryIngredients,
+                IncludeSpecialTreatMeal = state.IncludeSpecialTreatMeal,
+                IncludeDessertAddOn = state.IncludeDessertAddOn,
+                SelectedDessertAddOnName = state.SelectedDessertAddOnName
             };
         }
         catch
@@ -1350,5 +1455,8 @@ public class AislePilotController(
         public string? PantryItems { get; set; }
         public bool PreferQuickMeals { get; set; } = true;
         public bool RequireCorePantryIngredients { get; set; }
+        public bool IncludeSpecialTreatMeal { get; set; }
+        public bool IncludeDessertAddOn { get; set; }
+        public string? SelectedDessertAddOnName { get; set; }
     }
 }

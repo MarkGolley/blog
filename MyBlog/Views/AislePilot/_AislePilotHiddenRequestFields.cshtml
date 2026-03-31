@@ -31,6 +31,9 @@ else
 <input type="hidden" name="Request.IgnoredMealSlotIndexesCsv" value="@Model.Request.IgnoredMealSlotIndexesCsv" />
 <input type="hidden" name="Request.PantrySuggestionHistoryState" value="@Model.Request.PantrySuggestionHistoryState" />
 <input type="hidden" name="Request.PreferQuickMeals" value="@(Model.Request.PreferQuickMeals ? "true" : "false")" />
+<input type="hidden" name="Request.IncludeSpecialTreatMeal" value="@(Model.Request.IncludeSpecialTreatMeal ? "true" : "false")" />
+<input type="hidden" name="Request.IncludeDessertAddOn" value="@(Model.Request.IncludeDessertAddOn ? "true" : "false")" />
+<input type="hidden" name="Request.SelectedDessertAddOnName" value="@Model.Request.SelectedDessertAddOnName" />
 @foreach (var mode in dietaryModes)
 {
     <input type="hidden" name="Request.DietaryModes" value="@mode" />

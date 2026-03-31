@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
+using MyBlog.Services;
 
 namespace MyBlog.Tests;
 
@@ -196,6 +198,56 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
             "name=\"Request.IgnoredMealSlotIndexesCsv\" value=\"1\"",
             html,
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SwapDessert_WithDessertAddOnEnabled_RotatesToDifferentDessert()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        const string currentDessertName = "Chocolate sponge tray bake";
+        using var scope = _factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IAislePilotService>();
+        var expectedNextDessertName = service.ResolveNextDessertAddOnName(currentDessertName);
+        Assert.False(
+            currentDessertName.Equals(expectedNextDessertName, StringComparison.OrdinalIgnoreCase),
+            "Test precondition failed: expected next dessert must differ from current.");
+
+        var swapDessertForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "75"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.IncludeDessertAddOn", "true"),
+            new("Request.SelectedDessertAddOnName", currentDessertName),
+            new("Request.DietaryModes", "Balanced"),
+            new("currentDessertAddOnName", currentDessertName),
+            new("currentPlanMealNames", "Chicken stir fry with rice"),
+            new("currentPlanMealNames", "Turkey chilli with beans"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+
+        using var swappedResponse = await client.PostAsync("/projects/aisle-pilot/swap-dessert", new FormUrlEncodedContent(swapDessertForm));
+
+        Assert.Equal(HttpStatusCode.OK, swappedResponse.StatusCode);
+        var swappedHtml = await swappedResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(
+            "Could not resolve the current plan for dessert swap",
+            swappedHtml,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(expectedNextDessertName, swappedHtml, StringComparison.OrdinalIgnoreCase);
+        var selectedDessertValues = ExtractHiddenInputValues(swappedHtml, "Request.SelectedDessertAddOnName");
+        Assert.Contains(
+            selectedDessertValues,
+            value => value.Equals(expectedNextDessertName, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("Swap dessert", swappedHtml, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -676,6 +728,39 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task Index_Post_WithSinglePersonAndSpecialOptions_RendersSingularServingSummaryAndPersistsFlags()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "1",
+            ["Request.CookDays"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.IncludeSpecialTreatMeal"] = "true",
+            ["Request.IncludeDessertAddOn"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("1 person -", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Treat meal on", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Dessert add-on", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Chocolate sponge tray bake", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("plated dessert", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("name=\"Request.IncludeSpecialTreatMeal\" value=\"true\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("name=\"Request.IncludeDessertAddOn\" value=\"true\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Get_RendersPlanDaysSlider()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -860,4 +945,14 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.True(match.Success, $"Hidden input '{inputName}' was not found.");
         return WebUtility.HtmlDecode(match.Groups[1].Value);
     }
+
+    private static IReadOnlyList<string> ExtractHiddenInputValues(string html, string inputName)
+    {
+        var pattern = $@"<input[^>]*name=""{Regex.Escape(inputName)}""[^>]*value=""([^""]*)""";
+        return Regex.Matches(html, pattern, RegexOptions.IgnoreCase)
+            .Select(match => WebUtility.HtmlDecode(match.Groups[1].Value))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+    }
+
 }

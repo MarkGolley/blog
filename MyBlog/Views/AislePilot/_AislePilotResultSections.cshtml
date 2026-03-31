@@ -127,6 +127,8 @@
     var ignoredMealSlotIndexes = ParseIgnoredMealSlotIndexes(Model.Request.IgnoredMealSlotIndexesCsv, Math.Max(0, mealCount - 1));
     var dayCardCount = dayMealGroups.Count;
     var mealLabel = mealCount == 1 ? "meal" : "meals";
+    var safeHouseholdSize = Math.Clamp(Model.Request.HouseholdSize, 1, 8);
+    var householdLabel = safeHouseholdSize == 1 ? "person" : "people";
     var shoppingListNotesBuilder = new StringBuilder();
     shoppingListNotesBuilder.AppendLine("AislePilot Shopping List");
     shoppingListNotesBuilder.AppendLine($"Supermarket: {result.Supermarket}");
@@ -231,6 +233,10 @@
             <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Portion size</p>
                 <p class="aislepilot-stat-value">@result.PortionSize</p>
+            </article>
+            <article class="aislepilot-stat-card">
+                <p class="aislepilot-stat-label">Cooking for</p>
+                <p class="aislepilot-stat-value">@safeHouseholdSize @householdLabel</p>
             </article>
             <article class="aislepilot-stat-card">
                 <p class="aislepilot-stat-label">Budget</p>
@@ -470,6 +476,10 @@
                                                             Makes extra for @dayGroup.LeftoverDaysCovered leftover day(s)
                                                         </span>
                                                     }
+                                                    @if (meal.IsSpecialTreat && !isIgnored)
+                                                    {
+                                                        <span class="aislepilot-card-meta-pill">Special treat</span>
+                                                    }
                                                 </div>
                                                 <div class="aislepilot-card-action-row">
                                                     <details class="aislepilot-meal-details">
@@ -584,10 +594,112 @@
                                 </div>
                             </article>
                         }
+                        @if (result.IncludeDessertAddOn)
+                        {
+                            <article class="aislepilot-card aislepilot-day-card">
+                                <div class="aislepilot-card-head">
+                                    <p class="aislepilot-card-kicker">Dessert</p>
+                                    <p class="aislepilot-day-card-meta">1 meal</p>
+                                </div>
+                                <div class="aislepilot-day-meal-tabs aislepilot-day-meal-tabs-static" aria-hidden="true" role="presentation">
+                                    <span class="aislepilot-day-meal-tab is-active">Dessert</span>
+                                </div>
+                                <div class="aislepilot-meal-image-shell">
+                                    <img class="aislepilot-meal-image"
+                                         src="@fallbackMealImageUrl"
+                                         data-meal-image
+                                         data-meal-name="@result.DessertAddOnName"
+                                         alt="@($"{result.DessertAddOnName} plated dessert")"
+                                         loading="lazy"
+                                         decoding="async" />
+                                </div>
+                                <div class="aislepilot-card-head">
+                                    <p class="aislepilot-card-kicker">Dessert</p>
+                                    <p class="aislepilot-cost">@result.DessertAddOnEstimatedCost.ToString("C", ukCulture)</p>
+                                </div>
+                                <h3>@result.DessertAddOnName</h3>
+                                <div class="aislepilot-card-compact-meta">
+                                    <span class="aislepilot-card-meta-pill">Optional add-on</span>
+                                    <span class="aislepilot-card-meta-pill">@result.DessertAddOnIngredientLines.Count ingredient(s)</span>
+                                </div>
+                                <div class="aislepilot-card-action-row">
+                                    <details class="aislepilot-meal-details">
+                                        <summary>
+                                            <span class="aislepilot-btn-label">
+                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                                                        <circle cx="12" cy="12" r="2.5"></circle>
+                                                    </svg>
+                                                </span>
+                                                View details
+                                            </span>
+                                        </summary>
+                                        <div class="aislepilot-meal-details-panel">
+                                            <p class="aislepilot-card-meta aislepilot-card-reason">Dessert add-on for a more indulgent week.</p>
+                                            <div class="aislepilot-meal-details-grid">
+                                                <div class="aislepilot-recipe-details">
+                                                    <p class="aislepilot-card-kicker">Ingredients</p>
+                                                    <ul class="case-list">
+                                                        @if (result.DessertAddOnIngredientLines.Count == 0)
+                                                        {
+                                                            <li>Ingredients are included in your shopping list.</li>
+                                                        }
+                                                        else
+                                                        {
+                                                            @foreach (var ingredientLine in result.DessertAddOnIngredientLines)
+                                                            {
+                                                                <li>@ingredientLine</li>
+                                                            }
+                                                        }
+                                                    </ul>
+                                                    <p class="aislepilot-card-kicker">Method</p>
+                                                    <ol class="case-list">
+                                                        <li>Heat oven to 180C and line a tray-bake tin.</li>
+                                                        <li>Cream butter and sugar, then beat in eggs.</li>
+                                                        <li>Fold in flour and cocoa, then spread mixture in the tin.</li>
+                                                        <li>Bake until springy and cool before slicing.</li>
+                                                    </ol>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </details>
+                                    <form method="post"
+                                          action="@Url.Action("SwapDessert", "AislePilot")#aislepilot-meals"
+                                          class="aislepilot-swap-form aislepilot-card-action-inline"
+                                          data-preserve-scroll-form
+                                          data-ajax-swap-form>
+                                        @Html.AntiForgeryToken()
+                                        <partial name="_AislePilotHiddenRequestFields"
+                                                 model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                                        <input type="hidden" name="currentDessertAddOnName" value="@result.DessertAddOnName" />
+                                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping...">
+                                            <span class="aislepilot-btn-label">
+                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                        <path d="M16 3h5v5"></path>
+                                                        <path d="M21 3 9 15"></path>
+                                                        <path d="M8 21H3v-5"></path>
+                                                        <path d="M3 21 15 9"></path>
+                                                    </svg>
+                                                </span>
+                                                Swap dessert
+                                            </span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </article>
+                        }
                     </div>
                 </section>
 
                 <section id="aislepilot-shop" aria-label="Shopping" role="tabpanel" aria-labelledby="aislepilot-tab-shop" class="aislepilot-window-panel" data-window-name="Shopping">
+                    @if (result.IncludeDessertAddOn)
+                    {
+                        <p class="aislepilot-window-meta">
+                            Dessert add-on ingredients are included in this list (@result.DessertAddOnEstimatedCost.ToString("C", ukCulture)).
+                        </p>
+                    }
                     <div class="aislepilot-shopping-grid">
                         @foreach (var department in groupedItems)
                         {

@@ -104,8 +104,24 @@
     var dietarySummaryText = dietarySummaryValues.Count == 0
         ? "No dietary filters"
         : string.Join(", ", dietarySummaryValues);
-    var servingSummaryText = $"{Math.Clamp(Model.Request.HouseholdSize, 1, 8)} people - {selectedPortionSize} portions";
+    var safeHouseholdSize = Math.Clamp(Model.Request.HouseholdSize, 1, 8);
+    var householdLabel = safeHouseholdSize == 1 ? "person" : "people";
+    var servingSummaryText = $"{safeHouseholdSize} {householdLabel} - {selectedPortionSize} portions";
     var cookingSummaryText = Model.Request.PreferQuickMeals ? "Quick meals on" : "Quick meals off";
+    var specialOptions = new List<string>();
+    if (Model.Request.IncludeSpecialTreatMeal)
+    {
+        specialOptions.Add("Treat meal on");
+    }
+
+    if (Model.Request.IncludeDessertAddOn)
+    {
+        specialOptions.Add("Dessert add-on on");
+    }
+
+    var specialOptionsSummaryText = specialOptions.Count == 0
+        ? "No extras"
+        : string.Join(", ", specialOptions);
     var exclusionsSummaryRaw = string.IsNullOrWhiteSpace(Model.Request.DislikesOrAllergens)
         ? "No exclusions set"
         : Model.Request.DislikesOrAllergens.Trim();
@@ -329,6 +345,7 @@
             <input asp-for="ReturnUrl" type="hidden" />
             <input type="hidden" name="SetupMode" value="@defaultSetupMode" data-setup-mode-value />
             <input asp-for="Request.PantrySuggestionHistoryState" type="hidden" />
+            <input asp-for="Request.SelectedDessertAddOnName" type="hidden" />
             @if (!hasModelErrors)
             {
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -674,6 +691,24 @@
                                 </div>
                                 <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
                             </div>
+                        </fieldset>
+                    </details>
+
+                    <details class="aislepilot-collapsible"
+                             data-plan-basic-item="special-options">
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Special options</span>
+                            <span class="aislepilot-collapsible-value" data-special-options-summary>@specialOptionsSummaryText</span>
+                        </summary>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                            <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                                <input asp-for="Request.IncludeSpecialTreatMeal" type="checkbox" />
+                                <span>Include one special treat meal</span>
+                            </label>
+                            <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                                <input asp-for="Request.IncludeDessertAddOn" type="checkbox" />
+                                <span>Add cake/dessert ingredients</span>
+                            </label>
                         </fieldset>
                     </details>
                 </div>

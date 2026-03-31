@@ -1184,22 +1184,26 @@
             const exclusionSummary = form.querySelector("[data-exclusion-summary]");
             const pantrySummary = form.querySelector("[data-pantry-summary]");
             const generatorCoreSummary = form.querySelector("[data-generator-core-summary]");
+            const specialOptionsSummary = form.querySelector("[data-special-options-summary]");
             if (!(servingSummary instanceof HTMLElement) &&
                 !(dietarySummary instanceof HTMLElement) &&
                 !(cookingSummary instanceof HTMLElement) &&
                 !(exclusionSummary instanceof HTMLElement) &&
                 !(pantrySummary instanceof HTMLElement) &&
-                !(generatorCoreSummary instanceof HTMLElement)) {
+                !(generatorCoreSummary instanceof HTMLElement) &&
+                !(specialOptionsSummary instanceof HTMLElement)) {
                 return;
             }
 
             const householdInput = form.querySelector("input[name='Request.HouseholdSize']");
             const portionInput = form.querySelector("input[name='Request.PortionSize']");
             const dietaryInputs = Array.from(form.querySelectorAll("input[name='Request.DietaryModes']"));
-            const quickMealsInput = form.querySelector("input[name='Request.PreferQuickMeals']");
+            const quickMealsInput = form.querySelector("input[type='checkbox'][name='Request.PreferQuickMeals']");
             const exclusionsInput = form.querySelector("input[name='Request.DislikesOrAllergens']");
             const pantryInput = form.querySelector("textarea[name='Request.PantryItems']");
-            const strictCoreInput = form.querySelector("input[name='Request.RequireCorePantryIngredients']");
+            const strictCoreInput = form.querySelector("input[type='checkbox'][name='Request.RequireCorePantryIngredients']");
+            const specialTreatInput = form.querySelector("input[type='checkbox'][name='Request.IncludeSpecialTreatMeal']");
+            const dessertAddOnInput = form.querySelector("input[type='checkbox'][name='Request.IncludeDessertAddOn']");
 
             const updateServingSummary = () => {
                 if (!(servingSummary instanceof HTMLElement)) {
@@ -1209,7 +1213,8 @@
                 const peopleValue = Number.parseInt(householdInput?.value ?? "2", 10);
                 const safePeople = Number.isInteger(peopleValue) ? Math.max(1, Math.min(8, peopleValue)) : 2;
                 const portionValue = (portionInput?.value ?? "Medium").trim() || "Medium";
-                servingSummary.textContent = `${safePeople} people - ${portionValue} portions`;
+                const peopleLabel = safePeople === 1 ? "person" : "people";
+                servingSummary.textContent = `${safePeople} ${peopleLabel} - ${portionValue} portions`;
             };
 
             const updateDietarySummary = () => {
@@ -1266,6 +1271,24 @@
                     : "Strict core off";
             };
 
+            const updateSpecialOptionsSummary = () => {
+                if (!(specialOptionsSummary instanceof HTMLElement)) {
+                    return;
+                }
+
+                const options = [];
+                if (specialTreatInput instanceof HTMLInputElement && specialTreatInput.checked) {
+                    options.push("Treat meal on");
+                }
+                if (dessertAddOnInput instanceof HTMLInputElement && dessertAddOnInput.checked) {
+                    options.push("Dessert add-on on");
+                }
+
+                specialOptionsSummary.textContent = options.length > 0
+                    ? options.join(", ")
+                    : "No extras";
+            };
+
             if (form.dataset.sharedSummaryWired !== "true") {
                 if (householdInput instanceof HTMLInputElement) {
                     householdInput.addEventListener("input", updateServingSummary);
@@ -1296,6 +1319,12 @@
                 if (strictCoreInput instanceof HTMLInputElement) {
                     strictCoreInput.addEventListener("change", updateGeneratorCoreSummary);
                 }
+                if (specialTreatInput instanceof HTMLInputElement) {
+                    specialTreatInput.addEventListener("change", updateSpecialOptionsSummary);
+                }
+                if (dessertAddOnInput instanceof HTMLInputElement) {
+                    dessertAddOnInput.addEventListener("change", updateSpecialOptionsSummary);
+                }
 
                 form.dataset.sharedSummaryWired = "true";
             }
@@ -1306,6 +1335,7 @@
             updateExclusionSummary();
             updatePantrySummary();
             updateGeneratorCoreSummary();
+            updateSpecialOptionsSummary();
         });
     };
 

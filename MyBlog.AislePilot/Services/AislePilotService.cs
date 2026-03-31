@@ -316,6 +316,11 @@ public sealed class AislePilotService : IAislePilotService
         "Pescatarian",
         "Gluten-Free"
     ];
+    private static readonly string[] SupportedAiMealTags =
+    [
+        .. SupportedDietaryModes,
+        "Special Treat"
+    ];
 
     private static readonly string[] BreakfastNameKeywords =
     [
@@ -351,6 +356,55 @@ public sealed class AislePilotService : IAislePilotService
         "grain bowls",
         "poke bowl",
         "poke bowls"
+    ];
+
+    private static readonly string[] SpecialTreatNameKeywords =
+    [
+        "special treat",
+        "indulgent",
+        "pie",
+        "risotto",
+        "bake",
+        "roast",
+        "salmon",
+        "steak",
+        "parmesan",
+        "creamy",
+        "lasagne",
+        "lasagna",
+        "loaded",
+        "sticky"
+    ];
+
+    private static readonly DessertAddOnTemplate[] DessertAddOnTemplates =
+    [
+        new(
+            "Chocolate sponge tray bake",
+            [
+                new IngredientTemplate("Self-raising flour", "Tins & Dry Goods", 0.30m, "kg", 0.40m),
+                new IngredientTemplate("Caster sugar", "Tins & Dry Goods", 0.20m, "kg", 0.35m),
+                new IngredientTemplate("Cocoa powder", "Tins & Dry Goods", 0.08m, "kg", 0.80m),
+                new IngredientTemplate("Eggs", "Dairy & Eggs", 4m, "pcs", 0.95m),
+                new IngredientTemplate("Unsalted butter", "Dairy & Eggs", 0.22m, "kg", 1.55m)
+            ]),
+        new(
+            "Lemon drizzle loaf cake",
+            [
+                new IngredientTemplate("Self-raising flour", "Tins & Dry Goods", 0.30m, "kg", 0.40m),
+                new IngredientTemplate("Caster sugar", "Tins & Dry Goods", 0.22m, "kg", 0.39m),
+                new IngredientTemplate("Eggs", "Dairy & Eggs", 4m, "pcs", 0.95m),
+                new IngredientTemplate("Unsalted butter", "Dairy & Eggs", 0.22m, "kg", 1.55m),
+                new IngredientTemplate("Lemons", "Produce", 2m, "pcs", 0.90m)
+            ]),
+        new(
+            "Apple crumble pots",
+            [
+                new IngredientTemplate("Cooking apples", "Produce", 0.60m, "kg", 1.20m),
+                new IngredientTemplate("Plain flour", "Tins & Dry Goods", 0.25m, "kg", 0.30m),
+                new IngredientTemplate("Brown sugar", "Tins & Dry Goods", 0.18m, "kg", 0.45m),
+                new IngredientTemplate("Unsalted butter", "Dairy & Eggs", 0.20m, "kg", 1.40m),
+                new IngredientTemplate("Ground cinnamon", "Spices & Sauces", 0.04m, "jar", 0.30m)
+            ])
     ];
 
     private static readonly WarmupProfile[] WarmupProfilesSingleMode =
@@ -484,7 +538,7 @@ public sealed class AislePilotService : IAislePilotService
             "Salmon, potatoes, and broccoli",
             8.90m,
             IsQuick: true,
-            ["Balanced", "High-Protein", "Pescatarian", "Gluten-Free"],
+            ["Balanced", "High-Protein", "Pescatarian", "Gluten-Free", "Special Treat"],
             [
                 new IngredientTemplate("Salmon fillets", "Meat & Fish", 0.36m, "kg", 4.40m),
                 new IngredientTemplate("Potatoes", "Produce", 0.90m, "kg", 1.10m),
@@ -542,7 +596,7 @@ public sealed class AislePilotService : IAislePilotService
             "Chicken and leek cream pie",
             7.20m,
             IsQuick: false,
-            ["Balanced", "High-Protein"],
+            ["Balanced", "High-Protein", "Special Treat"],
             [
                 new IngredientTemplate("Chicken breast", "Meat & Fish", 0.45m, "kg", 3.25m),
                 new IngredientTemplate("Leeks", "Produce", 2m, "pcs", 1.20m),
@@ -554,7 +608,7 @@ public sealed class AislePilotService : IAislePilotService
             "Paneer tikka tray bake",
             6.50m,
             IsQuick: false,
-            ["Balanced", "Vegetarian", "Gluten-Free"],
+            ["Balanced", "Vegetarian", "Gluten-Free", "Special Treat"],
             [
                 new IngredientTemplate("Paneer", "Dairy & Eggs", 0.40m, "kg", 2.40m),
                 new IngredientTemplate("Onions", "Produce", 0.60m, "kg", 0.70m),
@@ -649,7 +703,7 @@ public sealed class AislePilotService : IAislePilotService
             "Tofu coconut veg curry",
             5.90m,
             IsQuick: true,
-            ["Vegan", "Gluten-Free"],
+            ["Vegan", "Gluten-Free", "Special Treat"],
             [
                 new IngredientTemplate("Firm tofu", "Dairy & Eggs", 0.40m, "kg", 1.60m),
                 new IngredientTemplate("Coconut milk", "Tins & Dry Goods", 2m, "tins", 1.60m),
@@ -685,7 +739,7 @@ public sealed class AislePilotService : IAislePilotService
             "Mushroom spinach risotto",
             6.10m,
             IsQuick: false,
-            ["Balanced", "Vegetarian", "Gluten-Free"],
+            ["Balanced", "Vegetarian", "Gluten-Free", "Special Treat"],
             [
                 new IngredientTemplate("Risotto rice", "Tins & Dry Goods", 0.40m, "kg", 1.30m),
                 new IngredientTemplate("Chestnut mushrooms", "Produce", 0.40m, "kg", 1.45m),
@@ -696,12 +750,48 @@ public sealed class AislePilotService : IAislePilotService
             "Pesto mozzarella pasta bake",
             6.40m,
             IsQuick: false,
-            ["Balanced", "Vegetarian"],
+            ["Balanced", "Vegetarian", "Special Treat"],
             [
                 new IngredientTemplate("Pasta", "Tins & Dry Goods", 0.45m, "kg", 0.90m),
                 new IngredientTemplate("Pesto", "Spices & Sauces", 1m, "jar", 1.35m),
                 new IngredientTemplate("Mozzarella", "Dairy & Eggs", 2m, "balls", 1.70m),
                 new IngredientTemplate("Cherry tomatoes", "Produce", 0.30m, "kg", 1.00m)
+            ]),
+        new(
+            "Creamy chicken and mushroom pasta bake",
+            8.10m,
+            IsQuick: false,
+            ["Balanced", "High-Protein", "Special Treat"],
+            [
+                new IngredientTemplate("Chicken breast", "Meat & Fish", 0.50m, "kg", 3.45m),
+                new IngredientTemplate("Pasta", "Tins & Dry Goods", 0.45m, "kg", 0.90m),
+                new IngredientTemplate("Chestnut mushrooms", "Produce", 0.35m, "kg", 1.35m),
+                new IngredientTemplate("Double cream", "Dairy & Eggs", 0.25m, "pot", 0.95m),
+                new IngredientTemplate("Parmesan", "Dairy & Eggs", 0.10m, "kg", 1.05m)
+            ]),
+        new(
+            "Halloumi and harissa roast veg tray bake",
+            7.20m,
+            IsQuick: false,
+            ["Balanced", "Vegetarian", "Gluten-Free", "Special Treat"],
+            [
+                new IngredientTemplate("Halloumi", "Dairy & Eggs", 0.35m, "kg", 2.70m),
+                new IngredientTemplate("Sweet potatoes", "Produce", 0.90m, "kg", 1.55m),
+                new IngredientTemplate("Courgettes", "Produce", 2m, "pcs", 1.20m),
+                new IngredientTemplate("Bell peppers", "Produce", 3m, "pcs", 1.50m),
+                new IngredientTemplate("Harissa paste", "Spices & Sauces", 0.12m, "jar", 0.70m)
+            ]),
+        new(
+            "Sticky sesame tofu rice bowl",
+            6.70m,
+            IsQuick: false,
+            ["Vegan", "Gluten-Free", "Special Treat"],
+            [
+                new IngredientTemplate("Firm tofu", "Dairy & Eggs", 0.45m, "kg", 1.80m),
+                new IngredientTemplate("Rice", "Tins & Dry Goods", 0.45m, "kg", 0.95m),
+                new IngredientTemplate("Broccoli", "Produce", 2m, "pcs", 1.60m),
+                new IngredientTemplate("Carrots", "Produce", 4m, "pcs", 0.80m),
+                new IngredientTemplate("Tamari", "Spices & Sauces", 0.18m, "bottle", 1.10m)
             ]),
         new(
             "Greek yogurt berry oat pots",
@@ -945,6 +1035,7 @@ public sealed class AislePilotService : IAislePilotService
                 ? aiMeal
                 : MealTemplates.FirstOrDefault(template =>
                     template.Name.Equals(mealName, StringComparison.OrdinalIgnoreCase));
+            template ??= TryBuildDessertAddOnImageMealTemplate(mealName);
             if (template is not null)
             {
                 QueueMealImageGeneration(template);
@@ -954,6 +1045,37 @@ public sealed class AislePilotService : IAislePilotService
         }
 
         return resolved;
+    }
+
+    private static MealTemplate? TryBuildDessertAddOnImageMealTemplate(string mealName)
+    {
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            return null;
+        }
+
+        var dessertTemplate = DessertAddOnTemplates.FirstOrDefault(template =>
+            template.Name.Equals(mealName.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (dessertTemplate is null)
+        {
+            return null;
+        }
+
+        var estimatedBaseCostForTwo = decimal.Round(
+            dessertTemplate.Ingredients.Sum(ingredient => Math.Max(0m, ingredient.EstimatedCostForTwo)),
+            2,
+            MidpointRounding.AwayFromZero);
+        if (estimatedBaseCostForTwo <= 0m)
+        {
+            estimatedBaseCostForTwo = 4.5m;
+        }
+
+        return new MealTemplate(
+            dessertTemplate.Name,
+            estimatedBaseCostForTwo,
+            IsQuick: false,
+            ["Balanced", "Special Treat"],
+            dessertTemplate.Ingredients.ToList());
     }
 
     public async Task<AislePilotWarmupResult> WarmupAiMealPoolAsync(
@@ -1395,6 +1517,7 @@ public sealed class AislePilotService : IAislePilotService
                 requestedCount,
                 mealsPerDay: 1,
                 mealTypeSlots: ["Dinner"],
+                requireSpecialTreatDinner: false,
                 out var validationReason);
             if (aiMeals is null)
             {
@@ -1476,7 +1599,7 @@ public sealed class AislePilotService : IAislePilotService
         var mealTypeSlots = BuildMealTypeSlots(request);
         var mealsPerDay = mealTypeSlots.Count;
         var totalMealCount = NormalizeRequestedMealCount(cookDays * mealsPerDay);
-        if (ShouldUseTemplateFallback())
+        if (ShouldUseTemplateFallback() && !request.IncludeSpecialTreatMeal)
         {
             _logger?.LogWarning("AislePilot is using local meal templates because AI generation is unavailable in this runtime.");
             return await BuildPlanFromTemplateCatalogAsync(request, context, cookDays, totalMealCount, cancellationToken);
@@ -1502,6 +1625,14 @@ public sealed class AislePilotService : IAislePilotService
         if (aiPlan is not null)
         {
             return aiPlan;
+        }
+
+        if (request.IncludeSpecialTreatMeal)
+        {
+            _logger?.LogWarning(
+                "AislePilot could not produce an AI special treat dinner for this request; not falling back to template dinners.");
+            throw new InvalidOperationException(
+                "Couldn't generate a valid special treat dinner right now. Please try again in a moment.");
         }
 
         _logger?.LogWarning(
@@ -1717,7 +1848,8 @@ public sealed class AislePilotService : IAislePilotService
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
-            BuildMealTypeSlots(request));
+            BuildMealTypeSlots(request),
+            request.IncludeSpecialTreatMeal);
 
         // Keep swap behavior consistent by making fallback-selected meals available in the in-memory pool.
         AddMealsToAiPool(selectedMeals);
@@ -1823,15 +1955,25 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
-        var selectedMeals = SelectMeals(
-            aiMeals,
-            context.DietaryModes,
-            request.WeeklyBudget,
-            context.HouseholdFactor,
-            request.PreferQuickMeals,
-            context.DislikesOrAllergens,
-            totalMealCount,
-            mealTypeSlots);
+        IReadOnlyList<MealTemplate> selectedMeals;
+        try
+        {
+            selectedMeals = SelectMeals(
+                aiMeals,
+                context.DietaryModes,
+                request.WeeklyBudget,
+                context.HouseholdFactor,
+                request.PreferQuickMeals,
+                context.DislikesOrAllergens,
+                totalMealCount,
+                mealTypeSlots,
+                request.IncludeSpecialTreatMeal);
+        }
+        catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
+        {
+            _logger?.LogWarning(ex, "AislePilot AI generation did not include a valid special treat dinner.");
+            return null;
+        }
 
         if (!HasUniqueMealNames(selectedMeals, totalMealCount, mealTypeSlots))
         {
@@ -1944,6 +2086,7 @@ public sealed class AislePilotService : IAislePilotService
                 requestedMealCount,
                 mealsPerDay,
                 mealTypeSlots,
+                request.IncludeSpecialTreatMeal,
                 out var validationReason);
             if (aiMeals is null)
             {
@@ -1988,15 +2131,25 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
-        var selectedMeals = SelectMeals(
-            pooledMeals,
-            context.DietaryModes,
-            request.WeeklyBudget,
-            context.HouseholdFactor,
-            request.PreferQuickMeals,
-            context.DislikesOrAllergens,
-            totalMealCount,
-            mealTypeSlots);
+        IReadOnlyList<MealTemplate> selectedMeals;
+        try
+        {
+            selectedMeals = SelectMeals(
+                pooledMeals,
+                context.DietaryModes,
+                request.WeeklyBudget,
+                context.HouseholdFactor,
+                request.PreferQuickMeals,
+                context.DislikesOrAllergens,
+                totalMealCount,
+                mealTypeSlots,
+                request.IncludeSpecialTreatMeal);
+        }
+        catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
+        {
+            _logger?.LogInformation(ex, "AislePilot AI meal pool lacked a valid special treat dinner for this request.");
+            return null;
+        }
 
         if (!HasUniqueMealNames(selectedMeals, totalMealCount, mealTypeSlots))
         {
@@ -2039,15 +2192,25 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
-        var selectedMeals = SelectMeals(
-            pooledMeals,
-            context.DietaryModes,
-            request.WeeklyBudget,
-            context.HouseholdFactor,
-            request.PreferQuickMeals,
-            context.DislikesOrAllergens,
-            totalMealCount,
-            mealTypeSlots);
+        IReadOnlyList<MealTemplate> selectedMeals;
+        try
+        {
+            selectedMeals = SelectMeals(
+                pooledMeals,
+                context.DietaryModes,
+                request.WeeklyBudget,
+                context.HouseholdFactor,
+                request.PreferQuickMeals,
+                context.DislikesOrAllergens,
+                totalMealCount,
+                mealTypeSlots,
+                request.IncludeSpecialTreatMeal);
+        }
+        catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
+        {
+            _logger?.LogInformation(ex, "AislePilot AI meal pool lacked a valid special treat dinner for this request.");
+            return null;
+        }
 
         if (!HasUniqueMealNames(selectedMeals, totalMealCount, mealTypeSlots))
         {
@@ -2231,6 +2394,31 @@ public sealed class AislePilotService : IAislePilotService
             usedAiGeneratedMeals: !planSourceLabel.Equals("Template swap", StringComparison.OrdinalIgnoreCase),
             planSourceLabel: planSourceLabel,
             cancellationToken: cancellationToken);
+    }
+
+    public string ResolveNextDessertAddOnName(string? currentDessertAddOnName)
+    {
+        if (DessertAddOnTemplates.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var normalizedCurrentDessertName = currentDessertAddOnName?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedCurrentDessertName))
+        {
+            return DessertAddOnTemplates[0].Name;
+        }
+
+        var currentIndex = Array.FindIndex(
+            DessertAddOnTemplates,
+            template => template.Name.Equals(normalizedCurrentDessertName, StringComparison.OrdinalIgnoreCase));
+        if (currentIndex < 0)
+        {
+            return DessertAddOnTemplates[0].Name;
+        }
+
+        var nextIndex = (currentIndex + 1) % DessertAddOnTemplates.Length;
+        return DessertAddOnTemplates[nextIndex].Name;
     }
 
     private MealTemplate? TryBuildReplacementMealWithAi(
@@ -2542,7 +2730,7 @@ Rules:
 - Use realistic prices, avoid placeholder values, and keep all monetary values to 2 decimal places.
 - The sum of `estimatedCostForTwo` across ingredients should be broadly consistent with `baseCostForTwo`.
 - `quantityForTwo` must be a positive number.
-- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
+- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free, Special Treat
 - `tags` must include every listed dietary requirement.
 - `recipeSteps` must contain 5-6 concrete, meal-specific cooking steps in order.
 - Keep each recipe step concise (ideally <= 140 characters).
@@ -2749,7 +2937,7 @@ Rules:
 - Use realistic prices, avoid placeholder values, and keep all monetary values to 2 decimal places.
 - The sum of `estimatedCostForTwo` across ingredients should be broadly consistent with `baseCostForTwo`.
 - `quantityForTwo` must be a positive number.
-- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
+- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free, Special Treat
 - `recipeSteps` must contain 5-8 concrete, meal-specific cooking steps in order.
 - Include `nutritionPerServing` for one medium serving (not household total), with calories and grams for protein/carbs/fat.
 
@@ -2882,7 +3070,10 @@ Return JSON only with this schema:
             SwapHistoryState = request.SwapHistoryState,
             IgnoredMealSlotIndexesCsv = request.IgnoredMealSlotIndexesCsv,
             PreferQuickMeals = request.PreferQuickMeals,
-            RequireCorePantryIngredients = request.RequireCorePantryIngredients
+            RequireCorePantryIngredients = request.RequireCorePantryIngredients,
+            IncludeSpecialTreatMeal = request.IncludeSpecialTreatMeal,
+            IncludeDessertAddOn = request.IncludeDessertAddOn,
+            SelectedDessertAddOnName = request.SelectedDessertAddOnName
         };
     }
 
@@ -3044,6 +3235,11 @@ Return JSON only with this schema:
             return null;
         }
 
+        if (request.IncludeSpecialTreatMeal && !HasSpecialTreatDinner(selectedMeals, mealTypeSlots))
+        {
+            return null;
+        }
+
         AddMealsToAiPool(selectedMeals);
         return BuildPlanFromMeals(
             request,
@@ -3158,6 +3354,11 @@ Return JSON only with this schema:
         }
 
         if (!hasChanges)
+        {
+            return null;
+        }
+
+        if (request.IncludeSpecialTreatMeal && !HasSpecialTreatDinner(selectedMeals, mealTypeSlots))
         {
             return null;
         }
@@ -3290,7 +3491,8 @@ Return JSON only with this schema:
             request.PreferQuickMeals,
             IsHighProteinPreferred(context.DietaryModes),
             totalMealCount,
-            mealTypeSlots);
+            mealTypeSlots,
+            request.IncludeSpecialTreatMeal);
 
         return BuildPlanFromMeals(
             request,
@@ -3332,7 +3534,8 @@ Return JSON only with this schema:
             request.PreferQuickMeals,
             IsHighProteinPreferred(context.DietaryModes),
             totalMealCount,
-            mealTypeSlots);
+            mealTypeSlots,
+            request.IncludeSpecialTreatMeal);
 
         return await BuildPlanFromMealsAsync(
             request,
@@ -3350,7 +3553,8 @@ Return JSON only with this schema:
         bool preferQuickMeals,
         bool preferHighProtein,
         int requestedMealCount,
-        IReadOnlyList<string> mealTypeSlots)
+        IReadOnlyList<string> mealTypeSlots,
+        bool includeSpecialTreatMeal)
     {
         if (mealSource.Count == 0)
         {
@@ -3392,6 +3596,16 @@ Return JSON only with this schema:
                 i,
                 normalizedMealCount);
             selected.Add(candidate);
+        }
+
+        if (includeSpecialTreatMeal)
+        {
+            var treatApplied = TryApplySpecialTreatMeal(selected, orderedCandidates, resolvedMealTypeSlots, householdFactor);
+            if (!treatApplied || !HasSpecialTreatDinner(selected, resolvedMealTypeSlots))
+            {
+                throw new InvalidOperationException(
+                    "No indulgent special treat dinner was available for the current settings.");
+            }
         }
 
         return selected;
@@ -3519,15 +3733,39 @@ Return JSON only with this schema:
             portionSizeFactor,
             context.DietaryModes,
             context.DislikesOrAllergens);
+        var dessertAddOnTemplate = request.IncludeDessertAddOn
+            ? ResolveDessertAddOnTemplate(request.SelectedDessertAddOnName)
+            : null;
         var shoppingItems = BuildShoppingList(
             normalizedSelectedMeals,
             mealPortionMultipliers,
             ignoredMealSlotIndexes,
             context.HouseholdFactor,
-            context.AisleOrder);
-        var estimatedTotalCost = decimal.Round(dailyPlans.Sum(x => x.EstimatedCost), 2, MidpointRounding.AwayFromZero);
+            context.AisleOrder,
+            dessertAddOnTemplate);
+        var dessertAddOnCost = dessertAddOnTemplate is not null
+            ? CalculateDessertAddOnEstimatedCost(context.HouseholdFactor, dessertAddOnTemplate)
+            : 0m;
+        var dessertAddOnName = dessertAddOnTemplate?.Name ?? string.Empty;
+        var dessertAddOnIngredientLines = dessertAddOnTemplate is not null
+            ? BuildDessertAddOnIngredientLines(context.HouseholdFactor, dessertAddOnTemplate)
+            : Array.Empty<string>();
+        var estimatedTotalCost = decimal.Round(
+            dailyPlans.Sum(x => x.EstimatedCost) + dessertAddOnCost,
+            2,
+            MidpointRounding.AwayFromZero);
         var budgetDelta = decimal.Round(request.WeeklyBudget - estimatedTotalCost, 2, MidpointRounding.AwayFromZero);
         var isOverBudget = budgetDelta < 0;
+        var budgetTips = BuildBudgetTips(isOverBudget, budgetDelta, leftoverDays).ToList();
+        if (request.IncludeSpecialTreatMeal)
+        {
+            budgetTips.Add("Includes one special treat meal in your week.");
+        }
+
+        if (dessertAddOnTemplate is not null)
+        {
+            budgetTips.Add("Includes a cake/dessert add-on in your shopping list.");
+        }
 
         return new AislePilotPlanResultViewModel
         {
@@ -3546,8 +3784,13 @@ Return JSON only with this schema:
             EstimatedTotalCost = estimatedTotalCost,
             BudgetDelta = budgetDelta,
             IsOverBudget = isOverBudget,
+            IncludeSpecialTreatMeal = request.IncludeSpecialTreatMeal,
+            IncludeDessertAddOn = request.IncludeDessertAddOn,
+            DessertAddOnEstimatedCost = dessertAddOnCost,
+            DessertAddOnName = dessertAddOnName,
+            DessertAddOnIngredientLines = dessertAddOnIngredientLines,
             AisleOrderUsed = context.AisleOrder,
-            BudgetTips = BuildBudgetTips(isOverBudget, budgetDelta, leftoverDays),
+            BudgetTips = budgetTips,
             MealPlan = dailyPlans,
             ShoppingItems = shoppingItems
         };
@@ -4645,6 +4888,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             var mealType = resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count];
             var mealPortionMultiplier = Math.Max(1, mealPortionMultipliers[i]);
             var isIgnored = ignoredMealSlotIndexes.Contains(i);
+            var isSpecialTreat = template.Tags.Contains("Special Treat", StringComparer.OrdinalIgnoreCase);
             var estimatedCost = isIgnored
                 ? 0m
                 : decimal.Round(
@@ -4657,6 +4901,11 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             if (safeMealsPerDay > 1)
             {
                 reason = $"{mealType} option. {reason}";
+            }
+
+            if (isSpecialTreat && !isIgnored)
+            {
+                reason = $"Special treat pick for this week. {reason}";
             }
 
             if (isIgnored)
@@ -4699,6 +4948,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                 MealType = mealType,
                 IsIgnored = isIgnored,
                 MealName = template.Name,
+                IsSpecialTreat = isSpecialTreat,
                 MealImageUrl = mealImageUrls.GetValueOrDefault(template.Name, GetFallbackMealImageUrl()),
                 MealReason = reason,
                 LeftoverDaysCovered = leftoverDaysCovered,
@@ -5162,12 +5412,34 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         };
     }
 
+    private static DessertAddOnTemplate ResolveDessertAddOnTemplate(string? selectedDessertAddOnName)
+    {
+        if (DessertAddOnTemplates.Length == 0)
+        {
+            throw new InvalidOperationException("No dessert add-on templates are configured.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedDessertAddOnName))
+        {
+            var normalizedSelectedDessertName = selectedDessertAddOnName.Trim();
+            var selectedTemplate = DessertAddOnTemplates.FirstOrDefault(template =>
+                template.Name.Equals(normalizedSelectedDessertName, StringComparison.OrdinalIgnoreCase));
+            if (selectedTemplate is not null)
+            {
+                return selectedTemplate;
+            }
+        }
+
+        return DessertAddOnTemplates[0];
+    }
+
     private static IReadOnlyList<AislePilotShoppingItemViewModel> BuildShoppingList(
         IReadOnlyList<MealTemplate> selectedMeals,
         IReadOnlyList<int> mealPortionMultipliers,
         IReadOnlySet<int> ignoredMealSlotIndexes,
         decimal householdFactor,
-        IReadOnlyList<string> aisleOrder)
+        IReadOnlyList<string> aisleOrder,
+        DessertAddOnTemplate? dessertAddOnTemplate)
     {
         var aggregated = new Dictionary<string, MutableShoppingItem>(StringComparer.OrdinalIgnoreCase);
         var mealCount = Math.Min(selectedMeals.Count, mealPortionMultipliers.Count);
@@ -5199,6 +5471,11 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             }
         }
 
+        if (dessertAddOnTemplate is not null)
+        {
+            AddDessertAddOnShoppingItems(aggregated, householdFactor, dessertAddOnTemplate);
+        }
+
         var departmentOrder = aisleOrder
             .Select((department, index) => new { department, index })
             .ToDictionary(x => x.department, x => x.index, StringComparer.OrdinalIgnoreCase);
@@ -5217,6 +5494,57 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             .ToList();
     }
 
+    private static void AddDessertAddOnShoppingItems(
+        IDictionary<string, MutableShoppingItem> aggregated,
+        decimal householdFactor,
+        DessertAddOnTemplate dessertAddOnTemplate)
+    {
+        var scale = Math.Clamp(householdFactor, 0.5m, 4m);
+        foreach (var ingredient in dessertAddOnTemplate.Ingredients)
+        {
+            var key = $"{ingredient.Department}|{ingredient.Name}|{ingredient.Unit}";
+            if (!aggregated.TryGetValue(key, out var existing))
+            {
+                existing = new MutableShoppingItem
+                {
+                    Department = ingredient.Department,
+                    Name = ingredient.Name,
+                    Unit = ingredient.Unit
+                };
+                aggregated[key] = existing;
+            }
+
+            existing.Quantity += ingredient.QuantityForTwo * scale;
+            existing.EstimatedCost += ingredient.EstimatedCostForTwo * scale;
+        }
+    }
+
+    private static decimal CalculateDessertAddOnEstimatedCost(
+        decimal householdFactor,
+        DessertAddOnTemplate dessertAddOnTemplate)
+    {
+        var scale = Math.Clamp(householdFactor, 0.5m, 4m);
+        var estimatedCost = dessertAddOnTemplate.Ingredients.Sum(ingredient => ingredient.EstimatedCostForTwo * scale);
+        return decimal.Round(estimatedCost, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static IReadOnlyList<string> BuildDessertAddOnIngredientLines(
+        decimal householdFactor,
+        DessertAddOnTemplate dessertAddOnTemplate)
+    {
+        var scale = Math.Clamp(householdFactor, 0.5m, 4m);
+        return dessertAddOnTemplate.Ingredients
+            .Select(ingredient =>
+            {
+                var scaledQuantity = decimal.Round(
+                    ingredient.QuantityForTwo * scale,
+                    2,
+                    MidpointRounding.AwayFromZero);
+                return $"{QuantityDisplayFormatter.FormatForRecipe(scaledQuantity, ingredient.Unit)} {ingredient.Name}";
+            })
+            .ToList();
+    }
+
     private static IReadOnlyList<MealTemplate> SelectMeals(
         IReadOnlyList<MealTemplate> mealSource,
         IReadOnlyList<string> dietaryModes,
@@ -5225,7 +5553,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         bool preferQuickMeals,
         string dislikesOrAllergens,
         int requestedMealCount,
-        IReadOnlyList<string>? mealTypeSlots = null)
+        IReadOnlyList<string>? mealTypeSlots = null,
+        bool includeSpecialTreatMeal = false)
     {
         var candidates = FilterMeals(dietaryModes, dislikesOrAllergens, mealSource)
             .Select(meal => EnsureMealTypeSuitability(meal))
@@ -5289,6 +5618,16 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                 i,
                 normalizedMealCount);
             selected.Add(candidate);
+        }
+
+        if (includeSpecialTreatMeal)
+        {
+            var treatApplied = TryApplySpecialTreatMeal(selected, rotatedCandidates, resolvedMealTypeSlots, householdFactor);
+            if (!treatApplied || !HasSpecialTreatDinner(selected, resolvedMealTypeSlots))
+            {
+                throw new InvalidOperationException(
+                    "No indulgent special treat dinner was available for the current settings.");
+            }
         }
 
         return selected;
@@ -6205,6 +6544,140 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         };
     }
 
+    private static bool IsSpecialTreatMealCandidate(MealTemplate meal)
+    {
+        if (meal.Tags.Contains("Special Treat", StringComparer.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return SpecialTreatNameKeywords.Any(keyword =>
+            meal.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool TryApplySpecialTreatMeal(
+        IList<MealTemplate> selectedMeals,
+        IReadOnlyList<MealTemplate> candidateMeals,
+        IReadOnlyList<string> resolvedMealTypeSlots,
+        decimal householdFactor)
+    {
+        if (selectedMeals.Count == 0 || candidateMeals.Count == 0 || resolvedMealTypeSlots.Count == 0)
+        {
+            return false;
+        }
+
+        var dinnerSlotIndexes = Enumerable.Range(0, selectedMeals.Count)
+            .Where(index =>
+                resolvedMealTypeSlots[index % resolvedMealTypeSlots.Count]
+                    .Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (dinnerSlotIndexes.Count == 0)
+        {
+            return false;
+        }
+
+        var existingTreatDinnerIndex = dinnerSlotIndexes
+            .Cast<int?>()
+            .FirstOrDefault(index => index.HasValue && IsSpecialTreatMealCandidate(selectedMeals[index.Value]));
+        if (existingTreatDinnerIndex.HasValue)
+        {
+            var dinnerIndex = existingTreatDinnerIndex.Value;
+            selectedMeals[dinnerIndex] = MarkMealAsSpecialTreat(selectedMeals[dinnerIndex]);
+            return true;
+        }
+
+        var targetDinnerIndex = dinnerSlotIndexes
+            .OrderBy(index => CalculateScaledMealCost(selectedMeals[index], householdFactor, dayMultiplier: 1))
+            .ThenBy(index => index)
+            .First();
+        var currentDinnerMeal = selectedMeals[targetDinnerIndex];
+
+        var usedMealNames = selectedMeals
+            .Where((_, index) => index != targetDinnerIndex)
+            .Select(meal => meal.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var dinnerCosts = dinnerSlotIndexes
+            .Select(index => CalculateScaledMealCost(selectedMeals[index], householdFactor, dayMultiplier: 1))
+            .ToList();
+        var averageDinnerCost = dinnerCosts.Count == 0
+            ? 0m
+            : dinnerCosts.Average();
+
+        var rankedTreatCandidates = candidateMeals
+            .Select(meal => EnsureMealTypeSuitability(meal))
+            .Where(meal => SupportsMealType(meal, "Dinner"))
+            .Where(IsSpecialTreatMealCandidate)
+            .Where(meal => !usedMealNames.Contains(meal.Name))
+            .Select(meal => new
+            {
+                Meal = meal,
+                Cost = CalculateScaledMealCost(meal, householdFactor, dayMultiplier: 1)
+            })
+            .OrderByDescending(entry => entry.Cost)
+            .ThenBy(entry => entry.Meal.IsQuick ? 1 : 0)
+            .ThenBy(entry => entry.Meal.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var treatCandidates = rankedTreatCandidates
+            .Where(entry => IsSpecialTreatMealCandidate(entry.Meal))
+            .ToList();
+        var premiumThreshold = decimal.Round(averageDinnerCost * 1.12m, 2, MidpointRounding.AwayFromZero);
+        var replacement = treatCandidates
+            .Where(entry => entry.Cost >= premiumThreshold)
+            .Select(entry => entry.Meal)
+            .FirstOrDefault(meal => !meal.Name.Equals(currentDinnerMeal.Name, StringComparison.OrdinalIgnoreCase));
+        replacement ??= treatCandidates
+            .Select(entry => entry.Meal)
+            .FirstOrDefault(meal => !meal.Name.Equals(currentDinnerMeal.Name, StringComparison.OrdinalIgnoreCase));
+        replacement ??= treatCandidates
+            .Where(entry => entry.Cost >= premiumThreshold)
+            .Select(entry => entry.Meal)
+            .FirstOrDefault();
+        replacement ??= treatCandidates
+            .Select(entry => entry.Meal)
+            .FirstOrDefault();
+
+        if (replacement is null)
+        {
+            return false;
+        }
+
+        selectedMeals[targetDinnerIndex] = MarkMealAsSpecialTreat(replacement);
+        return true;
+    }
+
+    private static bool HasSpecialTreatDinner(
+        IReadOnlyList<MealTemplate> selectedMeals,
+        IReadOnlyList<string> mealTypeSlots)
+    {
+        if (selectedMeals.Count == 0 || mealTypeSlots.Count == 0)
+        {
+            return false;
+        }
+
+        var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
+        return Enumerable.Range(0, selectedMeals.Count)
+            .Where(index =>
+                resolvedMealTypeSlots[index % resolvedMealTypeSlots.Count]
+                    .Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+            .Any(index => IsSpecialTreatMealCandidate(selectedMeals[index]));
+    }
+
+    private static MealTemplate MarkMealAsSpecialTreat(MealTemplate meal)
+    {
+        var tags = meal.Tags
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (!tags.Contains("Special Treat", StringComparer.OrdinalIgnoreCase))
+        {
+            tags.Add("Special Treat");
+        }
+
+        return meal with { Tags = tags };
+    }
+
     private static MealTemplate SelectCandidateForSlot(
         IReadOnlyList<MealTemplate> slotCompatibleCandidates,
         IReadOnlyList<MealTemplate> selectedMeals,
@@ -6440,7 +6913,7 @@ Rules:
 - `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
 - Use realistic prices and keep all monetary values to 2 decimal places.
 - `quantityForTwo` must be a positive number.
-- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
+- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free, Special Treat
 - Include all requested dietary modes in each meal's tags, except Balanced is optional.
 - `recipeSteps` must contain 5-6 concrete cooking steps in order.
 - Include `nutritionPerServing` for one medium serving (not household total), with calories and grams for protein/carbs/fat.
@@ -6521,6 +6994,8 @@ Planner inputs:
 - Meal slot order per cook day: {{mealTypePattern}}
 - Total meal slots visible in the plan: {{totalMealCount}}
 - Prefer quick meals: {{(request.PreferQuickMeals ? "yes" : "no")}}
+- Include one special treat meal: {{(request.IncludeSpecialTreatMeal ? "yes" : "no")}}
+- Include dessert add-on ingredients: {{(request.IncludeDessertAddOn ? "yes" : "no")}}
 - Dietary requirements: {{strictModeText}}
 - Dislikes or allergens: {{dislikesText}}
 - Pantry items already available: {{pantryText}}
@@ -6542,6 +7017,9 @@ Rules:
 - Assume standard pantry basics are available (oil, salt, pepper, onions, garlic, dried herbs) even if not listed.
 - If pantry hints are sparse or mismatched, still return viable meals and never return an empty `meals` array.
 - If quick meals are preferred, most meals should be 30 minutes or less.
+- If special treat meal is enabled, include one clearly indulgent dinner (richer sauce/bake/roast style), not a standard weekday dinner.
+- Tag that indulgent dinner with `Special Treat` and include the phrase "special treat" in the meal name.
+- Do not include dessert-only meals in the meal slots unless a meal slot is explicitly dessert.
 - Every meal must include 3-7 ingredients only.
 - Department must be one of: Produce, Bakery, Meat & Fish, Dairy & Eggs, Frozen, Tins & Dry Goods, Spices & Sauces, Snacks, Drinks, Household, Other
 - Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
@@ -6550,7 +7028,7 @@ Rules:
 - Use realistic prices, avoid placeholder values, and keep all monetary values to 2 decimal places.
 - The sum of `estimatedCostForTwo` across ingredients should be broadly consistent with `baseCostForTwo`.
 - `quantityForTwo` must be a positive number.
-- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free
+- `tags` must only use values from: Balanced, High-Protein, Vegetarian, Vegan, Pescatarian, Gluten-Free, Special Treat
 - Include all requested dietary modes in each meal's tags, except Balanced is optional.
 - `recipeSteps` must contain 5-6 concrete, meal-specific cooking steps in order.
 - Do not write generic filler; include relevant timings, heat levels, and ingredient usage.
@@ -6601,6 +7079,7 @@ Return JSON only with this schema:
         int requestedMealCount,
         int mealsPerDay,
         IReadOnlyList<string>? mealTypeSlots,
+        bool requireSpecialTreatDinner,
         out string? validationReason)
     {
         validationReason = null;
@@ -6663,6 +7142,23 @@ Return JSON only with this schema:
             }
 
             meals.Add(meal);
+        }
+
+        if (requireSpecialTreatDinner)
+        {
+            var hasDinnerSlot = resolvedMealTypeSlots
+                .Any(slot => slot.Equals("Dinner", StringComparison.OrdinalIgnoreCase));
+            if (!hasDinnerSlot)
+            {
+                validationReason = "special_treat_requires_dinner_slot";
+                return null;
+            }
+
+            if (!HasSpecialTreatDinner(meals, resolvedMealTypeSlots))
+            {
+                validationReason = "special_treat_not_found";
+                return null;
+            }
         }
 
         return meals;
@@ -6897,7 +7393,7 @@ Return JSON only with this schema:
 
         var tags = payload.Tags?
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(tag => SupportedDietaryModes.FirstOrDefault(mode => mode.Equals(tag.Trim(), StringComparison.OrdinalIgnoreCase)))
+            .Select(tag => SupportedAiMealTags.FirstOrDefault(mode => mode.Equals(tag.Trim(), StringComparison.OrdinalIgnoreCase)))
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Cast<string>()
@@ -8484,6 +8980,10 @@ Return JSON only with this schema:
         decimal QuantityForTwo,
         string Unit,
         decimal EstimatedCostForTwo);
+
+    private sealed record DessertAddOnTemplate(
+        string Name,
+        IReadOnlyList<IngredientTemplate> Ingredients);
 
     private sealed record IngredientUnitPriceReference(
         string IngredientNameNormalized,
