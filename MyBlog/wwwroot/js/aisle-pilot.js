@@ -1255,6 +1255,69 @@
         });
     };
 
+    const wireSharedSetupAccordion = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const sharedItems = Array.from(
+                form.querySelectorAll(".aislepilot-shared-setup > .aislepilot-collapsible")
+            ).filter(item => item instanceof HTMLDetailsElement);
+            if (sharedItems.length === 0) {
+                return;
+            }
+
+            const openOnlyItem = nextItem => {
+                if (!(nextItem instanceof HTMLDetailsElement)) {
+                    return;
+                }
+
+                sharedItems.forEach(item => {
+                    if (!(item instanceof HTMLDetailsElement)) {
+                        return;
+                    }
+
+                    item.open = item === nextItem;
+                });
+            };
+
+            sharedItems.forEach(item => {
+                if (!(item instanceof HTMLDetailsElement) || item.dataset.sharedSetupAccordionWired === "true") {
+                    return;
+                }
+
+                item.dataset.sharedSetupAccordionWired = "true";
+                item.addEventListener("toggle", () => {
+                    if (item.open) {
+                        openOnlyItem(item);
+                    }
+                });
+
+                item.addEventListener("focusin", event => {
+                    if (item.open) {
+                        return;
+                    }
+
+                    const summary = item.querySelector("summary");
+                    if (
+                        summary instanceof HTMLElement &&
+                        event.target instanceof Node &&
+                        summary.contains(event.target)
+                    ) {
+                        return;
+                    }
+
+                    openOnlyItem(item);
+                });
+            });
+        });
+    };
+
     wireSharedPreferenceSummaries(document);
 
     const getSelectedSupermarket = form => {
@@ -1359,6 +1422,7 @@
 
     wireCustomAisleFieldVisibility(document);
     wirePlanBasicsAccordion(document);
+    wireSharedSetupAccordion(document);
 
     const wireNotesExportButtons = scope => {
         const shells = scope instanceof Element

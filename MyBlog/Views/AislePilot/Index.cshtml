@@ -124,6 +124,7 @@
         ? "Strict core on"
         : "Strict core off";
     var shouldShowGeneratorMode = Model.PantrySuggestions.Count > 0 || hasPantryValidationErrors;
+    var generatorOnlyPreferenceHiddenAttribute = shouldShowGeneratorMode ? null : "hidden";
     var plannerOnlyPreferenceHiddenAttribute = shouldShowGeneratorMode ? "hidden" : null;
     var defaultSetupMode = shouldShowGeneratorMode ? "generator" : "planner";
     var forceDefaultSetupMode = shouldShowGeneratorMode ? "true" : "false";
@@ -662,6 +663,52 @@
                 </div>
             </section>
 
+            <section class="aislepilot-planner-settings"
+                     data-generator-only-preference
+                     @generatorOnlyPreferenceHiddenAttribute>
+                <h2 class="aislepilot-planner-settings-title">
+                    <span class="aislepilot-symbol-label">
+                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" focusable="false">
+                                <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
+                                <path d="M20 4v6h-6"></path>
+                            </svg>
+                        </span>
+                        Generator settings
+                    </span>
+                </h2>
+
+                <div class="aislepilot-planner-settings-list">
+                    <details class="aislepilot-collapsible" open>
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Foods on hand</span>
+                            <span class="aislepilot-collapsible-value" data-pantry-summary>@pantrySummaryText</span>
+                        </summary>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-generator-pantry-panel aislepilot-field aislepilot-field-optional aislepilot-pantry-entry-field">
+                            <label asp-for="Request.PantryItems" class="sr-only">Pantry items</label>
+                            <textarea asp-for="Request.PantryItems"
+                                      class="aislepilot-pantry-entry-input"
+                                      rows="3"
+                                      placeholder="Example: rice, eggs, chicken breast, frozen peas, spinach, olive oil"></textarea>
+                            <span asp-validation-for="Request.PantryItems" class="text-danger"></span>
+                        </fieldset>
+                    </details>
+
+                    <details class="aislepilot-collapsible">
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Core ingredient mode</span>
+                            <span class="aislepilot-collapsible-value" data-generator-core-summary>@generatorCoreSummaryText</span>
+                        </summary>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                            <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                                <input asp-for="Request.RequireCorePantryIngredients" type="checkbox" disabled="@(!shouldShowGeneratorMode)" />
+                                <span>Strict core ingredients</span>
+                            </label>
+                        </fieldset>
+                    </details>
+                </div>
+            </section>
+
             <section id="aislepilot-planner-mode"
                      class="aislepilot-setup-mode"
                      aria-label="Meal planner"
@@ -819,57 +866,6 @@
                      role="tabpanel"
                      data-setup-mode-panel="generator"
                      @generatorModeHiddenAttribute>
-                <div class="aislepilot-setup-mode-head">
-                    <p class="aislepilot-setup-mode-copy">Generate 3 meal ideas from pantry items.</p>
-                </div>
-
-                <section class="aislepilot-planner-settings">
-                    <h2 class="aislepilot-planner-settings-title">
-                        <span class="aislepilot-symbol-label">
-                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" focusable="false">
-                                    <path d="M4 6h16"></path>
-                                    <path d="M4 12h16"></path>
-                                    <path d="M4 18h16"></path>
-                                </svg>
-                            </span>
-                            Generator settings
-                        </span>
-                    </h2>
-
-                    <div class="aislepilot-planner-settings-list">
-                        <details class="aislepilot-collapsible" open>
-                            <summary>
-                                <span class="aislepilot-collapsible-title">Foods on hand</span>
-                                <span class="aislepilot-collapsible-value" data-pantry-summary>@pantrySummaryText</span>
-                            </summary>
-                            <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-generator-pantry-panel">
-                                <div class="aislepilot-field aislepilot-field-optional aislepilot-pantry-entry-field">
-                                    <label asp-for="Request.PantryItems">Foods on hand</label>
-                                    <textarea asp-for="Request.PantryItems"
-                                              class="aislepilot-pantry-entry-input"
-                                              rows="3"
-                                              placeholder="Example: rice, eggs, chicken breast, frozen peas, spinach, olive oil"></textarea>
-                                    <span asp-validation-for="Request.PantryItems" class="text-danger"></span>
-                                </div>
-                            </fieldset>
-                        </details>
-
-                        <details class="aislepilot-collapsible"
-                                 data-generator-only-preference>
-                            <summary>
-                                <span class="aislepilot-collapsible-title">Core ingredient mode</span>
-                                <span class="aislepilot-collapsible-value" data-generator-core-summary>@generatorCoreSummaryText</span>
-                            </summary>
-                            <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                                <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
-                                    <input asp-for="Request.RequireCorePantryIngredients" type="checkbox" disabled="@(!shouldShowGeneratorMode)" />
-                                    <span>Strict core ingredients</span>
-                                </label>
-                            </fieldset>
-                        </details>
-                    </div>
-                </section>
                 <div class="aislepilot-submit-actions aislepilot-generator-submit-actions">
                     <button
                         type="submit"
