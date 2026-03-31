@@ -1638,6 +1638,10 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-radius: 11px;
     background: rgba(255, 255, 255, 0.95);
     font-weight: 600;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    color: var(--ink);
 }
 
 .aislepilot-toggle-chip span::before {
@@ -1709,9 +1713,10 @@ html.aislepilot-restore-pending .aislepilot-app {
     background-position: right 0.02rem center;
     background-size: 0.82rem;
     padding: 0 1.04rem 0 0 !important;
-    font-size: 0.84rem !important;
+    font-size: 0.8rem !important;
     line-height: 1.2 !important;
-    font-weight: 700 !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em;
     color: var(--ink) !important;
     text-align: left !important;
     text-align-last: left !important;
@@ -1726,6 +1731,11 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: none !important;
     background-color: transparent !important;
     box-shadow: none !important;
+}
+
+.aislepilot-special-treat-day-select option {
+    background: rgba(255, 255, 255, 0.98);
+    color: var(--ink);
 }
 
 .aislepilot-budget-grid {
@@ -2942,6 +2952,11 @@ html.aislepilot-restore-pending .aislepilot-app {
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23b7d7ef' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     color: var(--ink) !important;
+}
+
+:root[data-theme="dark"] .aislepilot-special-treat-day-select option {
+    background: rgba(14, 23, 36, 0.98);
+    color: var(--ink);
 }
 
 :root[data-theme="dark"] .aislepilot-setup-section .aislepilot-field input,
