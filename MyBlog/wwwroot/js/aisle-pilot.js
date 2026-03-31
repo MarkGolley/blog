@@ -875,12 +875,23 @@
                     return "";
                 }
 
+                const formatSupermarketLabel = value => {
+                    const normalized = (value ?? "").trim();
+                    if (normalized.length === 0) {
+                        return "";
+                    }
+
+                    return normalized
+                        .toLowerCase()
+                        .replace(/\b([a-z])/g, letter => letter.toUpperCase());
+                };
+
                 const itemType = (item.dataset.planBasicItem ?? "").trim().toLowerCase();
                 switch (itemType) {
                     case "supermarket": {
                         const selectedSupermarket = getSelectedSupermarket(form).trim();
                         return selectedSupermarket.length > 0
-                            ? selectedSupermarket.toUpperCase()
+                            ? formatSupermarketLabel(selectedSupermarket)
                             : "Not set";
                     }
                     case "budget": {

@@ -168,7 +168,17 @@
                     @Html.AntiForgeryToken()
                     <partial name="_AislePilotHiddenRequestFields"
                              model="BuildHiddenRequestFields()" />
-                    <button type="submit" class="aislepilot-overview-regenerate-btn" data-loading-label="Regenerating...">Regenerate plan</button>
+                    <button type="submit" class="aislepilot-overview-regenerate-btn" data-loading-label="Refreshing meals...">
+                        <span class="aislepilot-btn-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
+                                    <path d="M20 4v6h-6"></path>
+                                </svg>
+                            </span>
+                            Refresh meals
+                        </span>
+                    </button>
                 </form>
                 <button
                     type="button"
@@ -176,7 +186,15 @@
                     data-setup-toggle
                     aria-controls="aislepilot-setup"
                     aria-expanded="false">
-                    Edit settings
+                    <span class="aislepilot-btn-label">
+                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" focusable="false">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a1 1 0 0 1-1 1h-1.4a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0l-1-1a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a1 1 0 0 1-1-1v-1.4a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4l1-1a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.4a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a1 1 0 0 1 1 1v1.4a1 1 0 0 1-1 1h-.2a1 1 0 0 0-.4.1"></path>
+                            </svg>
+                        </span>
+                        Edit settings
+                    </span>
                 </button>
             </div>
         </div>

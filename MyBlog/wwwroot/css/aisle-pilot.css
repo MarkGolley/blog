@@ -6,6 +6,18 @@
     padding-bottom: 1.25rem;
 }
 
+.aislepilot-layout {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.aislepilot-results-stack {
+    display: grid;
+    gap: 0.85rem;
+    min-width: 0;
+    align-content: start;
+}
+
 .aislepilot-app [hidden] {
     display: none !important;
 }
@@ -558,6 +570,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     gap: 0.5rem;
     padding: 0.48rem 2rem 0.5rem 0.68rem;
     cursor: pointer;
+    min-width: 0;
 }
 
 .aislepilot-collapsible > summary::-webkit-details-marker {
@@ -587,6 +600,9 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: var(--brand-deep);
     line-height: 1.25;
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .aislepilot-collapsible-value {
@@ -1227,10 +1243,17 @@ html.aislepilot-restore-pending .aislepilot-app {
     font-size: 0.8rem;
     font-weight: 600;
     line-height: 1.2;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     color: var(--ink);
     text-align: center;
+}
+
+.aislepilot-supermarket-option span {
+    text-transform: none;
+}
+
+.aislepilot-mode-option span {
+    text-transform: uppercase;
 }
 
 .aislepilot-supermarket-option input[type="radio"]:checked + span,
@@ -2481,6 +2504,243 @@ html.aislepilot-restore-pending .aislepilot-app {
 
     .aislepilot-pantry-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .aislepilot-app {
+        width: min(100%, 94rem);
+        gap: 1.1rem;
+    }
+
+    .aislepilot-app-head {
+        padding: 1.2rem 1.3rem;
+    }
+
+    .aislepilot-app-head:not(.is-compact) {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        column-gap: 1.1rem;
+        align-items: center;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-brand-lockup {
+        margin: 0;
+        align-self: start;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-head-intro {
+        min-width: 0;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-title {
+        margin-top: 0;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-title,
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-subtitle {
+        max-width: none;
+    }
+
+    .aislepilot-layout {
+        gap: 1.1rem;
+    }
+
+    .aislepilot-layout.has-results {
+        grid-template-columns: minmax(22.5rem, 30rem) minmax(0, 1fr);
+        column-gap: 1.1rem;
+        align-items: start;
+    }
+
+    .aislepilot-layout.has-results > #aislepilot-setup:not([hidden]) {
+        position: sticky;
+        top: 1rem;
+        align-self: start;
+        max-height: calc(100dvh - 2rem);
+        overflow: auto;
+        scrollbar-gutter: stable both-edges;
+    }
+
+    .aislepilot-layout.has-results > #aislepilot-setup[hidden] + .aislepilot-results-stack {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-layout.has-results > .aislepilot-results-stack {
+        gap: 1rem;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup {
+        max-width: none;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.82rem 1rem;
+        align-items: start;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-form > [asp-validation-summary],
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-form > .text-danger,
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-form > .aislepilot-setup-mode-switch {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-shared-setup {
+        grid-column: 1;
+        margin: 0;
+        padding: 0.34rem;
+        border: 1px solid rgba(16, 63, 101, 0.18);
+        border-radius: 12px;
+        background: rgba(16, 63, 101, 0.06);
+        align-content: start;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-shared-setup::before {
+        content: "Shared settings";
+        display: block;
+        margin: 0;
+        padding: 0 0.2rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+        line-height: 1.25;
+        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings:not([hidden]) {
+        grid-column: 2;
+        margin: 0;
+        padding: 0.34rem;
+        border: 1px solid rgba(16, 63, 101, 0.18);
+        border-radius: 12px;
+        background: rgba(16, 63, 101, 0.06);
+        align-content: start;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings-title {
+        margin: 0;
+        padding: 0 0.2rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+        line-height: 1.25;
+        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings-title .aislepilot-symbol-label {
+        display: block;
+        gap: 0;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings-title .aislepilot-symbol-glyph {
+        display: none;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-submit-actions {
+        max-width: none;
+        width: 100%;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-submit-actions button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-setup-mode:not([hidden]) {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-shell {
+        min-width: 0;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-head {
+        align-items: flex-start;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-nav {
+        justify-items: start;
+        align-items: start;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-nav-hint {
+        display: none;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-tabs {
+        width: fit-content;
+        min-width: 22rem;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-shell {
+        padding: 1rem;
+    }
+
+    .aislepilot-serving-context-fields .aislepilot-inline-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .aislepilot-collapsible > summary {
+        padding: 0.58rem 2rem 0.6rem 0.72rem;
+    }
+
+    .aislepilot-collapsible-title {
+        font-size: 0.83rem;
+    }
+
+    .aislepilot-collapsible-value {
+        font-size: 0.78rem;
+    }
+
+    .aislepilot-planner-settings-title {
+        font-size: 0.94rem;
+    }
+
+    .aislepilot-setup-mode-copy {
+        font-size: 0.86rem;
+    }
+
+    .aislepilot-budget-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .aislepilot-stat-card {
+        padding: 0.34rem 0.62rem 0.38rem;
+    }
+
+    .aislepilot-meal-image-shell {
+        height: clamp(7.8rem, 11vw, 10.2rem);
+    }
+}
+
+@media (min-width: 1280px) {
+    .aislepilot-app {
+        width: min(100%, 100rem);
+    }
+
+    .aislepilot-layout.has-results {
+        grid-template-columns: minmax(24rem, 32rem) minmax(0, 1fr);
+    }
+
+    .aislepilot-budget-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .aislepilot-meal-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .aislepilot-shopping-grid {
+        column-count: 3;
+        column-gap: 0.75rem;
+    }
+
+    .aislepilot-pantry-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
