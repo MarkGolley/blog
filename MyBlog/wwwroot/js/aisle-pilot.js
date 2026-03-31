@@ -1203,7 +1203,83 @@
             const pantryInput = form.querySelector("textarea[name='Request.PantryItems']");
             const strictCoreInput = form.querySelector("input[type='checkbox'][name='Request.RequireCorePantryIngredients']");
             const specialTreatInput = form.querySelector("input[type='checkbox'][name='Request.IncludeSpecialTreatMeal']");
+            const specialTreatCookDayField = form.querySelector("[data-special-treat-day-field]");
+            const specialTreatCookDaySelect = form.querySelector("[data-special-treat-day-select]");
             const dessertAddOnInput = form.querySelector("input[type='checkbox'][name='Request.IncludeDessertAddOn']");
+            const cookDaysInput = form.querySelector("input[name='Request.CookDays']");
+            const planDaysInput = form.querySelector("input[name='Request.PlanDays']");
+
+            const weekDayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+            const buildDefaultCookDayMultipliers = (cookDays, planDays) => {
+                const safePlanDays = Number.isInteger(planDays) ? Math.max(1, Math.min(7, planDays)) : 7;
+                const safeCookDays = Number.isInteger(cookDays) ? Math.max(1, Math.min(safePlanDays, cookDays)) : safePlanDays;
+                const leftoverDays = Math.max(0, safePlanDays - safeCookDays);
+                const multipliers = Array.from({ length: safeCookDays }, () => 1);
+                for (let index = 0; index < leftoverDays; index += 1) {
+                    multipliers[index % safeCookDays] += 1;
+                }
+
+                return multipliers;
+            };
+
+            const buildSpecialTreatCookDayLabels = () => {
+                const cookDaysValue = Number.parseInt(cookDaysInput?.value ?? "7", 10);
+                const planDaysValue = Number.parseInt(planDaysInput?.value ?? "7", 10);
+                const safePlanDays = Number.isInteger(planDaysValue) ? Math.max(1, Math.min(7, planDaysValue)) : 7;
+                const safeCookDays = Number.isInteger(cookDaysValue) ? Math.max(1, Math.min(safePlanDays, cookDaysValue)) : safePlanDays;
+                const multipliers = buildDefaultCookDayMultipliers(safeCookDays, safePlanDays);
+                const labels = [];
+                let dayCursor = 0;
+                for (let index = 0; index < safeCookDays; index += 1) {
+                    const safeDayIndex = Math.max(0, Math.min(safePlanDays - 1, dayCursor));
+                    const dayName = weekDayNames[safeDayIndex];
+                    labels.push(dayName);
+                    dayCursor += Math.max(1, multipliers[index]);
+                }
+
+                return labels;
+            };
+
+            const syncSpecialTreatCookDayOptions = () => {
+                if (!(specialTreatCookDaySelect instanceof HTMLSelectElement)) {
+                    return;
+                }
+
+                const labels = buildSpecialTreatCookDayLabels();
+                const previousValue = Number.parseInt(specialTreatCookDaySelect.value, 10);
+                specialTreatCookDaySelect.innerHTML = "";
+                labels.forEach((label, index) => {
+                    const option = document.createElement("option");
+                    option.value = `${index}`;
+                    option.textContent = label;
+                    specialTreatCookDaySelect.appendChild(option);
+                });
+
+                const fallbackIndex = labels.length > 0 ? 0 : -1;
+                const nextIndex =
+                    Number.isInteger(previousValue) &&
+                    previousValue >= 0 &&
+                    previousValue < labels.length
+                        ? previousValue
+                        : fallbackIndex;
+                if (nextIndex >= 0) {
+                    specialTreatCookDaySelect.value = `${nextIndex}`;
+                }
+            };
+
+            const syncSpecialTreatCookDayVisibility = () => {
+                if (!(specialTreatInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                if (specialTreatCookDayField instanceof HTMLElement) {
+                    specialTreatCookDayField.hidden = !specialTreatInput.checked;
+                }
+
+                if (specialTreatCookDaySelect instanceof HTMLSelectElement) {
+                    specialTreatCookDaySelect.disabled = !specialTreatInput.checked;
+                }
+            };
 
             const updateServingSummary = () => {
                 if (!(servingSummary instanceof HTMLElement)) {
@@ -1278,7 +1354,12 @@
 
                 const options = [];
                 if (specialTreatInput instanceof HTMLInputElement && specialTreatInput.checked) {
-                    options.push("Treat meal on");
+                    const selectedTreatDayLabel = specialTreatCookDaySelect instanceof HTMLSelectElement
+                        ? (specialTreatCookDaySelect.options[specialTreatCookDaySelect.selectedIndex]?.text ?? "").trim()
+                        : "";
+                    options.push(selectedTreatDayLabel.length > 0
+                        ? `Treat meal on ${selectedTreatDayLabel}`
+                        : "Treat meal on");
                 }
                 if (dessertAddOnInput instanceof HTMLInputElement && dessertAddOnInput.checked) {
                     options.push("Dessert add-on on");
@@ -1320,15 +1401,43 @@
                     strictCoreInput.addEventListener("change", updateGeneratorCoreSummary);
                 }
                 if (specialTreatInput instanceof HTMLInputElement) {
-                    specialTreatInput.addEventListener("change", updateSpecialOptionsSummary);
+                    specialTreatInput.addEventListener("change", () => {
+                        syncSpecialTreatCookDayVisibility();
+                        updateSpecialOptionsSummary();
+                    });
+                }
+                if (specialTreatCookDaySelect instanceof HTMLSelectElement) {
+                    specialTreatCookDaySelect.addEventListener("change", updateSpecialOptionsSummary);
                 }
                 if (dessertAddOnInput instanceof HTMLInputElement) {
                     dessertAddOnInput.addEventListener("change", updateSpecialOptionsSummary);
+                }
+                if (cookDaysInput instanceof HTMLInputElement) {
+                    cookDaysInput.addEventListener("input", () => {
+                        syncSpecialTreatCookDayOptions();
+                        updateSpecialOptionsSummary();
+                    });
+                    cookDaysInput.addEventListener("change", () => {
+                        syncSpecialTreatCookDayOptions();
+                        updateSpecialOptionsSummary();
+                    });
+                }
+                if (planDaysInput instanceof HTMLInputElement) {
+                    planDaysInput.addEventListener("input", () => {
+                        syncSpecialTreatCookDayOptions();
+                        updateSpecialOptionsSummary();
+                    });
+                    planDaysInput.addEventListener("change", () => {
+                        syncSpecialTreatCookDayOptions();
+                        updateSpecialOptionsSummary();
+                    });
                 }
 
                 form.dataset.sharedSummaryWired = "true";
             }
 
+            syncSpecialTreatCookDayOptions();
+            syncSpecialTreatCookDayVisibility();
             updateServingSummary();
             updateDietarySummary();
             updateCookingSummary();

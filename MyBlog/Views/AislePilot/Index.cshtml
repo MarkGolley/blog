@@ -28,6 +28,46 @@
     var selectedPortionSize = portionSizeOptions[selectedPortionSizeIndex];
     var selectedPlanDays = Math.Clamp(Model.Request.PlanDays, 1, 7);
     var selectedCookDays = Math.Clamp(Model.Request.CookDays, 1, selectedPlanDays);
+    var weekDayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+    List<int> BuildDefaultCookDayMultipliers(int cookDays, int planDays)
+    {
+        var safePlanDays = Math.Clamp(planDays, 1, 7);
+        var safeCookDays = Math.Clamp(cookDays, 1, safePlanDays);
+        var leftoverDays = Math.Max(0, safePlanDays - safeCookDays);
+        var multipliers = Enumerable.Repeat(1, safeCookDays).ToList();
+        for (var index = 0; index < leftoverDays; index++)
+        {
+            multipliers[index % safeCookDays]++;
+        }
+
+        return multipliers;
+    }
+
+    List<string> BuildSpecialTreatCookDayLabels(int cookDays, int planDays)
+    {
+        var safePlanDays = Math.Clamp(planDays, 1, 7);
+        var safeCookDays = Math.Clamp(cookDays, 1, safePlanDays);
+        var planWeekDayNames = weekDayNames.Take(safePlanDays).ToArray();
+        var multipliers = BuildDefaultCookDayMultipliers(safeCookDays, safePlanDays);
+        var labels = new List<string>(safeCookDays);
+        var dayCursor = 0;
+        for (var index = 0; index < safeCookDays; index++)
+        {
+            var dayName = planWeekDayNames[Math.Clamp(dayCursor, 0, planWeekDayNames.Length - 1)];
+            labels.Add(dayName);
+            dayCursor += Math.Max(1, multipliers[index]);
+        }
+
+        return labels;
+    }
+
+    var specialTreatCookDayLabels = BuildSpecialTreatCookDayLabels(selectedCookDays, selectedPlanDays);
+    var selectedSpecialTreatCookDayIndex = Model.Request.SelectedSpecialTreatCookDayIndex.HasValue
+        ? Math.Clamp(Model.Request.SelectedSpecialTreatCookDayIndex.Value, 0, selectedCookDays - 1)
+        : 0;
+    var selectedSpecialTreatCookDayLabel = specialTreatCookDayLabels.Count == 0
+        ? string.Empty
+        : specialTreatCookDayLabels[Math.Clamp(selectedSpecialTreatCookDayIndex, 0, specialTreatCookDayLabels.Count - 1)];
     var selectedMealTypes = (Model.Request.SelectedMealTypes ?? [])
         .Where(type => !string.IsNullOrWhiteSpace(type))
         .Select(type =>
@@ -111,7 +151,10 @@
     var specialOptions = new List<string>();
     if (Model.Request.IncludeSpecialTreatMeal)
     {
-        specialOptions.Add("Treat meal on");
+        specialOptions.Add(
+            string.IsNullOrWhiteSpace(selectedSpecialTreatCookDayLabel)
+                ? "Treat meal on"
+                : $"Treat meal on {selectedSpecialTreatCookDayLabel}");
     }
 
     if (Model.Request.IncludeDessertAddOn)
@@ -705,9 +748,23 @@
                                 <input asp-for="Request.IncludeSpecialTreatMeal" type="checkbox" />
                                 <span>Include one special treat meal</span>
                             </label>
+                            <div class="aislepilot-field aislepilot-field-chip"
+                                 data-special-treat-day-field
+                                 hidden="@(!Model.Request.IncludeSpecialTreatMeal)">
+                                <label asp-for="Request.SelectedSpecialTreatCookDayIndex">Special treat day</label>
+                                <select asp-for="Request.SelectedSpecialTreatCookDayIndex"
+                                        class="aislepilot-select"
+                                        data-special-treat-day-select>
+                                    @for (var cookDayIndex = 0; cookDayIndex < specialTreatCookDayLabels.Count; cookDayIndex++)
+                                    {
+                                        <option value="@cookDayIndex">@specialTreatCookDayLabels[cookDayIndex]</option>
+                                    }
+                                </select>
+                                <span asp-validation-for="Request.SelectedSpecialTreatCookDayIndex" class="text-danger"></span>
+                            </div>
                             <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
                                 <input asp-for="Request.IncludeDessertAddOn" type="checkbox" />
-                                <span>Add cake/dessert ingredients</span>
+                                <span>Add desert</span>
                             </label>
                         </fieldset>
                     </details>

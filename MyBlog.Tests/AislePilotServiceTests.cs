@@ -1403,6 +1403,190 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithSpecialTreatCookDaySelection_PlacesTreatOnSelectedDinnerSlot()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "true"
+            })
+            .Build();
+        var payloadContent = """
+{
+  "meals": [
+    {
+      "name": "Special treat creamy chicken pasta bake",
+      "baseCostForTwo": 9.10,
+      "isQuick": false,
+      "tags": ["Balanced", "Special Treat"],
+      "recipeSteps": [
+        "Heat the oven to 200C and lightly oil a baking dish.",
+        "Cook pasta for 8 minutes then drain well.",
+        "Brown chicken pieces in a hot pan for 6 minutes.",
+        "Stir in cream, spinach, and seasoning and simmer for 3 minutes.",
+        "Combine pasta and sauce, top with cheese, and bake for 12 minutes."
+      ],
+      "ingredients": [
+        { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 2.80 },
+        { "name": "Pasta", "department": "Tins & Dry Goods", "quantityForTwo": 0.25, "unit": "kg", "estimatedCostForTwo": 0.90 },
+        { "name": "Cheddar", "department": "Dairy & Eggs", "quantityForTwo": 0.12, "unit": "kg", "estimatedCostForTwo": 1.35 }
+      ]
+    },
+    {
+      "name": "Turkey chilli with beans",
+      "baseCostForTwo": 7.00,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat oil in a deep pan and soften onion for 4 minutes.",
+        "Add turkey mince and cook until browned.",
+        "Stir in spices, tomatoes, and beans.",
+        "Simmer for 20 minutes until thickened.",
+        "Taste, season, and serve."
+      ],
+      "ingredients": [
+        { "name": "Turkey mince", "department": "Meat & Fish", "quantityForTwo": 0.4, "unit": "kg", "estimatedCostForTwo": 3.10 },
+        { "name": "Kidney beans", "department": "Tins & Dry Goods", "quantityForTwo": 1, "unit": "tin", "estimatedCostForTwo": 0.75 },
+        { "name": "Chopped tomatoes", "department": "Tins & Dry Goods", "quantityForTwo": 1, "unit": "tin", "estimatedCostForTwo": 0.70 }
+      ]
+    }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 95m,
+            HouseholdSize = 2,
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"],
+            IncludeSpecialTreatMeal = true,
+            SelectedSpecialTreatCookDayIndex = 1
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(2, result.MealPlan.Count);
+        Assert.Equal("Dinner", result.MealPlan[1].MealType, ignoreCase: true);
+        Assert.True(result.MealPlan[1].IsSpecialTreat);
+    }
+
+    [Fact]
+    public void BuildPlan_WithOutOfRangeSpecialTreatCookDaySelection_FallsBackToAnyDinner()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "true"
+            })
+            .Build();
+        var payloadContent = """
+{
+  "meals": [
+    {
+      "name": "Special treat creamy chicken pasta bake",
+      "baseCostForTwo": 9.10,
+      "isQuick": false,
+      "tags": ["Balanced", "Special Treat"],
+      "recipeSteps": [
+        "Heat the oven to 200C and lightly oil a baking dish.",
+        "Cook pasta for 8 minutes then drain well.",
+        "Brown chicken pieces in a hot pan for 6 minutes.",
+        "Stir in cream, spinach, and seasoning and simmer for 3 minutes.",
+        "Combine pasta and sauce, top with cheese, and bake for 12 minutes."
+      ],
+      "ingredients": [
+        { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 2.80 },
+        { "name": "Pasta", "department": "Tins & Dry Goods", "quantityForTwo": 0.25, "unit": "kg", "estimatedCostForTwo": 0.90 },
+        { "name": "Cheddar", "department": "Dairy & Eggs", "quantityForTwo": 0.12, "unit": "kg", "estimatedCostForTwo": 1.35 }
+      ]
+    },
+    {
+      "name": "Turkey chilli with beans",
+      "baseCostForTwo": 7.00,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat oil in a deep pan and soften onion for 4 minutes.",
+        "Add turkey mince and cook until browned.",
+        "Stir in spices, tomatoes, and beans.",
+        "Simmer for 20 minutes until thickened.",
+        "Taste, season, and serve."
+      ],
+      "ingredients": [
+        { "name": "Turkey mince", "department": "Meat & Fish", "quantityForTwo": 0.4, "unit": "kg", "estimatedCostForTwo": 3.10 },
+        { "name": "Kidney beans", "department": "Tins & Dry Goods", "quantityForTwo": 1, "unit": "tin", "estimatedCostForTwo": 0.75 },
+        { "name": "Chopped tomatoes", "department": "Tins & Dry Goods", "quantityForTwo": 1, "unit": "tin", "estimatedCostForTwo": 0.70 }
+      ]
+    }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 95m,
+            HouseholdSize = 2,
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"],
+            IncludeSpecialTreatMeal = true,
+            SelectedSpecialTreatCookDayIndex = 42
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Contains(
+            result.MealPlan,
+            meal => meal.MealType.Equals("Dinner", StringComparison.OrdinalIgnoreCase) && meal.IsSpecialTreat);
+    }
+
+    [Fact]
     public void BuildPlan_WithSpecialTreatMealEnabled_WhenBatchLacksTreat_UsesDedicatedAiTreatGeneration()
     {
         ClearAiPool();
@@ -1726,6 +1910,43 @@ public class AislePilotServiceTests
         Assert.False(string.IsNullOrWhiteSpace(firstDessert));
         Assert.False(string.IsNullOrWhiteSpace(nextDessert));
         Assert.NotEqual(firstDessert, nextDessert);
+    }
+
+    [Fact]
+    public void ResolveNextDessertAddOnName_WithPersistedDessertPool_UsesPersistedDessertsInRotation()
+    {
+        var dessertPool = GetRequiredStaticField("DessertAddOnPool");
+        var dessertTemplates = GetRequiredStaticField("DessertAddOnTemplates") as IEnumerable;
+        Assert.NotNull(dessertTemplates);
+        var seedDessertTemplate = dessertTemplates!.Cast<object>().First();
+        var dessertTemplateType = seedDessertTemplate.GetType();
+        var ingredientsProperty = dessertTemplateType.GetProperty("Ingredients", BindingFlags.Public | BindingFlags.Instance);
+        Assert.NotNull(ingredientsProperty);
+        var ingredients = ingredientsProperty!.GetValue(seedDessertTemplate)
+            ?? throw new InvalidOperationException("Dessert add-on template ingredients were missing.");
+        var constructor = dessertTemplateType.GetConstructors(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(candidate =>
+            {
+                var parameters = candidate.GetParameters();
+                return parameters.Length == 2 && parameters[0].ParameterType == typeof(string);
+            });
+        Assert.NotNull(constructor);
+
+        var persistedDessertName = $"Test persisted dessert {Guid.NewGuid():N}";
+        var persistedDessertTemplate = constructor!.Invoke([persistedDessertName, ingredients]);
+        var indexer = dessertPool.GetType().GetProperty("Item");
+        Assert.NotNull(indexer);
+
+        try
+        {
+            indexer!.SetValue(dessertPool, persistedDessertTemplate, [persistedDessertName]);
+            var nextDessert = _service.ResolveNextDessertAddOnName("Apple crumble pots");
+            Assert.Equal(persistedDessertName, nextDessert, ignoreCase: true);
+        }
+        finally
+        {
+            RemoveFromConcurrentDictionary(dessertPool, persistedDessertName);
+        }
     }
 
     [Fact]

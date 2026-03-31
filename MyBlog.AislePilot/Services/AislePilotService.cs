@@ -38,6 +38,7 @@ public sealed class AislePilotService : IAislePilotService
     private const int MaxFreshAiPlanMeals = 8;
     private const string AiMealsCollection = "aislePilotAiMeals";
     private const string MealImagesCollection = "aislePilotMealImages";
+    private const string DessertAddOnsCollection = "aislePilotDessertAddOns";
     private const string SupermarketLayoutsCollection = "aislePilotSupermarketLayouts";
     private const string OpenAiChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
     private const string OpenAiResponsesEndpoint = "https://api.openai.com/v1/responses";
@@ -63,11 +64,14 @@ public sealed class AislePilotService : IAislePilotService
     private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan AiMealPoolEntryTtl = TimeSpan.FromHours(24);
     private static readonly TimeSpan MealImageLookupMissTtl = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan DessertAddOnPoolRefreshInterval = TimeSpan.FromMinutes(30);
 
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> AiMealPoolLastTouchedUtc =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string> MealImagePool = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, DessertAddOnTemplate> DessertAddOnPool =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> MealImageLookupMissesUtc =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> MealImageGenerationInFlight = new(StringComparer.OrdinalIgnoreCase);
@@ -79,11 +83,13 @@ public sealed class AislePilotService : IAislePilotService
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImagePoolRefreshLock = new(1, 1);
+    private static readonly SemaphoreSlim DessertAddOnPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImageGenerationThrottle = new(1, 1);
     private static readonly SemaphoreSlim SupermarketLayoutRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim AiMealWarmupLock = new(1, 1);
     private static DateTime? _lastAiMealPoolRefreshUtc;
     private static DateTime? _lastMealImagePoolRefreshUtc;
+    private static DateTime? _lastDessertAddOnPoolRefreshUtc;
     private static DateTime? _lastSupermarketLayoutCacheRefreshUtc;
 
     private static readonly HashSet<string> GenericPantryTokens = new(StringComparer.OrdinalIgnoreCase)
@@ -1016,6 +1022,7 @@ public sealed class AislePilotService : IAislePilotService
         }
 
         await EnsureMealImagePoolHydratedAsync(normalizedMealNames, cancellationToken);
+        await EnsureDessertAddOnPoolHydratedAsync(cancellationToken);
 
         var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var mealName in normalizedMealNames)
@@ -1055,7 +1062,7 @@ public sealed class AislePilotService : IAislePilotService
             return null;
         }
 
-        var dessertTemplate = DessertAddOnTemplates.FirstOrDefault(template =>
+        var dessertTemplate = GetAvailableDessertAddOnTemplatesSnapshot().FirstOrDefault(template =>
             template.Name.Equals(mealName.Trim(), StringComparison.OrdinalIgnoreCase));
         if (dessertTemplate is null)
         {
@@ -1077,6 +1084,143 @@ public sealed class AislePilotService : IAislePilotService
             IsQuick: false,
             ["Balanced", "Special Treat"],
             dessertTemplate.Ingredients.ToList());
+    }
+
+    private static IReadOnlyList<DessertAddOnTemplate> GetAvailableDessertAddOnTemplatesSnapshot()
+    {
+        var dedupedByName = new Dictionary<string, DessertAddOnTemplate>(StringComparer.OrdinalIgnoreCase);
+        var orderedTemplates = new List<DessertAddOnTemplate>();
+
+        void AddTemplateIfUnique(DessertAddOnTemplate template)
+        {
+            if (string.IsNullOrWhiteSpace(template.Name) || dedupedByName.ContainsKey(template.Name))
+            {
+                return;
+            }
+
+            dedupedByName[template.Name] = template;
+            orderedTemplates.Add(template);
+        }
+
+        foreach (var builtInTemplate in DessertAddOnTemplates)
+        {
+            AddTemplateIfUnique(builtInTemplate);
+        }
+
+        foreach (var persistedTemplate in DessertAddOnPool.Values
+                     .OrderBy(template => template.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            AddTemplateIfUnique(persistedTemplate);
+        }
+
+        return orderedTemplates;
+    }
+
+    private void EnsureDessertAddOnPoolHydrated()
+    {
+        try
+        {
+            EnsureDessertAddOnPoolHydratedAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Unable to hydrate AislePilot dessert add-on pool from Firestore.");
+        }
+    }
+
+    private async Task EnsureDessertAddOnPoolHydratedAsync(CancellationToken cancellationToken = default)
+    {
+        if (_db is null)
+        {
+            return;
+        }
+
+        var shouldRefresh =
+            !_lastDessertAddOnPoolRefreshUtc.HasValue ||
+            DateTime.UtcNow - _lastDessertAddOnPoolRefreshUtc.Value > DessertAddOnPoolRefreshInterval;
+        if (!shouldRefresh)
+        {
+            return;
+        }
+
+        await DessertAddOnPoolRefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            shouldRefresh =
+                !_lastDessertAddOnPoolRefreshUtc.HasValue ||
+                DateTime.UtcNow - _lastDessertAddOnPoolRefreshUtc.Value > DessertAddOnPoolRefreshInterval;
+            if (!shouldRefresh)
+            {
+                return;
+            }
+
+            var snapshot = await _db.Collection(DessertAddOnsCollection)
+                .OrderByDescending(nameof(FirestoreAislePilotDessertAddOn.UpdatedAtUtc))
+                .Limit(160)
+                .GetSnapshotAsync(cancellationToken);
+            DessertAddOnPool.Clear();
+
+            foreach (var doc in snapshot.Documents)
+            {
+                if (!doc.Exists)
+                {
+                    continue;
+                }
+
+                FirestoreAislePilotDessertAddOn? mappedDoc;
+                try
+                {
+                    mappedDoc = doc.ConvertTo<FirestoreAislePilotDessertAddOn>();
+                }
+                catch
+                {
+                    continue;
+                }
+
+                var mappedTemplate = FromFirestoreDessertAddOnDocument(mappedDoc);
+                if (mappedTemplate is not null)
+                {
+                    DessertAddOnPool[mappedTemplate.Name] = mappedTemplate;
+                }
+            }
+
+            _lastDessertAddOnPoolRefreshUtc = DateTime.UtcNow;
+        }
+        finally
+        {
+            DessertAddOnPoolRefreshLock.Release();
+        }
+    }
+
+    private async Task PersistDessertAddOnTemplateAsync(
+        DessertAddOnTemplate dessertAddOnTemplate,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(dessertAddOnTemplate.Name))
+        {
+            return;
+        }
+
+        DessertAddOnPool[dessertAddOnTemplate.Name] = dessertAddOnTemplate;
+        if (_db is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var docRef = _db.Collection(DessertAddOnsCollection).Document(ToAiMealDocumentId(dessertAddOnTemplate.Name));
+            await docRef.SetAsync(
+                ToFirestoreDessertAddOnDocument(dessertAddOnTemplate),
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(
+                ex,
+                "Unable to persist AislePilot dessert add-on '{DessertName}'.",
+                dessertAddOnTemplate.Name);
+        }
     }
 
     public async Task<AislePilotWarmupResult> WarmupAiMealPoolAsync(
@@ -1853,7 +1997,8 @@ public sealed class AislePilotService : IAislePilotService
             context.DislikesOrAllergens,
             totalMealCount,
             BuildMealTypeSlots(request),
-            request.IncludeSpecialTreatMeal);
+            request.IncludeSpecialTreatMeal,
+            request.SelectedSpecialTreatCookDayIndex);
 
         // Keep swap behavior consistent by making fallback-selected meals available in the in-memory pool.
         AddMealsToAiPool(selectedMeals);
@@ -1996,7 +2141,8 @@ public sealed class AislePilotService : IAislePilotService
                 context.DislikesOrAllergens,
                 totalMealCount,
                 mealTypeSlots,
-                request.IncludeSpecialTreatMeal);
+                request.IncludeSpecialTreatMeal,
+                request.SelectedSpecialTreatCookDayIndex);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -2102,7 +2248,8 @@ public sealed class AislePilotService : IAislePilotService
             patchedMeals,
             dedicatedSpecialTreatMeal,
             mealTypeSlots,
-            context.HouseholdFactor);
+            context.HouseholdFactor,
+            request.SelectedSpecialTreatCookDayIndex);
         if (!applied || !HasSpecialTreatDinner(patchedMeals, mealTypeSlots))
         {
             return null;
@@ -2267,7 +2414,8 @@ public sealed class AislePilotService : IAislePilotService
                 context.DislikesOrAllergens,
                 totalMealCount,
                 mealTypeSlots,
-                request.IncludeSpecialTreatMeal);
+                request.IncludeSpecialTreatMeal,
+                request.SelectedSpecialTreatCookDayIndex);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -2328,7 +2476,8 @@ public sealed class AislePilotService : IAislePilotService
                 context.DislikesOrAllergens,
                 totalMealCount,
                 mealTypeSlots,
-                request.IncludeSpecialTreatMeal);
+                request.IncludeSpecialTreatMeal,
+                request.SelectedSpecialTreatCookDayIndex);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -2522,7 +2671,9 @@ public sealed class AislePilotService : IAislePilotService
 
     public string ResolveNextDessertAddOnName(string? currentDessertAddOnName)
     {
-        if (DessertAddOnTemplates.Length == 0)
+        EnsureDessertAddOnPoolHydrated();
+        var availableDessertTemplates = GetAvailableDessertAddOnTemplatesSnapshot();
+        if (availableDessertTemplates.Count == 0)
         {
             return string.Empty;
         }
@@ -2530,19 +2681,48 @@ public sealed class AislePilotService : IAislePilotService
         var normalizedCurrentDessertName = currentDessertAddOnName?.Trim();
         if (string.IsNullOrWhiteSpace(normalizedCurrentDessertName))
         {
-            return DessertAddOnTemplates[0].Name;
+            return availableDessertTemplates[0].Name;
         }
 
-        var currentIndex = Array.FindIndex(
-            DessertAddOnTemplates,
-            template => template.Name.Equals(normalizedCurrentDessertName, StringComparison.OrdinalIgnoreCase));
+        var currentIndex = availableDessertTemplates
+            .Select((template, index) => new { template, index })
+            .Where(entry =>
+                entry.template.Name.Equals(normalizedCurrentDessertName, StringComparison.OrdinalIgnoreCase))
+            .Select(entry => entry.index)
+            .DefaultIfEmpty(-1)
+            .First();
         if (currentIndex < 0)
         {
-            return DessertAddOnTemplates[0].Name;
+            return availableDessertTemplates[0].Name;
         }
 
-        var nextIndex = (currentIndex + 1) % DessertAddOnTemplates.Length;
-        return DessertAddOnTemplates[nextIndex].Name;
+        var nextIndex = (currentIndex + 1) % availableDessertTemplates.Count;
+        return availableDessertTemplates[nextIndex].Name;
+    }
+
+    private async Task<DessertAddOnTemplate> ResolveDessertAddOnTemplateAsync(
+        string? selectedDessertAddOnName,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureDessertAddOnPoolHydratedAsync(cancellationToken);
+        var availableDessertTemplates = GetAvailableDessertAddOnTemplatesSnapshot();
+        if (availableDessertTemplates.Count == 0)
+        {
+            throw new InvalidOperationException("No dessert add-on templates are configured.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedDessertAddOnName))
+        {
+            var normalizedSelectedDessertName = selectedDessertAddOnName.Trim();
+            var selectedTemplate = availableDessertTemplates.FirstOrDefault(template =>
+                template.Name.Equals(normalizedSelectedDessertName, StringComparison.OrdinalIgnoreCase));
+            if (selectedTemplate is not null)
+            {
+                return selectedTemplate;
+            }
+        }
+
+        return availableDessertTemplates[0];
     }
 
     private MealTemplate? TryBuildReplacementMealWithAi(
@@ -3361,6 +3541,7 @@ Return JSON only with this schema:
             PreferQuickMeals = request.PreferQuickMeals,
             RequireCorePantryIngredients = request.RequireCorePantryIngredients,
             IncludeSpecialTreatMeal = request.IncludeSpecialTreatMeal,
+            SelectedSpecialTreatCookDayIndex = request.SelectedSpecialTreatCookDayIndex,
             IncludeDessertAddOn = request.IncludeDessertAddOn,
             SelectedDessertAddOnName = request.SelectedDessertAddOnName
         };
@@ -3781,7 +3962,8 @@ Return JSON only with this schema:
             IsHighProteinPreferred(context.DietaryModes),
             totalMealCount,
             mealTypeSlots,
-            request.IncludeSpecialTreatMeal);
+            request.IncludeSpecialTreatMeal,
+            request.SelectedSpecialTreatCookDayIndex);
 
         return BuildPlanFromMeals(
             request,
@@ -3824,7 +4006,8 @@ Return JSON only with this schema:
             IsHighProteinPreferred(context.DietaryModes),
             totalMealCount,
             mealTypeSlots,
-            request.IncludeSpecialTreatMeal);
+            request.IncludeSpecialTreatMeal,
+            request.SelectedSpecialTreatCookDayIndex);
 
         return await BuildPlanFromMealsAsync(
             request,
@@ -3843,7 +4026,8 @@ Return JSON only with this schema:
         bool preferHighProtein,
         int requestedMealCount,
         IReadOnlyList<string> mealTypeSlots,
-        bool includeSpecialTreatMeal)
+        bool includeSpecialTreatMeal,
+        int? selectedSpecialTreatCookDayIndex)
     {
         if (mealSource.Count == 0)
         {
@@ -3889,7 +4073,12 @@ Return JSON only with this schema:
 
         if (includeSpecialTreatMeal)
         {
-            var treatApplied = TryApplySpecialTreatMeal(selected, orderedCandidates, resolvedMealTypeSlots, householdFactor);
+            var treatApplied = TryApplySpecialTreatMeal(
+                selected,
+                orderedCandidates,
+                resolvedMealTypeSlots,
+                householdFactor,
+                selectedSpecialTreatCookDayIndex);
             if (!treatApplied || !HasSpecialTreatDinner(selected, resolvedMealTypeSlots))
             {
                 throw new InvalidOperationException(
@@ -4023,8 +4212,12 @@ Return JSON only with this schema:
             context.DietaryModes,
             context.DislikesOrAllergens);
         var dessertAddOnTemplate = request.IncludeDessertAddOn
-            ? ResolveDessertAddOnTemplate(request.SelectedDessertAddOnName)
+            ? await ResolveDessertAddOnTemplateAsync(request.SelectedDessertAddOnName, cancellationToken)
             : null;
+        if (dessertAddOnTemplate is not null)
+        {
+            await PersistDessertAddOnTemplateAsync(dessertAddOnTemplate, cancellationToken);
+        }
         var shoppingItems = BuildShoppingList(
             normalizedSelectedMeals,
             mealPortionMultipliers,
@@ -5703,7 +5896,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
 
     private static DessertAddOnTemplate ResolveDessertAddOnTemplate(string? selectedDessertAddOnName)
     {
-        if (DessertAddOnTemplates.Length == 0)
+        var availableDessertTemplates = GetAvailableDessertAddOnTemplatesSnapshot();
+        if (availableDessertTemplates.Count == 0)
         {
             throw new InvalidOperationException("No dessert add-on templates are configured.");
         }
@@ -5711,7 +5905,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         if (!string.IsNullOrWhiteSpace(selectedDessertAddOnName))
         {
             var normalizedSelectedDessertName = selectedDessertAddOnName.Trim();
-            var selectedTemplate = DessertAddOnTemplates.FirstOrDefault(template =>
+            var selectedTemplate = availableDessertTemplates.FirstOrDefault(template =>
                 template.Name.Equals(normalizedSelectedDessertName, StringComparison.OrdinalIgnoreCase));
             if (selectedTemplate is not null)
             {
@@ -5719,7 +5913,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             }
         }
 
-        return DessertAddOnTemplates[0];
+        return availableDessertTemplates[0];
     }
 
     private static IReadOnlyList<AislePilotShoppingItemViewModel> BuildShoppingList(
@@ -5843,7 +6037,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         string dislikesOrAllergens,
         int requestedMealCount,
         IReadOnlyList<string>? mealTypeSlots = null,
-        bool includeSpecialTreatMeal = false)
+        bool includeSpecialTreatMeal = false,
+        int? selectedSpecialTreatCookDayIndex = null)
     {
         var candidates = FilterMeals(dietaryModes, dislikesOrAllergens, mealSource)
             .Select(meal => EnsureMealTypeSuitability(meal))
@@ -5911,7 +6106,12 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
 
         if (includeSpecialTreatMeal)
         {
-            var treatApplied = TryApplySpecialTreatMeal(selected, rotatedCandidates, resolvedMealTypeSlots, householdFactor);
+            var treatApplied = TryApplySpecialTreatMeal(
+                selected,
+                rotatedCandidates,
+                resolvedMealTypeSlots,
+                householdFactor,
+                selectedSpecialTreatCookDayIndex);
             if (!treatApplied || !HasSpecialTreatDinner(selected, resolvedMealTypeSlots))
             {
                 throw new InvalidOperationException(
@@ -6092,6 +6292,61 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             CreatedAtUtc = DateTime.UtcNow,
             Source = "openai"
         };
+    }
+
+    private static FirestoreAislePilotDessertAddOn ToFirestoreDessertAddOnDocument(DessertAddOnTemplate dessertAddOnTemplate)
+    {
+        return new FirestoreAislePilotDessertAddOn
+        {
+            Name = dessertAddOnTemplate.Name,
+            Ingredients = dessertAddOnTemplate.Ingredients
+                .Select(ingredient => new FirestoreAislePilotIngredient
+                {
+                    Name = ingredient.Name,
+                    Department = ingredient.Department,
+                    QuantityForTwo = (double)ingredient.QuantityForTwo,
+                    Unit = ingredient.Unit,
+                    EstimatedCostForTwo = (double)ingredient.EstimatedCostForTwo
+                })
+                .ToList(),
+            UpdatedAtUtc = DateTime.UtcNow,
+            Source = "app"
+        };
+    }
+
+    private static DessertAddOnTemplate? FromFirestoreDessertAddOnDocument(FirestoreAislePilotDessertAddOn? doc)
+    {
+        if (doc is null)
+        {
+            return null;
+        }
+
+        var normalizedName = ClampAndNormalize(doc.Name, MaxAiMealNameLength);
+        if (string.IsNullOrWhiteSpace(normalizedName))
+        {
+            return null;
+        }
+
+        var normalizedIngredients = (doc.Ingredients ?? [])
+            .Select(ingredient => new IngredientTemplate(
+                ClampAndNormalize(ingredient.Name, MaxAiIngredientNameLength),
+                ClampAndNormalizeDepartmentName(ingredient.Department),
+                Math.Max(0m, (decimal)ingredient.QuantityForTwo),
+                ClampAndNormalize(ingredient.Unit, MaxAiUnitLength),
+                Math.Max(0m, (decimal)ingredient.EstimatedCostForTwo)))
+            .Where(ingredient =>
+                !string.IsNullOrWhiteSpace(ingredient.Name) &&
+                !string.IsNullOrWhiteSpace(ingredient.Department) &&
+                !string.IsNullOrWhiteSpace(ingredient.Unit) &&
+                ingredient.QuantityForTwo > 0m &&
+                ingredient.EstimatedCostForTwo > 0m)
+            .ToList();
+        if (normalizedIngredients.Count == 0)
+        {
+            return null;
+        }
+
+        return new DessertAddOnTemplate(normalizedName, normalizedIngredients);
     }
 
     private static MealTemplate? FromFirestoreDocument(FirestoreAislePilotMeal? doc)
@@ -6848,7 +7103,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         IList<MealTemplate> selectedMeals,
         IReadOnlyList<MealTemplate> candidateMeals,
         IReadOnlyList<string> resolvedMealTypeSlots,
-        decimal householdFactor)
+        decimal householdFactor,
+        int? selectedSpecialTreatCookDayIndex)
     {
         if (selectedMeals.Count == 0 || candidateMeals.Count == 0 || resolvedMealTypeSlots.Count == 0)
         {
@@ -6865,21 +7121,31 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             return false;
         }
 
-        var existingTreatDinnerIndex = dinnerSlotIndexes
-            .Cast<int?>()
-            .FirstOrDefault(index => index.HasValue && IsSpecialTreatMealCandidate(selectedMeals[index.Value]));
-        if (existingTreatDinnerIndex.HasValue)
+        var targetDinnerIndex = ResolveTargetDinnerIndex(
+            dinnerSlotIndexes,
+            selectedMeals,
+            resolvedMealTypeSlots,
+            householdFactor,
+            selectedSpecialTreatCookDayIndex);
+        var currentDinnerMeal = selectedMeals[targetDinnerIndex];
+        if (IsSpecialTreatMealCandidate(currentDinnerMeal))
         {
-            var dinnerIndex = existingTreatDinnerIndex.Value;
-            selectedMeals[dinnerIndex] = MarkMealAsSpecialTreat(selectedMeals[dinnerIndex]);
+            selectedMeals[targetDinnerIndex] = MarkMealAsSpecialTreat(currentDinnerMeal);
             return true;
         }
 
-        var targetDinnerIndex = dinnerSlotIndexes
-            .OrderBy(index => CalculateScaledMealCost(selectedMeals[index], householdFactor, dayMultiplier: 1))
-            .ThenBy(index => index)
-            .First();
-        var currentDinnerMeal = selectedMeals[targetDinnerIndex];
+        var existingTreatDinnerIndex = dinnerSlotIndexes
+            .Where(index => index != targetDinnerIndex && IsSpecialTreatMealCandidate(selectedMeals[index]))
+            .Cast<int?>()
+            .FirstOrDefault();
+        if (existingTreatDinnerIndex.HasValue)
+        {
+            var sourceTreatDinnerIndex = existingTreatDinnerIndex.Value;
+            var targetMeal = selectedMeals[targetDinnerIndex];
+            selectedMeals[targetDinnerIndex] = MarkMealAsSpecialTreat(selectedMeals[sourceTreatDinnerIndex]);
+            selectedMeals[sourceTreatDinnerIndex] = targetMeal;
+            return true;
+        }
 
         var usedMealNames = selectedMeals
             .Where((_, index) => index != targetDinnerIndex)
@@ -6935,6 +7201,56 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         return true;
     }
 
+    private static int ResolveTargetDinnerIndex(
+        IReadOnlyList<int> dinnerSlotIndexes,
+        IList<MealTemplate> selectedMeals,
+        IReadOnlyList<string> resolvedMealTypeSlots,
+        decimal householdFactor,
+        int? selectedSpecialTreatCookDayIndex)
+    {
+        var preferredDinnerIndex = ResolvePreferredSpecialTreatDinnerIndex(
+            dinnerSlotIndexes,
+            resolvedMealTypeSlots.Count,
+            selectedSpecialTreatCookDayIndex);
+        if (preferredDinnerIndex.HasValue)
+        {
+            return preferredDinnerIndex.Value;
+        }
+
+        return dinnerSlotIndexes
+            .OrderBy(index => CalculateScaledMealCost(selectedMeals[index], householdFactor, dayMultiplier: 1))
+            .ThenBy(index => index)
+            .First();
+    }
+
+    private static int? ResolvePreferredSpecialTreatDinnerIndex(
+        IReadOnlyList<int> dinnerSlotIndexes,
+        int mealsPerDay,
+        int? selectedSpecialTreatCookDayIndex)
+    {
+        if (!selectedSpecialTreatCookDayIndex.HasValue || mealsPerDay <= 0)
+        {
+            return null;
+        }
+
+        var preferredCookDayIndex = selectedSpecialTreatCookDayIndex.Value;
+        if (preferredCookDayIndex < 0)
+        {
+            return null;
+        }
+
+        foreach (var dinnerSlotIndex in dinnerSlotIndexes)
+        {
+            var cookDayIndex = dinnerSlotIndex / mealsPerDay;
+            if (cookDayIndex == preferredCookDayIndex)
+            {
+                return dinnerSlotIndex;
+            }
+        }
+
+        return null;
+    }
+
     private static bool HasSpecialTreatDinner(
         IReadOnlyList<MealTemplate> selectedMeals,
         IReadOnlyList<string> mealTypeSlots)
@@ -6956,7 +7272,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         IList<MealTemplate> selectedMeals,
         MealTemplate specialTreatMeal,
         IReadOnlyList<string> mealTypeSlots,
-        decimal householdFactor)
+        decimal householdFactor,
+        int? selectedSpecialTreatCookDayIndex)
     {
         if (selectedMeals.Count == 0 || mealTypeSlots.Count == 0)
         {
@@ -6974,10 +7291,12 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             return false;
         }
 
-        var targetDinnerIndex = dinnerSlotIndexes
-            .OrderBy(index => CalculateScaledMealCost(selectedMeals[index], householdFactor, dayMultiplier: 1))
-            .ThenBy(index => index)
-            .First();
+        var targetDinnerIndex = ResolveTargetDinnerIndex(
+            dinnerSlotIndexes,
+            selectedMeals,
+            resolvedMealTypeSlots,
+            householdFactor,
+            selectedSpecialTreatCookDayIndex);
 
         selectedMeals[targetDinnerIndex] = MarkMealAsSpecialTreat(EnsureMealTypeSuitability(specialTreatMeal));
         return true;
@@ -9459,6 +9778,22 @@ Return JSON only with this schema:
 
         [FirestoreProperty]
         public double ConfidenceScore { get; set; }
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreAislePilotDessertAddOn
+    {
+        [FirestoreProperty]
+        public string Name { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public List<FirestoreAislePilotIngredient> Ingredients { get; set; } = [];
+
+        [FirestoreProperty]
+        public DateTime UpdatedAtUtc { get; set; }
+
+        [FirestoreProperty]
+        public string Source { get; set; } = string.Empty;
     }
 
     [FirestoreData]

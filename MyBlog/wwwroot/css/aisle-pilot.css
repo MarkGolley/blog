@@ -1773,6 +1773,14 @@ html.aislepilot-restore-pending .aislepilot-app {
     transform-origin: center;
 }
 
+.aislepilot-meal-image[src*="aislepilot-icon.svg"] {
+    object-fit: contain;
+    object-position: center;
+    transform: none;
+    padding: 0.45rem;
+    box-sizing: border-box;
+}
+
 @keyframes aislepilot-swap-grid-in {
     from {
         opacity: 0.68;

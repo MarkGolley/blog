@@ -526,6 +526,7 @@ public class AislePilotController(
     private void RefreshResultModelState()
     {
         ModelState.Remove("Request.SelectedDessertAddOnName");
+        ModelState.Remove("Request.SelectedSpecialTreatCookDayIndex");
     }
 
     private string ResolveReturnUrl(string? returnUrl)
@@ -620,6 +621,19 @@ public class AislePilotController(
             .ToList() ?? [];
         normalized.PlanDays = Math.Clamp(normalized.PlanDays, 1, 7);
         normalized.CookDays = Math.Clamp(normalized.CookDays, 1, normalized.PlanDays);
+        if (normalized.SelectedSpecialTreatCookDayIndex.HasValue)
+        {
+            normalized.SelectedSpecialTreatCookDayIndex = Math.Clamp(
+                normalized.SelectedSpecialTreatCookDayIndex.Value,
+                0,
+                normalized.CookDays - 1);
+        }
+
+        if (normalized.IncludeSpecialTreatMeal && !normalized.SelectedSpecialTreatCookDayIndex.HasValue)
+        {
+            normalized.SelectedSpecialTreatCookDayIndex = 0;
+        }
+
         var normalizedSelectedMealTypes = NormalizeSelectedMealTypes(normalized.SelectedMealTypes);
         if (normalizedSelectedMealTypes.Count == 0 && !selectedMealTypesWereSubmitted)
         {
@@ -863,6 +877,7 @@ public class AislePilotController(
             PreferQuickMeals = request.PreferQuickMeals,
             RequireCorePantryIngredients = request.RequireCorePantryIngredients,
             IncludeSpecialTreatMeal = request.IncludeSpecialTreatMeal,
+            SelectedSpecialTreatCookDayIndex = request.SelectedSpecialTreatCookDayIndex,
             IncludeDessertAddOn = request.IncludeDessertAddOn,
             SelectedDessertAddOnName = request.SelectedDessertAddOnName
         };
@@ -931,6 +946,7 @@ public class AislePilotController(
                 PreferQuickMeals = state.PreferQuickMeals,
                 RequireCorePantryIngredients = state.RequireCorePantryIngredients,
                 IncludeSpecialTreatMeal = state.IncludeSpecialTreatMeal,
+                SelectedSpecialTreatCookDayIndex = state.SelectedSpecialTreatCookDayIndex,
                 IncludeDessertAddOn = state.IncludeDessertAddOn,
                 SelectedDessertAddOnName = state.SelectedDessertAddOnName
             };
@@ -1463,6 +1479,7 @@ public class AislePilotController(
         public bool PreferQuickMeals { get; set; } = true;
         public bool RequireCorePantryIngredients { get; set; }
         public bool IncludeSpecialTreatMeal { get; set; }
+        public int? SelectedSpecialTreatCookDayIndex { get; set; }
         public bool IncludeDessertAddOn { get; set; }
         public string? SelectedDessertAddOnName { get; set; }
     }
