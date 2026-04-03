@@ -2029,6 +2029,7 @@
     }
 
     const setupPanel = document.querySelector("[data-setup-panel]");
+    const getOverviewContent = () => document.querySelector("[data-overview-content]");
 
     const viewport = root.querySelector("[data-window-viewport]");
     const track = root.querySelector("[data-window-track]");
@@ -2217,6 +2218,46 @@
     };
 
     const getSetupToggleButtons = () => Array.from(document.querySelectorAll("[data-setup-toggle]"));
+    const getOverviewToggleButtons = () => Array.from(document.querySelectorAll("[data-overview-toggle]"));
+
+    const syncOverviewToggleState = () => {
+        const overviewContent = getOverviewContent();
+        if (!(overviewContent instanceof HTMLElement)) {
+            return;
+        }
+
+        const overviewToggleButtons = getOverviewToggleButtons();
+        if (overviewToggleButtons.length === 0) {
+            return;
+        }
+
+        const isExpanded = !overviewContent.hasAttribute("hidden");
+        overviewToggleButtons.forEach(button => {
+            const srOnlyLabel = button.querySelector(".sr-only");
+            const collapsedLabel = button.dataset.overviewToggleCollapsedLabel
+                || srOnlyLabel?.textContent?.trim()
+                || button.getAttribute("aria-label")
+                || button.textContent?.trim()
+                || "Expand overview";
+            const expandedLabel = button.dataset.overviewToggleExpandedLabel || "Collapse overview";
+            const nextLabel = isExpanded ? expandedLabel : collapsedLabel;
+
+            button.dataset.overviewToggleCollapsedLabel = collapsedLabel;
+            button.dataset.overviewToggleExpandedLabel = expandedLabel;
+
+            if (srOnlyLabel) {
+                srOnlyLabel.textContent = nextLabel;
+            } else {
+                button.textContent = nextLabel;
+            }
+
+            button.setAttribute("aria-label", nextLabel);
+            if (button.hasAttribute("title")) {
+                button.setAttribute("title", nextLabel);
+            }
+            button.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+        });
+    };
 
     const syncSetupToggleState = () => {
         if (!setupPanel) {
@@ -2281,6 +2322,34 @@
                 }
 
                 syncSetupToggleState();
+            });
+        });
+    };
+
+    const wireOverviewToggleHandlers = scope => {
+        const overviewToggleButtons = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-overview-toggle]"))
+            : getOverviewToggleButtons();
+
+        overviewToggleButtons.forEach(button => {
+            if (!(button instanceof HTMLButtonElement) || button.dataset.overviewToggleWired === "true") {
+                return;
+            }
+
+            button.dataset.overviewToggleWired = "true";
+            button.addEventListener("click", () => {
+                const overviewContent = getOverviewContent();
+                if (!(overviewContent instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (overviewContent.hasAttribute("hidden")) {
+                    overviewContent.removeAttribute("hidden");
+                } else {
+                    overviewContent.setAttribute("hidden", "hidden");
+                }
+
+                syncOverviewToggleState();
             });
         });
     };
@@ -2886,18 +2955,20 @@
 
         const formType = form.classList.contains("aislepilot-ignore-form")
             ? "ignore"
-            : "swap";
+            : form.classList.contains("aislepilot-favorite-form")
+                ? "favorite"
+                : "swap";
         return `${formType}:${dayIndex}`;
     };
 
     const syncAjaxSwapFormsFromResponse = responseDocument => {
         if (!(responseDocument instanceof Document)) {
-            return;
+            return false;
         }
 
         const responseForms = Array.from(responseDocument.querySelectorAll("#aislepilot-meals [data-ajax-swap-form]"));
         if (responseForms.length === 0) {
-            return;
+            return false;
         }
 
         const responseFormsBySignature = new Map();
@@ -2915,6 +2986,7 @@
         });
 
         const currentForms = Array.from(document.querySelectorAll("#aislepilot-meals [data-ajax-swap-form]"));
+        let replacements = 0;
         currentForms.forEach(form => {
             if (!(form instanceof HTMLFormElement)) {
                 return;
@@ -2936,7 +3008,33 @@
             }
 
             form.replaceWith(replacement);
+            replacements += 1;
         });
+
+        return replacements > 0;
+    };
+
+    const syncHiddenInputValueFromResponse = (responseDocument, inputName) => {
+        if (!(responseDocument instanceof Document) || typeof inputName !== "string" || inputName.length === 0) {
+            return false;
+        }
+
+        const escapedInputName = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+            ? CSS.escape(inputName)
+            : inputName.replace(/["\\]/g, "\\$&");
+        const selector = `input[name="${escapedInputName}"]`;
+        const nextInput = responseDocument.querySelector(selector);
+        if (!(nextInput instanceof HTMLInputElement)) {
+            return false;
+        }
+
+        const nextValue = nextInput.value;
+        const currentInputs = Array.from(document.querySelectorAll(selector))
+            .filter(input => input instanceof HTMLInputElement);
+        currentInputs.forEach(input => {
+            input.value = nextValue;
+        });
+        return currentInputs.length > 0;
     };
 
     const applyAjaxSwapResponse = (responseText, slotIndex) => {
@@ -2945,6 +3043,10 @@
         }
 
         rememberDayMealSlots(document);
+        const wasOverviewExpanded = (() => {
+            const currentOverviewContent = getOverviewContent();
+            return currentOverviewContent instanceof HTMLElement && !currentOverviewContent.hasAttribute("hidden");
+        })();
         const responseDocument = new DOMParser().parseFromString(responseText, "text/html");
         const didReplaceMeals =
             replaceSwappedMealCard(responseDocument, slotIndex) ||
@@ -2957,6 +3059,12 @@
         replaceSectionContent(responseDocument, "#aislepilot-overview");
         replaceSectionContent(responseDocument, "#aislepilot-shop");
         replaceSectionContent(responseDocument, "#aislepilot-export");
+        if (wasOverviewExpanded) {
+            const nextOverviewContent = getOverviewContent();
+            if (nextOverviewContent instanceof HTMLElement) {
+                nextOverviewContent.removeAttribute("hidden");
+            }
+        }
 
         wireSubmitLoadingHandlers(document);
         wireExportThemeForms(document);
@@ -2965,14 +3073,37 @@
         wireCustomAisleFieldVisibility(document);
         wirePreserveScrollHandlers(document);
         wireSetupToggleHandlers(document);
+        wireOverviewToggleHandlers(document);
         wireLeftoverPlanner(document);
         wireDayMealCards(document);
         wireAjaxSwapHandlers(document);
         wireNotesExportButtons(document);
         startMealImagePolling();
         syncSetupToggleState();
+        syncOverviewToggleState();
         observeActivePanelHeight();
         updateViewportHeight(true);
+        return true;
+    };
+
+    const applyAjaxFavoriteResponse = responseText => {
+        if (typeof DOMParser === "undefined") {
+            return false;
+        }
+
+        const responseDocument = new DOMParser().parseFromString(responseText, "text/html");
+        const didSyncForms = syncAjaxSwapFormsFromResponse(responseDocument);
+        const didSyncSavedState = syncHiddenInputValueFromResponse(
+            responseDocument,
+            "Request.SavedEnjoyedMealNamesState"
+        );
+        if (!didSyncForms && !didSyncSavedState) {
+            return false;
+        }
+
+        wireSubmitLoadingHandlers(document);
+        wirePreserveScrollHandlers(document);
+        wireAjaxSwapHandlers(document);
         return true;
     };
 
@@ -3018,12 +3149,13 @@
             }
 
             swapForm.dataset.ajaxSwapSubmitting = "true";
+            const isFavoriteForm = swapForm.classList.contains("aislepilot-favorite-form");
             const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
             const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
                 ? scrollSnapshot.anchorDayIndex
                 : null;
             const currentCard = swapForm.closest(".aislepilot-card");
-            if (currentCard instanceof HTMLElement) {
+            if (!isFavoriteForm && currentCard instanceof HTMLElement) {
                 currentCard.classList.add("is-swap-fading-out");
             }
             const actionUrl = stripHashFromFormAction(swapForm);
@@ -3052,6 +3184,16 @@
                     responseText.includes("<!DOCTYPE html");
 
                 if (isHtmlResponse) {
+                    if (isFavoriteForm) {
+                        if (!applyAjaxFavoriteResponse(responseText)) {
+                            replaceDocumentWithHtml(responseText);
+                            return;
+                        }
+
+                        restoreInlineSwapScroll(scrollSnapshot);
+                        return;
+                    }
+
                     if (!applyAjaxSwapResponse(responseText, swapDayIndex)) {
                         replaceDocumentWithHtml(responseText);
                         return;
@@ -3074,7 +3216,7 @@
                 HTMLFormElement.prototype.submit.call(swapForm);
                 return;
             } finally {
-                if (currentCard instanceof HTMLElement && currentCard.isConnected) {
+                if (!isFavoriteForm && currentCard instanceof HTMLElement && currentCard.isConnected) {
                     currentCard.classList.remove("is-swap-fading-out");
                 }
                 clearSubmitLoadingDelay(swapForm);
@@ -3091,6 +3233,7 @@
     };
 
     wireSetupToggleHandlers(document);
+    wireOverviewToggleHandlers(document);
     wirePreserveScrollHandlers(document);
     wireLeftoverPlanner(document);
     wireDayMealCards(document);
@@ -3149,6 +3292,7 @@
     syncUi(initialIndex >= 0 ? initialIndex : 0, false);
     updateViewportHeight(false);
     syncSetupToggleState();
+    syncOverviewToggleState();
     const restored = restoreSwapScrollPosition();
     if (!restored) {
         clearRestorePending();

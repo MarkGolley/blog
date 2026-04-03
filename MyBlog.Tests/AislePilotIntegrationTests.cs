@@ -930,6 +930,35 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("Leftovers", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("2 day(s)", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            "data-overview-content(?:\\s+[^>]*)?\\s+hidden|hidden(?:\\s+[^>]*)?\\s+data-overview-content",
+            html);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithNoLeftovers_HidesLeftoversOverviewStat()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "7",
+            ["Request.CookDays"] = "7",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("<p class=\"aislepilot-stat-label\">Leftovers</p>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Rebalance leftovers", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1076,7 +1105,8 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains("name=\"Request.CookDays\" value=\"1\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("0 day(s)", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<p class=\"aislepilot-stat-label\">Leftovers</p>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Rebalance leftovers", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

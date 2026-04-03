@@ -8,6 +8,7 @@
         let pollIntervalId = null;
         let pollInFlight = false;
         let pollAttempts = 0;
+        const preloadCache = new Map();
 
         const normalizeImagePath = value => {
             if (typeof value !== "string") {
@@ -25,6 +26,59 @@
                 const fallbackPath = trimmed.split("?")[0].split("#")[0];
                 return fallbackPath.toLowerCase();
             }
+        };
+
+        const preloadImage = url => {
+            if (typeof url !== "string" || url.trim().length === 0) {
+                return Promise.resolve(false);
+            }
+
+            const normalizedUrl = url.trim();
+            const cachedResult = preloadCache.get(normalizedUrl);
+            if (typeof cachedResult === "boolean") {
+                return Promise.resolve(cachedResult);
+            }
+
+            return new Promise(resolve => {
+                const probe = new Image();
+                let settled = false;
+                const finish = didLoad => {
+                    if (settled) {
+                        return;
+                    }
+
+                    settled = true;
+                    preloadCache.set(normalizedUrl, didLoad);
+                    resolve(didLoad);
+                };
+
+                probe.onload = () => finish(true);
+                probe.onerror = () => finish(false);
+                probe.src = normalizedUrl;
+                window.setTimeout(() => finish(false), 8000);
+            });
+        };
+
+        const wireMealImageFallbackHandlers = pollContext => {
+            if (!pollContext) {
+                return;
+            }
+
+            pollContext.imageElements.forEach(imageElement => {
+                if (!(imageElement instanceof HTMLImageElement) || imageElement.dataset.mealImageFallbackWired === "true") {
+                    return;
+                }
+
+                imageElement.dataset.mealImageFallbackWired = "true";
+                imageElement.addEventListener("error", () => {
+                    const currentPath = normalizeImagePath(imageElement.getAttribute("src") || imageElement.currentSrc || "");
+                    if (currentPath === pollContext.fallbackPath) {
+                        return;
+                    }
+
+                    imageElement.src = pollContext.fallbackUrl;
+                });
+            });
         };
 
         const getPollContext = () => {
@@ -45,15 +99,19 @@
             }
 
             const endpoint = pollRoot.dataset.mealImagePollUrl?.trim() || "/projects/aisle-pilot/meal-images";
-            const fallbackPath = normalizeImagePath(
-                pollRoot.dataset.fallbackMealImageUrl?.trim() || "/images/aislepilot-icon.svg"
-            );
+            const fallbackUrl = pollRoot.dataset.fallbackMealImageUrl?.trim() ||
+                "/projects/aisle-pilot/images/aislepilot-icon.svg";
+            const fallbackPath = normalizeImagePath(fallbackUrl);
 
-            return {
+            const context = {
                 endpoint,
+                fallbackUrl,
                 fallbackPath,
                 imageElements
             };
+
+            wireMealImageFallbackHandlers(context);
+            return context;
         };
 
         const getPendingMealImageNames = pollContext => {
@@ -169,23 +227,28 @@
                     imageUrlByMealName.set(mealName, imageUrl);
                 });
 
-                pendingByMealName.forEach((imageElements, mealName) => {
+                for (const [mealName, imageElements] of pendingByMealName.entries()) {
                     const nextImageUrl = imageUrlByMealName.get(mealName);
                     if (!nextImageUrl) {
-                        return;
+                        continue;
                     }
 
                     if (normalizeImagePath(nextImageUrl) === pollContext.fallbackPath) {
-                        return;
+                        continue;
                     }
 
                     const cacheBustedUrl = `${nextImageUrl}${nextImageUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+                    const didLoad = await preloadImage(cacheBustedUrl);
+                    if (!didLoad) {
+                        continue;
+                    }
+
                     imageElements.forEach(imageElement => {
                         if (imageElement instanceof HTMLImageElement) {
                             imageElement.src = cacheBustedUrl;
                         }
                     });
-                });
+                }
 
                 if (getPendingMealImageNames(getPollContext()).size === 0) {
                     stop();

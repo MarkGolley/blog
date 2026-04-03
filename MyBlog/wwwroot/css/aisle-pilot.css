@@ -199,11 +199,13 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-window-tab.is-icon-only,
 .aislepilot-overview-regenerate-btn.is-icon-only,
+.aislepilot-overview-toggle-btn.is-icon-only,
 .aislepilot-edit-setup-btn.is-icon-only {
     padding: 0.36rem !important;
 }
 
 .aislepilot-overview-regenerate-btn.is-icon-only,
+.aislepilot-overview-toggle-btn.is-icon-only,
 .aislepilot-edit-setup-btn.is-icon-only {
     width: 2.2rem !important;
     min-width: 2.2rem !important;
@@ -212,17 +214,20 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-window-tab.is-icon-only .aislepilot-tab-label,
 .aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-btn-label,
+.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-btn-label,
 .aislepilot-edit-setup-btn.is-icon-only .aislepilot-btn-label {
     gap: 0;
 }
 
 .aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-btn-label,
+.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-btn-label,
 .aislepilot-edit-setup-btn.is-icon-only .aislepilot-btn-label {
     font-size: 0 !important;
 }
 
 .aislepilot-window-tab.is-icon-only .aislepilot-symbol-glyph,
 .aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-symbol-glyph,
+.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-symbol-glyph,
 .aislepilot-edit-setup-btn.is-icon-only .aislepilot-symbol-glyph {
     width: 1.42rem;
     height: 1.42rem;
@@ -230,6 +235,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-window-tab.is-icon-only .aislepilot-symbol-glyph svg,
 .aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-symbol-glyph svg,
+.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-symbol-glyph svg,
 .aislepilot-edit-setup-btn.is-icon-only .aislepilot-symbol-glyph svg {
     width: 0.96rem;
     height: 0.96rem;
@@ -482,6 +488,26 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin-bottom: 0.62rem;
 }
 
+.aislepilot-overview-head {
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.aislepilot-overview-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.34rem;
+    min-width: 0;
+}
+
+.aislepilot-overview-title-row .aislepilot-section-title {
+    margin-bottom: 0;
+}
+
+.aislepilot-overview-content[hidden] {
+    display: none !important;
+}
+
 .aislepilot-section-head-row {
     padding: 0.42rem 0.5rem;
     border: 1px solid rgba(16, 63, 101, 0.2);
@@ -518,6 +544,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
+    margin-left: auto;
     gap: 0.38rem;
 }
 
@@ -558,6 +585,34 @@ html.aislepilot-restore-pending .aislepilot-app {
     padding: 0.36rem 0.64rem !important;
     font-size: 0.84rem !important;
     font-weight: 700 !important;
+}
+
+.aislepilot-overview-toggle-btn {
+    min-height: 2.1rem !important;
+    border: none !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--ink-soft) !important;
+    box-shadow: none !important;
+    padding: 0.24rem !important;
+}
+
+.aislepilot-overview-toggle-btn .aislepilot-symbol-glyph {
+    border: none;
+    background: transparent;
+    color: currentColor;
+}
+
+.aislepilot-overview-toggle-btn:hover {
+    color: var(--brand-deep) !important;
+}
+
+.aislepilot-overview-toggle-btn .aislepilot-symbol-glyph svg {
+    transition: transform 0.18s ease;
+}
+
+.aislepilot-overview-toggle-btn[aria-expanded="true"] .aislepilot-symbol-glyph svg {
+    transform: rotate(180deg);
 }
 
 .aislepilot-edit-setup-btn {
@@ -2155,6 +2210,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-card-meta-pill {
     display: inline-flex;
     align-items: center;
+    gap: 0.24rem;
     min-height: 1.34rem;
     padding: 0.14rem 0.46rem;
     border: 1px solid rgba(16, 63, 101, 0.18);
@@ -2167,13 +2223,13 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-card-meta-pill .aislepilot-symbol-glyph {
-    width: 0.9rem;
-    height: 0.9rem;
+    width: 1rem;
+    height: 1rem;
 }
 
 .aislepilot-card-meta-pill .aislepilot-symbol-glyph svg {
-    width: 0.54rem;
-    height: 0.54rem;
+    width: 0.64rem;
+    height: 0.64rem;
 }
 
 .aislepilot-card-action-row {
@@ -2218,6 +2274,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin-left: auto;
     flex-wrap: nowrap;
     align-items: center;
+    justify-content: flex-end;
 }
 
 .aislepilot-card-action-row.is-inline-actions .aislepilot-meal-details {
@@ -2485,6 +2542,22 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 @media (max-width: 520px) {
+    .aislepilot-budget-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.32rem;
+    }
+
+    .aislepilot-stat-card {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.08rem;
+        padding: 0.22rem 0.42rem 0.24rem;
+    }
+
+    .aislepilot-stat-value {
+        text-align: left;
+        font-size: 0.86rem;
+    }
+
     .aislepilot-brand-logo {
         width: min(100%, 240px);
     }
@@ -2539,28 +2612,30 @@ html.aislepilot-restore-pending .aislepilot-app {
         display: none;
     }
 
-    .aislepilot-section-head:not(.aislepilot-section-head-row) {
+    .aislepilot-section-head:not(.aislepilot-section-head-row):not(.aislepilot-overview-head) {
         flex-direction: column;
         align-items: flex-start;
     }
 
     .aislepilot-overview-actions {
-        width: 100%;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: auto;
+        margin-left: auto;
+        display: flex;
+        justify-content: flex-end;
         gap: 0.34rem;
     }
 
     .aislepilot-overview-regenerate-form {
-        width: 100%;
+        width: auto;
     }
 
-    .aislepilot-overview-regenerate-btn,
-    .aislepilot-edit-setup-btn {
-        width: 100%;
+    .aislepilot-overview-actions .aislepilot-overview-regenerate-btn,
+    .aislepilot-overview-actions .aislepilot-edit-setup-btn {
+        width: auto;
     }
 
     .aislepilot-overview-regenerate-btn.is-icon-only,
+    .aislepilot-overview-toggle-btn.is-icon-only,
     .aislepilot-edit-setup-btn.is-icon-only {
         width: 2.2rem !important;
         min-width: 2.2rem !important;
@@ -3108,6 +3183,18 @@ html.aislepilot-restore-pending .aislepilot-app {
 :root[data-theme="dark"] .aislepilot-alert-btn:not(.is-secondary) {
     background: linear-gradient(98deg, #2e8dab 0%, #1f557c 100%) !important;
     color: #f4faff !important;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-toggle-btn {
+    background: transparent !important;
+    color: var(--ink-soft) !important;
+    box-shadow: none !important;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-toggle-btn .aislepilot-symbol-glyph {
+    border: none;
+    background: transparent;
+    color: currentColor;
 }
 
 :root[data-theme="dark"] .aislepilot-setup-mode-toggle:not(.is-active) {
