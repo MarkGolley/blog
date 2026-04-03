@@ -22,6 +22,8 @@ public class AislePilotController(
     private const int MaxMealsPerDay = 3;
     private const int MaxSwapMealSlotIndex = 20;
     private const int MaxIgnoredMealSlotIndex = 20;
+    private const int MaxSavedEnjoyedMealNames = 32;
+    private const int MaxSavedMealNameLength = 90;
     private static readonly string[] MealTypeSlotOrder = ["Dinner", "Lunch", "Breakfast"];
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
@@ -477,6 +479,76 @@ public class AislePilotController(
         }
     }
 
+    [HttpPost("toggle-enjoyed-meal")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleEnjoyedMeal(
+        AislePilotPageViewModel pageModel,
+        string? mealName,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
+    {
+        var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
+
+        var normalizedMealName = string.IsNullOrWhiteSpace(mealName)
+            ? string.Empty
+            : mealName.Trim();
+        if (normalizedMealName.Length == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Could not save meal right now. Regenerate and try again.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        request.SavedEnjoyedMealNamesState = ToggleSavedEnjoyedMealNameState(
+            request.SavedEnjoyedMealNamesState,
+            normalizedMealName);
+        PersistSetupState(request);
+        RefreshResultModelState();
+
+        try
+        {
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+            if (resolvedCurrentPlanMealNames is null || resolvedCurrentPlanMealNames.Count == 0)
+            {
+                return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+            }
+
+            var result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                resolvedCurrentPlanMealNames,
+                cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
+            PersistCurrentPlanState(result);
+            var responseModel = BuildPageModel(request, result, returnUrl: resolvedReturnUrl);
+            if (IsAjaxRequest())
+            {
+                return PartialView("_AislePilotResultSections", responseModel);
+            }
+
+            return View("Index", responseModel);
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogInformation(ex, "AislePilot could not refresh current plan after toggling enjoyed meal.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Saved meal preference was updated, but this plan needs a fresh regenerate.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot toggle enjoyed meal failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Saved meal preference was updated, but the plan could not refresh right now.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+    }
+
     [HttpGet("meal-images")]
     [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> MealImages([FromQuery] List<string>? mealNames, CancellationToken cancellationToken)
@@ -640,6 +712,7 @@ public class AislePilotController(
     {
         ModelState.Remove("Request.SelectedDessertAddOnName");
         ModelState.Remove("Request.SelectedSpecialTreatCookDayIndex");
+        ModelState.Remove("Request.SavedEnjoyedMealNamesState");
     }
 
     private string ResolveReturnUrl(string? returnUrl)
@@ -727,11 +800,14 @@ public class AislePilotController(
         normalized.IgnoredMealSlotIndexesCsv =
             NormalizeIgnoredMealSlotIndexesCsv(normalized.IgnoredMealSlotIndexesCsv);
         normalized.PantrySuggestionHistoryState = normalized.PantrySuggestionHistoryState?.Trim() ?? string.Empty;
+        normalized.SavedEnjoyedMealNamesState = SerializeSavedEnjoyedMealNameState(
+            ParseSavedEnjoyedMealNamesState(normalized.SavedEnjoyedMealNamesState));
         normalized.DietaryModes = normalized.DietaryModes?
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList() ?? [];
+        normalized.SavedMealRepeatRatePercent = Math.Clamp(normalized.SavedMealRepeatRatePercent, 10, 100);
         normalized.PlanDays = Math.Clamp(normalized.PlanDays, 1, 7);
         normalized.CookDays = Math.Clamp(normalized.CookDays, 1, normalized.PlanDays);
         if (normalized.SelectedSpecialTreatCookDayIndex.HasValue)
@@ -988,6 +1064,9 @@ public class AislePilotController(
             CustomAisleOrder = request.CustomAisleOrder ?? string.Empty,
             PantryItems = request.PantryItems ?? string.Empty,
             PreferQuickMeals = request.PreferQuickMeals,
+            EnableSavedMealRepeats = request.EnableSavedMealRepeats,
+            SavedMealRepeatRatePercent = Math.Clamp(request.SavedMealRepeatRatePercent, 10, 100),
+            SavedEnjoyedMealNamesState = request.SavedEnjoyedMealNamesState ?? string.Empty,
             RequireCorePantryIngredients = request.RequireCorePantryIngredients,
             IncludeSpecialTreatMeal = request.IncludeSpecialTreatMeal,
             SelectedSpecialTreatCookDayIndex = request.SelectedSpecialTreatCookDayIndex,
@@ -1057,6 +1136,10 @@ public class AislePilotController(
                 CustomAisleOrder = state.CustomAisleOrder ?? string.Empty,
                 PantryItems = state.PantryItems ?? string.Empty,
                 PreferQuickMeals = state.PreferQuickMeals,
+                EnableSavedMealRepeats = state.EnableSavedMealRepeats,
+                SavedMealRepeatRatePercent = Math.Clamp(state.SavedMealRepeatRatePercent, 10, 100),
+                SavedEnjoyedMealNamesState = SerializeSavedEnjoyedMealNameState(
+                    ParseSavedEnjoyedMealNamesState(state.SavedEnjoyedMealNamesState)),
                 RequireCorePantryIngredients = state.RequireCorePantryIngredients,
                 IncludeSpecialTreatMeal = state.IncludeSpecialTreatMeal,
                 SelectedSpecialTreatCookDayIndex = state.SelectedSpecialTreatCookDayIndex,
@@ -1357,6 +1440,66 @@ public class AislePilotController(
         }
     }
 
+    private static IReadOnlyList<string> ParseSavedEnjoyedMealNamesState(string? savedEnjoyedMealNamesState)
+    {
+        if (string.IsNullOrWhiteSpace(savedEnjoyedMealNamesState))
+        {
+            return [];
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<string>>(savedEnjoyedMealNamesState, SetupStateJsonOptions);
+            return NormalizeSavedEnjoyedMealNames(parsed);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static IReadOnlyList<string> NormalizeSavedEnjoyedMealNames(IReadOnlyList<string>? mealNames)
+    {
+        return (mealNames ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Where(name => name.Length is > 0 and <= MaxSavedMealNameLength)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(MaxSavedEnjoyedMealNames)
+            .ToList();
+    }
+
+    private static string SerializeSavedEnjoyedMealNameState(IReadOnlyList<string>? savedMealNames)
+    {
+        var normalized = NormalizeSavedEnjoyedMealNames(savedMealNames);
+        return normalized.Count == 0
+            ? string.Empty
+            : JsonSerializer.Serialize(normalized, SetupStateJsonOptions);
+    }
+
+    private static string ToggleSavedEnjoyedMealNameState(string? currentState, string mealName)
+    {
+        var normalizedMealName = string.IsNullOrWhiteSpace(mealName) ? string.Empty : mealName.Trim();
+        if (normalizedMealName.Length == 0 || normalizedMealName.Length > MaxSavedMealNameLength)
+        {
+            return SerializeSavedEnjoyedMealNameState(ParseSavedEnjoyedMealNamesState(currentState));
+        }
+
+        var savedMealNames = ParseSavedEnjoyedMealNamesState(currentState).ToList();
+        var existingIndex = savedMealNames.FindIndex(
+            name => name.Equals(normalizedMealName, StringComparison.OrdinalIgnoreCase));
+        if (existingIndex >= 0)
+        {
+            savedMealNames.RemoveAt(existingIndex);
+        }
+        else
+        {
+            savedMealNames.Add(normalizedMealName);
+        }
+
+        return SerializeSavedEnjoyedMealNameState(savedMealNames);
+    }
+
     private static string UpdatePantrySuggestionHistoryState(
         string? currentState,
         IEnumerable<string> additionalMealNames)
@@ -1590,6 +1733,9 @@ public class AislePilotController(
         public string? CustomAisleOrder { get; set; }
         public string? PantryItems { get; set; }
         public bool PreferQuickMeals { get; set; } = true;
+        public bool EnableSavedMealRepeats { get; set; } = true;
+        public int SavedMealRepeatRatePercent { get; set; } = 35;
+        public string? SavedEnjoyedMealNamesState { get; set; }
         public bool RequireCorePantryIngredients { get; set; }
         public bool IncludeSpecialTreatMeal { get; set; }
         public int? SelectedSpecialTreatCookDayIndex { get; set; }

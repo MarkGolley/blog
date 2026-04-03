@@ -2287,6 +2287,12 @@ html.aislepilot-restore-pending .aislepilot-app {
     box-shadow: 0 8px 14px rgba(94, 22, 20, 0.22);
 }
 
+.aislepilot-swap-btn.is-secondary.is-saved-meal {
+    background: linear-gradient(118deg, #dff7e9 0%, #c8efd9 100%);
+    border-color: rgba(24, 114, 68, 0.35);
+    color: #0d5f3d;
+}
+
 .aislepilot-swap-btn.is-icon-only {
     width: 1.9rem;
     min-width: 1.9rem;
@@ -2317,6 +2323,12 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-color: rgba(255, 255, 255, 0.52);
     background: rgba(255, 255, 255, 0.16);
     color: #fff;
+}
+
+.aislepilot-swap-btn.is-secondary.is-saved-meal .aislepilot-symbol-glyph {
+    border-color: rgba(24, 114, 68, 0.35);
+    background: rgba(24, 114, 68, 0.12);
+    color: #0d5f3d;
 }
 
 .aislepilot-swap-btn:hover {
@@ -3126,6 +3138,19 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: #ffeceb;
     border-color: rgba(230, 122, 112, 0.58);
     box-shadow: 0 8px 14px rgba(87, 28, 24, 0.28);
+}
+
+:root[data-theme="dark"] .aislepilot-swap-btn.is-secondary.is-saved-meal {
+    background: linear-gradient(118deg, #2c6e55 0%, #1f523f 100%);
+    color: #e8fff4;
+    border-color: rgba(99, 196, 152, 0.48);
+    box-shadow: 0 8px 14px rgba(15, 46, 34, 0.28);
+}
+
+:root[data-theme="dark"] .aislepilot-swap-btn.is-secondary.is-saved-meal .aislepilot-symbol-glyph {
+    border-color: rgba(145, 225, 190, 0.45);
+    background: rgba(145, 225, 190, 0.16);
+    color: #e8fff4;
 }
 
 :root[data-theme="dark"] .aislepilot-recipe-details,

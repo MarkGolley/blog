@@ -147,7 +147,12 @@
     var safeHouseholdSize = Math.Clamp(Model.Request.HouseholdSize, 1, 8);
     var householdLabel = safeHouseholdSize == 1 ? "person" : "people";
     var servingSummaryText = $"{safeHouseholdSize} {householdLabel} - {selectedPortionSize} portions";
-    var cookingSummaryText = Model.Request.PreferQuickMeals ? "Quick meals on" : "Quick meals off";
+    var savedMealRepeatsEnabled = Model.Request.EnableSavedMealRepeats;
+    var savedMealRepeatRatePercent = Math.Clamp(Model.Request.SavedMealRepeatRatePercent, 10, 100);
+    var savedMealRepeatSummaryText = savedMealRepeatsEnabled
+        ? $"Saved repeats {savedMealRepeatRatePercent}%"
+        : "Saved repeats off";
+    var cookingSummaryText = $"{(Model.Request.PreferQuickMeals ? "Quick meals on" : "Quick meals off")}, {savedMealRepeatSummaryText}";
     var specialOptions = new List<string>();
     if (Model.Request.IncludeSpecialTreatMeal)
     {
@@ -389,6 +394,7 @@
             <input type="hidden" name="SetupMode" value="@defaultSetupMode" data-setup-mode-value />
             <input asp-for="Request.PantrySuggestionHistoryState" type="hidden" />
             <input asp-for="Request.SelectedDessertAddOnName" type="hidden" />
+            <input asp-for="Request.SavedEnjoyedMealNamesState" type="hidden" />
             @if (hasResult && Model.Result is not null)
             {
                 foreach (var mealName in Model.Result.MealPlan
@@ -518,6 +524,33 @@
                             <input asp-for="Request.PreferQuickMeals" type="checkbox" />
                             <span>Prioritise quick meals</span>
                         </label>
+                        <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                            <input asp-for="Request.EnableSavedMealRepeats" type="checkbox" />
+                            <span>Repeat saved meals sometimes</span>
+                        </label>
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact"
+                             data-saved-repeat-rate-field
+                             hidden="@(!savedMealRepeatsEnabled)">
+                            <label asp-for="Request.SavedMealRepeatRatePercent">Repeat strength</label>
+                            <div class="aislepilot-slider-track-line">
+                                <span class="aislepilot-slider-boundary">10%</span>
+                                <input asp-for="Request.SavedMealRepeatRatePercent"
+                                       type="range"
+                                       min="10"
+                                       max="100"
+                                       step="5"
+                                       class="aislepilot-slider-input"
+                                       aria-label="Saved meal repeat strength"
+                                       data-number-slider-range
+                                       data-number-slider-suffix="%"
+                                       data-number-slider-decimals="0" />
+                                <span class="aislepilot-slider-boundary">100%</span>
+                            </div>
+                            <div class="aislepilot-slider-meta">
+                                <span class="aislepilot-slider-value" data-number-slider-value>@savedMealRepeatRatePercent%</span>
+                            </div>
+                            <span asp-validation-for="Request.SavedMealRepeatRatePercent" class="text-danger"></span>
+                        </div>
                     </fieldset>
                 </details>
 
