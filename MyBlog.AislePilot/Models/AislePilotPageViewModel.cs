@@ -34,6 +34,11 @@ public sealed class AislePilotPlanResultViewModel
     public bool BudgetRebalanceAttempted { get; set; }
     public bool BudgetRebalanceReducedCost { get; set; }
     public string BudgetRebalanceStatusMessage { get; set; } = string.Empty;
+    public bool IncludeSpecialTreatMeal { get; set; }
+    public bool IncludeDessertAddOn { get; set; }
+    public decimal DessertAddOnEstimatedCost { get; set; }
+    public string DessertAddOnName { get; set; } = string.Empty;
+    public IReadOnlyList<string> DessertAddOnIngredientLines { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> AisleOrderUsed { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> BudgetTips { get; set; } = Array.Empty<string>();
     public IReadOnlyList<AislePilotMealDayViewModel> MealPlan { get; set; } = Array.Empty<AislePilotMealDayViewModel>();
@@ -47,6 +52,7 @@ public sealed class AislePilotMealDayViewModel
     public string MealType { get; set; } = "Dinner";
     public bool IsIgnored { get; set; }
     public string MealName { get; set; } = string.Empty;
+    public bool IsSpecialTreat { get; set; }
     public string MealImageUrl { get; set; } = string.Empty;
     public string MealReason { get; set; } = string.Empty;
     public int LeftoverDaysCovered { get; set; }

@@ -28,6 +28,46 @@
     var selectedPortionSize = portionSizeOptions[selectedPortionSizeIndex];
     var selectedPlanDays = Math.Clamp(Model.Request.PlanDays, 1, 7);
     var selectedCookDays = Math.Clamp(Model.Request.CookDays, 1, selectedPlanDays);
+    var weekDayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+    List<int> BuildDefaultCookDayMultipliers(int cookDays, int planDays)
+    {
+        var safePlanDays = Math.Clamp(planDays, 1, 7);
+        var safeCookDays = Math.Clamp(cookDays, 1, safePlanDays);
+        var leftoverDays = Math.Max(0, safePlanDays - safeCookDays);
+        var multipliers = Enumerable.Repeat(1, safeCookDays).ToList();
+        for (var index = 0; index < leftoverDays; index++)
+        {
+            multipliers[index % safeCookDays]++;
+        }
+
+        return multipliers;
+    }
+
+    List<string> BuildSpecialTreatCookDayLabels(int cookDays, int planDays)
+    {
+        var safePlanDays = Math.Clamp(planDays, 1, 7);
+        var safeCookDays = Math.Clamp(cookDays, 1, safePlanDays);
+        var planWeekDayNames = weekDayNames.Take(safePlanDays).ToArray();
+        var multipliers = BuildDefaultCookDayMultipliers(safeCookDays, safePlanDays);
+        var labels = new List<string>(safeCookDays);
+        var dayCursor = 0;
+        for (var index = 0; index < safeCookDays; index++)
+        {
+            var dayName = planWeekDayNames[Math.Clamp(dayCursor, 0, planWeekDayNames.Length - 1)];
+            labels.Add(dayName);
+            dayCursor += Math.Max(1, multipliers[index]);
+        }
+
+        return labels;
+    }
+
+    var specialTreatCookDayLabels = BuildSpecialTreatCookDayLabels(selectedCookDays, selectedPlanDays);
+    var selectedSpecialTreatCookDayIndex = Model.Request.SelectedSpecialTreatCookDayIndex.HasValue
+        ? Math.Clamp(Model.Request.SelectedSpecialTreatCookDayIndex.Value, 0, selectedCookDays - 1)
+        : 0;
+    var selectedSpecialTreatCookDayLabel = specialTreatCookDayLabels.Count == 0
+        ? string.Empty
+        : specialTreatCookDayLabels[Math.Clamp(selectedSpecialTreatCookDayIndex, 0, specialTreatCookDayLabels.Count - 1)];
     var selectedMealTypes = (Model.Request.SelectedMealTypes ?? [])
         .Where(type => !string.IsNullOrWhiteSpace(type))
         .Select(type =>
@@ -104,8 +144,27 @@
     var dietarySummaryText = dietarySummaryValues.Count == 0
         ? "No dietary filters"
         : string.Join(", ", dietarySummaryValues);
-    var servingSummaryText = $"{Math.Clamp(Model.Request.HouseholdSize, 1, 8)} people - {selectedPortionSize} portions";
+    var safeHouseholdSize = Math.Clamp(Model.Request.HouseholdSize, 1, 8);
+    var householdLabel = safeHouseholdSize == 1 ? "person" : "people";
+    var servingSummaryText = $"{safeHouseholdSize} {householdLabel} - {selectedPortionSize} portions";
     var cookingSummaryText = Model.Request.PreferQuickMeals ? "Quick meals on" : "Quick meals off";
+    var specialOptions = new List<string>();
+    if (Model.Request.IncludeSpecialTreatMeal)
+    {
+        specialOptions.Add(
+            string.IsNullOrWhiteSpace(selectedSpecialTreatCookDayLabel)
+                ? "Treat meal on"
+                : $"Treat meal on {selectedSpecialTreatCookDayLabel}");
+    }
+
+    if (Model.Request.IncludeDessertAddOn)
+    {
+        specialOptions.Add("Dessert add-on on");
+    }
+
+    var specialOptionsSummaryText = specialOptions.Count == 0
+        ? "No extras"
+        : string.Join(", ", specialOptions);
     var exclusionsSummaryRaw = string.IsNullOrWhiteSpace(Model.Request.DislikesOrAllergens)
         ? "No exclusions set"
         : Model.Request.DislikesOrAllergens.Trim();
@@ -329,6 +388,7 @@
             <input asp-for="ReturnUrl" type="hidden" />
             <input type="hidden" name="SetupMode" value="@defaultSetupMode" data-setup-mode-value />
             <input asp-for="Request.PantrySuggestionHistoryState" type="hidden" />
+            <input asp-for="Request.SelectedDessertAddOnName" type="hidden" />
             @if (!hasModelErrors)
             {
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -674,6 +734,41 @@
                                 </div>
                                 <span asp-validation-for="Request.WeeklyBudget" class="text-danger"></span>
                             </div>
+                        </fieldset>
+                    </details>
+
+                    <details class="aislepilot-collapsible"
+                             data-plan-basic-item="special-options">
+                        <summary>
+                            <span class="aislepilot-collapsible-title">Special options</span>
+                            <span class="aislepilot-collapsible-value" data-special-options-summary>@specialOptionsSummaryText</span>
+                        </summary>
+                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
+                            <div class="aislepilot-special-option-row">
+                                <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                                    <input asp-for="Request.IncludeSpecialTreatMeal" type="checkbox" />
+                                    <span>Special treat dinner on</span>
+                                </label>
+                                <div class="aislepilot-field aislepilot-field-chip aislepilot-special-treat-day-inline"
+                                     data-special-treat-day-field
+                                     hidden="@(!Model.Request.IncludeSpecialTreatMeal)">
+                                    <label asp-for="Request.SelectedSpecialTreatCookDayIndex" class="sr-only">Special treat day</label>
+                                    <select asp-for="Request.SelectedSpecialTreatCookDayIndex"
+                                            class="aislepilot-special-treat-day-select"
+                                            data-special-treat-day-select
+                                            aria-label="Special treat day">
+                                        @for (var cookDayIndex = 0; cookDayIndex < specialTreatCookDayLabels.Count; cookDayIndex++)
+                                        {
+                                            <option value="@cookDayIndex">@specialTreatCookDayLabels[cookDayIndex]</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <span asp-validation-for="Request.SelectedSpecialTreatCookDayIndex" class="text-danger"></span>
+                            <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
+                                <input asp-for="Request.IncludeDessertAddOn" type="checkbox" />
+                                <span>Add desert</span>
+                            </label>
                         </fieldset>
                     </details>
                 </div>

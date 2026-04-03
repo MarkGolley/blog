@@ -52,4 +52,14 @@ public sealed class AislePilotRequestModel
     public string? PantrySuggestionHistoryState { get; set; } = string.Empty;
 
     public bool PreferQuickMeals { get; set; } = true;
+
+    public bool IncludeSpecialTreatMeal { get; set; }
+
+    [Range(0, 6, ErrorMessage = "Choose a valid special treat day.")]
+    public int? SelectedSpecialTreatCookDayIndex { get; set; }
+
+    public bool IncludeDessertAddOn { get; set; }
+
+    [StringLength(120, ErrorMessage = "Dessert selection is too long.")]
+    public string? SelectedDessertAddOnName { get; set; } = string.Empty;
 }

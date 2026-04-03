@@ -44,6 +44,7 @@ public interface IAislePilotService
         IReadOnlyList<string>? currentPlanMealNames,
         IReadOnlyList<string>? seenMealNames,
         CancellationToken cancellationToken = default);
+    string ResolveNextDessertAddOnName(string? currentDessertAddOnName);
     Task<IReadOnlyDictionary<string, string>> GetMealImageUrlsAsync(
         IReadOnlyList<string> mealNames,
         CancellationToken cancellationToken = default);
