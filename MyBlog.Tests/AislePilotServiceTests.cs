@@ -32,8 +32,9 @@ public class AislePilotServiceTests
     }
 
     [Theory]
-    [InlineData(0.45, "bottle", "0.45 bottle")]
-    [InlineData(0.06, "jar", "0.06 jar")]
+    [InlineData(0.45, "bottle", "225 ml")]
+    [InlineData(0.06, "jar", "15 ml")]
+    [InlineData(0.19, "pot", "60 ml")]
     [InlineData(1.24, "kg", "1.2 kg")]
     public void QuantityDisplayFormatter_RecipeFormatting_PreservesPreciseAmounts(decimal quantity, string unit, string expected)
     {
@@ -204,6 +205,32 @@ public class AislePilotServiceTests
             Assert.True(meal.RecipeSteps.Count >= 5, $"Expected at least 5 steps for '{meal.MealName}' but got {meal.RecipeSteps.Count}.");
             Assert.All(meal.RecipeSteps, step => Assert.False(string.IsNullOrWhiteSpace(step)));
         });
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_TurkeyChilliRecipe_DoesNotMentionMissingOnionOrGarlic()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 200m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, ["Turkey chilli with beans"]);
+
+        Assert.Single(result.MealPlan);
+        Assert.Equal("Turkey chilli with beans", result.MealPlan[0].MealName, ignoreCase: true);
+        Assert.DoesNotContain(
+            result.MealPlan[0].RecipeSteps,
+            step => step.Contains("onion", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            result.MealPlan[0].RecipeSteps,
+            step => step.Contains("garlic", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1008,6 +1035,63 @@ public class AislePilotServiceTests
 
             Assert.True(largeItem.Quantity > mediumItem.Quantity);
             Assert.True(largeItem.EstimatedCost > mediumItem.EstimatedCost);
+            Assert.True(largeItem.Quantity <= decimal.Round(mediumItem.Quantity * 1.2m, 2, MidpointRounding.AwayFromZero));
+        }
+    }
+
+    [Fact]
+    public void BuildPlan_SmallerPortionSize_MateriallyReducesMealAndShoppingVolumes()
+    {
+        var baseRequest = new AislePilotRequestModel
+        {
+            DietaryModes = ["Vegetarian", "Gluten-Free"],
+            DislikesOrAllergens = "lentils, coconut milk, chickpea, quinoa, black beans, sweet potatoes, mushrooms, risotto rice, spinach",
+            WeeklyBudget = 70m,
+            HouseholdSize = 2,
+            CookDays = 1
+        };
+
+        var smallResult = _service.BuildPlan(new AislePilotRequestModel
+        {
+            Supermarket = baseRequest.Supermarket,
+            WeeklyBudget = baseRequest.WeeklyBudget,
+            HouseholdSize = baseRequest.HouseholdSize,
+            CookDays = baseRequest.CookDays,
+            PortionSize = "Small",
+            DietaryModes = [.. baseRequest.DietaryModes],
+            DislikesOrAllergens = baseRequest.DislikesOrAllergens
+        });
+
+        var mediumResult = _service.BuildPlan(new AislePilotRequestModel
+        {
+            Supermarket = baseRequest.Supermarket,
+            WeeklyBudget = baseRequest.WeeklyBudget,
+            HouseholdSize = baseRequest.HouseholdSize,
+            CookDays = baseRequest.CookDays,
+            PortionSize = "Medium",
+            DietaryModes = [.. baseRequest.DietaryModes],
+            DislikesOrAllergens = baseRequest.DislikesOrAllergens
+        });
+
+        Assert.Single(smallResult.MealPlan);
+        Assert.Single(mediumResult.MealPlan);
+        Assert.Equal(smallResult.MealPlan[0].MealName, mediumResult.MealPlan[0].MealName);
+        Assert.Equal("Small", smallResult.PortionSize);
+        Assert.Equal("Medium", mediumResult.PortionSize);
+        Assert.True(smallResult.EstimatedTotalCost < mediumResult.EstimatedTotalCost);
+        Assert.True(smallResult.EstimatedTotalCost <= decimal.Round(mediumResult.EstimatedTotalCost * 0.8m, 2, MidpointRounding.AwayFromZero));
+
+        Assert.Equal(mediumResult.ShoppingItems.Count, smallResult.ShoppingItems.Count);
+        foreach (var mediumItem in mediumResult.ShoppingItems)
+        {
+            var smallItem = Assert.Single(smallResult.ShoppingItems, item =>
+                item.Department.Equals(mediumItem.Department, StringComparison.OrdinalIgnoreCase) &&
+                item.Name.Equals(mediumItem.Name, StringComparison.OrdinalIgnoreCase) &&
+                item.Unit.Equals(mediumItem.Unit, StringComparison.OrdinalIgnoreCase));
+
+            Assert.True(smallItem.Quantity < mediumItem.Quantity);
+            Assert.True(smallItem.EstimatedCost < mediumItem.EstimatedCost);
+            Assert.True(smallItem.Quantity <= decimal.Round(mediumItem.Quantity * 0.8m, 2, MidpointRounding.AwayFromZero));
         }
     }
 
@@ -1270,6 +1354,52 @@ public class AislePilotServiceTests
 
         Assert.Equal(currentPlanMealNames.Count, resultMealNames.Count);
         Assert.True(resultMealNames.SequenceEqual(currentPlanMealNames, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_MacrosRemainPerServingAcrossHouseholdSizes()
+    {
+        var currentPlanMealNames = new List<string>
+        {
+            "Chicken stir fry with rice",
+            "Salmon, potatoes, and broccoli",
+            "Turkey chilli with beans",
+            "Veggie lentil curry",
+            "Tofu noodle bowls",
+            "Greek yogurt chicken wraps",
+            "Egg fried rice"
+        };
+        var onePersonRequest = new AislePilotRequestModel
+        {
+            WeeklyBudget = 200m,
+            HouseholdSize = 1,
+            CookDays = 7,
+            PortionSize = "Medium",
+            DietaryModes = ["Balanced"]
+        };
+        var fourPeopleRequest = new AislePilotRequestModel
+        {
+            WeeklyBudget = 200m,
+            HouseholdSize = 4,
+            CookDays = 7,
+            PortionSize = "Medium",
+            DietaryModes = ["Balanced"]
+        };
+
+        var onePersonPlan = await _service.BuildPlanFromCurrentMealsAsync(onePersonRequest, currentPlanMealNames);
+        var fourPeoplePlan = await _service.BuildPlanFromCurrentMealsAsync(fourPeopleRequest, currentPlanMealNames);
+
+        Assert.Equal(onePersonPlan.MealPlan.Count, fourPeoplePlan.MealPlan.Count);
+        for (var i = 0; i < onePersonPlan.MealPlan.Count; i++)
+        {
+            Assert.Equal(onePersonPlan.MealPlan[i].MealName, fourPeoplePlan.MealPlan[i].MealName);
+            Assert.Equal(onePersonPlan.MealPlan[i].CaloriesPerServing, fourPeoplePlan.MealPlan[i].CaloriesPerServing);
+            Assert.Equal(onePersonPlan.MealPlan[i].ProteinGramsPerServing, fourPeoplePlan.MealPlan[i].ProteinGramsPerServing);
+            Assert.Equal(onePersonPlan.MealPlan[i].CarbsGramsPerServing, fourPeoplePlan.MealPlan[i].CarbsGramsPerServing);
+            Assert.Equal(onePersonPlan.MealPlan[i].FatGramsPerServing, fourPeoplePlan.MealPlan[i].FatGramsPerServing);
+        }
+
+        Assert.True(fourPeoplePlan.EstimatedTotalCost > onePersonPlan.EstimatedTotalCost);
     }
 
     [Fact]
@@ -1770,7 +1900,41 @@ public class AislePilotServiceTests
     }
 
     [Fact]
-    public void BuildPlan_WithSpecialTreatMealEnabled_WhenAiReturnsNoTreat_ThrowsInsteadOfUsingNormalDinnerFallback()
+    public async Task BuildPlanFromCurrentMealsAsync_WithSpecialTreatMealEnabled_MarksOnlyOneMealCardAsSpecialTreat()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 5,
+            CookDays = 5,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"],
+            IncludeSpecialTreatMeal = true,
+            SelectedSpecialTreatCookDayIndex = 2
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Salmon, potatoes, and broccoli",
+            "Chicken and leek cream pie",
+            "Mushroom spinach risotto",
+            "Creamy chicken and mushroom pasta bake",
+            "Halloumi and harissa roast veg tray bake"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var flaggedTreatMeals = result.MealPlan
+            .Where(meal => meal.IsSpecialTreat)
+            .ToList();
+
+        Assert.Single(flaggedTreatMeals);
+        Assert.Equal("Dinner", flaggedTreatMeals[0].MealType, ignoreCase: true);
+        Assert.Equal("Wednesday", flaggedTreatMeals[0].Day, ignoreCase: true);
+    }
+
+    [Fact]
+    public void BuildPlan_WithSpecialTreatMealEnabled_WhenAiReturnsNoTreat_StillReturnsSpecialTreatMeal()
     {
         ClearAiPool();
 
@@ -1832,10 +1996,15 @@ public class AislePilotServiceTests
             IncludeSpecialTreatMeal = true
         };
 
-        var ex = Assert.Throws<InvalidOperationException>(() => service.BuildPlan(request));
+        var result = service.BuildPlan(request);
 
-        Assert.Contains("special treat dinner", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(2, handler.CallCount);
+        Assert.Single(result.MealPlan);
+        Assert.Contains(result.MealPlan, meal => meal.IsSpecialTreat);
+        Assert.True(result.IncludeSpecialTreatMeal);
+        Assert.DoesNotContain(
+            result.BudgetTips,
+            tip => tip.Contains("background", StringComparison.OrdinalIgnoreCase));
+        Assert.True(handler.CallCount >= 2);
     }
 
     [Fact]
@@ -2446,7 +2615,7 @@ public class AislePilotServiceTests
     }
 
     [Fact]
-    public void BuildPlan_WithSpecialTreatMealEnabledAndNoAiAvailable_ThrowsInsteadOfTemplateFallback()
+    public void BuildPlan_WithSpecialTreatMealEnabledAndNoAiAvailable_ReturnsTemplateFallbackWithoutThrowing()
     {
         ClearAiPool();
 
@@ -2470,9 +2639,14 @@ public class AislePilotServiceTests
             IncludeSpecialTreatMeal = true
         };
 
-        var ex = Assert.Throws<InvalidOperationException>(() => service.BuildPlan(request));
+        var result = service.BuildPlan(request);
 
-        Assert.Contains("special treat dinner", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEmpty(result.MealPlan);
+        Assert.True(result.IncludeSpecialTreatMeal);
+        Assert.Contains(result.MealPlan, meal => meal.IsSpecialTreat);
+        Assert.DoesNotContain(
+            result.BudgetTips,
+            tip => tip.Contains("background", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -2703,6 +2877,155 @@ public class AislePilotServiceTests
         Assert.False(result.UsedAiGeneratedMeals);
         Assert.Equal("Template fallback", result.PlanSourceLabel);
         Assert.Equal(2, result.MealPlan.Count);
+    }
+
+    [Fact]
+    public void BuildPlan_WhenAiMealNameImpliesRiceButIngredientListOmitsRice_FallsBackToTemplatePlan()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var payloadContent = """
+{
+  "meals": [
+    {
+      "name": "Chicken stir fry with rice",
+      "baseCostForTwo": 6.5,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat a large pan over medium heat for 2 minutes.",
+        "Cook chicken strips for 6 minutes until lightly browned.",
+        "Add peppers and carrots and cook for 4 minutes.",
+        "Stir in soy sauce and a splash of water and simmer briefly.",
+        "Serve immediately while hot."
+      ],
+      "ingredients": [
+        { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 2.6 },
+        { "name": "Bell peppers", "department": "Produce", "quantityForTwo": 2, "unit": "pcs", "estimatedCostForTwo": 1.1 },
+        { "name": "Carrots", "department": "Produce", "quantityForTwo": 3, "unit": "pcs", "estimatedCostForTwo": 0.8 }
+      ]
+    }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            CookDays = 1,
+            WeeklyBudget = 65m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(2, handler.CallCount);
+        Assert.False(result.UsedAiGeneratedMeals);
+        Assert.Equal("Template fallback", result.PlanSourceLabel);
+    }
+
+    [Fact]
+    public void BuildPlan_WhenAiRecipeMethodIsVague_ReplacesItWithMoreConcreteFallbackSteps()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var payloadContent = """
+{
+  "meals": [
+    {
+      "name": "Chicken skillet supper",
+      "baseCostForTwo": 6.9,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Prepare ingredients in advance.",
+        "Cook until done and stir now and then.",
+        "Season to taste as desired.",
+        "Add everything together and heat through.",
+        "Serve and enjoy."
+      ],
+      "ingredients": [
+        { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 2.6 },
+        { "name": "Bell peppers", "department": "Produce", "quantityForTwo": 2, "unit": "pcs", "estimatedCostForTwo": 1.2 },
+        { "name": "Rice", "department": "Tins & Dry Goods", "quantityForTwo": 0.4, "unit": "kg", "estimatedCostForTwo": 0.9 }
+      ]
+    }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            CookDays = 1,
+            WeeklyBudget = 65m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Single(result.MealPlan);
+        var recipeSteps = result.MealPlan[0].RecipeSteps;
+        Assert.True(recipeSteps.Count >= 5);
+        Assert.DoesNotContain(recipeSteps, step => step.Contains("serve and enjoy", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            recipeSteps,
+            step => step.Contains("minute", StringComparison.OrdinalIgnoreCase) ||
+                    step.Contains("200C", StringComparison.OrdinalIgnoreCase) ||
+                    step.Contains("medium-high", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

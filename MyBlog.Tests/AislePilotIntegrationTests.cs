@@ -701,6 +701,143 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task Index_Post_WhenOnlyPortionSizeChanges_UsesCurrentPlanMealNames()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "70"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var postedCurrentPlanMealNames = new[]
+        {
+            "Greek yogurt berry oat pots",
+            "Chicken and leek cream pie"
+        };
+        var portionUpdateForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "70"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Small"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in postedCurrentPlanMealNames)
+        {
+            portionUpdateForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var portionUpdateResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(portionUpdateForm));
+
+        Assert.Equal(HttpStatusCode.OK, portionUpdateResponse.StatusCode);
+        var html = await portionUpdateResponse.Content.ReadAsStringAsync();
+        Assert.Contains("name=\"Request.PortionSize\" value=\"Small\"", html, StringComparison.OrdinalIgnoreCase);
+        var renderedMealNames = ExtractRenderedMealNames(html);
+        Assert.Equal(2, renderedMealNames.Count);
+        Assert.Contains("Greek yogurt berry oat pots", renderedMealNames, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Chicken and leek cream pie", renderedMealNames, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WhenOnlyLeftoverRebalanceChanges_UsesCurrentPlanMealNames()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var baselineForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "3"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.LeftoverCookDayIndexesCsv", "0"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(baselineForm));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var postedCurrentPlanMealNames = new[]
+        {
+            "Chicken stir fry with rice",
+            "Turkey chilli with beans"
+        };
+        var leftoverRebalanceForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "3"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.LeftoverCookDayIndexesCsv", "1"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in postedCurrentPlanMealNames)
+        {
+            leftoverRebalanceForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var rebalanceResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(leftoverRebalanceForm));
+
+        Assert.Equal(HttpStatusCode.OK, rebalanceResponse.StatusCode);
+        var html = await rebalanceResponse.Content.ReadAsStringAsync();
+        Assert.Contains(
+            "name=\"Request.LeftoverCookDayIndexesCsv\" value=\"1\"",
+            html,
+            StringComparison.OrdinalIgnoreCase);
+        var renderedMealNames = ExtractRenderedMealNames(html);
+        Assert.Equal(2, renderedMealNames.Count);
+        Assert.Contains("Chicken stir fry with rice", renderedMealNames, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Turkey chilli with beans", renderedMealNames, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Post_WithFiveCookDays_ShowsTwoLeftoverDaysInOverview()
     {
         using var client = CreateClient(allowAutoRedirect: true);
