@@ -53,6 +53,14 @@ public sealed class AislePilotRequestModel
 
     public bool PreferQuickMeals { get; set; } = true;
 
+    public bool EnableSavedMealRepeats { get; set; } = true;
+
+    [Range(10, 100, ErrorMessage = "Saved meal repeat strength must be between 10 and 100.")]
+    public int SavedMealRepeatRatePercent { get; set; } = 35;
+
+    [StringLength(3200, ErrorMessage = "Saved meal list is too long.")]
+    public string? SavedEnjoyedMealNamesState { get; set; } = string.Empty;
+
     public bool IncludeSpecialTreatMeal { get; set; }
 
     [Range(0, 6, ErrorMessage = "Choose a valid special treat day.")]

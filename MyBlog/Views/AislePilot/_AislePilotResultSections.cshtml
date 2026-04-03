@@ -1,5 +1,6 @@
 @using System.Globalization
 @using System.Text
+@using System.Text.Json
 @model AislePilotPageViewModel
 
 @if (Model.HasResult && Model.Result is not null)
@@ -109,6 +110,28 @@
     var currentPlanMealNames = result.MealPlan
         .Select(meal => meal.MealName)
         .ToList();
+    HashSet<string> ParseSavedEnjoyedMealNames(string? savedMealNamesState)
+    {
+        if (string.IsNullOrWhiteSpace(savedMealNamesState))
+        {
+            return [];
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<string>>(savedMealNamesState);
+            return (parsed ?? [])
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+    var savedEnjoyedMealNames = ParseSavedEnjoyedMealNames(Model.Request.SavedEnjoyedMealNamesState);
     var mealCount = result.MealPlan.Count;
     HashSet<int> ParseIgnoredMealSlotIndexes(string? ignoredMealSlotIndexesCsv, int maxMealSlotIndex)
     {
@@ -454,6 +477,7 @@
                                             var meal = entry.meal;
                                             var mealIndex = entry.index;
                                             var isIgnored = ignoredMealSlotIndexes.Contains(mealIndex) || meal.IsIgnored;
+                                            var isSavedMeal = savedEnjoyedMealNames.Contains(meal.MealName);
                                             var panelLabelledBy = dayGroup.Entries.Count > 1
                                                 ? $"{tabPrefix}-tab-{slotIndex}"
                                                 : null;
@@ -571,6 +595,34 @@
                                                                         </svg>
                                                                     </span>
                                                                     <span class="sr-only">Swap meal</span>
+                                                                </span>
+                                                            </button>
+                                                        </form>
+
+                                                        <form method="post"
+                                                              action="@Url.Action("ToggleEnjoyedMeal", "AislePilot")#aislepilot-meals"
+                                                              class="aislepilot-swap-form aislepilot-card-action-inline"
+                                                              data-preserve-scroll-form
+                                                              data-ajax-swap-form
+                                                              data-skip-submit-loading>
+                                                            @Html.AntiForgeryToken()
+                                                            <partial name="_AislePilotHiddenRequestFields"
+                                                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                                                            <input type="hidden" name="mealName" value="@meal.MealName" />
+                                                            @{
+                                                                var saveActionLabel = isSavedMeal ? "Saved meal" : "Save meal";
+                                                                var saveButtonClass = isSavedMeal
+                                                                    ? "aislepilot-swap-btn is-secondary is-icon-only is-saved-meal"
+                                                                    : "aislepilot-swap-btn is-secondary is-icon-only";
+                                                            }
+                                                            <button type="submit"
+                                                                    class="@saveButtonClass"
+                                                                    aria-label="@saveActionLabel"
+                                                                    title="@saveActionLabel">
+                                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                                        <path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.5 6.5 20.1l1-6.2L3 9.5l6.2-.9z"></path>
+                                                                    </svg>
                                                                 </span>
                                                             </button>
                                                         </form>

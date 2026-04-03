@@ -400,6 +400,31 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithSavedMealRepeatsEnabled_PrefersSavedMealInWeeklyPlan()
+    {
+        const string savedMealName = "Greek yogurt berry oat pots";
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            PlanDays = 7,
+            CookDays = 7,
+            MealsPerDay = 3,
+            SelectedMealTypes = ["Dinner", "Lunch", "Breakfast"],
+            EnableSavedMealRepeats = true,
+            SavedMealRepeatRatePercent = 100,
+            SavedEnjoyedMealNamesState = JsonSerializer.Serialize(new[] { savedMealName })
+        };
+
+        var result = _service.BuildPlan(request);
+        var savedMealCount = result.MealPlan.Count(meal =>
+            meal.MealName.Equals(savedMealName, StringComparison.OrdinalIgnoreCase));
+
+        Assert.True(
+            savedMealCount >= 2,
+            $"Expected saved meal '{savedMealName}' to repeat at least twice, but it appeared {savedMealCount} time(s).");
+    }
+
+    [Fact]
     public void BuildPlan_WithThreeMealsPerDay_Vegan_KeepsBreakfastAndLunchSlotAppropriate()
     {
         static bool IsBreakfastLike(string mealName)

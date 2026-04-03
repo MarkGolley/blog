@@ -201,6 +201,74 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task ToggleEnjoyedMeal_ValidRequest_PersistsSavedMealState()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var baselineForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "85"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.EnableSavedMealRepeats", "true"),
+            new("Request.SavedMealRepeatRatePercent", "35"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(baselineForm));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        var baselineHtml = await baselineResponse.Content.ReadAsStringAsync();
+        var currentPlanMealNames = ExtractRenderedMealNames(baselineHtml);
+        Assert.True(currentPlanMealNames.Count >= 2);
+        var targetMealName = currentPlanMealNames[0];
+
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        var toggleForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "85"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.EnableSavedMealRepeats", "true"),
+            new("Request.SavedMealRepeatRatePercent", "35"),
+            new("Request.SavedEnjoyedMealNamesState", string.Empty),
+            new("Request.DietaryModes", "Balanced"),
+            new("mealName", targetMealName),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in currentPlanMealNames)
+        {
+            toggleForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var toggleResponse = await client.PostAsync("/projects/aisle-pilot/toggle-enjoyed-meal", new FormUrlEncodedContent(toggleForm));
+
+        Assert.Equal(HttpStatusCode.OK, toggleResponse.StatusCode);
+        var toggledHtml = await toggleResponse.Content.ReadAsStringAsync();
+        var savedState = ExtractHiddenInputValue(toggledHtml, "Request.SavedEnjoyedMealNamesState");
+        Assert.Contains(targetMealName, savedState, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("title=\"Saved meal\"", toggledHtml, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SwapDessert_WithDessertAddOnEnabled_RotatesToDifferentDessert()
     {
         using var client = CreateClient(allowAutoRedirect: true);

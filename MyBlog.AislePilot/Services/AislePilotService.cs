@@ -28,6 +28,9 @@ public sealed class AislePilotService : IAislePilotService
     private const int MaxAiDepartmentLength = 32;
     private const int MaxAiUnitLength = 18;
     private const int MaxAiRecipeStepLength = 220;
+    private const int MaxSavedEnjoyedMealNameLength = 90;
+    private const int MaxSavedEnjoyedMealCount = 32;
+    private const int DefaultSavedMealRepeatRatePercent = 35;
     private const int PrimaryAiMealPlanMaxTokens = 3400;
     private const int RetryAiMealPlanMaxTokens = 2200;
     private const int WarmupMealMaxTokens = 1000;
@@ -2066,7 +2069,10 @@ public sealed class AislePilotService : IAislePilotService
             totalMealCount,
             BuildMealTypeSlots(request),
             request.IncludeSpecialTreatMeal,
-            request.SelectedSpecialTreatCookDayIndex);
+            request.SelectedSpecialTreatCookDayIndex,
+            savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+            enableSavedMealRepeats: request.EnableSavedMealRepeats,
+            savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
 
         // Keep swap behavior consistent by making fallback-selected meals available in the in-memory pool.
         AddMealsToAiPool(selectedMeals);
@@ -2174,7 +2180,31 @@ public sealed class AislePilotService : IAislePilotService
 
         var aiMeals = aiBatch.Meals.ToList();
         var mealTypeSlots = BuildMealTypeSlots(request);
-        if (!HasSlotCoverageForMealTypes(aiMeals, mealTypeSlots))
+        var savedEnjoyedMealNames = ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState);
+        var selectionCandidates = aiMeals.ToList();
+        if (request.EnableSavedMealRepeats && savedEnjoyedMealNames.Count > 0)
+        {
+            await EnsureAiMealPoolHydratedAsync(cancellationToken);
+            var savedFallbackCandidates = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens)
+                .Concat(FilterMeals(context.DietaryModes, context.DislikesOrAllergens, MealTemplates))
+                .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToDictionary(meal => meal.Name, meal => meal, StringComparer.OrdinalIgnoreCase);
+            foreach (var savedMealName in savedEnjoyedMealNames)
+            {
+                if (selectionCandidates.Any(meal => meal.Name.Equals(savedMealName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                if (savedFallbackCandidates.TryGetValue(savedMealName, out var savedFallbackMeal))
+                {
+                    selectionCandidates.Add(savedFallbackMeal);
+                }
+            }
+        }
+
+        if (!HasSlotCoverageForMealTypes(selectionCandidates, mealTypeSlots))
         {
             _logger?.LogWarning(
                 "AislePilot AI generation returned meals without required slot coverage for {MealTypes}; falling back.",
@@ -2184,7 +2214,7 @@ public sealed class AislePilotService : IAislePilotService
 
         if (request.IncludeSpecialTreatMeal &&
             mealTypeSlots.Any(slot => slot.Equals("Dinner", StringComparison.OrdinalIgnoreCase)) &&
-            !HasSpecialTreatDinner(aiMeals, mealTypeSlots))
+            !HasSpecialTreatDinner(selectionCandidates, mealTypeSlots))
         {
             var dedicatedSpecialTreatMeal = await TryGenerateSpecialTreatMealWithAiAsync(
                 request,
@@ -2194,6 +2224,7 @@ public sealed class AislePilotService : IAislePilotService
             if (dedicatedSpecialTreatMeal is not null)
             {
                 aiMeals.Add(dedicatedSpecialTreatMeal);
+                selectionCandidates.Add(dedicatedSpecialTreatMeal);
             }
         }
 
@@ -2201,7 +2232,7 @@ public sealed class AislePilotService : IAislePilotService
         try
         {
             selectedMeals = SelectMeals(
-                aiMeals,
+                selectionCandidates,
                 context.DietaryModes,
                 request.WeeklyBudget,
                 context.HouseholdFactor,
@@ -2210,7 +2241,10 @@ public sealed class AislePilotService : IAislePilotService
                 totalMealCount,
                 mealTypeSlots,
                 request.IncludeSpecialTreatMeal,
-                request.SelectedSpecialTreatCookDayIndex);
+                request.SelectedSpecialTreatCookDayIndex,
+                savedEnjoyedMealNames: savedEnjoyedMealNames,
+                enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -2220,7 +2254,7 @@ public sealed class AislePilotService : IAislePilotService
             try
             {
                 var templateMeals = FilterMeals(context.DietaryModes, context.DislikesOrAllergens, MealTemplates);
-                var combinedCandidates = aiMeals
+                var combinedCandidates = selectionCandidates
                     .Concat(templateMeals)
                     .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group.OrderBy(meal => meal.BaseCostForTwo).First())
@@ -2235,7 +2269,10 @@ public sealed class AislePilotService : IAislePilotService
                     totalMealCount,
                     mealTypeSlots,
                     includeSpecialTreatMeal: true,
-                    selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex);
+                    selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex,
+                    savedEnjoyedMealNames: savedEnjoyedMealNames,
+                    enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
             }
             catch (InvalidOperationException)
             {
@@ -2243,7 +2280,7 @@ public sealed class AislePilotService : IAislePilotService
                 try
                 {
                     selectedMeals = SelectMeals(
-                        aiMeals,
+                        selectionCandidates,
                         context.DietaryModes,
                         request.WeeklyBudget,
                         context.HouseholdFactor,
@@ -2251,7 +2288,10 @@ public sealed class AislePilotService : IAislePilotService
                         context.DislikesOrAllergens,
                         totalMealCount,
                         mealTypeSlots,
-                        includeSpecialTreatMeal: false);
+                        includeSpecialTreatMeal: false,
+                        savedEnjoyedMealNames: savedEnjoyedMealNames,
+                        enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
                 }
                 catch (InvalidOperationException)
                 {
@@ -2332,7 +2372,10 @@ public sealed class AislePilotService : IAislePilotService
                 context.DislikesOrAllergens,
                 totalMealCount,
                 mealTypeSlots,
-                includeSpecialTreatMeal: false);
+                includeSpecialTreatMeal: false,
+                savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
         }
         catch (InvalidOperationException)
         {
@@ -2578,7 +2621,10 @@ public sealed class AislePilotService : IAislePilotService
                 totalMealCount,
                 mealTypeSlots,
                 request.IncludeSpecialTreatMeal,
-                request.SelectedSpecialTreatCookDayIndex);
+                request.SelectedSpecialTreatCookDayIndex,
+                savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -2603,7 +2649,10 @@ public sealed class AislePilotService : IAislePilotService
                     totalMealCount,
                     mealTypeSlots,
                     includeSpecialTreatMeal: true,
-                    selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex);
+                    selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex,
+                    savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                    enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
             }
             catch (InvalidOperationException)
             {
@@ -2619,7 +2668,10 @@ public sealed class AislePilotService : IAislePilotService
                         context.DislikesOrAllergens,
                         totalMealCount,
                         mealTypeSlots,
-                        includeSpecialTreatMeal: false);
+                        includeSpecialTreatMeal: false,
+                        savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                        enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
                 }
                 catch (InvalidOperationException)
                 {
@@ -2682,7 +2734,10 @@ public sealed class AislePilotService : IAislePilotService
                 totalMealCount,
                 mealTypeSlots,
                 request.IncludeSpecialTreatMeal,
-                request.SelectedSpecialTreatCookDayIndex);
+                request.SelectedSpecialTreatCookDayIndex,
+                savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -2707,7 +2762,10 @@ public sealed class AislePilotService : IAislePilotService
                     totalMealCount,
                     mealTypeSlots,
                     includeSpecialTreatMeal: true,
-                    selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex);
+                    selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex,
+                    savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                    enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
             }
             catch (InvalidOperationException)
             {
@@ -2723,7 +2781,10 @@ public sealed class AislePilotService : IAislePilotService
                         context.DislikesOrAllergens,
                         totalMealCount,
                         mealTypeSlots,
-                        includeSpecialTreatMeal: false);
+                        includeSpecialTreatMeal: false,
+                        savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                        enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
                 }
                 catch (InvalidOperationException)
                 {
@@ -3819,6 +3880,9 @@ Return JSON only with this schema:
             SwapHistoryState = request.SwapHistoryState,
             IgnoredMealSlotIndexesCsv = request.IgnoredMealSlotIndexesCsv,
             PreferQuickMeals = request.PreferQuickMeals,
+            EnableSavedMealRepeats = request.EnableSavedMealRepeats,
+            SavedMealRepeatRatePercent = request.SavedMealRepeatRatePercent,
+            SavedEnjoyedMealNamesState = request.SavedEnjoyedMealNamesState,
             RequireCorePantryIngredients = request.RequireCorePantryIngredients,
             IncludeSpecialTreatMeal = request.IncludeSpecialTreatMeal,
             SelectedSpecialTreatCookDayIndex = request.SelectedSpecialTreatCookDayIndex,
@@ -4243,7 +4307,10 @@ Return JSON only with this schema:
             totalMealCount,
             mealTypeSlots,
             request.IncludeSpecialTreatMeal,
-            request.SelectedSpecialTreatCookDayIndex);
+            request.SelectedSpecialTreatCookDayIndex,
+            savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+            enableSavedMealRepeats: request.EnableSavedMealRepeats,
+            savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
 
         return BuildPlanFromMeals(
             request,
@@ -4287,7 +4354,10 @@ Return JSON only with this schema:
             totalMealCount,
             mealTypeSlots,
             request.IncludeSpecialTreatMeal,
-            request.SelectedSpecialTreatCookDayIndex);
+            request.SelectedSpecialTreatCookDayIndex,
+            savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+            enableSavedMealRepeats: request.EnableSavedMealRepeats,
+            savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
 
         return await BuildPlanFromMealsAsync(
             request,
@@ -4307,7 +4377,10 @@ Return JSON only with this schema:
         int requestedMealCount,
         IReadOnlyList<string> mealTypeSlots,
         bool includeSpecialTreatMeal,
-        int? selectedSpecialTreatCookDayIndex)
+        int? selectedSpecialTreatCookDayIndex,
+        IReadOnlySet<string>? savedEnjoyedMealNames = null,
+        bool enableSavedMealRepeats = false,
+        int savedMealRepeatRatePercent = DefaultSavedMealRepeatRatePercent)
     {
         if (mealSource.Count == 0)
         {
@@ -4330,6 +4403,11 @@ Return JSON only with this schema:
 
         var selected = new List<MealTemplate>(normalizedMealCount);
         var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
+        var normalizedSavedMealNames = savedEnjoyedMealNames is null || savedEnjoyedMealNames.Count == 0
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(savedEnjoyedMealNames, StringComparer.OrdinalIgnoreCase);
+        var normalizedSavedMealRepeatRatePercent = Math.Clamp(savedMealRepeatRatePercent, 10, 100);
+        var rotationSeed = Math.Abs((long)normalizedMealCount + 211L);
         for (var i = 0; i < normalizedMealCount; i++)
         {
             var slotMealType = resolvedMealTypeSlots[i % resolvedMealTypeSlots.Count];
@@ -4342,12 +4420,22 @@ Return JSON only with this schema:
                     $"No {slotMealType.ToLowerInvariant()} meals match the selected dietary modes and dislikes/allergens.");
             }
 
+            var shouldPreferSavedMealsForSlot =
+                enableSavedMealRepeats &&
+                normalizedSavedMealNames.Count > 0 &&
+                slotCompatibleCandidates.Any(meal => normalizedSavedMealNames.Contains(meal.Name)) &&
+                ShouldPreferSavedMealForSlot(
+                    rotationSeed,
+                    i,
+                    normalizedSavedMealRepeatRatePercent);
             var candidate = SelectCandidateForSlot(
                 slotCompatibleCandidates,
                 selected,
                 resolvedMealTypeSlots,
                 i,
-                normalizedMealCount);
+                normalizedMealCount,
+                preferredMealNames: normalizedSavedMealNames,
+                shouldPreferPreferredMeals: shouldPreferSavedMealsForSlot);
             selected.Add(candidate);
         }
 
@@ -6518,7 +6606,10 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         int requestedMealCount,
         IReadOnlyList<string>? mealTypeSlots = null,
         bool includeSpecialTreatMeal = false,
-        int? selectedSpecialTreatCookDayIndex = null)
+        int? selectedSpecialTreatCookDayIndex = null,
+        IReadOnlySet<string>? savedEnjoyedMealNames = null,
+        bool enableSavedMealRepeats = false,
+        int savedMealRepeatRatePercent = DefaultSavedMealRepeatRatePercent)
     {
         var candidates = FilterMeals(dietaryModes, dislikesOrAllergens, mealSource)
             .Select(meal => EnsureMealTypeSuitability(meal))
@@ -6557,6 +6648,10 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         var budgetSeed = (long)decimal.Truncate(Math.Abs(weeklyBudget) * 100m);
         var quickSeed = preferQuickMeals ? 17L : 0L;
         var rotationSeed = Math.Abs((long)daySeed + budgetSeed + quickSeed + normalizedMealCount);
+        var normalizedSavedMealRepeatRatePercent = Math.Clamp(savedMealRepeatRatePercent, 10, 100);
+        var normalizedSavedMealNames = savedEnjoyedMealNames is null || savedEnjoyedMealNames.Count == 0
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(savedEnjoyedMealNames, StringComparer.OrdinalIgnoreCase);
         var startIndex = (int)(rotationSeed % scoredCandidates.Count);
         var rotatedCandidates = scoredCandidates
             .Skip(startIndex)
@@ -6575,12 +6670,22 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
                     $"No {slotMealType.ToLowerInvariant()} meals match the selected dietary modes and dislikes/allergens.");
             }
 
+            var shouldPreferSavedMealsForSlot =
+                enableSavedMealRepeats &&
+                normalizedSavedMealNames.Count > 0 &&
+                slotCompatibleCandidates.Any(meal => normalizedSavedMealNames.Contains(meal.Name)) &&
+                ShouldPreferSavedMealForSlot(
+                    rotationSeed,
+                    i,
+                    normalizedSavedMealRepeatRatePercent);
             var candidate = SelectCandidateForSlot(
                 slotCompatibleCandidates,
                 selected,
                 resolvedMealTypeSlots,
                 i,
-                normalizedMealCount);
+                normalizedMealCount,
+                preferredMealNames: normalizedSavedMealNames,
+                shouldPreferPreferredMeals: shouldPreferSavedMealsForSlot);
             selected.Add(candidate);
         }
 
@@ -6600,6 +6705,22 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         }
 
         return selected;
+    }
+
+    private static bool ShouldPreferSavedMealForSlot(
+        long rotationSeed,
+        int slotIndex,
+        int savedMealRepeatRatePercent)
+    {
+        var normalizedRate = Math.Clamp(savedMealRepeatRatePercent, 10, 100);
+        if (normalizedRate >= 100)
+        {
+            return true;
+        }
+
+        var slotSeed = Math.Abs(rotationSeed + ((slotIndex + 1L) * 43L));
+        var percentile = (int)(slotSeed % 100L);
+        return percentile < normalizedRate;
     }
 
     private static IReadOnlyList<string> ResolveHardDietaryModes(IReadOnlyList<string> dietaryModes)
@@ -6652,6 +6773,35 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             .ToList();
 
         return strictFiltered;
+    }
+
+    private static IReadOnlySet<string> ParseSavedEnjoyedMealNamesState(string? savedEnjoyedMealNamesState)
+    {
+        if (string.IsNullOrWhiteSpace(savedEnjoyedMealNamesState))
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<string>>(savedEnjoyedMealNamesState, JsonOptions);
+            if (parsed is null || parsed.Count == 0)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return parsed
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name.Trim())
+                .Where(name => name.Length is > 0 and <= MaxSavedEnjoyedMealNameLength)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(MaxSavedEnjoyedMealCount)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     private static IReadOnlyList<MealTemplate> GetCompatibleAiPoolMeals(
@@ -7875,7 +8025,9 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         IReadOnlyList<MealTemplate> selectedMeals,
         IReadOnlyList<string> resolvedMealTypeSlots,
         int slotIndex,
-        int totalSlotCount)
+        int totalSlotCount,
+        IReadOnlySet<string>? preferredMealNames = null,
+        bool shouldPreferPreferredMeals = false)
     {
         if (slotCompatibleCandidates.Count == 0)
         {
@@ -7903,6 +8055,35 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         int GetSlotTypeRepeatCount(MealTemplate meal)
         {
             return usedSlotMealTypeCounts.TryGetValue(meal.Name, out var count) ? count : 0;
+        }
+
+        if (shouldPreferPreferredMeals && preferredMealNames is { Count: > 0 })
+        {
+            MealTemplate? FindPreferredCandidate(Func<MealTemplate, bool> predicate)
+            {
+                return slotCompatibleCandidates.FirstOrDefault(meal =>
+                    preferredMealNames.Contains(meal.Name) &&
+                    predicate(meal));
+            }
+
+            var preferredSavedCandidate = FindPreferredCandidate(meal =>
+                GetSlotTypeRepeatCount(meal) < maxRepeatsForSlotType &&
+                (!isDinnerSlot || !usedDinnerMealNames.Contains(meal.Name)) &&
+                (selectedMeals.Count == 0 ||
+                 !meal.Name.Equals(selectedMeals[^1].Name, StringComparison.OrdinalIgnoreCase)));
+            if (preferredSavedCandidate is not null)
+            {
+                return preferredSavedCandidate;
+            }
+
+            preferredSavedCandidate = FindPreferredCandidate(meal =>
+                !usedMealNames.Contains(meal.Name) &&
+                GetSlotTypeRepeatCount(meal) < maxRepeatsForSlotType &&
+                (!isDinnerSlot || !usedDinnerMealNames.Contains(meal.Name)));
+            if (preferredSavedCandidate is not null)
+            {
+                return preferredSavedCandidate;
+            }
         }
 
         var preferredCandidate = slotCompatibleCandidates.FirstOrDefault(meal =>
@@ -8169,6 +8350,13 @@ Return JSON only with this schema:
         var pantryText = string.IsNullOrWhiteSpace(request.PantryItems)
             ? "none supplied"
             : request.PantryItems!;
+        var savedEnjoyedMealNames = ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState);
+        var savedEnjoyedMealsText = savedEnjoyedMealNames.Count == 0
+            ? "none"
+            : string.Join(", ", savedEnjoyedMealNames.Take(8));
+        var savedMealRepeatPreference = request.EnableSavedMealRepeats
+            ? $"enabled ({Math.Clamp(request.SavedMealRepeatRatePercent, 10, 100)}%)"
+            : "disabled";
         var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, mealsPerDay);
         var mealTypePattern = string.Join(" -> ", resolvedMealTypeSlots);
 
@@ -8191,6 +8379,8 @@ Planner inputs:
 - Dietary requirements: {{strictModeText}}
 - Dislikes or allergens: {{dislikesText}}
 - Pantry items already available: {{pantryText}}
+- Saved enjoyed meal names: {{savedEnjoyedMealsText}}
+- Saved meal repeat preference: {{savedMealRepeatPreference}}
 
 Rules:
 - Return exactly {{requestedMealCount}} meals in `meals`.
@@ -8205,6 +8395,7 @@ Rules:
 - Use typical UK non-promo shelf prices (no loyalty-only offers, markdowns, or extreme bulk discounts).
 - Keep the full plan period roughly within the stated budget.
 - Avoid repeating the same meal in this plan.
+- If saved meal repeat preference is enabled and saved meals are compatible, include some of those meals where possible.
 - Respect dietary requirements and dislikes/allergens strictly.
 - Assume standard pantry basics are available (oil, salt, pepper, dried herbs) even if not listed.
 - If pantry hints are sparse or mismatched, still return viable meals and never return an empty `meals` array.

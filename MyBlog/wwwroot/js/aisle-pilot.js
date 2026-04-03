@@ -98,6 +98,9 @@
             targetForm.setAttribute("data-is-submitting", "true");
             submitButton.disabled = true;
             submitButton.setAttribute("aria-busy", "true");
+            if (targetForm.hasAttribute("data-skip-submit-loading")) {
+                return;
+            }
 
             const loadingDelayRaw = submitButton.dataset.loadingDelayMs ?? targetForm.dataset.loadingDelayMs ?? "";
             const loadingDelayMs = Number.parseInt(loadingDelayRaw, 10);
@@ -1199,6 +1202,9 @@
             const portionInput = form.querySelector("input[name='Request.PortionSize']");
             const dietaryInputs = Array.from(form.querySelectorAll("input[name='Request.DietaryModes']"));
             const quickMealsInput = form.querySelector("input[type='checkbox'][name='Request.PreferQuickMeals']");
+            const savedMealRepeatsInput = form.querySelector("input[type='checkbox'][name='Request.EnableSavedMealRepeats']");
+            const savedMealRepeatRateInput = form.querySelector("input[name='Request.SavedMealRepeatRatePercent']");
+            const savedMealRepeatRateField = form.querySelector("[data-saved-repeat-rate-field]");
             const exclusionsInput = form.querySelector("input[name='Request.DislikesOrAllergens']");
             const pantryInput = form.querySelector("textarea[name='Request.PantryItems']");
             const strictCoreInput = form.querySelector("input[type='checkbox'][name='Request.RequireCorePantryIngredients']");
@@ -1312,7 +1318,31 @@
                     return;
                 }
 
-                cookingSummary.textContent = quickMealsInput.checked ? "Quick meals on" : "Quick meals off";
+                const quickMealsSummary = quickMealsInput.checked ? "Quick meals on" : "Quick meals off";
+                const savedRepeatsSummary = (() => {
+                    if (!(savedMealRepeatsInput instanceof HTMLInputElement) || !savedMealRepeatsInput.checked) {
+                        return "Saved repeats off";
+                    }
+
+                    const parsedRepeatRate = Number.parseInt(savedMealRepeatRateInput?.value ?? "35", 10);
+                    const safeRepeatRate = Number.isInteger(parsedRepeatRate)
+                        ? Math.max(10, Math.min(100, parsedRepeatRate))
+                        : 35;
+                    return `Saved repeats ${safeRepeatRate}%`;
+                })();
+
+                cookingSummary.textContent = `${quickMealsSummary}, ${savedRepeatsSummary}`;
+            };
+
+            const syncSavedMealRepeatControls = () => {
+                const enabled = savedMealRepeatsInput instanceof HTMLInputElement && savedMealRepeatsInput.checked;
+                if (savedMealRepeatRateField instanceof HTMLElement) {
+                    savedMealRepeatRateField.hidden = !enabled;
+                }
+
+                if (savedMealRepeatRateInput instanceof HTMLInputElement) {
+                    savedMealRepeatRateInput.disabled = !enabled;
+                }
             };
 
             const updateExclusionSummary = () => {
@@ -1389,6 +1419,16 @@
                 if (quickMealsInput instanceof HTMLInputElement) {
                     quickMealsInput.addEventListener("change", updateCookingSummary);
                 }
+                if (savedMealRepeatsInput instanceof HTMLInputElement) {
+                    savedMealRepeatsInput.addEventListener("change", () => {
+                        syncSavedMealRepeatControls();
+                        updateCookingSummary();
+                    });
+                }
+                if (savedMealRepeatRateInput instanceof HTMLInputElement) {
+                    savedMealRepeatRateInput.addEventListener("input", updateCookingSummary);
+                    savedMealRepeatRateInput.addEventListener("change", updateCookingSummary);
+                }
                 if (exclusionsInput instanceof HTMLInputElement) {
                     exclusionsInput.addEventListener("input", updateExclusionSummary);
                     exclusionsInput.addEventListener("change", updateExclusionSummary);
@@ -1438,6 +1478,7 @@
 
             syncSpecialTreatCookDayOptions();
             syncSpecialTreatCookDayVisibility();
+            syncSavedMealRepeatControls();
             updateServingSummary();
             updateDietarySummary();
             updateCookingSummary();
