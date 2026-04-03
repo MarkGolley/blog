@@ -42,8 +42,15 @@ public class AislePilotController(
     [HttpPost("")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Index(AislePilotPageViewModel pageModel, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        AislePilotPageViewModel pageModel,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
     {
+        var previousRequest = NormalizeRequest(TryReadSavedSetupState() ?? new AislePilotRequestModel
+        {
+            MealsPerDay = DefaultMealsPerDay
+        });
         var request = NormalizeRequest(pageModel.Request);
         PersistSetupState(request);
         var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
@@ -56,7 +63,34 @@ public class AislePilotController(
 
         try
         {
-            var result = await aislePilotService.BuildPlanAsync(request, cancellationToken);
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+            var shouldRecalculateCurrentPlan =
+                resolvedCurrentPlanMealNames is { Count: > 0 } &&
+                ShouldRecalculateCurrentPlan(previousRequest, request);
+
+            AislePilotPlanResultViewModel result;
+            if (shouldRecalculateCurrentPlan)
+            {
+                try
+                {
+                    result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                        request,
+                        resolvedCurrentPlanMealNames!,
+                        cancellationToken);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogInformation(
+                        ex,
+                        "AislePilot could not recalculate plan from current meals. Falling back to full regeneration.");
+                    result = await aislePilotService.BuildPlanAsync(request, cancellationToken);
+                }
+            }
+            else
+            {
+                result = await aislePilotService.BuildPlanAsync(request, cancellationToken);
+            }
+
             SyncRequestWithResult(request, result);
             RefreshResultModelState();
             PersistSetupState(request);
@@ -76,6 +110,78 @@ public class AislePilotController(
                 "Plan regeneration hit a temporary issue. Please retry in a few seconds.");
             return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
+    }
+
+    private static bool ShouldRecalculateCurrentPlan(
+        AislePilotRequestModel previousRequest,
+        AislePilotRequestModel nextRequest)
+    {
+        if (!HasSameMealCompatibilitySettings(previousRequest, nextRequest))
+        {
+            return false;
+        }
+
+        return previousRequest.HouseholdSize != nextRequest.HouseholdSize ||
+               previousRequest.WeeklyBudget != nextRequest.WeeklyBudget ||
+               !string.Equals(
+                   previousRequest.PortionSize,
+                   nextRequest.PortionSize,
+                   StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(
+                   previousRequest.LeftoverCookDayIndexesCsv,
+                   nextRequest.LeftoverCookDayIndexesCsv,
+                   StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(
+                   previousRequest.IgnoredMealSlotIndexesCsv,
+                   nextRequest.IgnoredMealSlotIndexesCsv,
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasSameMealCompatibilitySettings(
+        AislePilotRequestModel previousRequest,
+        AislePilotRequestModel nextRequest)
+    {
+        return string.Equals(previousRequest.Supermarket, nextRequest.Supermarket, StringComparison.OrdinalIgnoreCase) &&
+               previousRequest.PlanDays == nextRequest.PlanDays &&
+               previousRequest.CookDays == nextRequest.CookDays &&
+               previousRequest.MealsPerDay == nextRequest.MealsPerDay &&
+               AreEquivalentSelections(previousRequest.SelectedMealTypes, nextRequest.SelectedMealTypes) &&
+               AreEquivalentSelections(previousRequest.DietaryModes, nextRequest.DietaryModes) &&
+               string.Equals(
+                   previousRequest.DislikesOrAllergens,
+                   nextRequest.DislikesOrAllergens,
+                   StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(
+                   previousRequest.CustomAisleOrder,
+                   nextRequest.CustomAisleOrder,
+                   StringComparison.OrdinalIgnoreCase) &&
+               previousRequest.PreferQuickMeals == nextRequest.PreferQuickMeals &&
+               previousRequest.IncludeSpecialTreatMeal == nextRequest.IncludeSpecialTreatMeal &&
+               previousRequest.SelectedSpecialTreatCookDayIndex == nextRequest.SelectedSpecialTreatCookDayIndex &&
+               previousRequest.IncludeDessertAddOn == nextRequest.IncludeDessertAddOn &&
+               string.Equals(
+                   previousRequest.SelectedDessertAddOnName,
+                   nextRequest.SelectedDessertAddOnName,
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool AreEquivalentSelections(
+        IReadOnlyList<string>? left,
+        IReadOnlyList<string>? right)
+    {
+        var leftValues = (left ?? [])
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var rightValues = (right ?? [])
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return leftValues.Count == rightValues.Count &&
+               leftValues.All(value => rightValues.Contains(value, StringComparer.OrdinalIgnoreCase));
     }
 
     [HttpPost("rebalance-budget")]
@@ -518,9 +624,16 @@ public class AislePilotController(
 
     private static void SyncRequestWithResult(AislePilotRequestModel request, AislePilotPlanResultViewModel result)
     {
-        request.SelectedDessertAddOnName = result.IncludeDessertAddOn
-            ? result.DessertAddOnName
-            : string.Empty;
+        if (!request.IncludeDessertAddOn)
+        {
+            request.SelectedDessertAddOnName = string.Empty;
+            return;
+        }
+
+        if (result.IncludeDessertAddOn && !string.IsNullOrWhiteSpace(result.DessertAddOnName))
+        {
+            request.SelectedDessertAddOnName = result.DessertAddOnName;
+        }
     }
 
     private void RefreshResultModelState()

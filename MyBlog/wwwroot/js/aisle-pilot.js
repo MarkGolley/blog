@@ -2187,7 +2187,28 @@
 
         const isHidden = setupPanel.hasAttribute("hidden");
         setupToggleButtons.forEach(button => {
-            button.textContent = isHidden ? "Edit settings" : "Hide settings";
+            const srOnlyLabel = button.querySelector(".sr-only");
+            const collapsedLabel = button.dataset.setupToggleCollapsedLabel
+                || srOnlyLabel?.textContent?.trim()
+                || button.getAttribute("aria-label")
+                || button.textContent?.trim()
+                || "Edit settings";
+            const expandedLabel = button.dataset.setupToggleExpandedLabel || "Hide settings";
+            const nextLabel = isHidden ? collapsedLabel : expandedLabel;
+
+            button.dataset.setupToggleCollapsedLabel = collapsedLabel;
+            button.dataset.setupToggleExpandedLabel = expandedLabel;
+
+            if (srOnlyLabel) {
+                srOnlyLabel.textContent = nextLabel;
+            } else {
+                button.textContent = nextLabel;
+            }
+
+            button.setAttribute("aria-label", nextLabel);
+            if (button.hasAttribute("title")) {
+                button.setAttribute("title", nextLabel);
+            }
             button.setAttribute("aria-expanded", isHidden ? "false" : "true");
         });
     };

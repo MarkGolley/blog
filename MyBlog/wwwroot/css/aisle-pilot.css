@@ -197,6 +197,45 @@ html.aislepilot-restore-pending .aislepilot-app {
     stroke-linejoin: round;
 }
 
+.aislepilot-window-tab.is-icon-only,
+.aislepilot-overview-regenerate-btn.is-icon-only,
+.aislepilot-edit-setup-btn.is-icon-only {
+    padding: 0.36rem !important;
+}
+
+.aislepilot-overview-regenerate-btn.is-icon-only,
+.aislepilot-edit-setup-btn.is-icon-only {
+    width: 2.2rem !important;
+    min-width: 2.2rem !important;
+    justify-content: center !important;
+}
+
+.aislepilot-window-tab.is-icon-only .aislepilot-tab-label,
+.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-btn-label,
+.aislepilot-edit-setup-btn.is-icon-only .aislepilot-btn-label {
+    gap: 0;
+}
+
+.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-btn-label,
+.aislepilot-edit-setup-btn.is-icon-only .aislepilot-btn-label {
+    font-size: 0 !important;
+}
+
+.aislepilot-window-tab.is-icon-only .aislepilot-symbol-glyph,
+.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-symbol-glyph,
+.aislepilot-edit-setup-btn.is-icon-only .aislepilot-symbol-glyph {
+    width: 1.42rem;
+    height: 1.42rem;
+}
+
+.aislepilot-window-tab.is-icon-only .aislepilot-symbol-glyph svg,
+.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-symbol-glyph svg,
+.aislepilot-edit-setup-btn.is-icon-only .aislepilot-symbol-glyph svg {
+    width: 0.96rem;
+    height: 0.96rem;
+    stroke-width: 2.15;
+}
+
 .aislepilot-window-shell {
     display: grid;
     gap: 0.62rem;
@@ -273,6 +312,23 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-color: rgba(255, 255, 255, 0.48);
     background: rgba(255, 255, 255, 0.18);
     color: #fff;
+}
+
+.aislepilot-overview-regenerate-btn .aislepilot-symbol-glyph,
+.aislepilot-edit-setup-btn .aislepilot-symbol-glyph {
+    border-color: rgba(255, 255, 255, 0.52);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
+.aislepilot-edit-setup-btn .aislepilot-symbol-glyph {
+    border-color: #fff;
+    background: #fff;
+    color: var(--brand-deep);
+}
+
+.aislepilot-edit-setup-btn .aislepilot-symbol-glyph svg {
+    stroke-width: 2.4;
 }
 
 .aislepilot-window-viewport {
@@ -2085,6 +2141,17 @@ html.aislepilot-restore-pending .aislepilot-app {
     gap: 0.24rem;
 }
 
+.aislepilot-card-primary-row {
+    display: flex;
+    align-items: center;
+    gap: 0.34rem;
+    flex-wrap: wrap;
+}
+
+.aislepilot-card-primary-row + .aislepilot-card-compact-meta {
+    margin-top: 0.24rem;
+}
+
 .aislepilot-card-meta-pill {
     display: inline-flex;
     align-items: center;
@@ -2144,6 +2211,32 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-meal-details > summary::-webkit-details-marker {
     display: none;
+}
+
+.aislepilot-card-action-row.is-inline-actions {
+    margin-top: 0;
+    margin-left: auto;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.aislepilot-card-action-row.is-inline-actions .aislepilot-meal-details {
+    flex: 0 0 auto;
+}
+
+.aislepilot-card-action-row.is-inline-actions .aislepilot-card-action-inline {
+    margin-left: 0;
+}
+
+.aislepilot-meal-details > summary.is-icon-only {
+    width: 1.9rem;
+    min-width: 1.9rem;
+    padding: 0;
+    line-height: 1;
+}
+
+.aislepilot-meal-details > summary.is-icon-only .aislepilot-btn-label {
+    gap: 0;
 }
 
 .aislepilot-card-reason {
@@ -2455,6 +2548,12 @@ html.aislepilot-restore-pending .aislepilot-app {
         width: 100%;
     }
 
+    .aislepilot-overview-regenerate-btn.is-icon-only,
+    .aislepilot-edit-setup-btn.is-icon-only {
+        width: 2.2rem !important;
+        min-width: 2.2rem !important;
+    }
+
     .aislepilot-leftover-editor-head {
         flex-direction: column;
         align-items: flex-start;
@@ -2569,6 +2668,14 @@ html.aislepilot-restore-pending .aislepilot-app {
     .aislepilot-card-action-inline {
         position: static;
         margin-left: auto;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions .aislepilot-meal-details {
+        flex: 0 0 auto;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions .aislepilot-card-action-inline {
+        margin-left: 0;
     }
 }
 

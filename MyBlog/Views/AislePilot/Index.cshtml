@@ -389,6 +389,15 @@
             <input type="hidden" name="SetupMode" value="@defaultSetupMode" data-setup-mode-value />
             <input asp-for="Request.PantrySuggestionHistoryState" type="hidden" />
             <input asp-for="Request.SelectedDessertAddOnName" type="hidden" />
+            @if (hasResult && Model.Result is not null)
+            {
+                foreach (var mealName in Model.Result.MealPlan
+                             .Select(meal => meal.MealName)
+                             .Where(mealName => !string.IsNullOrWhiteSpace(mealName)))
+                {
+                    <input type="hidden" name="currentPlanMealNames" value="@mealName" />
+                }
+            }
             @if (!hasModelErrors)
             {
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>

@@ -9,6 +9,15 @@ public static class QuantityDisplayFormatter
         "jar",
         "jars"
     };
+    private static readonly Dictionary<string, decimal> RecipeContainerUnitMillilitres = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["pot"] = 300m,
+        ["pots"] = 300m,
+        ["bottle"] = 500m,
+        ["bottles"] = 500m,
+        ["jar"] = 190m,
+        ["jars"] = 190m
+    };
 
     private static readonly HashSet<string> WholePurchaseUnits = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -75,6 +84,16 @@ public static class QuantityDisplayFormatter
             return FormatKg(quantity);
         }
 
+        if (RecipeContainerUnitMillilitres.TryGetValue(normalizedUnit, out var millilitresPerUnit))
+        {
+            var totalMillilitres = decimal.Round(
+                quantity * millilitresPerUnit,
+                0,
+                MidpointRounding.AwayFromZero);
+            var roundedUpMillilitres = RoundUpToNearest(totalMillilitres, 5m);
+            return $"{roundedUpMillilitres:0} ml";
+        }
+
         var roundedQuantity = decimal.Round(quantity, 2, MidpointRounding.AwayFromZero);
         return string.IsNullOrWhiteSpace(normalizedUnit)
             ? $"{roundedQuantity:0.##}"
@@ -116,5 +135,15 @@ public static class QuantityDisplayFormatter
     private static string ToDisplayUnit(string normalizedUnit, int quantity)
     {
         return ToDisplayUnit(normalizedUnit, (decimal)quantity);
+    }
+
+    private static decimal RoundUpToNearest(decimal value, decimal step)
+    {
+        if (step <= 0m)
+        {
+            return value;
+        }
+
+        return decimal.Ceiling(value / step) * step;
     }
 }
