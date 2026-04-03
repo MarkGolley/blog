@@ -951,6 +951,8 @@
                         ));
                     case "meal-types":
                         return getSelectedMealTypes().length > 0;
+                    case "special-options":
+                        return true;
                     default:
                         return false;
                 }
