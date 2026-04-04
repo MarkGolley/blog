@@ -2198,7 +2198,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-card-primary-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.34rem;
     flex-wrap: wrap;
 }
@@ -2274,6 +2274,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin-left: auto;
     flex-wrap: nowrap;
     align-items: center;
+    align-content: center;
+    align-self: center;
     justify-content: flex-end;
 }
 

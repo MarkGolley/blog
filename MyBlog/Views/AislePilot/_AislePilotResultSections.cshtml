@@ -544,7 +544,7 @@
                                                         @meal.EstimatedPrepMinutes mins
                                                     </span>
                                                     <div class="aislepilot-card-action-row is-inline-actions">
-                                                        <details class="aislepilot-meal-details">
+                                                        <details class="aislepilot-meal-details" data-inline-details-toggle>
                                                             <summary class="is-icon-only"
                                                                      aria-label="View details"
                                                                      title="View details">
@@ -558,38 +558,7 @@
                                                                     <span class="sr-only">View details</span>
                                                                 </span>
                                                             </summary>
-                                                            <div class="aislepilot-meal-details-panel">
-                                                                <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
-                                                                <div class="aislepilot-meal-details-grid">
-                                                                    <div class="aislepilot-nutrition-details">
-                                                                        <p class="aislepilot-card-kicker">Est. calories + macros</p>
-                                                                        <ul class="aislepilot-nutrition-list">
-                                                                            <li>@meal.CaloriesPerServing kcal per serving</li>
-                                                                            <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
-                                                                            <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
-                                                                            <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
-                                                                        </ul>
-                                                                    </div>
-                                                                    <div class="aislepilot-recipe-details">
-                                                                        <p class="aislepilot-card-kicker">Ingredients</p>
-                                                                        <ul class="case-list">
-                                                                            @foreach (var ingredientLine in meal.IngredientLines)
-                                                                            {
-                                                                                <li>@ingredientLine</li>
-                                                                            }
-                                                                        </ul>
-                                                                        <p class="aislepilot-card-kicker">Method</p>
-                                                                        <ol class="case-list">
-                                                                            @foreach (var step in meal.RecipeSteps)
-                                                                            {
-                                                                                <li>@step</li>
-                                                                            }
-                                                                        </ol>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
                                                         </details>
-
                                                         <form method="post"
                                                               action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
                                                               class="aislepilot-swap-form aislepilot-card-action-inline"
@@ -687,6 +656,36 @@
                                                         </form>
                                                     </div>
                                                 </div>
+                                                <div class="aislepilot-meal-details-panel" data-inline-details-panel hidden>
+                                                    <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
+                                                    <div class="aislepilot-meal-details-grid">
+                                                        <div class="aislepilot-nutrition-details">
+                                                            <p class="aislepilot-card-kicker">Est. calories + macros</p>
+                                                            <ul class="aislepilot-nutrition-list">
+                                                                <li>@meal.CaloriesPerServing kcal per serving</li>
+                                                                <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
+                                                                <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
+                                                                <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
+                                                            </ul>
+                                                        </div>
+                                                        <div class="aislepilot-recipe-details">
+                                                            <p class="aislepilot-card-kicker">Ingredients</p>
+                                                            <ul class="case-list">
+                                                                @foreach (var ingredientLine in meal.IngredientLines)
+                                                                {
+                                                                    <li>@ingredientLine</li>
+                                                                }
+                                                            </ul>
+                                                            <p class="aislepilot-card-kicker">Method</p>
+                                                            <ol class="case-list">
+                                                                @foreach (var step in meal.RecipeSteps)
+                                                                {
+                                                                    <li>@step</li>
+                                                                }
+                                                            </ol>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 @if (dayGroup.LeftoverDaysCovered > 0 || (meal.IsSpecialTreat && !isIgnored))
                                                 {
                                                     <div class="aislepilot-card-compact-meta">
@@ -747,7 +746,7 @@
                                             <div class="aislepilot-card-primary-row">
                                                 <span class="aislepilot-card-meta-pill">Optional add-on</span>
                                                 <div class="aislepilot-card-action-row is-inline-actions">
-                                                    <details class="aislepilot-meal-details">
+                                                    <details class="aislepilot-meal-details" data-inline-details-toggle>
                                                         <summary class="is-icon-only"
                                                                  aria-label="View details"
                                                                  title="View details">
@@ -761,34 +760,6 @@
                                                                 <span class="sr-only">View details</span>
                                                             </span>
                                                         </summary>
-                                                        <div class="aislepilot-meal-details-panel">
-                                                            <p class="aislepilot-card-meta aislepilot-card-reason">Dessert add-on for a more indulgent week.</p>
-                                                            <div class="aislepilot-meal-details-grid">
-                                                                <div class="aislepilot-recipe-details">
-                                                                    <p class="aislepilot-card-kicker">Ingredients</p>
-                                                                    <ul class="case-list">
-                                                                        @if (result.DessertAddOnIngredientLines.Count == 0)
-                                                                        {
-                                                                            <li>Ingredients are included in your shopping list.</li>
-                                                                        }
-                                                                        else
-                                                                        {
-                                                                            @foreach (var ingredientLine in result.DessertAddOnIngredientLines)
-                                                                            {
-                                                                                <li>@ingredientLine</li>
-                                                                            }
-                                                                        }
-                                                                    </ul>
-                                                                    <p class="aislepilot-card-kicker">Method</p>
-                                                                    <ol class="case-list">
-                                                                        <li>Heat oven to 180C and line a tray-bake tin.</li>
-                                                                        <li>Cream butter and sugar, then beat in eggs.</li>
-                                                                        <li>Fold in flour and cocoa, then spread mixture in the tin.</li>
-                                                                        <li>Bake until springy and cool before slicing.</li>
-                                                                    </ol>
-                                                                </div>
-                                                            </div>
-                                                        </div>
                                                     </details>
                                                     <form method="post"
                                                           action="@Url.Action("SwapDessert", "AislePilot")#aislepilot-meals"
@@ -817,6 +788,34 @@
                                                             </span>
                                                         </button>
                                                     </form>
+                                                </div>
+                                            </div>
+                                            <div class="aislepilot-meal-details-panel" data-inline-details-panel hidden>
+                                                <p class="aislepilot-card-meta aislepilot-card-reason">Dessert add-on for a more indulgent week.</p>
+                                                <div class="aislepilot-meal-details-grid">
+                                                    <div class="aislepilot-recipe-details">
+                                                        <p class="aislepilot-card-kicker">Ingredients</p>
+                                                        <ul class="case-list">
+                                                            @if (result.DessertAddOnIngredientLines.Count == 0)
+                                                            {
+                                                                <li>Ingredients are included in your shopping list.</li>
+                                                            }
+                                                            else
+                                                            {
+                                                                @foreach (var ingredientLine in result.DessertAddOnIngredientLines)
+                                                                {
+                                                                    <li>@ingredientLine</li>
+                                                                }
+                                                            }
+                                                        </ul>
+                                                        <p class="aislepilot-card-kicker">Method</p>
+                                                        <ol class="case-list">
+                                                            <li>Heat oven to 180C and line a tray-bake tin.</li>
+                                                            <li>Cream butter and sugar, then beat in eggs.</li>
+                                                            <li>Fold in flour and cocoa, then spread mixture in the tin.</li>
+                                                            <li>Bake until springy and cool before slicing.</li>
+                                                        </ol>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </section>

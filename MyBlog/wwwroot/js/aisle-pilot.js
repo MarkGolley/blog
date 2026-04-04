@@ -2814,6 +2814,43 @@
         });
     };
 
+    const wireInlineDetailsPanels = scope => {
+        const toggles = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-inline-details-toggle]"))
+            : Array.from(document.querySelectorAll("[data-inline-details-toggle]"));
+
+        toggles.forEach(toggle => {
+            if (!(toggle instanceof HTMLDetailsElement) || toggle.dataset.inlineDetailsWired === "true") {
+                return;
+            }
+
+            const mealPanel = toggle.closest("[data-day-meal-panel]");
+            if (!(mealPanel instanceof HTMLElement)) {
+                return;
+            }
+
+            const detailsPanel = mealPanel.querySelector("[data-inline-details-panel]");
+            if (!(detailsPanel instanceof HTMLElement)) {
+                return;
+            }
+
+            toggle.dataset.inlineDetailsWired = "true";
+
+            const syncDetailsPanel = () => {
+                if (toggle.open) {
+                    detailsPanel.removeAttribute("hidden");
+                } else {
+                    detailsPanel.setAttribute("hidden", "hidden");
+                }
+
+                updateViewportHeight(true);
+            };
+
+            toggle.addEventListener("toggle", syncDetailsPanel);
+            syncDetailsPanel();
+        });
+    };
+
     const wireDayMealCards = scope => {
         const cards = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-day-meal-card]"))
@@ -3075,6 +3112,7 @@
         wireSetupToggleHandlers(document);
         wireOverviewToggleHandlers(document);
         wireLeftoverPlanner(document);
+        wireInlineDetailsPanels(document);
         wireDayMealCards(document);
         wireAjaxSwapHandlers(document);
         wireNotesExportButtons(document);
@@ -3236,6 +3274,7 @@
     wireOverviewToggleHandlers(document);
     wirePreserveScrollHandlers(document);
     wireLeftoverPlanner(document);
+    wireInlineDetailsPanels(document);
     wireDayMealCards(document);
     wireAjaxSwapHandlers(document);
     startMealImagePolling();
