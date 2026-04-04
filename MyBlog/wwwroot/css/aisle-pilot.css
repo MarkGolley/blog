@@ -2084,9 +2084,12 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-day-meal-panel {
     flex: 0 0 100%;
-    min-width: 100%;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     position: relative;
     overflow: hidden;
+    box-sizing: border-box;
     transition: filter 0.18s ease;
 }
 
@@ -2201,6 +2204,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     align-items: flex-start;
     gap: 0.34rem;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .aislepilot-card-primary-row + .aislepilot-card-compact-meta {
