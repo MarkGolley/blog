@@ -145,6 +145,61 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotViewDetails_KeepsActionRowStable()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var mealTimePill = activeMealPanel.Locator(".aislepilot-card-primary-row .aislepilot-card-meta-pill").First;
+        var inlineActionRow = activeMealPanel.Locator(".aislepilot-card-action-row.is-inline-actions").First;
+        var viewSummaryButton = activeMealPanel.Locator("[data-inline-details-toggle] > summary").First;
+        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
+
+        await viewSummaryButton.ScrollIntoViewIfNeededAsync();
+
+        var mealTimePillBefore = await mealTimePill.BoundingBoxAsync();
+        var inlineActionRowBefore = await inlineActionRow.BoundingBoxAsync();
+        Assert.NotNull(mealTimePillBefore);
+        Assert.NotNull(inlineActionRowBefore);
+
+        await viewSummaryButton.ClickAsync();
+        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var mealTimePillAfter = await mealTimePill.BoundingBoxAsync();
+        var inlineActionRowAfter = await inlineActionRow.BoundingBoxAsync();
+        Assert.NotNull(mealTimePillAfter);
+        Assert.NotNull(inlineActionRowAfter);
+
+        var actionRowShift = Math.Abs(inlineActionRowAfter!.Y - inlineActionRowBefore!.Y);
+        var mealTimeShift = Math.Abs(mealTimePillAfter!.Y - mealTimePillBefore!.Y);
+
+        Assert.True(
+            actionRowShift <= 2.5,
+            $"Expected action icons to remain fixed when details open. BeforeY={inlineActionRowBefore.Y}, AfterY={inlineActionRowAfter.Y}, Delta={actionRowShift}.");
+        Assert.True(
+            mealTimeShift <= 2.5,
+            $"Expected meal time pill to remain fixed when details open. BeforeY={mealTimePillBefore.Y}, AfterY={mealTimePillAfter.Y}, Delta={mealTimeShift}.");
+    }
+
+    [Fact]
     public async Task Desktop_LoginLogoutLogin_DoesNotReturnBadRequest()
     {
         if (!IsE2EEnabled())
