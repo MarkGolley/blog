@@ -1006,6 +1006,20 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task Index_Get_RendersSavedMealRepeatStrengthSliderWithPlanBasicsFrameStyle()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Matches(
+            new Regex(
+                @"<div[^>]*(?:class=""[^""]*aislepilot-slider-field--plan-basics-frame[^""]*""[^>]*data-saved-repeat-rate-field|data-saved-repeat-rate-field[^>]*class=""[^""]*aislepilot-slider-field--plan-basics-frame[^""]*"")",
+                RegexOptions.IgnoreCase),
+            html);
+    }
+
+    [Fact]
     public async Task Index_Get_RendersMealsPerDayControl_DefaultingToThree()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -1047,9 +1061,37 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains("data-day-meal-tab", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(">Dinner<", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(">Lunch<", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(">Breakfast<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Lunch<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Dinner<", html, StringComparison.OrdinalIgnoreCase);
+
+        var mealTabsMatches = Regex.Matches(
+            html,
+            @"<div class=""aislepilot-day-meal-tabs""[^>]*>(?<tabs>[\s\S]*?)</div>",
+            RegexOptions.IgnoreCase);
+        Assert.True(mealTabsMatches.Count > 0, "Expected meal slot tab list to be rendered.");
+
+        string tabsMarkup = string.Empty;
+        foreach (Match match in mealTabsMatches)
+        {
+            var candidate = match.Groups["tabs"].Value;
+            if (Regex.IsMatch(candidate, @">\s*Breakfast\s*<", RegexOptions.IgnoreCase) &&
+                Regex.IsMatch(candidate, @">\s*Lunch\s*<", RegexOptions.IgnoreCase) &&
+                Regex.IsMatch(candidate, @">\s*Dinner\s*<", RegexOptions.IgnoreCase))
+            {
+                tabsMarkup = candidate;
+                break;
+            }
+        }
+
+        Assert.False(string.IsNullOrWhiteSpace(tabsMarkup), "Expected at least one meal tab list to include Breakfast, Lunch, and Dinner.");
+        var breakfastMatch = Regex.Match(tabsMarkup, @">\s*Breakfast\s*<", RegexOptions.IgnoreCase);
+        var lunchMatch = Regex.Match(tabsMarkup, @">\s*Lunch\s*<", RegexOptions.IgnoreCase);
+        var dinnerMatch = Regex.Match(tabsMarkup, @">\s*Dinner\s*<", RegexOptions.IgnoreCase);
+        Assert.True(breakfastMatch.Success && lunchMatch.Success && dinnerMatch.Success, "Expected Breakfast, Lunch, and Dinner tabs.");
+        Assert.True(
+            breakfastMatch.Index < lunchMatch.Index && lunchMatch.Index < dinnerMatch.Index,
+            $"Expected meal tabs in Breakfast -> Lunch -> Dinner order, but indexes were {breakfastMatch.Index}, {lunchMatch.Index}, {dinnerMatch.Index}.");
     }
 
     [Fact]

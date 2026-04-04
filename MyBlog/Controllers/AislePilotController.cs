@@ -24,7 +24,7 @@ public class AislePilotController(
     private const int MaxIgnoredMealSlotIndex = 20;
     private const int MaxSavedEnjoyedMealNames = 32;
     private const int MaxSavedMealNameLength = 90;
-    private static readonly string[] MealTypeSlotOrder = ["Dinner", "Lunch", "Breakfast"];
+    private static readonly string[] MealTypeSlotOrder = ["Breakfast", "Lunch", "Dinner"];
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -884,8 +884,8 @@ public class AislePilotController(
         return safeMealsPerDay switch
         {
             1 => ["Dinner"],
-            2 => ["Dinner", "Lunch"],
-            _ => ["Dinner", "Lunch", "Breakfast"]
+            2 => ["Lunch", "Dinner"],
+            _ => ["Breakfast", "Lunch", "Dinner"]
         };
     }
 

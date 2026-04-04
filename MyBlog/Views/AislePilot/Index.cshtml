@@ -92,7 +92,7 @@
         })
         .Where(type => type.Length > 0)
         .Distinct(StringComparer.OrdinalIgnoreCase)
-        .OrderBy(type => type.Equals("Dinner", StringComparison.OrdinalIgnoreCase)
+        .OrderBy(type => type.Equals("Breakfast", StringComparison.OrdinalIgnoreCase)
             ? 0
             : type.Equals("Lunch", StringComparison.OrdinalIgnoreCase)
                 ? 1
@@ -103,8 +103,8 @@
         selectedMealTypes = Math.Clamp(Model.Request.MealsPerDay, 1, 3) switch
         {
             1 => ["Dinner"],
-            2 => ["Dinner", "Lunch"],
-            _ => ["Dinner", "Lunch", "Breakfast"]
+            2 => ["Lunch", "Dinner"],
+            _ => ["Breakfast", "Lunch", "Dinner"]
         };
     }
 
@@ -528,7 +528,7 @@
                             <input asp-for="Request.EnableSavedMealRepeats" type="checkbox" />
                             <span>Repeat saved meals sometimes</span>
                         </label>
-                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact"
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-slider-field--plan-basics-frame"
                              data-saved-repeat-rate-field
                              hidden="@(!savedMealRepeatsEnabled)">
                             <label asp-for="Request.SavedMealRepeatRatePercent">Repeat strength</label>

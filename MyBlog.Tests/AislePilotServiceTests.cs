@@ -276,7 +276,7 @@ public class AislePilotServiceTests
     }
 
     [Fact]
-    public void BuildPlan_WithThreeMealsPerDay_ReturnsBreakfastLunchDinnerPerCookDay()
+    public void BuildPlan_WithThreeMealsPerDay_ReturnsMealsInBreakfastLunchDinnerOrderPerCookDay()
     {
         var request = new AislePilotRequestModel
         {
@@ -296,7 +296,7 @@ public class AislePilotServiceTests
         Assert.Equal(9, result.MealPlan.Count);
         Assert.Equal(3, groupedByDay.Count);
         Assert.All(groupedByDay, mealTypes =>
-            Assert.Equal(["Dinner", "Lunch", "Breakfast"], mealTypes));
+            Assert.Equal(["Breakfast", "Lunch", "Dinner"], mealTypes));
     }
 
     [Fact]
@@ -409,7 +409,7 @@ public class AislePilotServiceTests
             PlanDays = 7,
             CookDays = 7,
             MealsPerDay = 3,
-            SelectedMealTypes = ["Dinner", "Lunch", "Breakfast"],
+            SelectedMealTypes = ["Breakfast", "Lunch", "Dinner"],
             EnableSavedMealRepeats = true,
             SavedMealRepeatRatePercent = 100,
             SavedEnjoyedMealNamesState = JsonSerializer.Serialize(new[] { savedMealName })
@@ -686,7 +686,7 @@ public class AislePilotServiceTests
     }
 
     [Fact]
-    public void BuildPlan_WithDinnerAndLunchSlots_ReturnsDinnerThenLunchPerCookDay()
+    public void BuildPlan_WithLunchAndDinnerSlots_ReturnsLunchThenDinnerPerCookDay()
     {
         var request = new AislePilotRequestModel
         {
@@ -705,7 +705,7 @@ public class AislePilotServiceTests
 
         Assert.Equal(2, result.MealsPerDay);
         Assert.Equal(4, result.MealPlan.Count);
-        Assert.All(groupedByDay, mealTypes => Assert.Equal(["Dinner", "Lunch"], mealTypes));
+        Assert.All(groupedByDay, mealTypes => Assert.Equal(["Lunch", "Dinner"], mealTypes));
     }
 
     [Fact]
@@ -1912,7 +1912,7 @@ public class AislePilotServiceTests
             PlanDays = 5,
             CookDays = 5,
             MealsPerDay = 2,
-            SelectedMealTypes = ["Dinner", "Lunch"],
+            SelectedMealTypes = ["Lunch", "Dinner"],
             DietaryModes = ["Balanced"],
             IncludeSpecialTreatMeal = true
         };

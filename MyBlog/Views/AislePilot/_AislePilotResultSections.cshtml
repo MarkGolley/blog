@@ -75,7 +75,7 @@
     var weekDayShortLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
     var planWeekDayNames = weekDayNames.Take(planDays).ToArray();
     var planWeekDayShortLabels = weekDayShortLabels.Take(planDays).ToArray();
-    var mealTypeOrder = new[] { "Dinner", "Lunch", "Breakfast" };
+    var mealTypeOrder = new[] { "Breakfast", "Lunch", "Dinner" };
     var mealTypeRank = mealTypeOrder
         .Select((type, index) => new { type, index })
         .ToDictionary(x => x.type, x => x.index, StringComparer.OrdinalIgnoreCase);

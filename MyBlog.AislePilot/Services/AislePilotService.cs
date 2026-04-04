@@ -7557,8 +7557,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         return safeMealsPerDay switch
         {
             1 => ["Dinner"],
-            2 => ["Dinner", "Lunch"],
-            _ => ["Dinner", "Lunch", "Breakfast"]
+            2 => ["Lunch", "Dinner"],
+            _ => ["Breakfast", "Lunch", "Dinner"]
         };
     }
 
@@ -7576,7 +7576,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             .Where(type => type is not null)
             .Select(type => type!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(type => type.Equals("Dinner", StringComparison.OrdinalIgnoreCase)
+            .OrderBy(type => type.Equals("Breakfast", StringComparison.OrdinalIgnoreCase)
                 ? 0
                 : type.Equals("Lunch", StringComparison.OrdinalIgnoreCase)
                     ? 1

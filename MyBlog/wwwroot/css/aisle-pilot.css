@@ -1093,12 +1093,14 @@ html.aislepilot-restore-pending .aislepilot-app {
     gap: 0.24rem;
 }
 
-.aislepilot-plan-basics .aislepilot-slider-field {
+.aislepilot-plan-basics .aislepilot-slider-field,
+.aislepilot-slider-field.aislepilot-slider-field--plan-basics-frame {
     padding: 0.16rem 0.46rem 0.14rem;
 }
 
 .aislepilot-plan-basics .aislepilot-field,
-.aislepilot-plan-basics .aislepilot-field-chip {
+.aislepilot-plan-basics .aislepilot-field-chip,
+.aislepilot-field-chip.aislepilot-slider-field--plan-basics-frame {
     border-radius: 12px;
 }
 
@@ -1913,6 +1915,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: 1px solid rgba(16, 63, 101, 0.2);
     border-radius: 12px;
     padding: 0.72rem;
+    min-width: 0;
     background: rgba(255, 255, 255, 0.95);
     transition: opacity 0.16s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
@@ -1939,6 +1942,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin: -0.72rem -0.72rem 0.38rem;
     width: calc(100% + 1.44rem);
     display: block;
+    position: relative;
+    isolation: isolate;
     border-radius: 12px 12px 8px 8px;
     overflow: hidden;
     height: clamp(6.8rem, 18vw, 8.6rem);
@@ -1961,6 +1966,56 @@ html.aislepilot-restore-pending .aislepilot-app {
     transform: none;
     padding: 0.45rem;
     box-sizing: border-box;
+}
+
+.aislepilot-meal-image-shell[data-meal-image-loading="true"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+        linear-gradient(
+            110deg,
+            rgba(255, 255, 255, 0) 20%,
+            rgba(255, 255, 255, 0.55) 50%,
+            rgba(255, 255, 255, 0) 80%
+        ),
+        linear-gradient(145deg, rgba(197, 218, 242, 0.55), rgba(231, 242, 255, 0.35));
+    background-size: 240% 100%, 100% 100%;
+    animation: aislepilot-meal-image-loading 1.15s linear infinite;
+}
+
+.aislepilot-meal-image-shell[data-meal-image-loading="true"]::after {
+    content: "Loading image...";
+    position: absolute;
+    left: 0.55rem;
+    bottom: 0.5rem;
+    z-index: 2;
+    pointer-events: none;
+    padding: 0.14rem 0.4rem;
+    border: 1px solid rgba(16, 63, 101, 0.25);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    font-size: 0.62rem;
+    line-height: 1.15;
+    letter-spacing: 0.02em;
+    font-weight: 700;
+    color: rgba(16, 63, 101, 0.9);
+}
+
+.aislepilot-meal-image-shell[data-meal-image-loading="true"] .aislepilot-meal-image[src*="aislepilot-icon.svg"] {
+    opacity: 0.72;
+}
+
+@keyframes aislepilot-meal-image-loading {
+    0% {
+        background-position: 130% 0, 0 0;
+    }
+
+    100% {
+        background-position: -130% 0, 0 0;
+    }
 }
 
 @keyframes aislepilot-swap-grid-in {
@@ -2015,21 +2070,25 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-day-meal-tabs {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
     gap: 0.2rem;
     padding: 0.2rem;
     margin-top: 0.18rem;
     border: 1px solid rgba(16, 63, 101, 0.18);
     border-radius: 999px;
     background: rgba(16, 63, 101, 0.08);
+    overflow: hidden;
 }
 
 .aislepilot-day-meal-tab {
     display: inline-flex;
+    flex: 1 1 0;
     align-items: center;
     justify-content: center;
-    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
     min-height: 1.68rem !important;
     border: 1px solid rgba(16, 63, 101, 0.16) !important;
     border-radius: 999px !important;
@@ -2040,6 +2099,9 @@ html.aislepilot-restore-pending .aislepilot-app {
     font-weight: 700 !important;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .aislepilot-day-meal-tabs-static .aislepilot-day-meal-tab {
@@ -2663,7 +2725,8 @@ html.aislepilot-restore-pending .aislepilot-app {
         gap: 0.16rem;
     }
 
-    .aislepilot-plan-basics .aislepilot-slider-field {
+    .aislepilot-plan-basics .aislepilot-slider-field,
+    .aislepilot-slider-field.aislepilot-slider-field--plan-basics-frame {
         padding: 0.22rem 0.52rem 0.2rem;
     }
 
@@ -3260,6 +3323,23 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: linear-gradient(145deg, rgba(26, 39, 58, 0.9), rgba(17, 28, 44, 0.95));
 }
 
+:root[data-theme="dark"] .aislepilot-meal-image-shell[data-meal-image-loading="true"]::before {
+    background:
+        linear-gradient(
+            110deg,
+            rgba(255, 255, 255, 0) 20%,
+            rgba(124, 163, 209, 0.32) 50%,
+            rgba(255, 255, 255, 0) 80%
+        ),
+        linear-gradient(145deg, rgba(46, 67, 97, 0.5), rgba(29, 44, 66, 0.44));
+}
+
+:root[data-theme="dark"] .aislepilot-meal-image-shell[data-meal-image-loading="true"]::after {
+    border-color: rgba(124, 163, 209, 0.35);
+    background: rgba(12, 20, 32, 0.84);
+    color: #d8ebff;
+}
+
 :root[data-theme="dark"] .aislepilot-alert-shell {
     background: linear-gradient(150deg, rgba(56, 43, 22, 0.75), rgba(20, 31, 46, 0.92));
 }
@@ -3271,6 +3351,12 @@ html.aislepilot-restore-pending .aislepilot-app {
 :root[data-theme="dark"] .aislepilot-meal-removed-watermark {
     color: rgba(181, 201, 224, 0.36);
     text-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .aislepilot-meal-image-shell[data-meal-image-loading="true"]::before {
+        animation: none;
+    }
 }
 
 @media print {

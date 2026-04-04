@@ -145,6 +145,67 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotMealImagePolling_ShowsLoadingStateForFallbackImage()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var configured = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const pollRoot = document.querySelector("[data-meal-image-poll-root]");
+                if (!(pollRoot instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const targetImage = pollRoot.querySelector("img[data-meal-image][data-meal-name]");
+                if (!(targetImage instanceof HTMLImageElement)) {
+                    return false;
+                }
+
+                const fallbackImageUrl = pollRoot.dataset.fallbackMealImageUrl?.trim() || "/projects/aisle-pilot/images/aislepilot-icon.svg";
+                targetImage.src = fallbackImageUrl;
+
+                const originalFetch = window.fetch.bind(window);
+                window.fetch = () => new Promise(() => {});
+
+                const controller = window.AislePilotMealImagePolling?.createController({
+                    documentRef: document,
+                    intervalMs: 60000,
+                    maxAttempts: 2
+                });
+                if (!controller || typeof controller.start !== "function") {
+                    window.fetch = originalFetch;
+                    return false;
+                }
+
+                controller.start();
+                window.setTimeout(() => {
+                    window.fetch = originalFetch;
+                }, 500);
+                return true;
+            }
+            """);
+
+        Assert.True(configured, "Expected to configure meal image polling test state.");
+
+        var loadingShell = page.Locator(".aislepilot-meal-image-shell[data-meal-image-loading='true']").First;
+        await loadingShell.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+        Assert.True(await loadingShell.IsVisibleAsync());
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotViewDetails_KeepsActionRowStable()
     {
         if (!IsE2EEnabled())
@@ -197,6 +258,99 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(
             mealTimeShift <= 2.5,
             $"Expected meal time pill to remain fixed when details open. BeforeY={mealTimePillBefore.Y}, AfterY={mealTimePillAfter.Y}, Delta={mealTimeShift}.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotBreakfastTabs_DoNotOverflowDayCardWidth()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var breakfastTab = page.Locator(".aislepilot-day-meal-tab", new() { HasText = "Breakfast" }).First;
+        await breakfastTab.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var overflowIssueCount = await page.EvaluateAsync<int>(
+            """
+            () => {
+                const tolerancePx = 1.5;
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                const breakfastCards = cards.filter(card => card.querySelectorAll(".aislepilot-day-meal-tab").length >= 3);
+                if (breakfastCards.length === 0) {
+                    return -1;
+                }
+
+                let issues = 0;
+                for (const card of breakfastCards) {
+                    const grid = card.closest(".aislepilot-meal-grid");
+                    if (!(grid instanceof HTMLElement)) {
+                        issues++;
+                        continue;
+                    }
+
+                    if (card.scrollWidth - card.clientWidth > tolerancePx) {
+                        issues++;
+                    }
+
+                    const gridRect = grid.getBoundingClientRect();
+                    const cardRect = card.getBoundingClientRect();
+                    if (cardRect.left < gridRect.left - tolerancePx || cardRect.right > gridRect.right + tolerancePx) {
+                        issues++;
+                    }
+
+                    const tabList = card.querySelector(".aislepilot-day-meal-tabs");
+                    if (!(tabList instanceof HTMLElement)) {
+                        issues++;
+                        continue;
+                    }
+
+                    if (tabList.scrollWidth - tabList.clientWidth > tolerancePx) {
+                        issues++;
+                    }
+
+                    const listRect = tabList.getBoundingClientRect();
+                    if (listRect.left < cardRect.left - tolerancePx || listRect.right > cardRect.right + tolerancePx) {
+                        issues++;
+                    }
+
+                    const tabs = Array.from(tabList.querySelectorAll(".aislepilot-day-meal-tab"));
+                    if (tabs.length !== 3) {
+                        issues++;
+                        continue;
+                    }
+
+                    for (const tab of tabs) {
+                        if (!(tab instanceof HTMLElement)) {
+                            issues++;
+                            continue;
+                        }
+
+                        const tabRect = tab.getBoundingClientRect();
+                        if (tabRect.left < listRect.left - tolerancePx || tabRect.right > listRect.right + tolerancePx) {
+                            issues++;
+                            break;
+                        }
+                    }
+                }
+
+                return issues;
+            }
+            """);
+
+        Assert.NotEqual(-1, overflowIssueCount);
+        Assert.Equal(
+            0,
+            overflowIssueCount);
     }
 
     [Fact]

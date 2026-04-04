@@ -59,6 +59,69 @@
             });
         };
 
+        const resolveImageShell = imageElement => {
+            if (!(imageElement instanceof HTMLImageElement)) {
+                return null;
+            }
+
+            const shell = imageElement.closest(".aislepilot-meal-image-shell");
+            return shell instanceof HTMLElement ? shell : null;
+        };
+
+        const setMealImageLoadingState = (imageElement, isLoading) => {
+            if (!(imageElement instanceof HTMLImageElement)) {
+                return;
+            }
+
+            const shell = resolveImageShell(imageElement);
+            if (!(shell instanceof HTMLElement)) {
+                return;
+            }
+
+            if (isLoading) {
+                shell.dataset.mealImageLoading = "true";
+                imageElement.setAttribute("aria-busy", "true");
+                return;
+            }
+
+            delete shell.dataset.mealImageLoading;
+            imageElement.removeAttribute("aria-busy");
+        };
+
+        const clearDocumentMealImageLoadingStates = () => {
+            const imageElements = Array.from(documentRef.querySelectorAll("img[data-meal-image]"))
+                .filter(node => node instanceof HTMLImageElement);
+            imageElements.forEach(imageElement => {
+                setMealImageLoadingState(imageElement, false);
+            });
+        };
+
+        const syncMealImageLoadingStates = (pollContext, pendingByMealName) => {
+            if (!pollContext) {
+                clearDocumentMealImageLoadingStates();
+                return;
+            }
+
+            const pendingElements = new Set();
+            if (pendingByMealName instanceof Map) {
+                pendingByMealName.forEach(imageElements => {
+                    if (!Array.isArray(imageElements)) {
+                        return;
+                    }
+
+                    imageElements.forEach(imageElement => {
+                        if (imageElement instanceof HTMLImageElement) {
+                            pendingElements.add(imageElement);
+                        }
+                    });
+                });
+            }
+
+            pollContext.imageElements.forEach(imageElement => {
+                setMealImageLoadingState(imageElement, pendingElements.has(imageElement));
+            });
+        };
+
         const wireMealImageFallbackHandlers = pollContext => {
             if (!pollContext) {
                 return;
@@ -70,6 +133,10 @@
                 }
 
                 imageElement.dataset.mealImageFallbackWired = "true";
+                imageElement.addEventListener("load", () => {
+                    const currentPath = normalizeImagePath(imageElement.getAttribute("src") || imageElement.currentSrc || "");
+                    setMealImageLoadingState(imageElement, currentPath === pollContext.fallbackPath);
+                });
                 imageElement.addEventListener("error", () => {
                     const currentPath = normalizeImagePath(imageElement.getAttribute("src") || imageElement.currentSrc || "");
                     if (currentPath === pollContext.fallbackPath) {
@@ -77,6 +144,7 @@
                     }
 
                     imageElement.src = pollContext.fallbackUrl;
+                    setMealImageLoadingState(imageElement, true);
                 });
             });
         };
@@ -156,6 +224,7 @@
             pollIntervalId = null;
             pollInFlight = false;
             pollAttempts = 0;
+            clearDocumentMealImageLoadingStates();
         };
 
         const pollOnce = async () => {
@@ -170,6 +239,7 @@
             }
 
             const pendingByMealName = getPendingMealImageNames(pollContext);
+            syncMealImageLoadingStates(pollContext, pendingByMealName);
             if (pendingByMealName.size === 0) {
                 stop();
                 return;
@@ -246,6 +316,7 @@
                     imageElements.forEach(imageElement => {
                         if (imageElement instanceof HTMLImageElement) {
                             imageElement.src = cacheBustedUrl;
+                            setMealImageLoadingState(imageElement, false);
                         }
                     });
                 }
@@ -267,7 +338,9 @@
                 return;
             }
 
-            if (getPendingMealImageNames(pollContext).size === 0) {
+            const pendingByMealName = getPendingMealImageNames(pollContext);
+            syncMealImageLoadingStates(pollContext, pendingByMealName);
+            if (pendingByMealName.size === 0) {
                 stop();
                 return;
             }
