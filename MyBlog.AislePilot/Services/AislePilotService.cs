@@ -1873,17 +1873,85 @@ public sealed class AislePilotService : IAislePilotService
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Select(name => name.Trim())
             .ToList();
-        if (normalizedMealNames.Count != totalMealCount)
+        if (normalizedMealNames.Count == 0)
         {
             throw new InvalidOperationException("Could not resolve the current plan for export. Generate a fresh plan and try again.");
+        }
+        if (normalizedMealNames.Count > totalMealCount)
+        {
+            normalizedMealNames = normalizedMealNames
+                .Take(totalMealCount)
+                .ToList();
         }
 
         var context = await BuildPlanContextAsync(request, cancellationToken);
         await EnsureAiMealPoolHydratedAsync(cancellationToken);
-        var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(normalizedMealNames, totalMealCount);
-        if (selectedMeals is null)
+        var resolvableMealCount = Math.Min(normalizedMealNames.Count, totalMealCount);
+        var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(normalizedMealNames, resolvableMealCount);
+        if (selectedMeals is null || selectedMeals.Count == 0)
         {
             throw new InvalidOperationException("Could not resolve the current plan for export. Generate a fresh plan and try again.");
+        }
+        var usedTemplateTopUp = false;
+        if (selectedMeals.Count < totalMealCount)
+        {
+            try
+            {
+                var fallbackMeals = SelectMeals(
+                    MealTemplates,
+                    context.DietaryModes,
+                    request.WeeklyBudget,
+                    context.HouseholdFactor,
+                    request.PreferQuickMeals,
+                    context.DislikesOrAllergens,
+                    totalMealCount,
+                    mealTypeSlots,
+                    request.IncludeSpecialTreatMeal,
+                    request.SelectedSpecialTreatCookDayIndex,
+                    savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                    enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+
+                var stitchedMeals = new List<MealTemplate>(totalMealCount);
+                stitchedMeals.AddRange(selectedMeals);
+
+                foreach (var fallbackMeal in fallbackMeals)
+                {
+                    if (stitchedMeals.Count >= totalMealCount)
+                    {
+                        break;
+                    }
+
+                    if (stitchedMeals.Any(existing =>
+                            existing.Name.Equals(fallbackMeal.Name, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
+                    stitchedMeals.Add(fallbackMeal);
+                }
+
+                if (stitchedMeals.Count < totalMealCount)
+                {
+                    foreach (var fallbackMeal in fallbackMeals)
+                    {
+                        if (stitchedMeals.Count >= totalMealCount)
+                        {
+                            break;
+                        }
+
+                        stitchedMeals.Add(fallbackMeal);
+                    }
+                }
+
+                selectedMeals = stitchedMeals;
+                AddMealsToAiPool(fallbackMeals);
+                usedTemplateTopUp = true;
+            }
+            catch (InvalidOperationException)
+            {
+                selectedMeals = NormalizeSelectedMealsForCount(selectedMeals, totalMealCount).ToList();
+            }
         }
 
         return await BuildPlanFromMealsAsync(
@@ -1892,7 +1960,7 @@ public sealed class AislePilotService : IAislePilotService
             selectedMeals,
             cookDays,
             usedAiGeneratedMeals: true,
-            planSourceLabel: "Current plan",
+            planSourceLabel: usedTemplateTopUp ? "Current plan + template top-up" : "Current plan",
             cancellationToken: cancellationToken);
     }
 
@@ -3787,14 +3855,15 @@ Return JSON only with this schema:
         IReadOnlyList<string>? currentPlanMealNames,
         int expectedMealCount)
     {
-        if (currentPlanMealNames is null || currentPlanMealNames.Count != expectedMealCount)
+        if (currentPlanMealNames is null || currentPlanMealNames.Count < expectedMealCount)
         {
             return null;
         }
 
         var selectedMeals = new List<MealTemplate>(expectedMealCount);
-        foreach (var mealName in currentPlanMealNames)
+        for (var mealIndex = 0; mealIndex < expectedMealCount; mealIndex++)
         {
+            var mealName = currentPlanMealNames[mealIndex];
             if (string.IsNullOrWhiteSpace(mealName))
             {
                 return null;

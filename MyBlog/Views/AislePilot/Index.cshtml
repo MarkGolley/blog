@@ -697,36 +697,7 @@
                         </fieldset>
                     </details>
 
-                    <details class="aislepilot-collapsible"
-                             data-plan-basic-item="cook-days">
-                        <summary>
-                            <span class="aislepilot-collapsible-title">Cook days</span>
-                            <span class="aislepilot-collapsible-value" data-plan-basic-summary>@($"{selectedCookDays} day{(selectedCookDays == 1 ? string.Empty : "s")}")</span>
-                        </summary>
-                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
-                                <label asp-for="Request.CookDays">Cook days</label>
-                                <div class="aislepilot-slider-track-line">
-                                    <span class="aislepilot-slider-boundary">1</span>
-                                    <input asp-for="Request.CookDays"
-                                           type="range"
-                                           min="1"
-                                           max="7"
-                                           step="1"
-                                           class="aislepilot-slider-input"
-                                           aria-label="Cook days"
-                                           data-number-slider-range
-                                           data-number-slider-decimals="0"
-                                           data-cook-days-slider />
-                                    <span class="aislepilot-slider-boundary">7</span>
-                                </div>
-                                <div class="aislepilot-slider-meta">
-                                    <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
-                                </div>
-                                <span asp-validation-for="Request.CookDays" class="text-danger"></span>
-                            </div>
-                        </fieldset>
-                    </details>
+                    <input asp-for="Request.CookDays" type="hidden" value="@selectedCookDays" />
 
                     <details class="aislepilot-collapsible"
                              data-plan-basic-item="budget">
@@ -954,26 +925,6 @@
                             <span asp-validation-for="Request.PlanDays" class="text-danger"></span>
                         </div>
 
-                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
-                            <label asp-for="Request.CookDays">Cook days</label>
-                            <div class="aislepilot-slider-track-line">
-                                <span class="aislepilot-slider-boundary">1</span>
-                                <input asp-for="Request.CookDays"
-                                       type="range"
-                                       min="1"
-                                       max="7"
-                                       step="1"
-                                       class="aislepilot-slider-input"
-                                       data-number-slider-range
-                                       data-number-slider-decimals="0"
-                                       data-cook-days-slider />
-                                <span class="aislepilot-slider-boundary">7</span>
-                            </div>
-                            <div class="aislepilot-slider-meta">
-                                <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
-                            </div>
-                            <span asp-validation-for="Request.CookDays" class="text-danger"></span>
-                        </div>
                     </div>
                     </fieldset>
 

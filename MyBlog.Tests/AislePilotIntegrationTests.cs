@@ -894,13 +894,11 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(baselineForm));
 
         Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        var baselineHtml = await baselineResponse.Content.ReadAsStringAsync();
         antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
 
-        var postedCurrentPlanMealNames = new[]
-        {
-            "Chicken stir fry with rice",
-            "Turkey chilli with beans"
-        };
+        var postedCurrentPlanMealNames = ExtractRenderedMealNames(baselineHtml);
+        Assert.Equal(2, postedCurrentPlanMealNames.Count);
         var leftoverRebalanceForm = new List<KeyValuePair<string, string>>
         {
             new("Request.Supermarket", "Tesco"),
@@ -934,12 +932,151 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
             StringComparison.OrdinalIgnoreCase);
         var renderedMealNames = ExtractRenderedMealNames(html);
         Assert.Equal(2, renderedMealNames.Count);
-        Assert.Contains("Chicken stir fry with rice", renderedMealNames, StringComparer.OrdinalIgnoreCase);
-        Assert.Contains("Turkey chilli with beans", renderedMealNames, StringComparer.OrdinalIgnoreCase);
+        foreach (var mealName in postedCurrentPlanMealNames)
+        {
+            Assert.Contains(mealName, renderedMealNames, StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]
-    public async Task Index_Post_WithFiveCookDays_ShowsTwoLeftoverDaysInOverview()
+    public async Task Index_Post_WhenLeftoverRebalanceReducesCookDays_UsesCurrentPlanMealPrefix()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var baselineForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "3"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.LeftoverCookDayIndexesCsv", "0"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(baselineForm));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        var baselineHtml = await baselineResponse.Content.ReadAsStringAsync();
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var baselineMealNames = ExtractRenderedMealNames(baselineHtml);
+        Assert.Equal(2, baselineMealNames.Count);
+        var reorderedCurrentPlanMealNames = baselineMealNames
+            .AsEnumerable()
+            .Reverse()
+            .ToList();
+        Assert.False(
+            string.Equals(reorderedCurrentPlanMealNames[0], baselineMealNames[0], StringComparison.OrdinalIgnoreCase));
+
+        var leftoverRebalanceForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "3"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.LeftoverCookDayIndexesCsv", "0,1"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in reorderedCurrentPlanMealNames)
+        {
+            leftoverRebalanceForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var rebalanceResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(leftoverRebalanceForm));
+
+        Assert.Equal(HttpStatusCode.OK, rebalanceResponse.StatusCode);
+        var html = await rebalanceResponse.Content.ReadAsStringAsync();
+        Assert.Contains("name=\"Request.CookDays\" value=\"1\"", html, StringComparison.OrdinalIgnoreCase);
+        var renderedMealNames = ExtractRenderedMealNames(html);
+        Assert.Single(renderedMealNames);
+        Assert.Equal(reorderedCurrentPlanMealNames[0], renderedMealNames[0], StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WhenLeftoverRebalanceIncreasesCookDays_TopsUpFromCurrentPlanWithoutFullRegenerate()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var baselineForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "3"),
+            new("Request.CookDays", "1"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.LeftoverCookDayIndexesCsv", "0,1"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(baselineForm));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        var baselineHtml = await baselineResponse.Content.ReadAsStringAsync();
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var baselineMealNames = ExtractRenderedMealNames(baselineHtml);
+        Assert.Single(baselineMealNames);
+
+        var leftoverRebalanceForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "3"),
+            new("Request.CookDays", "1"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.LeftoverCookDayIndexesCsv", "0"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        leftoverRebalanceForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", baselineMealNames[0]));
+
+        using var rebalanceResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(leftoverRebalanceForm));
+
+        Assert.Equal(HttpStatusCode.OK, rebalanceResponse.StatusCode);
+        var html = await rebalanceResponse.Content.ReadAsStringAsync();
+        Assert.Contains("name=\"Request.CookDays\" value=\"2\"", html, StringComparison.OrdinalIgnoreCase);
+        var renderedMealNames = ExtractRenderedMealNames(html);
+        Assert.Equal(2, renderedMealNames.Count);
+        Assert.Equal(baselineMealNames[0], renderedMealNames[0], StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithLeftoverDayIndexesCsv_ShowsTwoLeftoverDaysInOverview()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -949,7 +1086,8 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
             ["Request.Supermarket"] = "Tesco",
             ["Request.WeeklyBudget"] = "65",
             ["Request.HouseholdSize"] = "2",
-            ["Request.CookDays"] = "5",
+            ["Request.PlanDays"] = "7",
+            ["Request.LeftoverCookDayIndexesCsv"] = "0,1",
             ["Request.CustomAisleOrder"] = string.Empty,
             ["Request.DislikesOrAllergens"] = string.Empty,
             ["Request.PreferQuickMeals"] = "true",
@@ -962,7 +1100,7 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("Cook days", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Leftovers", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("2 day(s)", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             "data-overview-content(?:\\s+[^>]*)?\\s+hidden|hidden(?:\\s+[^>]*)?\\s+data-overview-content",
             html);
@@ -1037,6 +1175,12 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.Contains("name=\"Request.PlanDays\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-plan-days-slider", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-cook-days-slider", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"<input[^>]*name=""Request\.CookDays""[^>]*type=""hidden""|<input[^>]*type=""hidden""[^>]*name=""Request\.CookDays""",
+                RegexOptions.IgnoreCase),
+            html);
     }
 
     [Fact]
@@ -1127,6 +1271,24 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task AislePilotScript_LeftoverPlanner_SubmitsImmediatelyFromCardToggle()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+
+        Assert.Contains("const leftoverRebalanceForms = scope instanceof Element", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const maxExtraRaw = Number.parseInt(", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const toggleButton = zone.querySelector(\"[data-leftover-toggle-sign]\")", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("zone.classList.toggle(\"is-leftover-locked\", !isAssigned && !canAssignMore);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("toggleButton.textContent = \"++\";", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("toggleButton.textContent = \"-\";", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (getAssignedCount() >= maxExtraAllocations)", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("submitLeftoverRebalance();", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("persistSwapScrollPosition(leftoverRebalanceForm);", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AislePilotStylesheet_MealMethodListsRenderMarkersInsidePanelBounds()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -1136,6 +1298,49 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains(".aislepilot-day-meal-panel > .aislepilot-meal-details-panel ol.case-list", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("list-style-position: inside;", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("padding-left: 0;", css, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_MoreActionsMenu_IsCompactWithDistinctSwapAndSaveIconStyles()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.Contains(".aislepilot-card-more-actions-menu {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("min-width: 3.4rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("width: 3.4rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("min-width: 9.5rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact:not(.is-saved-meal)",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fill: currentColor;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("stroke: none;", css, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_LeftoverCardToggle_IsPlainSymbolWithoutButtonChrome()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+        var stepButtonBlockMatch = Regex.Match(
+            css,
+            @"\.aislepilot-leftover-step-btn\s*\{(?<body>[\s\S]*?)\}",
+            RegexOptions.IgnoreCase);
+
+        Assert.True(stepButtonBlockMatch.Success, "Expected .aislepilot-leftover-step-btn CSS block.");
+        var stepButtonBlock = stepButtonBlockMatch.Groups["body"].Value;
+        Assert.Contains("border: none;", stepButtonBlock, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("border-radius: 0;", stepButtonBlock, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("background: transparent;", stepButtonBlock, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("border: 1px solid rgba(16, 63, 101, 0.3);", stepButtonBlock, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("border-radius: 999px;", stepButtonBlock, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1518,7 +1723,7 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
-    public async Task Index_Post_WhenCookDaysExceedPlanDays_ClampsCookDaysInRenderedState()
+    public async Task Index_Post_WhenCookDaysExceedPlanDays_DoesNotRenderCookDaysSliderAndKeepsHiddenCookDays()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -1540,8 +1745,9 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains("name=\"Request.CookDays\" value=\"1\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-cook-days-slider", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<p class=\"aislepilot-stat-label\">Leftovers</p>", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Adjust leftovers", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Adjust cook-extra days", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1566,9 +1772,21 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Adjust leftovers", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Select a leftover day, then select another day to move one leftover.", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Makes extra for 2 leftover day(s)", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Adjust cook-extra days", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-leftover-planner", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-leftover-rebalance-form", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-leftover-max-extra=\"6\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"<form[^>]*class=""[^""]*aislepilot-leftover-rebalance-form[^""]*""[^>]*(data-leftover-rebalance-form[^>]*data-ajax-swap-form|data-ajax-swap-form[^>]*data-leftover-rebalance-form)",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Contains("data-leftover-toggle-sign", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-day-card-leftover-controls", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-name=\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-leftover-day-count\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-leftover-day-count", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
     }
 
     private HttpClient CreateClient(bool allowAutoRedirect)

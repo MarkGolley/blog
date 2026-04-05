@@ -72,9 +72,7 @@
         .ToList();
     var planDays = Math.Clamp(result.PlanDays, 1, 7);
     var weekDayNames = new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
-    var weekDayShortLabels = new[] { "M", "T", "W", "T", "F", "S", "S" };
     var planWeekDayNames = weekDayNames.Take(planDays).ToArray();
-    var planWeekDayShortLabels = weekDayShortLabels.Take(planDays).ToArray();
     var mealTypeOrder = new[] { "Breakfast", "Lunch", "Dinner" };
     var mealTypeRank = mealTypeOrder
         .Select((type, index) => new { type, index })
@@ -337,9 +335,9 @@
     <section class="aislepilot-shell aislepilot-window-shell" aria-labelledby="aislepilot-window-title" data-aislepilot-window data-reveal>
         <div class="aislepilot-mobile-context" aria-label="Plan summary and quick navigation">
             <div class="aislepilot-mobile-context-summary">
-                <p class="aislepilot-mobile-context-title">Weekly plan</p>
                 <p class="aislepilot-mobile-context-meta">
-                    Est. @result.EstimatedTotalCost.ToString("C", ukCulture) &middot; @budgetDeltaSummaryText
+                    <span class="aislepilot-mobile-context-title">Weekly plan</span>
+                    &middot; Est. @result.EstimatedTotalCost.ToString("C", ukCulture) &middot; @budgetDeltaSummaryText
                 </p>
             </div>
             <div class="aislepilot-mobile-context-jumps" role="tablist" aria-label="Jump to section">
@@ -398,9 +396,7 @@
             </div>
         </div>
         <div class="aislepilot-window-head">
-            <h2 id="aislepilot-window-title" class="aislepilot-section-title">
-                Weekly plan
-            </h2>
+            <h2 id="aislepilot-window-title" class="sr-only">Plan results</h2>
             <div class="aislepilot-window-nav">
                 <p class="aislepilot-window-nav-hint" data-window-hint>Use tabs to switch between meals, shopping, and exports.</p>
                 <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
@@ -471,49 +467,20 @@
         <div class="aislepilot-window-viewport" data-window-viewport>
             <div class="aislepilot-window-track" data-window-track>
                 <section id="aislepilot-meals" aria-label="Meals" role="tabpanel" aria-labelledby="aislepilot-tab-meals" class="aislepilot-window-panel" data-window-name="Meals">
-                    @if (result.LeftoverDays > 0)
+                    @if (result.PlanDays > 1)
                     {
-                        <div class="aislepilot-leftover-editor">
-                            <div class="aislepilot-leftover-editor-head">
-                                <p class="aislepilot-window-meta">@result.LeftoverDays leftover day(s) are allocated. Green days are double-cook days.</p>
-                                <button type="button"
-                                        class="aislepilot-leftover-toggle"
-                                        data-leftover-toggle
-                                        aria-expanded="false">
-                                    Adjust leftovers
-                                </button>
-                            </div>
-                            <div class="aislepilot-leftover-planner-shell" data-leftover-planner hidden>
-                                <p class="aislepilot-leftover-helper">Select a leftover day, then select another day to move one leftover.</p>
-                                <form method="post"
-                                      action="@Url.Action("Index", "AislePilot")#aislepilot-meals"
-                                      class="aislepilot-leftover-rebalance-form"
-                                      data-leftover-rebalance-form
-                                      data-preserve-scroll-form>
-                                    @Html.AntiForgeryToken()
-                                    <partial name="_AislePilotHiddenRequestFields"
-                                             model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true, includeLeftoverCsvDataAttribute: true)" />
-                                </form>
-                                <div class="aislepilot-leftover-planner" role="list" aria-label="Leftover day allocation">
-                                    @for (var dayIndex = 0; dayIndex < planWeekDayNames.Length; dayIndex++)
-                                    {
-                                        var dayLeftoverCount = leftoverSourceWeekDayIndexes.Count(index => index == dayIndex);
-                                        var dayChipClass = dayLeftoverCount > 0
-                                            ? "aislepilot-leftover-day-chip is-leftover-source"
-                                            : "aislepilot-leftover-day-chip";
-                                        <button type="button"
-                                                class="@dayChipClass"
-                                                data-leftover-day-zone
-                                                data-day-index="@dayIndex"
-                                                data-leftover-count="@dayLeftoverCount"
-                                                aria-label="Leftover allocation for @planWeekDayNames[dayIndex]"
-                                                role="listitem">
-                                            <span class="aislepilot-leftover-day-name">@planWeekDayShortLabels[dayIndex]</span>
-                                        </button>
-                                    }
-                                </div>
-                            </div>
-                        </div>
+                        <form method="post"
+                              action="@Url.Action("Index", "AislePilot")#aislepilot-meals"
+                              class="aislepilot-leftover-rebalance-form"
+                              data-leftover-rebalance-form
+                              data-ajax-swap-form
+                              data-leftover-max-extra="@Math.Max(0, result.PlanDays - 1)"
+                              data-preserve-scroll-form
+                              hidden>
+                            @Html.AntiForgeryToken()
+                            <partial name="_AislePilotHiddenRequestFields"
+                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true, includeLeftoverCsvDataAttribute: true)" />
+                        </form>
                     }
                     <div class="aislepilot-meal-grid"
                          data-meal-image-poll-root
@@ -550,6 +517,35 @@
                                         }
                                     </div>
                                     <div class="aislepilot-day-card-head-actions">
+                                        @if (result.PlanDays > 1)
+                                        {
+                                            var dayWeekIndex = weekDayLookup.TryGetValue(dayGroup.Day, out var resolvedWeekDayIndex)
+                                                ? resolvedWeekDayIndex
+                                                : Math.Clamp(dayGroupIndex, 0, Math.Max(0, result.PlanDays - 1));
+                                            var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0
+                                                ? $"{dayGroup.Day}: cook-extra x{dayGroup.LeftoverDaysCovered}"
+                                                : $"{dayGroup.Day}: no cook-extra";
+                                            var dayAllocationControlClass = dayGroup.LeftoverDaysCovered > 0
+                                                ? "aislepilot-day-card-leftover-controls is-leftover-source"
+                                                : "aislepilot-day-card-leftover-controls";
+                                            <div class="@dayAllocationControlClass"
+                                                 data-leftover-day-zone
+                                                 data-day-index="@dayWeekIndex"
+                                                 data-day-name="@dayGroup.Day"
+                                                 data-leftover-count="@dayGroup.LeftoverDaysCovered"
+                                                 aria-label="@dayAllocationAriaLabel">
+                                                @{
+                                                    var dayCountHiddenAttribute = dayGroup.LeftoverDaysCovered > 1 ? null : "hidden";
+                                                }
+                                                <button type="button"
+                                                        class="aislepilot-leftover-step-btn"
+                                                        data-leftover-toggle-sign
+                                                        aria-label="@(dayGroup.LeftoverDaysCovered > 0 ? $"Remove cook-extra from {dayGroup.Day}" : $"Add cook-extra to {dayGroup.Day}")">
+                                                    @(dayGroup.LeftoverDaysCovered > 0 ? "++" : "+")
+                                                </button>
+                                                <span class="aislepilot-leftover-day-count" data-leftover-day-count @dayCountHiddenAttribute>x@dayGroup.LeftoverDaysCovered</span>
+                                            </div>
+                                        }
                                         @for (var slotIndex = 0; slotIndex < dayGroup.Entries.Count; slotIndex++)
                                         {
                                             var slotEntry = dayGroup.Entries[slotIndex];
@@ -799,23 +795,6 @@
                                                         }
                                                     </ol>
                                                 </div>
-                                                @if (dayGroup.LeftoverDaysCovered > 0)
-                                                {
-                                                    <div class="aislepilot-card-compact-meta">
-                                                        @if (dayGroup.LeftoverDaysCovered > 0)
-                                                        {
-                                                            <span class="aislepilot-card-meta-pill">
-                                                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                                    <svg viewBox="0 0 24 24" focusable="false">
-                                                                        <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
-                                                                        <path d="M20 4v6h-6"></path>
-                                                                    </svg>
-                                                                </span>
-                                                                Makes extra for @dayGroup.LeftoverDaysCovered leftover day(s)
-                                                            </span>
-                                                        }
-                                                    </div>
-                                                }
                                             </section>
                                         }
                                     </div>

@@ -1384,6 +1384,61 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_WithExtraCurrentPlanMealNames_TrimsToExpectedMealCount()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Turkey chilli with beans",
+            "Chicken stir fry with rice"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var resultMealNames = result.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Single(resultMealNames);
+        Assert.Equal("Turkey chilli with beans", resultMealNames[0], StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_WithFewerCurrentPlanMealNames_TopsUpAndPreservesPrefix()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Turkey chilli with beans"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var resultMealNames = result.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(2, resultMealNames.Count);
+        Assert.Equal("Turkey chilli with beans", resultMealNames[0], StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task BuildPlanFromCurrentMealsAsync_MacrosRemainPerServingAcrossHouseholdSizes()
     {
         var currentPlanMealNames = new List<string>

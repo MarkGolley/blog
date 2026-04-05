@@ -587,6 +587,7 @@
 
             const planDaysSlider = form.querySelector("[data-plan-days-slider]");
             const cookDaysSlider = form.querySelector("[data-cook-days-slider]");
+            const cookDaysHiddenInput = form.querySelector("input[type='hidden'][name='Request.CookDays']");
             const planDaysSliderField = planDaysSlider instanceof HTMLInputElement
                 ? planDaysSlider.closest(".aislepilot-slider-field")
                 : null;
@@ -617,7 +618,7 @@
             };
 
             const syncPlanDaysConstraint = source => {
-                if (!(planDaysSlider instanceof HTMLInputElement) || !(cookDaysSlider instanceof HTMLInputElement)) {
+                if (!(planDaysSlider instanceof HTMLInputElement)) {
                     return;
                 }
 
@@ -625,6 +626,18 @@
                 const safePlanDays = Number.isInteger(rawPlanDays)
                     ? Math.max(1, Math.min(7, rawPlanDays))
                     : 7;
+                if (!(cookDaysSlider instanceof HTMLInputElement)) {
+                    planDaysSlider.value = `${safePlanDays}`;
+                    planDaysSlider.setAttribute("aria-valuetext", `${safePlanDays}`);
+                    if (planDaysValueOutput instanceof HTMLElement) {
+                        planDaysValueOutput.textContent = `${safePlanDays}`;
+                    }
+                    if (cookDaysHiddenInput instanceof HTMLInputElement) {
+                        cookDaysHiddenInput.value = `${safePlanDays}`;
+                    }
+                    syncSliderProgress(planDaysSlider);
+                    return;
+                }
 
                 const rawCookDays = Number.parseInt(cookDaysSlider.value ?? "1", 10);
                 const cookMinRaw = Number.parseInt(cookDaysSlider.min ?? "1", 10);
@@ -658,7 +671,7 @@
                 syncSliderProgress(cookDaysSlider);
             };
 
-            if (planDaysSlider instanceof HTMLInputElement && cookDaysSlider instanceof HTMLInputElement) {
+            if (planDaysSlider instanceof HTMLInputElement) {
                 if (form.dataset.planDaysConstraintWired !== "true") {
                     form.dataset.planDaysConstraintWired = "true";
                     planDaysSlider.addEventListener("input", () => {
@@ -667,12 +680,14 @@
                     planDaysSlider.addEventListener("change", () => {
                         syncPlanDaysConstraint("plan-change");
                     });
-                    cookDaysSlider.addEventListener("input", () => {
-                        syncPlanDaysConstraint("cook-change");
-                    });
-                    cookDaysSlider.addEventListener("change", () => {
-                        syncPlanDaysConstraint("cook-change");
-                    });
+                    if (cookDaysSlider instanceof HTMLInputElement) {
+                        cookDaysSlider.addEventListener("input", () => {
+                            syncPlanDaysConstraint("cook-change");
+                        });
+                        cookDaysSlider.addEventListener("change", () => {
+                            syncPlanDaysConstraint("cook-change");
+                        });
+                    }
                 }
 
                 syncPlanDaysConstraint("init");
@@ -2888,51 +2903,38 @@
     };
 
     const wireLeftoverPlanner = scope => {
-        const plannerShells = scope instanceof Element
-            ? Array.from(scope.querySelectorAll("[data-leftover-planner]"))
-            : Array.from(document.querySelectorAll("[data-leftover-planner]"));
+        const leftoverRebalanceForms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-leftover-rebalance-form]"))
+            : Array.from(document.querySelectorAll("[data-leftover-rebalance-form]"));
 
-        plannerShells.forEach(plannerShell => {
-            if (!(plannerShell instanceof HTMLElement) || plannerShell.dataset.leftoverPlannerWired === "true") {
+        leftoverRebalanceForms.forEach(leftoverRebalanceForm => {
+            if (!(leftoverRebalanceForm instanceof HTMLFormElement) || leftoverRebalanceForm.dataset.leftoverPlannerWired === "true") {
                 return;
             }
 
-            plannerShell.dataset.leftoverPlannerWired = "true";
-            const mealsPanel = plannerShell.closest("#aislepilot-meals");
-            const container = mealsPanel instanceof HTMLElement ? mealsPanel : plannerShell.parentElement;
+            leftoverRebalanceForm.dataset.leftoverPlannerWired = "true";
+            const mealsPanel = leftoverRebalanceForm.closest("#aislepilot-meals");
+            const container = mealsPanel instanceof HTMLElement ? mealsPanel : leftoverRebalanceForm.parentElement;
             if (!(container instanceof HTMLElement)) {
                 return;
             }
 
-            const leftoverToggleButton = container.querySelector("[data-leftover-toggle]");
-                    if (leftoverToggleButton instanceof HTMLButtonElement && leftoverToggleButton.dataset.leftoverToggleWired !== "true") {
-                        leftoverToggleButton.dataset.leftoverToggleWired = "true";
-                        leftoverToggleButton.addEventListener("click", () => {
-                            const isHidden = plannerShell.hasAttribute("hidden");
-                            if (isHidden) {
-                                plannerShell.removeAttribute("hidden");
-                                leftoverToggleButton.setAttribute("aria-expanded", "true");
-                                leftoverToggleButton.textContent = "Hide leftover changes";
-                            } else {
-                                plannerShell.setAttribute("hidden", "hidden");
-                                leftoverToggleButton.setAttribute("aria-expanded", "false");
-                                leftoverToggleButton.textContent = "Adjust leftovers";
-                            }
-
-                    updateViewportHeight(true);
-                });
-            }
-
-            const leftoverRebalanceForm = container.querySelector("[data-leftover-rebalance-form]");
             const leftoverCsvInput = leftoverRebalanceForm?.querySelector("[data-leftover-csv]");
-            const leftoverZones = Array.from(plannerShell.querySelectorAll("[data-leftover-day-zone]"));
-            let selectedSourceZone = null;
+            const leftoverZones = Array.from(container.querySelectorAll("[data-leftover-day-zone]"));
+            const maxExtraRaw = Number.parseInt(
+                leftoverRebalanceForm.getAttribute("data-leftover-max-extra") ?? "",
+                10);
+            const maxExtraAllocations = Number.isInteger(maxExtraRaw) && maxExtraRaw >= 0
+                ? maxExtraRaw
+                : Math.max(0, leftoverZones.length - 1);
 
-            const submitLeftoverRebalance = () => {
-                if (!(leftoverRebalanceForm instanceof HTMLFormElement) || !(leftoverCsvInput instanceof HTMLInputElement)) {
-                    return;
-                }
-
+            const toCsv = dayIndexes => dayIndexes.join(",");
+            const getZoneCount = zone => {
+                const countRaw = zone.getAttribute("data-leftover-count");
+                const count = Number.parseInt(countRaw ?? "", 10);
+                return Number.isInteger(count) && count > 0 ? count : 0;
+            };
+            const buildRequestedDayIndexes = () => {
                 const requestedDayIndexes = [];
                 leftoverZones.forEach(zone => {
                     const dayIndexRaw = zone.getAttribute("data-day-index");
@@ -2941,93 +2943,147 @@
                         return;
                     }
 
-                    const countRaw = zone.getAttribute("data-leftover-count");
-                    const tokenCount = Number.parseInt(countRaw ?? "", 10);
-                    const normalizedCount = Number.isInteger(tokenCount) && tokenCount > 0 ? tokenCount : 0;
-                    for (let i = 0; i < normalizedCount; i++) {
+                    const normalizedCount = getZoneCount(zone);
+                    for (let i = 0; i < normalizedCount; i += 1) {
                         requestedDayIndexes.push(dayIndex);
                     }
                 });
+                return requestedDayIndexes;
+            };
+            const getAssignedCount = () => buildRequestedDayIndexes().length;
 
-                leftoverCsvInput.value = requestedDayIndexes.join(",");
-                persistSwapScrollPosition(leftoverRebalanceForm);
-                leftoverRebalanceForm.requestSubmit();
+            const syncSubmitPayload = () => {
+                if (!(leftoverCsvInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                leftoverCsvInput.value = toCsv(buildRequestedDayIndexes());
             };
 
-            const getZoneCount = zone => {
-                const countRaw = zone.getAttribute("data-leftover-count");
-                const count = Number.parseInt(countRaw ?? "", 10);
-                return Number.isInteger(count) && count > 0 ? count : 0;
+            const syncZoneCountBadge = (zone, normalizedCount) => {
+                const countBadge = zone.querySelector("[data-leftover-day-count]");
+                if (!(countBadge instanceof HTMLElement)) {
+                    return;
+                }
+
+                const dayCount = Math.max(0, normalizedCount);
+                if (dayCount > 1) {
+                    countBadge.textContent = `x${dayCount}`;
+                    countBadge.removeAttribute("hidden");
+                } else {
+                    countBadge.textContent = "";
+                    countBadge.setAttribute("hidden", "hidden");
+                }
+            };
+
+            const syncZoneAriaLabel = (zone, normalizedCount) => {
+                const dayName = (zone.getAttribute("data-day-name") ?? "").trim();
+                if (dayName.length === 0) {
+                    return;
+                }
+
+                const dayCount = Math.max(0, normalizedCount);
+                const nextLabel = dayCount > 0
+                    ? `${dayName}: cook-extra x${dayCount}`
+                    : `${dayName}: no cook-extra`;
+                zone.setAttribute("aria-label", nextLabel);
             };
 
             const setZoneCount = (zone, count) => {
                 const normalizedCount = Math.max(0, count);
                 zone.setAttribute("data-leftover-count", `${normalizedCount}`);
                 zone.classList.toggle("is-leftover-source", normalizedCount > 0);
+                syncZoneCountBadge(zone, normalizedCount);
+                syncZoneAriaLabel(zone, normalizedCount);
             };
 
-            const clearSourceSelection = () => {
-                if (!selectedSourceZone) {
-                    return;
-                }
+            const syncZoneControlButtons = () => {
+                const assignedCount = getAssignedCount();
+                const canAssignMore = assignedCount < maxExtraAllocations;
+                leftoverZones.forEach(zone => {
+                    if (!(zone instanceof HTMLElement)) {
+                        return;
+                    }
 
-                selectedSourceZone.classList.remove("is-source-selected");
-                selectedSourceZone = null;
-                leftoverZones.forEach(zone => zone.classList.remove("is-drop-ready"));
-            };
-
-            const selectSourceZone = zone => {
-                clearSourceSelection();
-                selectedSourceZone = zone;
-                zone.classList.add("is-source-selected");
-                leftoverZones.forEach(targetZone => {
-                    if (targetZone !== zone) {
-                        targetZone.classList.add("is-drop-ready");
+                    const toggleButton = zone.querySelector("[data-leftover-toggle-sign]");
+                    const zoneCount = getZoneCount(zone);
+                    const dayName = (zone.getAttribute("data-day-name") ?? "").trim();
+                    const isAssigned = zoneCount > 0;
+                    const canAssign = !isAssigned && canAssignMore;
+                    zone.classList.toggle("is-leftover-locked", !isAssigned && !canAssignMore);
+                    if (toggleButton instanceof HTMLButtonElement) {
+                        if (isAssigned) {
+                            toggleButton.hidden = false;
+                            toggleButton.disabled = false;
+                            toggleButton.textContent = "++";
+                            if (dayName.length > 0) {
+                                toggleButton.setAttribute("aria-label", `Remove cook-extra from ${dayName}`);
+                            }
+                        } else if (canAssign && canAssignMore) {
+                            toggleButton.hidden = false;
+                            toggleButton.disabled = false;
+                            toggleButton.textContent = "+";
+                            if (dayName.length > 0) {
+                                toggleButton.setAttribute("aria-label", `Add cook-extra to ${dayName}`);
+                            }
+                        } else {
+                            toggleButton.hidden = true;
+                            toggleButton.disabled = true;
+                        }
                     }
                 });
             };
 
-            const moveOneLeftover = targetZone => {
-                if (!selectedSourceZone || selectedSourceZone === targetZone) {
+            const syncPlannerState = () => {
+                syncSubmitPayload();
+                syncZoneControlButtons();
+            };
+
+            const submitLeftoverRebalance = () => {
+                if (!(leftoverRebalanceForm instanceof HTMLFormElement) || !(leftoverCsvInput instanceof HTMLInputElement)) {
                     return;
                 }
 
-                const sourceCount = getZoneCount(selectedSourceZone);
-                if (sourceCount <= 0) {
-                    clearSourceSelection();
-                    return;
-                }
-
-                const targetCount = getZoneCount(targetZone);
-                setZoneCount(selectedSourceZone, sourceCount - 1);
-                setZoneCount(targetZone, targetCount + 1);
-                clearSourceSelection();
-                submitLeftoverRebalance();
+                syncSubmitPayload();
+                persistSwapScrollPosition(leftoverRebalanceForm);
+                leftoverRebalanceForm.requestSubmit();
             };
 
             if (leftoverZones.length > 0) {
                 leftoverZones.forEach(zone => {
-                    if (!(zone instanceof HTMLButtonElement) || zone.dataset.leftoverZoneWired === "true") {
+                    if (!(zone instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    setZoneCount(zone, getZoneCount(zone));
+                });
+
+                syncPlannerState();
+
+                leftoverZones.forEach(zone => {
+                    if (!(zone instanceof HTMLElement) || zone.dataset.leftoverZoneWired === "true") {
                         return;
                     }
 
                     zone.dataset.leftoverZoneWired = "true";
-                    zone.addEventListener("click", () => {
-                        const zoneCount = getZoneCount(zone);
-                        if (!selectedSourceZone) {
+                    const toggleButton = zone.querySelector("[data-leftover-toggle-sign]");
+                    if (toggleButton instanceof HTMLButtonElement) {
+                        toggleButton.addEventListener("click", () => {
+                            const zoneCount = getZoneCount(zone);
                             if (zoneCount > 0) {
-                                selectSourceZone(zone);
+                                setZoneCount(zone, zoneCount - 1);
+                                submitLeftoverRebalance();
+                                return;
                             }
-                            return;
-                        }
 
-                        if (selectedSourceZone === zone) {
-                            clearSourceSelection();
-                            return;
-                        }
+                            if (getAssignedCount() >= maxExtraAllocations) {
+                                return;
+                            }
 
-                        moveOneLeftover(zone);
-                    });
+                            setZoneCount(zone, zoneCount + 1);
+                            submitLeftoverRebalance();
+                        });
+                    }
                 });
             }
         });
@@ -3715,6 +3771,7 @@
                 submitButton instanceof HTMLButtonElement &&
                 submitButton.classList.contains("is-saved-meal");
             const isIgnoreForm = swapForm.classList.contains("aislepilot-ignore-form");
+            const isLeftoverRebalanceForm = swapForm.hasAttribute("data-leftover-rebalance-form");
             const isDessertSwapForm = swapForm.action.toLowerCase().includes("/swap-dessert");
             const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
             const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
@@ -3792,7 +3849,9 @@
                         return;
                     }
 
-                    if (isIgnoreForm) {
+                    if (isLeftoverRebalanceForm) {
+                        // Leftover rebalancing is an inline layout tweak; avoid generic swap toast noise.
+                    } else if (isIgnoreForm) {
                         const normalizedAction = submitActionLabel.toLowerCase();
                         const ignoreMessage = normalizedAction.includes("ignore")
                             ? "Meal ignored."
