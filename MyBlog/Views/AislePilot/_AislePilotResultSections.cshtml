@@ -562,35 +562,6 @@
                                                  data-day-card-header-actions
                                                  data-slot-index="@slotIndex"
                                                  aria-hidden="@(slotIndex == 0 ? "false" : "true")">
-                                                <form method="post"
-                                                      action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
-                                                      class="aislepilot-swap-form aislepilot-card-action-inline"
-                                                      data-preserve-scroll-form
-                                                      data-ajax-swap-form>
-                                                    @Html.AntiForgeryToken()
-                                                    <partial name="_AislePilotHiddenRequestFields"
-                                                             model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                                                    <input type="hidden" name="dayIndex" value="@slotMealIndex" />
-                                                    <input type="hidden" name="currentMealName" value="@slotMeal.MealName" />
-                                                    <button type="submit"
-                                                            class="aislepilot-swap-btn is-icon-only"
-                                                            data-loading-label="Swapping..."
-                                                            data-loading-delay-ms="320"
-                                                            aria-label="Swap meal"
-                                                            title="Swap meal">
-                                                        <span class="aislepilot-btn-label">
-                                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                                <svg viewBox="0 0 24 24" focusable="false">
-                                                                    <path d="M16 3h5v5"></path>
-                                                                    <path d="M21 3 9 15"></path>
-                                                                    <path d="M8 21H3v-5"></path>
-                                                                    <path d="M3 21 15 9"></path>
-                                                                </svg>
-                                                            </span>
-                                                            <span class="sr-only">Swap meal</span>
-                                                        </span>
-                                                    </button>
-                                                </form>
                                                 <details class="aislepilot-card-more-actions" data-card-more-actions>
                                                     <summary class="aislepilot-more-actions-trigger is-icon-only"
                                                              aria-controls="@slotMoreActionsMenuId"
@@ -608,6 +579,37 @@
                                                     </summary>
                                                     <div id="@slotMoreActionsMenuId" class="aislepilot-card-more-actions-menu" role="menu" aria-label="Meal actions">
                                                         <form method="post"
+                                                              action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
+                                                              class="aislepilot-swap-form aislepilot-card-more-action-form"
+                                                              data-preserve-scroll-form
+                                                              data-ajax-swap-form>
+                                                            @Html.AntiForgeryToken()
+                                                            <partial name="_AislePilotHiddenRequestFields"
+                                                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                                                            <input type="hidden" name="dayIndex" value="@slotMealIndex" />
+                                                            <input type="hidden" name="currentMealName" value="@slotMeal.MealName" />
+                                                            <button type="submit"
+                                                                    class="aislepilot-swap-btn is-secondary is-icon-only is-compact"
+                                                                    role="menuitem"
+                                                                    data-loading-label="Swapping..."
+                                                                    data-loading-delay-ms="320"
+                                                                    aria-label="Swap meal"
+                                                                    title="Swap meal">
+                                                                <span class="aislepilot-btn-label">
+                                                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                                        <svg viewBox="0 0 24 24" focusable="false">
+                                                                            <path d="M16 3h5v5"></path>
+                                                                            <path d="M21 3 9 15"></path>
+                                                                            <path d="M8 21H3v-5"></path>
+                                                                            <path d="M3 21 15 9"></path>
+                                                                        </svg>
+                                                                    </span>
+                                                                    <span class="sr-only">Swap meal</span>
+                                                                </span>
+                                                            </button>
+                                                        </form>
+
+                                                        <form method="post"
                                                               action="@Url.Action("ToggleEnjoyedMeal", "AislePilot")#aislepilot-meals"
                                                               class="aislepilot-swap-form aislepilot-favorite-form aislepilot-card-more-action-form"
                                                               data-preserve-scroll-form
@@ -621,8 +623,8 @@
                                                             @{
                                                                 var saveActionLabel = slotIsSavedMeal ? "Unsave meal" : "Save meal";
                                                                 var saveButtonClass = slotIsSavedMeal
-                                                                    ? "aislepilot-swap-btn is-secondary is-saved-meal is-compact"
-                                                                    : "aislepilot-swap-btn is-secondary is-compact";
+                                                                    ? "aislepilot-swap-btn is-secondary is-saved-meal is-icon-only is-compact"
+                                                                    : "aislepilot-swap-btn is-secondary is-icon-only is-compact";
                                                             }
                                                             <button type="submit"
                                                                     class="@saveButtonClass"
@@ -635,7 +637,7 @@
                                                                             <path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.5 6.5 20.1l1-6.2L3 9.5l6.2-.9z"></path>
                                                                         </svg>
                                                                     </span>
-                                                                    <span>@saveActionLabel</span>
+                                                                    <span class="sr-only">@saveActionLabel</span>
                                                                 </span>
                                                             </button>
                                                         </form>
@@ -652,8 +654,8 @@
                                                             @{
                                                                 var ignoreActionLabel = slotIsIgnored ? "Include meal" : "Ignore meal";
                                                                 var ignoreButtonClass = slotIsIgnored
-                                                                    ? "aislepilot-swap-btn is-secondary is-compact"
-                                                                    : "aislepilot-swap-btn is-secondary is-danger is-compact";
+                                                                    ? "aislepilot-swap-btn is-secondary is-icon-only is-compact"
+                                                                    : "aislepilot-swap-btn is-secondary is-danger is-icon-only is-compact";
                                                             }
                                                             <button type="submit"
                                                                     class="@ignoreButtonClass"
@@ -676,7 +678,7 @@
                                                                             }
                                                                         </svg>
                                                                     </span>
-                                                                    <span>@ignoreActionLabel</span>
+                                                                    <span class="sr-only">@ignoreActionLabel</span>
                                                                 </span>
                                                             </button>
                                                         </form>

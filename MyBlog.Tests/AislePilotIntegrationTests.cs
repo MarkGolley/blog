@@ -1127,6 +1127,18 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task AislePilotStylesheet_MealMethodListsRenderMarkersInsidePanelBounds()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.Contains(".aislepilot-day-meal-panel > .aislepilot-meal-details-panel ol.case-list", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("list-style-position: inside;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("padding-left: 0;", css, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Post_WithThreeMealsPerDay_RendersMealSlotTabsOnDayCards()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -1200,7 +1212,7 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
-    public async Task Index_Post_WithThreeMealsPerDay_RendersPrimarySwapAndMoreActionsControls()
+    public async Task Index_Post_WithThreeMealsPerDay_RendersSwapInsideMoreActionsMenu()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -1223,12 +1235,22 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("class=\"aislepilot-swap-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-swap-btn is-secondary is-icon-only is-compact\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"sr-only\">Swap meal</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-loading-delay-ms=\"320\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-header-actions", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-card-more-actions", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aria-label=\"More actions\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"<div[^>]*class=""[^""]*aislepilot-card-more-actions-menu[^""]*""[^>]*>[\s\S]*?<form[^>]*action=""[^""]*/swap-meal[^""]*""",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.DoesNotMatch(
+            new Regex(
+                @"<form[^>]*action=""[^""]*/swap-meal[^""]*""[^>]*class=""[^""]*aislepilot-card-action-inline[^""]*""",
+                RegexOptions.IgnoreCase),
+            html);
         Assert.DoesNotContain("class=\"aislepilot-card-kicker\">Breakfast</p>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-card-kicker\">Lunch</p>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-card-kicker\">Dinner</p>", html, StringComparison.OrdinalIgnoreCase);
@@ -1260,8 +1282,10 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.Contains("class=\"aislepilot-overview-regenerate-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-edit-setup-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"aislepilot-swap-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-more-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-swap-btn is-secondary is-icon-only is-compact\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<span>Save meal</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<span>Ignore meal</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-meal-image-summary\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"sr-only\">Refresh plan</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"sr-only\">Edit settings</span>", html, StringComparison.OrdinalIgnoreCase);

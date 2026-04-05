@@ -2697,8 +2697,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin: 0;
 }
 
-.aislepilot-day-card-header-actions .aislepilot-swap-btn.is-icon-only,
-.aislepilot-day-card-header-actions .aislepilot-more-actions-trigger.is-icon-only {
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only {
     width: 1.92rem;
     min-width: 1.92rem;
     min-height: 1.92rem;
@@ -2708,8 +2707,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     box-shadow: none;
 }
 
-.aislepilot-day-card-header-actions .aislepilot-swap-btn.is-icon-only .aislepilot-symbol-glyph,
-.aislepilot-day-card-header-actions .aislepilot-more-actions-trigger.is-icon-only .aislepilot-symbol-glyph {
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only .aislepilot-symbol-glyph {
     width: 1.26rem;
     height: 1.26rem;
     border-color: rgba(16, 63, 101, 0.26);
@@ -2717,13 +2715,11 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: var(--brand-deep);
 }
 
-.aislepilot-day-card-header-actions .aislepilot-swap-btn.is-icon-only:hover,
-.aislepilot-day-card-header-actions .aislepilot-more-actions-trigger.is-icon-only:hover {
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only:hover {
     filter: none;
 }
 
-.aislepilot-day-card-header-actions .aislepilot-swap-btn.is-icon-only:hover .aislepilot-symbol-glyph,
-.aislepilot-day-card-header-actions .aislepilot-more-actions-trigger.is-icon-only:hover .aislepilot-symbol-glyph {
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only:hover .aislepilot-symbol-glyph {
     background: rgba(16, 63, 101, 0.14);
 }
 
@@ -2782,6 +2778,11 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-day-meal-panel > .aislepilot-meal-details-panel :is(.aislepilot-nutrition-list, .case-list):last-child {
     margin-bottom: 0;
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel ol.case-list {
+    list-style-position: inside;
+    padding-left: 0;
 }
 
 .aislepilot-meal-details-grid {
@@ -2985,6 +2986,19 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-card-more-action-form {
     margin: 0;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-icon-only.is-compact {
+    justify-content: center;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-icon-only.is-compact .aislepilot-btn-label {
+    gap: 0;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-icon-only.is-compact.is-loading {
+    width: 100%;
+    min-width: 0;
 }
 
 .aislepilot-toast-stack {
@@ -3554,8 +3568,7 @@ html.aislepilot-restore-pending .aislepilot-app {
         gap: 0.24rem;
     }
 
-    .aislepilot-day-card-header-actions .aislepilot-swap-btn.is-icon-only,
-    .aislepilot-day-card-header-actions .aislepilot-more-actions-trigger.is-icon-only {
+    .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only {
         width: 1.82rem;
         min-width: 1.82rem;
         min-height: 1.82rem;
@@ -4051,15 +4064,13 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: rgba(29, 45, 67, 0.96) !important;
 }
 
-:root[data-theme="dark"] .aislepilot-day-card-header-actions .aislepilot-swap-btn.is-icon-only,
-:root[data-theme="dark"] .aislepilot-day-card-header-actions .aislepilot-more-actions-trigger.is-icon-only {
+:root[data-theme="dark"] .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only {
     border: none !important;
     background: transparent !important;
     box-shadow: none !important;
 }
 
-:root[data-theme="dark"] .aislepilot-day-card-header-actions .aislepilot-swap-btn.is-icon-only .aislepilot-symbol-glyph,
-:root[data-theme="dark"] .aislepilot-day-card-header-actions .aislepilot-more-actions-trigger.is-icon-only .aislepilot-symbol-glyph {
+:root[data-theme="dark"] .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only .aislepilot-symbol-glyph {
     border-color: rgba(125, 167, 213, 0.44);
     background: rgba(125, 167, 213, 0.16);
     color: #deefff;

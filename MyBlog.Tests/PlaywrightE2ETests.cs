@@ -108,14 +108,20 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var swapButtons = page.Locator(
-            ".aislepilot-day-meal-panel[aria-hidden='false'] form[action*='/swap-meal'] button.aislepilot-swap-btn:has-text('Swap meal')");
-        var swapButtonCount = await swapButtons.CountAsync();
-        Assert.True(swapButtonCount > 0, "Expected at least one swap meal button to be rendered.");
+        var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary");
+        var moreActionsTriggerCount = await moreActionsTriggers.CountAsync();
+        Assert.True(moreActionsTriggerCount > 0, "Expected at least one meal actions menu trigger to be rendered.");
 
-        var targetIndex = Math.Min(3, swapButtonCount - 1);
-        var targetSwapButton = swapButtons.Nth(targetIndex);
-        await targetSwapButton.ScrollIntoViewIfNeededAsync();
+        var targetIndex = Math.Min(3, moreActionsTriggerCount - 1);
+        var targetTrigger = moreActionsTriggers.Nth(targetIndex);
+        var targetSwapButton = targetTrigger.Locator("xpath=ancestor::details[1]").Locator("button[aria-label='Swap meal']").First;
+        await targetTrigger.ScrollIntoViewIfNeededAsync();
+        await targetTrigger.ClickAsync();
+        await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
 
         var beforeScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
         Assert.True(beforeScrollY > 100, $"Expected to scroll below hero before swap. Actual scrollY={beforeScrollY}.");
@@ -539,7 +545,7 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
             """);
         Assert.True(submitted, "Expected to submit the AislePilot generator form.");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.Locator(".aislepilot-swap-btn").First.WaitForAsync(new LocatorWaitForOptions
+        await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 15000
@@ -561,16 +567,10 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
 
         var viewDetailsSummary = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
         var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
-        var swapButton = activeMealCard.Locator("[data-day-card-header-actions].is-active form[action*='/swap-meal'] button.aislepilot-swap-btn").First;
         var moreActionsSummary = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
 
         await moreActionsSummary.ScrollIntoViewIfNeededAsync();
         await viewDetailsSummary.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        await swapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 10000
@@ -585,9 +585,8 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
             """
             () => {
                 const controls = Array.from(document.querySelectorAll(
-                    "[data-day-card-header-actions].is-active form[action*='/swap-meal'] button.aislepilot-swap-btn, " +
                     "[data-day-card-header-actions].is-active [data-card-more-actions] > summary"));
-                if (controls.length < 2) {
+                if (controls.length === 0) {
                     return Number.POSITIVE_INFINITY;
                 }
 
@@ -1636,7 +1635,7 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         var generateButton = page.Locator("form.aislepilot-form button[type='submit']:has-text('Generate weekly plan')");
         await generateButton.ClickAsync();
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.Locator(".aislepilot-swap-btn").First.WaitForAsync(new LocatorWaitForOptions
+        await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 15000
