@@ -150,8 +150,8 @@
     var householdLabel = safeHouseholdSize == 1 ? "person" : "people";
     var budgetDeltaSummaryText = result.BudgetDelta switch
     {
-        > 0m => $"{result.BudgetDelta.ToString("C", ukCulture)} over",
-        < 0m => $"{Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} under",
+        > 0m => $"{result.BudgetDelta.ToString("C", ukCulture)} under",
+        < 0m => $"{Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over",
         _ => "On budget"
     };
     var shoppingListNotesBuilder = new StringBuilder();
@@ -337,7 +337,9 @@
             <div class="aislepilot-mobile-context-summary">
                 <p class="aislepilot-mobile-context-meta">
                     <span class="aislepilot-mobile-context-title">Weekly plan</span>
-                    &middot; Est. @result.EstimatedTotalCost.ToString("C", ukCulture) &middot; @budgetDeltaSummaryText
+                    <span class="aislepilot-mobile-context-meta-values">
+                        Est. @result.EstimatedTotalCost.ToString("C", ukCulture) &middot; @budgetDeltaSummaryText
+                    </span>
                 </p>
             </div>
             <div class="aislepilot-mobile-context-jumps" role="tablist" aria-label="Jump to section">
@@ -499,7 +501,7 @@
                             var firstSlotIsIgnored = ignoredMealSlotIndexes.Contains(firstSlotEntry.index) || firstSlotMeal.IsIgnored;
                             var daySummaryMeta = firstSlotIsIgnored
                                 ? "Removed"
-                                : $"{firstSlotMeal.EstimatedCost.ToString("C", ukCulture)} \u00B7 {Math.Max(0, firstSlotMeal.EstimatedPrepMinutes)} mins";
+                                : $"{firstSlotMeal.EstimatedCost.ToString("C", ukCulture)} \u00A0\u00A0\u00B7\u00A0\u00A0 {Math.Max(0, firstSlotMeal.EstimatedPrepMinutes)} mins";
                             var mealCardClass = dayGroup.LeftoverDaysCovered > 0
                                 ? "aislepilot-card aislepilot-day-card is-leftover-source"
                                 : "aislepilot-card aislepilot-day-card";
@@ -695,7 +697,7 @@
                                             var slotIsIgnored = ignoredMealSlotIndexes.Contains(slotEntry.index) || slotMeal.IsIgnored;
                                             var slotSummaryMeta = slotIsIgnored
                                                 ? "Removed"
-                                                : $"{slotMeal.EstimatedCost.ToString("C", ukCulture)} \u00B7 {Math.Max(0, slotMeal.EstimatedPrepMinutes)} mins";
+                                                : $"{slotMeal.EstimatedCost.ToString("C", ukCulture)} \u00A0\u00A0\u00B7\u00A0\u00A0 {Math.Max(0, slotMeal.EstimatedPrepMinutes)} mins";
                                             var slotTabId = $"{tabPrefix}-tab-{slotIndex}";
                                             <button type="button"
                                                     id="@slotTabId"

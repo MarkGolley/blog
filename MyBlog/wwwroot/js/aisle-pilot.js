@@ -3607,12 +3607,112 @@
         return currentInputs.length > 0;
     };
 
+    const normalizeMealImageName = value => {
+        if (typeof value !== "string") {
+            return "";
+        }
+
+        return value.trim().toLowerCase();
+    };
+
+    const captureRenderedMealImageSources = scope => {
+        if (!(scope instanceof Document || scope instanceof Element)) {
+            return new Map();
+        }
+
+        const imageElements = Array.from(scope.querySelectorAll("img[data-meal-image][data-meal-name]"));
+        const imageSrcByMealName = new Map();
+        imageElements.forEach(imageElement => {
+            if (!(imageElement instanceof HTMLImageElement)) {
+                return;
+            }
+
+            const mealNameKey = normalizeMealImageName(imageElement.dataset.mealName ?? "");
+            if (!mealNameKey) {
+                return;
+            }
+
+            const imageSrc = (imageElement.getAttribute("src") ?? imageElement.currentSrc ?? "").trim();
+            if (!imageSrc) {
+                return;
+            }
+
+            const preservedEntries = imageSrcByMealName.get(mealNameKey);
+            const nextEntry = {
+                imageElement,
+                imageSrc
+            };
+            if (Array.isArray(preservedEntries)) {
+                preservedEntries.push(nextEntry);
+                return;
+            }
+
+            imageSrcByMealName.set(mealNameKey, [nextEntry]);
+        });
+
+        return imageSrcByMealName;
+    };
+
+    const restoreRenderedMealImageSources = (scope, imageSrcByMealName) => {
+        if (!(scope instanceof Document || scope instanceof Element) || !(imageSrcByMealName instanceof Map) || imageSrcByMealName.size === 0) {
+            return;
+        }
+
+        const imageElements = Array.from(scope.querySelectorAll("img[data-meal-image][data-meal-name]"));
+        imageElements.forEach(imageElement => {
+            if (!(imageElement instanceof HTMLImageElement)) {
+                return;
+            }
+
+            const mealNameKey = normalizeMealImageName(imageElement.dataset.mealName ?? "");
+            if (!mealNameKey) {
+                return;
+            }
+
+            const preservedEntries = imageSrcByMealName.get(mealNameKey);
+            if (!Array.isArray(preservedEntries) || preservedEntries.length === 0) {
+                return;
+            }
+
+            const preservedEntry = preservedEntries.shift();
+            const preservedImageSrc = typeof preservedEntry?.imageSrc === "string"
+                ? preservedEntry.imageSrc.trim()
+                : "";
+            if (!preservedImageSrc) {
+                return;
+            }
+
+            const preservedImageElement = preservedEntry?.imageElement;
+            if (preservedImageElement instanceof HTMLImageElement) {
+                const currentPreservedSrc = (preservedImageElement.getAttribute("src") ?? preservedImageElement.currentSrc ?? "").trim();
+                if (currentPreservedSrc !== preservedImageSrc) {
+                    preservedImageElement.src = preservedImageSrc;
+                }
+
+                preservedImageElement.alt = imageElement.alt;
+                const incomingMealName = imageElement.dataset.mealName ?? "";
+                if (incomingMealName.length > 0) {
+                    preservedImageElement.dataset.mealName = incomingMealName;
+                }
+
+                imageElement.replaceWith(preservedImageElement);
+                return;
+            }
+
+            const currentImageSrc = (imageElement.getAttribute("src") ?? "").trim();
+            if (currentImageSrc !== preservedImageSrc) {
+                imageElement.src = preservedImageSrc;
+            }
+        });
+    };
+
     const applyAjaxSwapResponse = (responseText, slotIndex) => {
         if (typeof DOMParser === "undefined") {
             return false;
         }
 
         rememberDayMealSlots(document);
+        const preservedMealImageSources = captureRenderedMealImageSources(document);
         const wasOverviewExpanded = (() => {
             const currentOverviewContent = getOverviewContent();
             return currentOverviewContent instanceof HTMLElement && !currentOverviewContent.hasAttribute("hidden");
@@ -3629,6 +3729,7 @@
         replaceSectionContent(responseDocument, "#aislepilot-overview");
         replaceSectionContent(responseDocument, "#aislepilot-shop");
         replaceSectionContent(responseDocument, "#aislepilot-export");
+        restoreRenderedMealImageSources(document, preservedMealImageSources);
         if (wasOverviewExpanded) {
             const nextOverviewContent = getOverviewContent();
             if (nextOverviewContent instanceof HTMLElement) {

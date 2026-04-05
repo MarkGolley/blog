@@ -1439,6 +1439,33 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_WithUnresolvableCurrentPlanMealNames_FallsBackToTemplatesWithoutThrowing()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Meal that does not exist anywhere"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var resultMealNames = result.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(2, resultMealNames.Count);
+        Assert.DoesNotContain("Meal that does not exist anywhere", resultMealNames, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task BuildPlanFromCurrentMealsAsync_MacrosRemainPerServingAcrossHouseholdSizes()
     {
         var currentPlanMealNames = new List<string>

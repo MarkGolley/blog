@@ -1888,11 +1888,28 @@ public sealed class AislePilotService : IAislePilotService
         await EnsureAiMealPoolHydratedAsync(cancellationToken);
         var resolvableMealCount = Math.Min(normalizedMealNames.Count, totalMealCount);
         var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(normalizedMealNames, resolvableMealCount);
+        var usedTemplateTopUp = false;
         if (selectedMeals is null || selectedMeals.Count == 0)
         {
-            throw new InvalidOperationException("Could not resolve the current plan for export. Generate a fresh plan and try again.");
+            var fallbackMeals = SelectMeals(
+                MealTemplates,
+                context.DietaryModes,
+                request.WeeklyBudget,
+                context.HouseholdFactor,
+                request.PreferQuickMeals,
+                context.DislikesOrAllergens,
+                totalMealCount,
+                mealTypeSlots,
+                request.IncludeSpecialTreatMeal,
+                request.SelectedSpecialTreatCookDayIndex,
+                savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+            selectedMeals = fallbackMeals.ToList();
+            AddMealsToAiPool(fallbackMeals);
+            usedTemplateTopUp = true;
         }
-        var usedTemplateTopUp = false;
+
         if (selectedMeals.Count < totalMealCount)
         {
             try

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
@@ -1100,10 +1101,61 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("Cook days", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Leftovers", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("2 day(s)", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-mobile-context-meta-values\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             "data-overview-content(?:\\s+[^>]*)?\\s+hidden|hidden(?:\\s+[^>]*)?\\s+data-overview-content",
             html);
+    }
+
+    [Fact]
+    public async Task Index_Post_WeeklySummaryBudgetDirection_MatchesOverviewBudgetDifferenceSign()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "7",
+            ["Request.LeftoverCookDayIndexesCsv"] = "0,1",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        var budgetDifferenceText = ExtractOverviewBudgetDifferenceText(html);
+        var weeklySummaryText = ExtractWeeklyBudgetSummaryText(html);
+
+        Assert.True(
+            decimal.TryParse(
+                budgetDifferenceText.Replace("\u00A0", " "),
+                NumberStyles.Currency,
+                CultureInfo.GetCultureInfo("en-GB"),
+                out var budgetDifferenceValue),
+            $"Could not parse budget difference value '{budgetDifferenceText}'.");
+
+        if (budgetDifferenceValue < 0m)
+        {
+            Assert.Contains("over", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("under", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
+            return;
+        }
+
+        if (budgetDifferenceValue > 0m)
+        {
+            Assert.Contains("under", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("over", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
+            return;
+        }
+
+        Assert.Contains("on budget", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1289,6 +1341,20 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task AislePilotScript_AjaxSwapResponse_RestoresMealImagesToReduceFlash()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+
+        Assert.Contains("const captureRenderedMealImageSources = scope => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const restoreRenderedMealImageSources = (scope, imageSrcByMealName) => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("imageElement.replaceWith(preservedImageElement);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const preservedMealImageSources = captureRenderedMealImageSources(document);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("restoreRenderedMealImageSources(document, preservedMealImageSources);", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AislePilotStylesheet_MealMethodListsRenderMarkersInsidePanelBounds()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -1408,7 +1474,7 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
             html);
         Assert.Matches(
             new Regex(
-                @"<p class=""aislepilot-day-card-meta""[^>]*>\s*(?:\u00A3|&#xA3;|&pound;)\d+(?:\.\d{2})?\s*(?:&middot;|&#xB7;|·)\s*\d+\s+mins\s*</p>",
+                @"<p class=""aislepilot-day-card-meta""[^>]*>[\s\S]*?(?:\u00A3|&#xA3;|&pound;)[\s\S]*?mins\s*</p>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.DoesNotContain("class=\"aislepilot-meal-details-grid\"", html, StringComparison.OrdinalIgnoreCase);
@@ -1843,6 +1909,27 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
             .Select(match => WebUtility.HtmlDecode(match.Groups[1].Value))
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToList();
+    }
+
+    private static string ExtractOverviewBudgetDifferenceText(string html)
+    {
+        var match = Regex.Match(
+            html,
+            @"<p class=""aislepilot-stat-label"">\s*Budget difference\s*</p>\s*<p class=""aislepilot-stat-value[^""]*"">\s*(?<value>[^<]+)\s*</p>",
+            RegexOptions.IgnoreCase);
+        Assert.True(match.Success, "Could not find overview budget difference text.");
+        return WebUtility.HtmlDecode(match.Groups["value"].Value).Trim();
+    }
+
+    private static string ExtractWeeklyBudgetSummaryText(string html)
+    {
+        var match = Regex.Match(
+            html,
+            @"<span class=""aislepilot-mobile-context-meta-values"">\s*(?<value>[\s\S]*?)\s*</span>",
+            RegexOptions.IgnoreCase);
+        Assert.True(match.Success, "Could not find weekly summary budget text.");
+        var raw = WebUtility.HtmlDecode(match.Groups["value"].Value);
+        return Regex.Replace(raw, @"\s+", " ").Trim();
     }
 
 }
