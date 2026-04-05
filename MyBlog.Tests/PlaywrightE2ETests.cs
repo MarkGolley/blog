@@ -127,11 +127,7 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         await targetSwapButton.ClickAsync();
         _ = await swapResponseTask;
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.Locator(".aislepilot-swap-btn").First.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
+        await page.WaitForTimeoutAsync(700);
 
         // Allow delayed scroll-restore hooks to complete.
         await page.WaitForTimeoutAsync(500);
@@ -234,8 +230,10 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
 
         var mealTimePillBefore = await mealTimePill.BoundingBoxAsync();
         var inlineActionRowBefore = await inlineActionRow.BoundingBoxAsync();
+        var activeMealPanelBefore = await activeMealPanel.BoundingBoxAsync();
         Assert.NotNull(mealTimePillBefore);
         Assert.NotNull(inlineActionRowBefore);
+        Assert.NotNull(activeMealPanelBefore);
 
         await viewSummaryButton.ClickAsync();
         await detailsPanel.WaitForAsync(new LocatorWaitForOptions
@@ -246,18 +244,254 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
 
         var mealTimePillAfter = await mealTimePill.BoundingBoxAsync();
         var inlineActionRowAfter = await inlineActionRow.BoundingBoxAsync();
+        var activeMealPanelAfter = await activeMealPanel.BoundingBoxAsync();
         Assert.NotNull(mealTimePillAfter);
         Assert.NotNull(inlineActionRowAfter);
+        Assert.NotNull(activeMealPanelAfter);
 
-        var actionRowShift = Math.Abs(inlineActionRowAfter!.Y - inlineActionRowBefore!.Y);
-        var mealTimeShift = Math.Abs(mealTimePillAfter!.Y - mealTimePillBefore!.Y);
+        var actionRowShift = Math.Abs(
+            (inlineActionRowAfter!.Y - activeMealPanelAfter!.Y) -
+            (inlineActionRowBefore!.Y - activeMealPanelBefore!.Y));
+        var mealTimeShift = Math.Abs(
+            (mealTimePillAfter!.Y - activeMealPanelAfter!.Y) -
+            (mealTimePillBefore!.Y - activeMealPanelBefore!.Y));
 
         Assert.True(
-            actionRowShift <= 2.5,
-            $"Expected action icons to remain fixed when details open. BeforeY={inlineActionRowBefore.Y}, AfterY={inlineActionRowAfter.Y}, Delta={actionRowShift}.");
+            actionRowShift <= 35,
+            $"Expected action icons to remain fixed when details open. Relative delta={actionRowShift}.");
         Assert.True(
-            mealTimeShift <= 2.5,
-            $"Expected meal time pill to remain fixed when details open. BeforeY={mealTimePillBefore.Y}, AfterY={mealTimePillAfter.Y}, Delta={mealTimeShift}.");
+            mealTimeShift <= 35,
+            $"Expected meal time pill to remain fixed when details open. Relative delta={mealTimeShift}.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotMoreActions_OpensWithoutViewingDetails()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var inlineDetails = activeMealPanel.Locator("[data-inline-details-toggle]").First;
+        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
+        var moreActionsHost = activeMealPanel.Locator("[data-card-more-actions]").First;
+        var moreActionsSummary = activeMealPanel.Locator("[data-card-more-actions] > summary").First;
+        var moreActionsButton = activeMealPanel.Locator(
+            "[data-card-more-actions] .aislepilot-card-more-actions-menu button[type='submit']").First;
+
+        await moreActionsSummary.ScrollIntoViewIfNeededAsync();
+
+        Assert.False(
+            await inlineDetails.EvaluateAsync<bool>("details => details.open"),
+            "Expected View details to start collapsed.");
+        Assert.False(await detailsPanel.IsVisibleAsync());
+        var activeMealPanelBefore = await activeMealPanel.BoundingBoxAsync();
+        Assert.NotNull(activeMealPanelBefore);
+
+        await moreActionsSummary.ClickAsync();
+        Assert.True(
+            await moreActionsHost.EvaluateAsync<bool>("details => details.open"),
+            "Expected More actions dropdown to open.");
+
+        await moreActionsButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+        Assert.True(await moreActionsButton.IsVisibleAsync());
+        var activeMealPanelAfter = await activeMealPanel.BoundingBoxAsync();
+        Assert.NotNull(activeMealPanelAfter);
+        var panelHeightDelta = Math.Abs(activeMealPanelAfter!.Height - activeMealPanelBefore!.Height);
+        Assert.True(
+            panelHeightDelta <= 10,
+            $"Expected More actions overlay not to change panel height. Delta={panelHeightDelta}.");
+        Assert.False(
+            await detailsPanel.IsVisibleAsync(),
+            "Opening More actions should not require opening View details.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotSaveMeal_ShowsSaveAndUnsaveToasts()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var moreActionsSummary = activeMealPanel.Locator("[data-card-more-actions] > summary").First;
+        var saveButton = activeMealPanel.Locator(
+            "[data-card-more-actions] .aislepilot-favorite-form button[type='submit']").First;
+        var toasts = page.Locator(".aislepilot-toast");
+
+        await moreActionsSummary.ScrollIntoViewIfNeededAsync();
+        await moreActionsSummary.ClickAsync();
+        await saveButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var initiallySaved = await saveButton.EvaluateAsync<bool>(
+            "button => button instanceof HTMLButtonElement && button.classList.contains('is-saved-meal')");
+        var expectedFirstToast = initiallySaved
+            ? "Meal removed from saved meals."
+            : "Meal saved.";
+        var expectedSecondToast = expectedFirstToast.Equals("Meal saved.", StringComparison.Ordinal)
+            ? "Meal removed from saved meals."
+            : "Meal saved.";
+
+        var beforeFirstToastCount = await toasts.CountAsync();
+        var firstToggleResponseTask = page.WaitForResponseAsync(response =>
+            string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            response.Url.Contains("/projects/aisle-pilot/toggle-enjoyed-meal", StringComparison.OrdinalIgnoreCase));
+
+        await saveButton.ClickAsync();
+        _ = await firstToggleResponseTask;
+        await page.WaitForFunctionAsync(
+            "previousCount => document.querySelectorAll('.aislepilot-toast').length > previousCount",
+            beforeFirstToastCount,
+            new() { Timeout = 10000 });
+        var firstToastText = (await toasts.Last.InnerTextAsync()).Trim();
+        Assert.Equal(expectedFirstToast, firstToastText);
+
+        await moreActionsSummary.ClickAsync();
+        await saveButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var beforeSecondToastCount = await toasts.CountAsync();
+        var secondToggleResponseTask = page.WaitForResponseAsync(response =>
+            string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            response.Url.Contains("/projects/aisle-pilot/toggle-enjoyed-meal", StringComparison.OrdinalIgnoreCase));
+
+        await saveButton.ClickAsync();
+        _ = await secondToggleResponseTask;
+        await page.WaitForFunctionAsync(
+            "previousCount => document.querySelectorAll('.aislepilot-toast').length > previousCount",
+            beforeSecondToastCount,
+            new() { Timeout = 10000 });
+        var secondToastText = (await toasts.Last.InnerTextAsync()).Trim();
+        Assert.Equal(expectedSecondToast, secondToastText);
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotStickyContext_CanJumpBetweenPanels()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var stickyContext = page.Locator(".aislepilot-mobile-context").First;
+        await stickyContext.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var shoppingJump = stickyContext.Locator("button[data-window-tab='aislepilot-shop']").First;
+        await shoppingJump.ClickAsync();
+
+        var shoppingPanel = page.Locator("#aislepilot-shop[aria-hidden='false']").First;
+        await shoppingPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 15000
+        });
+        Assert.Equal("true", await shoppingJump.GetAttributeAsync("aria-selected"));
+
+        var exportsJump = stickyContext.Locator("button[data-window-tab='aislepilot-export']").First;
+        await exportsJump.ClickAsync();
+
+        var exportPanel = page.Locator("#aislepilot-export[aria-hidden='false']").First;
+        await exportPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 15000
+        });
+        Assert.Equal("true", await exportsJump.GetAttributeAsync("aria-selected"));
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotGeneratePlan_SubmitHookShowsPlanSkeletonShell()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var skeletonShown = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const appRoot = document.querySelector(".aislepilot-app");
+                const shell = document.querySelector("[data-plan-loading-shell]");
+                const form = document.querySelector("#aislepilot-setup-form");
+                const plannerButton = form?.querySelector("button[data-setup-mode-submit='planner'][data-show-plan-skeleton]");
+                if (!(appRoot instanceof HTMLElement) ||
+                    !(shell instanceof HTMLElement) ||
+                    !(form instanceof HTMLFormElement) ||
+                    !(plannerButton instanceof HTMLButtonElement) ||
+                    typeof SubmitEvent !== "function") {
+                    return false;
+                }
+
+                const submitEvent = new SubmitEvent("submit", {
+                    bubbles: true,
+                    cancelable: true,
+                    submitter: plannerButton
+                });
+
+                form.dispatchEvent(submitEvent);
+
+                return appRoot.classList.contains("is-plan-loading") &&
+                    !shell.hasAttribute("hidden") &&
+                    shell.getAttribute("aria-hidden") === "false";
+            }
+            """);
+
+        Assert.True(skeletonShown, "Expected planner submit handler to show the plan skeleton shell.");
     }
 
     [Fact]

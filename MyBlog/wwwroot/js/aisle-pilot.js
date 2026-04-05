@@ -6,6 +6,30 @@
     );
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
     const submitLoadingDelayTimers = new WeakMap();
+    const appRoot = document.querySelector(".aislepilot-app");
+    const planLoadingShell = appRoot instanceof HTMLElement
+        ? appRoot.querySelector("[data-plan-loading-shell]")
+        : null;
+
+    const showPlanLoadingShell = () => {
+        if (!(appRoot instanceof HTMLElement) || !(planLoadingShell instanceof HTMLElement)) {
+            return;
+        }
+
+        appRoot.classList.add("is-plan-loading");
+        planLoadingShell.removeAttribute("hidden");
+        planLoadingShell.setAttribute("aria-hidden", "false");
+    };
+
+    const hidePlanLoadingShell = () => {
+        if (!(appRoot instanceof HTMLElement) || !(planLoadingShell instanceof HTMLElement)) {
+            return;
+        }
+
+        appRoot.classList.remove("is-plan-loading");
+        planLoadingShell.setAttribute("hidden", "hidden");
+        planLoadingShell.setAttribute("aria-hidden", "true");
+    };
 
     const selectInputValue = input => {
         if (!(input instanceof HTMLInputElement)) {
@@ -98,6 +122,9 @@
             targetForm.setAttribute("data-is-submitting", "true");
             submitButton.disabled = true;
             submitButton.setAttribute("aria-busy", "true");
+            if (submitButton.hasAttribute("data-show-plan-skeleton") || targetForm.hasAttribute("data-show-plan-skeleton")) {
+                showPlanLoadingShell();
+            }
             if (targetForm.hasAttribute("data-skip-submit-loading")) {
                 return;
             }
@@ -167,6 +194,60 @@
             form.dataset.exportThemeWired = "true";
             form.addEventListener("submit", syncThemeInput);
         });
+    };
+
+    let toastHost = null;
+    let toastLiveRegion = null;
+
+    const ensureToastHost = () => {
+        if (toastHost instanceof HTMLElement && toastLiveRegion instanceof HTMLElement) {
+            return;
+        }
+
+        const host = document.createElement("div");
+        host.className = "aislepilot-toast-stack";
+        host.setAttribute("aria-hidden", "true");
+
+        const liveRegion = document.createElement("p");
+        liveRegion.className = "aislepilot-toast-live";
+        liveRegion.setAttribute("aria-live", "polite");
+        liveRegion.setAttribute("aria-atomic", "true");
+        liveRegion.textContent = "";
+
+        const appRoot = document.querySelector(".aislepilot-app");
+        if (appRoot instanceof HTMLElement) {
+            appRoot.append(host, liveRegion);
+        } else {
+            document.body.append(host, liveRegion);
+        }
+
+        toastHost = host;
+        toastLiveRegion = liveRegion;
+    };
+
+    const showToast = (message, type = "info") => {
+        const normalizedMessage = typeof message === "string" ? message.trim() : "";
+        if (normalizedMessage.length === 0) {
+            return;
+        }
+
+        ensureToastHost();
+        if (!(toastHost instanceof HTMLElement) || !(toastLiveRegion instanceof HTMLElement)) {
+            return;
+        }
+
+        const toast = document.createElement("div");
+        toast.className = `aislepilot-toast is-${type}`;
+        toast.textContent = normalizedMessage;
+        toastHost.append(toast);
+        toastLiveRegion.textContent = normalizedMessage;
+
+        window.setTimeout(() => {
+            toast.classList.add("is-fading-out");
+            window.setTimeout(() => {
+                toast.remove();
+            }, 220);
+        }, 2200);
     };
 
     wireSubmitLoadingHandlers(document);
@@ -1808,7 +1889,7 @@
             trigger.addEventListener("click", async () => {
                 const notesText = contentField.value?.trim() ?? "";
                 if (notesText.length === 0) {
-                    const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not prepare shopping list.";
+                    const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not prepare shopping list. Try again.";
                     setTemporaryButtonLabel(trigger, failedLabel);
                     return;
                 }
@@ -1951,6 +2032,7 @@
     wireModeScopedPreferenceVisibility(document);
 
     const resetSubmittingState = () => {
+        hidePlanLoadingShell();
         getAislePilotForms().forEach(form => {
             clearSubmitLoadingDelay(form);
             form.removeAttribute("data-is-submitting");
@@ -1991,6 +2073,9 @@
     });
 
     const swapScrollKey = "aislepilot:swap-scroll";
+    const clearPersistedSwapScroll = () => {
+        sessionStorage.removeItem(swapScrollKey);
+    };
     const clearRestorePending = () => {
         document.documentElement.classList.remove("aislepilot-restore-pending");
     };
@@ -2091,6 +2176,7 @@
         let targetX = window.scrollX;
         let targetY = window.scrollY;
         let anchorDayIndex = null;
+        let anchorPanelId = null;
         let anchorTop = null;
 
         if (form instanceof HTMLFormElement) {
@@ -2112,7 +2198,13 @@
             const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
             if (Number.isInteger(parsedDayIndex) && parsedDayIndex >= 0) {
                 anchorDayIndex = parsedDayIndex;
-                anchorTop = Math.round(form.getBoundingClientRect().top);
+                const panel = form.closest("[data-day-meal-panel]");
+                if (panel instanceof HTMLElement && panel.id) {
+                    anchorPanelId = panel.id;
+                    anchorTop = Math.round(panel.getBoundingClientRect().top);
+                } else {
+                    anchorTop = Math.round(form.getBoundingClientRect().top);
+                }
             }
         }
 
@@ -2122,6 +2214,7 @@
             y: targetY,
             activePanelId,
             anchorDayIndex,
+            anchorPanelId,
             anchorTop,
             at: Date.now()
         };
@@ -2163,6 +2256,9 @@
             const anchorDayIndex = Number.isInteger(parsed.anchorDayIndex)
                 ? parsed.anchorDayIndex
                 : null;
+            const anchorPanelId = typeof parsed.anchorPanelId === "string" && parsed.anchorPanelId.length > 0
+                ? parsed.anchorPanelId
+                : null;
             const anchorTop = typeof parsed.anchorTop === "number"
                 ? parsed.anchorTop
                 : null;
@@ -2171,7 +2267,14 @@
                     return fallbackTargetY;
                 }
 
-                const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${anchorDayIndex}']`;
+                if (anchorPanelId) {
+                    const targetPanel = document.getElementById(anchorPanelId);
+                    if (targetPanel instanceof HTMLElement) {
+                        return window.scrollY + (targetPanel.getBoundingClientRect().top - anchorTop);
+                    }
+                }
+
+                const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${anchorDayIndex}']`;
                 const targetDayInput = document.querySelector(selector);
                 if (!(targetDayInput instanceof HTMLInputElement)) {
                     return fallbackTargetY;
@@ -2467,6 +2570,7 @@
         let targetX = window.scrollX;
         let targetY = window.scrollY;
         let anchorDayIndex = null;
+        let anchorPanelId = null;
         let anchorTop = null;
 
         if (form instanceof HTMLFormElement) {
@@ -2488,7 +2592,13 @@
             const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
             if (Number.isInteger(parsedDayIndex) && parsedDayIndex >= 0) {
                 anchorDayIndex = parsedDayIndex;
-                anchorTop = Math.round(form.getBoundingClientRect().top);
+                const panel = form.closest("[data-day-meal-panel]");
+                if (panel instanceof HTMLElement && panel.id) {
+                    anchorPanelId = panel.id;
+                    anchorTop = Math.round(panel.getBoundingClientRect().top);
+                } else {
+                    anchorTop = Math.round(form.getBoundingClientRect().top);
+                }
             }
         }
 
@@ -2496,6 +2606,7 @@
             x: targetX,
             y: targetY,
             anchorDayIndex,
+            anchorPanelId,
             anchorTop
         };
     };
@@ -2510,6 +2621,9 @@
         const anchorDayIndex = Number.isInteger(snapshot.anchorDayIndex)
             ? snapshot.anchorDayIndex
             : null;
+        const anchorPanelId = typeof snapshot.anchorPanelId === "string" && snapshot.anchorPanelId.length > 0
+            ? snapshot.anchorPanelId
+            : null;
         const anchorTop = typeof snapshot.anchorTop === "number"
             ? snapshot.anchorTop
             : null;
@@ -2519,7 +2633,14 @@
                 return fallbackTargetY;
             }
 
-            const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${anchorDayIndex}']`;
+            if (anchorPanelId) {
+                const targetPanel = document.getElementById(anchorPanelId);
+                if (targetPanel instanceof HTMLElement) {
+                    return window.scrollY + (targetPanel.getBoundingClientRect().top - anchorTop);
+                }
+            }
+
+            const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${anchorDayIndex}']`;
             const targetDayInput = document.querySelector(selector);
             if (!(targetDayInput instanceof HTMLInputElement)) {
                 return fallbackTargetY;
@@ -2574,11 +2695,6 @@
 
         form.addEventListener("submit", () => {
             stripHashFromFormAction(form);
-
-            if (form.hasAttribute("data-ajax-swap-form")) {
-                return;
-            }
-
             persistSwapScrollPosition(form);
         });
     };
@@ -2686,19 +2802,19 @@
             }
 
             const leftoverToggleButton = container.querySelector("[data-leftover-toggle]");
-            if (leftoverToggleButton instanceof HTMLButtonElement && leftoverToggleButton.dataset.leftoverToggleWired !== "true") {
-                leftoverToggleButton.dataset.leftoverToggleWired = "true";
-                leftoverToggleButton.addEventListener("click", () => {
-                    const isHidden = plannerShell.hasAttribute("hidden");
-                    if (isHidden) {
-                        plannerShell.removeAttribute("hidden");
-                        leftoverToggleButton.setAttribute("aria-expanded", "true");
-                        leftoverToggleButton.textContent = "Hide leftover rebalance";
-                    } else {
-                        plannerShell.setAttribute("hidden", "hidden");
-                        leftoverToggleButton.setAttribute("aria-expanded", "false");
-                        leftoverToggleButton.textContent = "Rebalance leftovers";
-                    }
+                    if (leftoverToggleButton instanceof HTMLButtonElement && leftoverToggleButton.dataset.leftoverToggleWired !== "true") {
+                        leftoverToggleButton.dataset.leftoverToggleWired = "true";
+                        leftoverToggleButton.addEventListener("click", () => {
+                            const isHidden = plannerShell.hasAttribute("hidden");
+                            if (isHidden) {
+                                plannerShell.removeAttribute("hidden");
+                                leftoverToggleButton.setAttribute("aria-expanded", "true");
+                                leftoverToggleButton.textContent = "Hide leftover changes";
+                            } else {
+                                plannerShell.setAttribute("hidden", "hidden");
+                                leftoverToggleButton.setAttribute("aria-expanded", "false");
+                                leftoverToggleButton.textContent = "Adjust leftovers";
+                            }
 
                     updateViewportHeight(true);
                 });
@@ -2810,6 +2926,72 @@
                         moveOneLeftover(zone);
                     });
                 });
+            }
+        });
+    };
+
+    let cardMoreActionsGlobalWired = false;
+
+    const closeOpenCardMoreActions = except => {
+        const openMenus = Array.from(document.querySelectorAll("[data-card-more-actions][open]"));
+        openMenus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement) || menu === except) {
+                return;
+            }
+
+            menu.open = false;
+        });
+    };
+
+    const wireCardMoreActions = scope => {
+        const menus = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-card-more-actions]"))
+            : Array.from(document.querySelectorAll("[data-card-more-actions]"));
+
+        menus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement) || menu.dataset.cardMoreActionsWired === "true") {
+                return;
+            }
+
+            menu.dataset.cardMoreActionsWired = "true";
+            menu.addEventListener("toggle", () => {
+                if (menu.open) {
+                    closeOpenCardMoreActions(menu);
+                }
+            });
+
+            const actionButtons = Array.from(menu.querySelectorAll("button[type='submit']"));
+            actionButtons.forEach(button => {
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                button.addEventListener("click", () => {
+                    menu.open = false;
+                });
+            });
+        });
+
+        if (cardMoreActionsGlobalWired) {
+            return;
+        }
+
+        cardMoreActionsGlobalWired = true;
+        document.addEventListener("click", event => {
+            if (!(event.target instanceof Element)) {
+                return;
+            }
+
+            if (event.target.closest("[data-card-more-actions]")) {
+                return;
+            }
+
+            closeOpenCardMoreActions(null);
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                closeOpenCardMoreActions(null);
             }
         });
     };
@@ -2949,7 +3131,7 @@
             return null;
         }
 
-        const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${slotIndex}']`;
+        const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${slotIndex}']`;
         const dayInput = scope.querySelector(selector);
         if (!(dayInput instanceof HTMLInputElement)) {
             return null;
@@ -3112,6 +3294,7 @@
         wireSetupToggleHandlers(document);
         wireOverviewToggleHandlers(document);
         wireLeftoverPlanner(document);
+        wireCardMoreActions(document);
         wireInlineDetailsPanels(document);
         wireDayMealCards(document);
         wireAjaxSwapHandlers(document);
@@ -3143,6 +3326,46 @@
         wirePreserveScrollHandlers(document);
         wireAjaxSwapHandlers(document);
         return true;
+    };
+
+    const parseHtmlDocument = html => {
+        if (typeof DOMParser === "undefined" || typeof html !== "string" || html.length === 0) {
+            return null;
+        }
+
+        return new DOMParser().parseFromString(html, "text/html");
+    };
+
+    const hasAislePilotWindowRoot = responseDocument => {
+        if (!(responseDocument instanceof Document)) {
+            return false;
+        }
+
+        return responseDocument.querySelector("[data-aislepilot-window]") instanceof HTMLElement;
+    };
+
+    const readAjaxFailureMessage = responseDocument => {
+        if (!(responseDocument instanceof Document)) {
+            return "";
+        }
+
+        const alertItem = responseDocument.querySelector(".aislepilot-alert-list li");
+        if (alertItem instanceof HTMLElement) {
+            const text = alertItem.textContent?.trim();
+            if (typeof text === "string" && text.length > 0) {
+                return text;
+            }
+        }
+
+        const summary = responseDocument.querySelector(".text-danger");
+        if (summary instanceof HTMLElement) {
+            const text = summary.textContent?.replace(/\s+/g, " ").trim();
+            if (typeof text === "string" && text.length > 0) {
+                return text;
+            }
+        }
+
+        return "";
     };
 
     const animateSwappedMeal = dayIndex => {
@@ -3187,7 +3410,17 @@
             }
 
             swapForm.dataset.ajaxSwapSubmitting = "true";
+            const submitButton = getSubmitButton(event);
+            const submitActionLabel = submitButton instanceof HTMLButtonElement
+                ? (submitButton.getAttribute("aria-label") ?? submitButton.textContent ?? "").trim()
+                : "";
             const isFavoriteForm = swapForm.classList.contains("aislepilot-favorite-form");
+            const wasSavedMealFavorite =
+                isFavoriteForm &&
+                submitButton instanceof HTMLButtonElement &&
+                submitButton.classList.contains("is-saved-meal");
+            const isIgnoreForm = swapForm.classList.contains("aislepilot-ignore-form");
+            const isDessertSwapForm = swapForm.action.toLowerCase().includes("/swap-dessert");
             const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
             const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
                 ? scrollSnapshot.anchorDayIndex
@@ -3222,31 +3455,74 @@
                     responseText.includes("<!DOCTYPE html");
 
                 if (isHtmlResponse) {
+                    const parsedResponseDocument = parseHtmlDocument(responseText);
                     if (isFavoriteForm) {
                         if (!applyAjaxFavoriteResponse(responseText)) {
+                            if (parsedResponseDocument && !hasAislePilotWindowRoot(parsedResponseDocument)) {
+                                const message = readAjaxFailureMessage(parsedResponseDocument);
+                                showToast(
+                                    message.length > 0 ? message : "Could not update saved meals. Try again.",
+                                    "warning");
+                                clearPersistedSwapScroll();
+                                return;
+                            }
+
+                            persistSwapScrollPosition(swapForm);
                             replaceDocumentWithHtml(responseText);
                             return;
                         }
 
+                        showToast(
+                            wasSavedMealFavorite
+                                ? "Meal removed from saved meals."
+                                : "Meal saved.",
+                            "success");
                         restoreInlineSwapScroll(scrollSnapshot);
+                        clearPersistedSwapScroll();
                         return;
                     }
 
                     if (!applyAjaxSwapResponse(responseText, swapDayIndex)) {
+                        if (parsedResponseDocument && !hasAislePilotWindowRoot(parsedResponseDocument)) {
+                            const message = readAjaxFailureMessage(parsedResponseDocument);
+                            showToast(
+                                message.length > 0 ? message : "No alternative meal is available right now. Try another swap or regenerate.",
+                                "warning");
+                            clearPersistedSwapScroll();
+                            return;
+                        }
+
+                        persistSwapScrollPosition(swapForm);
                         replaceDocumentWithHtml(responseText);
                         return;
                     }
 
+                    if (isIgnoreForm) {
+                        const normalizedAction = submitActionLabel.toLowerCase();
+                        const ignoreMessage = normalizedAction.includes("ignore")
+                            ? "Meal ignored."
+                            : normalizedAction.includes("include")
+                                ? "Meal included."
+                                : "Meal updated.";
+                        showToast(ignoreMessage, "success");
+                    } else {
+                        showToast(isDessertSwapForm ? "Dessert swapped." : "Meal swapped.", "success");
+                    }
+
                     restoreInlineSwapScroll(scrollSnapshot);
+                    clearPersistedSwapScroll();
                     animateSwappedMeal(swapDayIndex);
                     return;
                 }
 
                 if (response.ok) {
+                    persistSwapScrollPosition(swapForm);
                     window.location.reload();
                     return;
                 }
 
+                showToast("Could not complete that action. Try again.", "warning");
+                clearPersistedSwapScroll();
                 resetSubmittingState();
                 return;
             } catch {
@@ -3274,6 +3550,7 @@
     wireOverviewToggleHandlers(document);
     wirePreserveScrollHandlers(document);
     wireLeftoverPlanner(document);
+    wireCardMoreActions(document);
     wireInlineDetailsPanels(document);
     wireDayMealCards(document);
     wireAjaxSwapHandlers(document);

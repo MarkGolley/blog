@@ -334,19 +334,19 @@
     @if (hasModelErrors)
     {
         var alertTitle = looksLikeSwapIssue
-            ? "Could not swap that meal"
+            ? "Could not swap meal"
             : looksLikeConstraintIssue
-                ? "Constraints are too strict for this plan"
+                ? "Constraints are too strict"
                 : looksLikeAiIssue
                     ? "Meal generation is temporarily unavailable"
-                    : "Something needs attention";
+                    : "Please review your settings";
         var alertGuidance = looksLikeSwapIssue
-            ? "Try swapping again, or regenerate your plan to refresh all meals."
+            ? "Try again or refresh your plan."
             : looksLikeConstraintIssue
-                ? "Remove one dietary constraint or allergen, then generate again."
+                ? "Remove one restriction, then generate again."
                 : looksLikeAiIssue
-                    ? "Wait 15-30 seconds and retry. If it still fails, regenerate with fewer strict constraints."
-                    : "Review the message below and try again.";
+                    ? "Wait 15-30 seconds, then generate again."
+                    : "Review the message below, then try again.";
 
         <section aria-labelledby="aislepilot-alert-title" class="aislepilot-shell aislepilot-alert-shell" data-reveal>
             <h2 id="aislepilot-alert-title" class="aislepilot-section-title">@alertTitle</h2>
@@ -361,8 +361,9 @@
                 <button type="submit"
                         class="aislepilot-alert-btn"
                         form="aislepilot-setup-form"
-                        data-loading-label="Generating plan...">
-                    Try generating again
+                        data-loading-label="Generating plan..."
+                        data-show-plan-skeleton>
+                    Generate again
                 </button>
                 @if (hasResult)
                 {
@@ -371,7 +372,7 @@
                             data-setup-toggle
                             aria-controls="aislepilot-setup"
                             aria-expanded="false">
-                        Edit settings first
+                        Edit settings
                     </button>
                 }
                 else
@@ -809,7 +810,7 @@
                             <span asp-validation-for="Request.SelectedSpecialTreatCookDayIndex" class="text-danger"></span>
                             <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
                                 <input asp-for="Request.IncludeDessertAddOn" type="checkbox" />
-                                <span>Add desert</span>
+                                <span>Add dessert</span>
                             </label>
                         </fieldset>
                     </details>
@@ -999,7 +1000,10 @@
                 </div>
 
                 <div class="aislepilot-submit-actions">
-                    <button type="submit" data-loading-label="Generating plan..." data-setup-mode-submit="planner">
+                    <button type="submit"
+                            data-loading-label="Generating plan..."
+                            data-setup-mode-submit="planner"
+                            data-show-plan-skeleton>
                         <span class="aislepilot-btn-label">
                             <span class="aislepilot-symbol-glyph" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" focusable="false">
@@ -1020,7 +1024,7 @@
                      data-setup-mode-panel="generator"
                      @generatorModeHiddenAttribute>
                 <div class="aislepilot-setup-mode-head">
-                    <p class="aislepilot-setup-mode-copy">Use your foods on hand to generate 3 quick meal ideas in one go.</p>
+                    <p class="aislepilot-setup-mode-copy">Use your on-hand foods to generate 3 quick meal ideas.</p>
                 </div>
                 <div class="aislepilot-submit-actions aislepilot-generator-submit-actions">
                     <button
@@ -1239,6 +1243,29 @@
     {
         <partial name="_AislePilotResultSections" model="Model" />
     }
+
+    <div class="aislepilot-plan-loading-shell" data-plan-loading-shell hidden aria-hidden="true">
+        <div class="aislepilot-plan-loading-surface" role="status" aria-live="polite">
+            <p class="aislepilot-plan-loading-title">Building your plan...</p>
+            <div class="aislepilot-plan-loading-grid" aria-hidden="true">
+                <div class="aislepilot-plan-loading-card">
+                    <div class="aislepilot-plan-loading-line is-wide"></div>
+                    <div class="aislepilot-plan-loading-line"></div>
+                    <div class="aislepilot-plan-loading-line is-short"></div>
+                </div>
+                <div class="aislepilot-plan-loading-card">
+                    <div class="aislepilot-plan-loading-line is-wide"></div>
+                    <div class="aislepilot-plan-loading-line"></div>
+                    <div class="aislepilot-plan-loading-line is-short"></div>
+                </div>
+                <div class="aislepilot-plan-loading-card">
+                    <div class="aislepilot-plan-loading-line is-wide"></div>
+                    <div class="aislepilot-plan-loading-line"></div>
+                    <div class="aislepilot-plan-loading-line is-short"></div>
+                </div>
+            </div>
+        </div>
+    </div>
     </div>
 </div>
 
