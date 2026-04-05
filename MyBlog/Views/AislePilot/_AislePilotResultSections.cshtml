@@ -344,7 +344,7 @@
             </div>
             <div class="aislepilot-mobile-context-jumps" role="tablist" aria-label="Jump to section">
                 <button type="button"
-                        class="aislepilot-mobile-context-jump is-active is-icon-only"
+                        class="aislepilot-mobile-context-jump is-active"
                         data-window-tab="aislepilot-meals"
                         role="tab"
                         aria-controls="aislepilot-meals"
@@ -360,10 +360,10 @@
                             <path d="M8 7h11M8 12h11M8 17h11"></path>
                         </svg>
                     </span>
-                    <span class="sr-only">Show meals</span>
+                    <span class="aislepilot-mobile-context-jump-text">Meals</span>
                 </button>
                 <button type="button"
-                        class="aislepilot-mobile-context-jump is-icon-only"
+                        class="aislepilot-mobile-context-jump"
                         data-window-tab="aislepilot-shop"
                         role="tab"
                         aria-controls="aislepilot-shop"
@@ -378,10 +378,10 @@
                             <path d="M3 4h2l2.4 10h10.8l1.8-7H7"></path>
                         </svg>
                     </span>
-                    <span class="sr-only">Show shopping list</span>
+                    <span class="aislepilot-mobile-context-jump-text">Shop</span>
                 </button>
                 <button type="button"
-                        class="aislepilot-mobile-context-jump is-icon-only"
+                        class="aislepilot-mobile-context-jump"
                         data-window-tab="aislepilot-export"
                         role="tab"
                         aria-controls="aislepilot-export"
@@ -396,7 +396,7 @@
                             <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
                         </svg>
                     </span>
-                    <span class="sr-only">Show exports</span>
+                    <span class="aislepilot-mobile-context-jump-text">Export</span>
                 </button>
             </div>
         </div>
@@ -407,7 +407,7 @@
                 <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
                     <button type="button"
                             id="aislepilot-tab-meals"
-                            class="aislepilot-window-tab is-active is-icon-only"
+                            class="aislepilot-window-tab is-active"
                             data-window-tab="aislepilot-meals"
                             role="tab"
                             aria-controls="aislepilot-meals"
@@ -424,12 +424,12 @@
                                     <path d="M8 7h11M8 12h11M8 17h11"></path>
                                 </svg>
                             </span>
-                            <span class="sr-only">Meals</span>
+                            <span class="aislepilot-tab-text">Meals</span>
                         </span>
                     </button>
                     <button type="button"
                             id="aislepilot-tab-shop"
-                            class="aislepilot-window-tab is-icon-only"
+                            class="aislepilot-window-tab"
                             data-window-tab="aislepilot-shop"
                             role="tab"
                             aria-controls="aislepilot-shop"
@@ -445,12 +445,12 @@
                                     <path d="M3 4h2l2.4 10h10.8l1.8-7H7"></path>
                                 </svg>
                             </span>
-                            <span class="sr-only">Shopping</span>
+                            <span class="aislepilot-tab-text">Shop</span>
                         </span>
                     </button>
                     <button type="button"
                             id="aislepilot-tab-export"
-                            class="aislepilot-window-tab is-icon-only"
+                            class="aislepilot-window-tab"
                             data-window-tab="aislepilot-export"
                             role="tab"
                             aria-controls="aislepilot-export"
@@ -466,7 +466,7 @@
                                     <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
                                 </svg>
                             </span>
-                            <span class="sr-only">Exports</span>
+                            <span class="aislepilot-tab-text">Export</span>
                         </span>
                     </button>
                 </div>
@@ -567,7 +567,7 @@
                                                  data-slot-index="@slotIndex"
                                                  aria-hidden="@(slotIndex == 0 ? "false" : "true")">
                                                 <details class="aislepilot-card-more-actions" data-card-more-actions>
-                                                    <summary class="aislepilot-more-actions-trigger is-icon-only"
+                                                    <summary class="aislepilot-more-actions-trigger"
                                                              aria-controls="@slotMoreActionsMenuId"
                                                              aria-expanded="false"
                                                              aria-haspopup="menu"
@@ -580,6 +580,7 @@
                                                                 <circle cx="18" cy="12" r="1.6"></circle>
                                                             </svg>
                                                         </span>
+                                                        <span class="aislepilot-swap-action-label">Actions</span>
                                                     </summary>
                                                     <div id="@slotMoreActionsMenuId" class="aislepilot-card-more-actions-menu" role="menu" aria-label="Meal actions">
                                                         <form method="post"
@@ -593,7 +594,7 @@
                                                             <input type="hidden" name="dayIndex" value="@slotMealIndex" />
                                                             <input type="hidden" name="currentMealName" value="@slotMeal.MealName" />
                                                             <button type="submit"
-                                                                    class="aislepilot-swap-btn is-secondary is-icon-only is-compact"
+                                                                    class="aislepilot-swap-btn is-secondary is-compact"
                                                                     role="menuitem"
                                                                     data-loading-label="Swapping..."
                                                                     data-loading-delay-ms="320"
@@ -608,7 +609,7 @@
                                                                             <path d="M3 21 15 9"></path>
                                                                         </svg>
                                                                     </span>
-                                                                    <span class="sr-only">Swap meal</span>
+                                                                    <span class="aislepilot-swap-action-label">Swap</span>
                                                                 </span>
                                                             </button>
                                                         </form>
@@ -627,8 +628,8 @@
                                                             @{
                                                                 var saveActionLabel = slotIsSavedMeal ? "Unsave meal" : "Save meal";
                                                                 var saveButtonClass = slotIsSavedMeal
-                                                                    ? "aislepilot-swap-btn is-secondary is-saved-meal is-icon-only is-compact"
-                                                                    : "aislepilot-swap-btn is-secondary is-icon-only is-compact";
+                                                                    ? "aislepilot-swap-btn is-secondary is-saved-meal is-compact"
+                                                                    : "aislepilot-swap-btn is-secondary is-compact";
                                                             }
                                                             <button type="submit"
                                                                     class="@saveButtonClass"
@@ -641,7 +642,7 @@
                                                                             <path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1 6.2L12 17.5 6.5 20.1l1-6.2L3 9.5l6.2-.9z"></path>
                                                                         </svg>
                                                                     </span>
-                                                                    <span class="sr-only">@saveActionLabel</span>
+                                                                    <span class="aislepilot-swap-action-label">@(slotIsSavedMeal ? "Unsave" : "Save")</span>
                                                                 </span>
                                                             </button>
                                                         </form>
@@ -658,8 +659,8 @@
                                                             @{
                                                                 var ignoreActionLabel = slotIsIgnored ? "Include meal" : "Ignore meal";
                                                                 var ignoreButtonClass = slotIsIgnored
-                                                                    ? "aislepilot-swap-btn is-secondary is-icon-only is-compact"
-                                                                    : "aislepilot-swap-btn is-secondary is-danger is-icon-only is-compact";
+                                                                    ? "aislepilot-swap-btn is-secondary is-compact"
+                                                                    : "aislepilot-swap-btn is-secondary is-danger is-compact";
                                                             }
                                                             <button type="submit"
                                                                     class="@ignoreButtonClass"
@@ -682,7 +683,7 @@
                                                                             }
                                                                         </svg>
                                                                     </span>
-                                                                    <span class="sr-only">@ignoreActionLabel</span>
+                                                                    <span class="aislepilot-swap-action-label">@(slotIsIgnored ? "Include" : "Ignore")</span>
                                                                 </span>
                                                             </button>
                                                         </form>
@@ -838,7 +839,7 @@
                                                                  model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                                                         <input type="hidden" name="currentDessertAddOnName" value="@result.DessertAddOnName" />
                                                         <button type="submit"
-                                                                class="aislepilot-swap-btn is-icon-only"
+                                                                class="aislepilot-swap-btn"
                                                                 data-loading-label="Swapping..."
                                                                 data-loading-delay-ms="320"
                                                                 aria-label="Swap dessert"
@@ -852,7 +853,7 @@
                                                                         <path d="M3 21 15 9"></path>
                                                                     </svg>
                                                                 </span>
-                                                                <span class="sr-only">Swap dessert</span>
+                                                                <span class="aislepilot-swap-action-label">Swap dessert</span>
                                                             </span>
                                                         </button>
                                                     </form>
@@ -977,11 +978,11 @@
                             <button type="button"
                                     class="aislepilot-export-btn"
                                     data-notes-export-trigger
-                                    data-notes-default-label="Share shopping list to iPhone Notes"
-                                    data-notes-shared-label="Share sheet opened. Choose Notes."
-                                    data-notes-copied-label="Shopping list copied. Paste into Notes."
+                                    data-notes-default-label="Share shopping list"
+                                    data-notes-shared-label="Share sheet opened. Choose your app."
+                                    data-notes-copied-label="Shopping list copied."
                                     data-notes-failed-label="Could not share. Try again.">
-                                Share shopping list to iPhone Notes
+                                Share shopping list
                             </button>
                         </div>
                     </div>

@@ -320,15 +320,18 @@
         <div class="aislepilot-brand-lockup" aria-label="AislePilot brand">
             <img class="aislepilot-brand-logo" src="~/images/aislepilot-logo-horizontal.svg" alt="AislePilot" />
         </div>
-        @if (!hasResult)
-        {
-            <div class="aislepilot-app-head-intro">
-                <h1 id="aislepilot-title" class="aislepilot-app-title">Plan a full week of meals and shopping in minutes.</h1>
-                <p class="aislepilot-app-subtitle">
-                    Build a practical weekly plan with aisle-ordered shopping, clear recipes, and export-ready lists.
-                </p>
-            </div>
-        }
+        <div class="aislepilot-app-head-intro@(hasResult ? " is-results-context" : string.Empty)">
+            <h1 id="aislepilot-title" class="aislepilot-app-title">
+                @(hasResult
+                    ? "AislePilot weekly planner"
+                    : "Plan a full week of meals and shopping in minutes.")
+            </h1>
+            <p class="aislepilot-app-subtitle">
+                @(hasResult
+                    ? "Adjust settings, refine meals, and export your list."
+                    : "Build a practical weekly plan with aisle-ordered shopping, clear recipes, and export-ready lists.")
+            </p>
+        </div>
     </section>
 
     @if (hasModelErrors)

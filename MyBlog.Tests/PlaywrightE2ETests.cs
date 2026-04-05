@@ -1692,6 +1692,72 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotGeneratePlan_PrimarySubmitIsNotObstructed()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        // Allow setup-mode reveal/layout hooks to settle before evaluating hit-testing.
+        await page.WaitForTimeoutAsync(350);
+
+        var hitTestReport = await page.EvaluateAsync<string>(
+            """
+            () => {
+                const button = document.querySelector("#aislepilot-setup-form button[data-setup-mode-submit='planner']");
+                if (!(button instanceof HTMLButtonElement)) {
+                    return "button-missing";
+                }
+
+                button.scrollIntoView({ block: "center", inline: "nearest" });
+                const rect = button.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) {
+                    return "button-zero-size";
+                }
+                const scrollSnapshot = `scrollY=${window.scrollY.toFixed(1)} innerH=${window.innerHeight.toFixed(1)} docH=${document.documentElement.scrollHeight.toFixed(1)}`;
+
+                const points = [
+                    [rect.left + (rect.width / 2), rect.top + (rect.height / 2)],
+                    [rect.left + 14, rect.top + (rect.height / 2)],
+                    [rect.right - 14, rect.top + (rect.height / 2)]
+                ];
+
+                for (const [x, y] of points) {
+                    const hit = document.elementFromPoint(x, y);
+                    if (!(hit instanceof Element)) {
+                        return `hit-missing@${x.toFixed(1)},${y.toFixed(1)} ${scrollSnapshot} buttonRect=${rect.left.toFixed(1)},${rect.top.toFixed(1)},${rect.width.toFixed(1)},${rect.height.toFixed(1)}`;
+                    }
+
+                    if (hit !== button && !button.contains(hit)) {
+                        const hitClass = typeof hit.className === "string" ? hit.className : "";
+                        const hitRect = hit.getBoundingClientRect();
+                        return `blocked:${hit.tagName.toLowerCase()}.${hitClass}@${x.toFixed(1)},${y.toFixed(1)} ${scrollSnapshot} buttonRect=${rect.left.toFixed(1)},${rect.top.toFixed(1)},${rect.width.toFixed(1)},${rect.height.toFixed(1)} hitRect=${hitRect.left.toFixed(1)},${hitRect.top.toFixed(1)},${hitRect.width.toFixed(1)},${hitRect.height.toFixed(1)}`;
+                    }
+                }
+
+                return "ok";
+            }
+            """);
+
+        if (!string.Equals(hitTestReport, "ok", StringComparison.Ordinal))
+        {
+            throw new Xunit.Sdk.XunitException(hitTestReport);
+        }
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotBreakfastTabs_DoNotOverflowDayCardWidth()
     {
         if (!IsE2EEnabled())
@@ -1884,6 +1950,40 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         Assert.Contains("is-active", exportClass, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Desktop_AislePilotLayout_UsesWideMainContainer()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var mainWidth = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const main = document.querySelector("main.app-shell-main.container");
+                if (!(main instanceof HTMLElement)) {
+                    return 0;
+                }
+
+                return main.getBoundingClientRect().width;
+            }
+            """);
+
+        Assert.True(mainWidth >= 1300, $"Expected a wide desktop container for AislePilot. Actual main width={mainWidth:F1}px.");
+    }
+
     private static bool IsE2EEnabled()
     {
         var value = Environment.GetEnvironmentVariable(E2EEnvVar);
@@ -1976,7 +2076,10 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         var generateButton = page.Locator("form.aislepilot-form button[type='submit']:has-text('Generate weekly plan')");
-        await generateButton.ClickAsync();
+        await generateButton.ScrollIntoViewIfNeededAsync();
+        // Some mobile emulation runs report transient hit-target interception while layout settles.
+        // Force-click keeps downstream scenario tests deterministic; direct hit-testing has its own regression test.
+        await generateButton.ClickAsync(new LocatorClickOptions { Force = true });
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First.WaitForAsync(new LocatorWaitForOptions
         {

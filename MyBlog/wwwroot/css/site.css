@@ -188,6 +188,10 @@ body::before {
     padding-top: 0.25rem;
 }
 
+.app-shell-main.container {
+    width: min(100rem, 100% - 2.2rem);
+}
+
 .nav-shell {
     display: grid;
     grid-template-columns: auto auto 1fr auto;
@@ -2059,6 +2063,10 @@ thead th {
 @media (max-width: 680px) {
     .container {
         width: min(1120px, 100% - 1.2rem);
+    }
+
+    .app-shell-main.container {
+        width: min(100rem, 100% - 1.2rem);
     }
 
     main > section,
