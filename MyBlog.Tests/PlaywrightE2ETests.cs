@@ -1285,6 +1285,88 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotDayCardHeader_HasSpacedSummaryAndCompactLeftoverToggle()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var card = page.Locator("[data-day-meal-card]:has([data-day-card-summary]):has([data-leftover-day-zone])").First;
+        await card.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var toggleButton = card.Locator("[data-leftover-toggle-sign]").First;
+        var dayZone = card.Locator("[data-leftover-day-zone]").First;
+        var dayIndex = await dayZone.GetAttributeAsync("data-day-index");
+        Assert.False(string.IsNullOrWhiteSpace(dayIndex));
+
+        var beforeMetrics = await card.EvaluateAsync<double[]>(
+            """
+            cardRoot => {
+                if (!(cardRoot instanceof HTMLElement)) {
+                    return [-1, -1, -1];
+                }
+
+                const kicker = cardRoot.querySelector(".aislepilot-day-card-head-main .aislepilot-card-kicker");
+                const summary = cardRoot.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta[data-day-card-summary]");
+                const zone = cardRoot.querySelector("[data-leftover-day-zone]");
+                const button = zone?.querySelector("[data-leftover-toggle-sign]");
+                if (!(kicker instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(zone instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+                    return [-1, -1, -1];
+                }
+
+                const kickerRect = kicker.getBoundingClientRect();
+                const summaryRect = summary.getBoundingClientRect();
+                const zoneRect = zone.getBoundingClientRect();
+                const buttonRect = button.getBoundingClientRect();
+                const spacingGap = Math.max(0, summaryRect.left - kickerRect.right);
+                const controlSlack = Math.max(0, zoneRect.width - buttonRect.width);
+                return [spacingGap, zoneRect.width, controlSlack];
+            }
+            """);
+
+        Assert.Equal(3, beforeMetrics.Length);
+        Assert.True(beforeMetrics[0] >= 10, $"Expected day-to-summary spacing to be wider. Actual={beforeMetrics[0]:F1}px.");
+        Assert.True(beforeMetrics[1] <= 56, $"Expected compact leftover control width. Actual={beforeMetrics[1]:F1}px.");
+        Assert.True(beforeMetrics[2] <= 20, $"Expected little slack around leftover icon. Actual={beforeMetrics[2]:F1}px.");
+
+        await toggleButton.ClickAsync();
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.WaitForTimeoutAsync(220);
+
+        var afterToggleMetrics = await page.EvaluateAsync<double[]>(
+            """
+            dayIndex => {
+                const safeDayIndex = typeof dayIndex === "string" ? dayIndex : "";
+                const zone = document.querySelector(`[data-leftover-day-zone][data-day-index="${safeDayIndex}"]`);
+                const button = zone?.querySelector("[data-leftover-toggle-sign]");
+                if (!(zone instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+                    return [-1, -1];
+                }
+
+                const zoneRect = zone.getBoundingClientRect();
+                const buttonRect = button.getBoundingClientRect();
+                const controlSlack = Math.max(0, zoneRect.width - buttonRect.width);
+                return [zoneRect.width, controlSlack];
+            }
+            """,
+            dayIndex ?? string.Empty);
+
+        Assert.Equal(2, afterToggleMetrics.Length);
+        Assert.True(afterToggleMetrics[0] <= 56, $"Expected compact leftover control after toggle. Actual={afterToggleMetrics[0]:F1}px.");
+        Assert.True(afterToggleMetrics[1] <= 20, $"Expected minimal control slack after toggle. Actual={afterToggleMetrics[1]:F1}px.");
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotQuickJumpTabs_SupportKeyboardNavigation()
     {
         if (!IsE2EEnabled())
@@ -1539,6 +1621,78 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
 
         Assert.False(sawBadRequest, "Encountered one or more HTTP 400 responses during login/logout flow.");
         Assert.Contains("/Admin", page.Url, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotWindowTabs_KeepActiveHighlightAfterSwitching()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var mealsTab = page.Locator("#aislepilot-tab-meals").First;
+        var shoppingTab = page.Locator("#aislepilot-tab-shop").First;
+        var exportTab = page.Locator("#aislepilot-tab-export").First;
+
+        await shoppingTab.ClickAsync();
+        await page.Locator("#aislepilot-shop[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 10000
+        });
+
+        Assert.Equal("true", await shoppingTab.GetAttributeAsync("aria-selected"));
+        Assert.Equal("page", await shoppingTab.GetAttributeAsync("aria-current"));
+        var shoppingClass = await shoppingTab.GetAttributeAsync("class") ?? string.Empty;
+        Assert.Contains("is-active", shoppingClass, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal("false", await mealsTab.GetAttributeAsync("aria-selected"));
+        Assert.Equal("false", await mealsTab.GetAttributeAsync("aria-current"));
+
+        var shopHasGradient = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const tab = document.querySelector("#aislepilot-tab-shop");
+                if (!(tab instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const backgroundImage = window.getComputedStyle(tab).backgroundImage || "";
+                return backgroundImage.toLowerCase().includes("gradient");
+            }
+            """);
+        var mealsHasGradient = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const tab = document.querySelector("#aislepilot-tab-meals");
+                if (!(tab instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const backgroundImage = window.getComputedStyle(tab).backgroundImage || "";
+                return backgroundImage.toLowerCase().includes("gradient");
+            }
+            """);
+        Assert.True(shopHasGradient);
+        Assert.False(mealsHasGradient);
+
+        await exportTab.ClickAsync();
+        await page.Locator("#aislepilot-export[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 10000
+        });
+
+        Assert.Equal("true", await exportTab.GetAttributeAsync("aria-selected"));
+        Assert.Equal("page", await exportTab.GetAttributeAsync("aria-current"));
+        var exportClass = await exportTab.GetAttributeAsync("class") ?? string.Empty;
+        Assert.Contains("is-active", exportClass, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsE2EEnabled()

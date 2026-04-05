@@ -2589,6 +2589,7 @@
             const isActive = targetId === panels[currentIndex].id;
             tab.classList.toggle("is-active", isActive);
             tab.setAttribute("aria-selected", isActive ? "true" : "false");
+            tab.setAttribute("aria-current", isActive ? "page" : "false");
             tab.setAttribute("tabindex", isActive ? "0" : "-1");
         });
 

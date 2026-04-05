@@ -1699,17 +1699,17 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("class=\"aislepilot-mobile-context-jumps\" role=\"tablist\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-meals"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-meals"")(?=[^>]*aria-selected=""true"")[^>]*>",
+                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-meals"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-meals"")(?=[^>]*aria-selected=""true"")(?=[^>]*aria-current=""page"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-shop"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-shop"")(?=[^>]*aria-selected=""false"")[^>]*>",
+                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-shop"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-shop"")(?=[^>]*aria-selected=""false"")(?=[^>]*aria-current=""false"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-export"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-export"")(?=[^>]*aria-selected=""false"")[^>]*>",
+                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-export"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-export"")(?=[^>]*aria-selected=""false"")(?=[^>]*aria-current=""false"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(new Regex(@"(&middot;|·)", RegexOptions.IgnoreCase), html);
@@ -1739,20 +1739,19 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("class=\"aislepilot-window-tab is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*id=""aislepilot-tab-meals""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-icon-only[^""]*"")[^>]*>",
+                @"<button[^>]*id=""aislepilot-tab-meals""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-active[^""]*is-icon-only[^""]*"")(?=[^>]*aria-controls=""aislepilot-meals"")(?=[^>]*aria-selected=""true"")(?=[^>]*aria-current=""page"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*id=""aislepilot-tab-shop""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-icon-only[^""]*"")[^>]*>",
+                @"<button[^>]*id=""aislepilot-tab-shop""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-icon-only[^""]*"")(?=[^>]*aria-controls=""aislepilot-shop"")(?=[^>]*aria-selected=""false"")(?=[^>]*aria-current=""false"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*id=""aislepilot-tab-export""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-icon-only[^""]*"")[^>]*>",
+                @"<button[^>]*id=""aislepilot-tab-export""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-icon-only[^""]*"")(?=[^>]*aria-controls=""aislepilot-export"")(?=[^>]*aria-selected=""false"")(?=[^>]*aria-current=""false"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Contains("aria-haspopup=\"menu\"", html, StringComparison.OrdinalIgnoreCase);
