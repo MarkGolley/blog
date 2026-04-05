@@ -110,10 +110,21 @@
     const setSubmitButtonLoadingState = submitButton => {
         lockSubmitButtonWidth(submitButton);
         const loadingLabel = submitButton.dataset.loadingLabel?.trim();
+        const fallbackLoadingLabel = "Loading...";
+
+        if (submitButton.classList.contains("is-icon-only")) {
+            const nextAriaLabel = loadingLabel && loadingLabel.length > 0
+                ? loadingLabel
+                : fallbackLoadingLabel;
+            submitButton.setAttribute("aria-label", nextAriaLabel);
+            submitButton.classList.add("is-loading");
+            return;
+        }
+
         if (loadingLabel && loadingLabel.length > 0) {
             submitButton.textContent = loadingLabel;
         } else {
-            submitButton.textContent = "Loading...";
+            submitButton.textContent = fallbackLoadingLabel;
         }
 
         submitButton.classList.add("is-loading");
@@ -143,6 +154,8 @@
 
             const originalLabel = submitButton.dataset.originalLabel ?? submitButton.textContent ?? "";
             submitButton.dataset.originalLabel = originalLabel.trim();
+            const originalAriaLabel = submitButton.dataset.originalAriaLabel ?? submitButton.getAttribute("aria-label") ?? "";
+            submitButton.dataset.originalAriaLabel = originalAriaLabel.trim();
             lockSubmitButtonWidth(submitButton);
             targetForm.setAttribute("data-is-submitting", "true");
             submitButton.disabled = true;
@@ -2075,8 +2088,17 @@
                 button.disabled = false;
                 button.removeAttribute("aria-busy");
 
+                const originalAriaLabel = button.dataset.originalAriaLabel;
+                if (typeof originalAriaLabel === "string") {
+                    if (originalAriaLabel.length > 0) {
+                        button.setAttribute("aria-label", originalAriaLabel);
+                    } else {
+                        button.removeAttribute("aria-label");
+                    }
+                }
+
                 const originalLabel = button.dataset.originalLabel?.trim();
-                if (originalLabel && originalLabel.length > 0) {
+                if (!button.classList.contains("is-icon-only") && originalLabel && originalLabel.length > 0) {
                     button.textContent = originalLabel;
                 }
 
@@ -3024,7 +3046,7 @@
         });
     };
 
-    const positionCardMoreActionsMenu = menu => {
+    const positionCardMoreActionsMenu = (menu, attempt = 0) => {
         if (!(menu instanceof HTMLDetailsElement) || !menu.open) {
             return;
         }
@@ -3036,17 +3058,56 @@
         }
 
         const viewportPadding = 8;
+        actionsMenu.style.removeProperty("max-height");
+        actionsMenu.style.removeProperty("overflow-y");
         menu.classList.remove("is-drop-up", "is-drop-down", "is-align-left");
-        menu.classList.add("is-drop-down");
-
         let actionsRect = actionsMenu.getBoundingClientRect();
         const triggerRect = trigger.getBoundingClientRect();
         const availableBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
         const availableAbove = triggerRect.top - viewportPadding;
+        const canFitBelow = actionsRect.height <= availableBelow;
+        const canFitAbove = actionsRect.height <= availableAbove;
+        const isMobileViewport = window.innerWidth <= 760;
+        const triggerMidpointY = triggerRect.top + (triggerRect.height / 2);
+        const shouldPreferDropUpOnMobile =
+            triggerMidpointY > (window.innerHeight * 0.62) ||
+            availableBelow < (actionsRect.height + 40);
+        let openUp = false;
 
-        if (actionsRect.height > availableBelow && availableAbove > availableBelow) {
-            menu.classList.remove("is-drop-down");
-            menu.classList.add("is-drop-up");
+        if (canFitAbove && !canFitBelow) {
+            openUp = true;
+        } else if (!canFitAbove && canFitBelow) {
+            openUp = false;
+        } else if (canFitAbove && canFitBelow) {
+            openUp = isMobileViewport && shouldPreferDropUpOnMobile;
+        } else {
+            openUp = availableAbove > availableBelow;
+        }
+
+        menu.classList.add(openUp ? "is-drop-up" : "is-drop-down");
+        actionsRect = actionsMenu.getBoundingClientRect();
+
+        const availableInDirection = menu.classList.contains("is-drop-up")
+            ? availableAbove
+            : availableBelow;
+        if (availableInDirection > 0 && actionsRect.height > availableInDirection) {
+            const maxVisibleHeight = window.innerHeight - (viewportPadding * 2);
+            const canFullyFitInViewport = actionsRect.height <= maxVisibleHeight + 1;
+            if (canFullyFitInViewport && attempt < 2) {
+                const neededDelta = Math.ceil(actionsRect.height - availableInDirection + 6);
+                if (neededDelta > 0) {
+                    const scrollDelta = menu.classList.contains("is-drop-up") ? -neededDelta : neededDelta;
+                    window.scrollBy(0, scrollDelta);
+                    window.requestAnimationFrame(() => {
+                        positionCardMoreActionsMenu(menu, attempt + 1);
+                    });
+                    return;
+                }
+            }
+
+            const clampedMaxHeight = Math.max(96, Math.floor(availableInDirection - 6));
+            actionsMenu.style.maxHeight = `${clampedMaxHeight}px`;
+            actionsMenu.style.overflowY = "auto";
             actionsRect = actionsMenu.getBoundingClientRect();
         }
 
@@ -3073,8 +3134,23 @@
             menu.dataset.cardMoreActionsWired = "true";
             menu.addEventListener("toggle", () => {
                 const trigger = menu.querySelector("summary");
+                const actionsMenu = menu.querySelector(".aislepilot-card-more-actions-menu");
                 if (trigger instanceof HTMLElement) {
                     trigger.setAttribute("aria-expanded", menu.open ? "true" : "false");
+                }
+                if (!menu.open && actionsMenu instanceof HTMLElement) {
+                    actionsMenu.style.removeProperty("max-height");
+                    actionsMenu.style.removeProperty("overflow-y");
+                }
+
+                const dayMealPanel = menu.closest("[data-day-meal-panel]");
+                if (dayMealPanel instanceof HTMLElement) {
+                    const hasOpenMenu = dayMealPanel.querySelector("[data-card-more-actions][open]") instanceof HTMLDetailsElement;
+                    if (hasOpenMenu) {
+                        dayMealPanel.classList.add("has-open-actions");
+                    } else {
+                        dayMealPanel.classList.remove("has-open-actions");
+                    }
                 }
 
                 if (menu.open) {
@@ -3224,6 +3300,38 @@
                     const isActive = index === currentSlotIndex;
                     panel.setAttribute("aria-hidden", isActive ? "false" : "true");
                     panel.setAttribute("tabindex", isActive ? "0" : "-1");
+                });
+
+                const summaryLabel = card.querySelector("[data-day-card-summary]");
+                if (summaryLabel instanceof HTMLElement) {
+                    const activeTab = tabs[currentSlotIndex];
+                    const summaryValue = activeTab instanceof HTMLButtonElement
+                        ? (activeTab.dataset.dayCardSummaryValue ?? "").trim()
+                        : "";
+                    const defaultSummaryValue = (summaryLabel.dataset.dayCardSummaryDefault ?? "").trim();
+                    const nextSummaryValue = summaryValue.length > 0 ? summaryValue : defaultSummaryValue;
+                    if (nextSummaryValue.length > 0) {
+                        summaryLabel.textContent = nextSummaryValue;
+                    }
+                }
+
+                const headerActions = Array.from(card.querySelectorAll("[data-day-card-header-actions]"));
+                headerActions.forEach(actions => {
+                    if (!(actions instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const slotIndex = Number.parseInt(actions.dataset.slotIndex ?? "-1", 10);
+                    const isActive = slotIndex === currentSlotIndex;
+                    actions.classList.toggle("is-active", isActive);
+                    actions.setAttribute("aria-hidden", isActive ? "false" : "true");
+
+                    if (!isActive) {
+                        const openMenu = actions.querySelector("[data-card-more-actions][open]");
+                        if (openMenu instanceof HTMLDetailsElement) {
+                            openMenu.open = false;
+                        }
+                    }
                 });
 
                 const dayKey = readCardDayKey(card);
@@ -3576,7 +3684,7 @@
         updatedCard.classList.add("is-swap-updated");
         window.setTimeout(() => {
             updatedCard.classList.remove("is-swap-updated");
-        }, 360);
+        }, 520);
     };
 
     const wireAjaxSwapForm = form => {

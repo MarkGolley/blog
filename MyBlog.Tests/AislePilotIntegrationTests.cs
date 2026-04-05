@@ -1023,6 +1023,7 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("Dessert add-on", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Chocolate sponge tray bake", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("plated dessert", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Special treat<", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("name=\"Request.IncludeSpecialTreatMeal\" value=\"true\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("name=\"Request.IncludeDessertAddOn\" value=\"true\"", html, StringComparison.OrdinalIgnoreCase);
     }
@@ -1083,6 +1084,49 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task Index_Get_UsesSimplifiedAislePilotLayoutWithoutDecorativeOverlays()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.DoesNotContain("class=\"page-aurora\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-scroll-progress", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_UsesLargerControlHeightTokensForReadableTapTargets()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.Contains("--ap-control-height: 2.5rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-control-height-lg: 2.75rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-overview-button-size: 2.35rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("min-height: var(--ap-overview-button-size) !important;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-day-meal-panel.has-open-actions", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("overflow-y: visible;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("overflow: hidden;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-card-action-row :is(.aislepilot-meal-details > summary, .aislepilot-swap-btn, .aislepilot-more-actions-trigger):focus-visible", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("inset 0 0 0 2px var(--ap-focus-ring-color)", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-card-action-row :is(.aislepilot-meal-details > summary, .aislepilot-swap-btn, .aislepilot-more-actions-trigger):focus", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("outline: none;", css, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotScript_PreservesIconOnlyButtonsWhenSubmitLoadingStarts()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+
+        Assert.Contains("if (submitButton.classList.contains(\"is-icon-only\"))", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("submitButton.setAttribute(\"aria-label\", nextAriaLabel);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (!button.classList.contains(\"is-icon-only\") && originalLabel && originalLabel.length > 0)", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Post_WithThreeMealsPerDay_RendersMealSlotTabsOnDayCards()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -1137,6 +1181,22 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.True(
             breakfastMatch.Index < lunchMatch.Index && lunchMatch.Index < dinnerMatch.Index,
             $"Expected meal tabs in Breakfast -> Lunch -> Dinner order, but indexes were {breakfastMatch.Index}, {lunchMatch.Index}, {dinnerMatch.Index}.");
+        Assert.DoesNotContain("class=\"aislepilot-day-card-meta\">3 meals</p>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"Selected meal cost and cook time\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-summary-value=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"<section[^>]*class=""[^""]*aislepilot-day-meal-panel[^""]*""[^>]*>[\s\S]*?<h3>[^<]+</h3>[\s\S]*?<div class=""aislepilot-meal-image-shell"">",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<p class=""aislepilot-day-card-meta""[^>]*>\s*(?:\u00A3|&#xA3;|&pound;)\d+(?:\.\d{2})?\s*(?:&middot;|&#xB7;|·)\s*\d+\s+mins\s*</p>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.DoesNotContain("class=\"aislepilot-meal-details-grid\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("class=\"aislepilot-nutrition-details\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("class=\"aislepilot-recipe-details\"", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1163,12 +1223,52 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains(">Swap meal<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-swap-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">Swap meal</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-loading-delay-ms=\"320\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-header-actions", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-card-more-actions", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aria-label=\"More actions\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-card-kicker\">Breakfast</p>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-card-kicker\">Lunch</p>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-card-kicker\">Dinner</p>", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithThreeMealsPerDay_RendersIconOnlyActionControlsWithAccessibleLabels()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "3",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("class=\"aislepilot-overview-regenerate-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-edit-setup-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-swap-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-more-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-meal-image-summary\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">Refresh plan</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">Edit settings</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">View details</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">Swap meal</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span>View details</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">View recipe<", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1196,11 +1296,12 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Contains("class=\"aislepilot-mobile-context\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"aislepilot-mobile-context-jump", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-mobile-context-jump is-active is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-mobile-context-jump is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-window-tab=\"aislepilot-meals\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-window-tab=\"aislepilot-shop\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-window-tab=\"aislepilot-export\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Use tabs to switch between Meals, Shopping, and Exports.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Use tabs to switch between meals, shopping, and exports.", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aria-label=\"Refresh plan\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-show-plan-skeleton", html, StringComparison.OrdinalIgnoreCase);
     }
@@ -1272,20 +1373,20 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
 
-        Assert.DoesNotContain("class=\"aislepilot-window-tab is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-window-tab is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*id=""aislepilot-tab-meals""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*"")[^>]*>",
+                @"<button[^>]*id=""aislepilot-tab-meals""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-icon-only[^""]*"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*id=""aislepilot-tab-shop""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*"")[^>]*>",
+                @"<button[^>]*id=""aislepilot-tab-shop""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-icon-only[^""]*"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
             new Regex(
-                @"<button[^>]*id=""aislepilot-tab-export""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*"")[^>]*>",
+                @"<button[^>]*id=""aislepilot-tab-export""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*is-icon-only[^""]*"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Contains("aria-haspopup=\"menu\"", html, StringComparison.OrdinalIgnoreCase);
