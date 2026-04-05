@@ -35,6 +35,8 @@ public class AislePilotServiceTests
     [InlineData(0.45, "bottle", "225 ml")]
     [InlineData(0.06, "jar", "15 ml")]
     [InlineData(0.19, "pot", "60 ml")]
+    [InlineData(0.18, "L", "180 ml")]
+    [InlineData(1.5, "litres", "1500 ml")]
     [InlineData(1.24, "kg", "1.2 kg")]
     public void QuantityDisplayFormatter_RecipeFormatting_PreservesPreciseAmounts(decimal quantity, string unit, string expected)
     {
