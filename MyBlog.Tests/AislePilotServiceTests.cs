@@ -836,6 +836,22 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WithRequestedDistinctLeftoverSourceDays_PreservesRequestedDistributionWhenFeasible()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            CookDays = 5,
+            LeftoverCookDayIndexesCsv = "0,2"
+        };
+
+        var result = _service.BuildPlan(request);
+        var leftoverSourceDayIndexes = ExtractLeftoverSourceDayIndexes(result.MealPlan);
+
+        Assert.Equal([0, 2], leftoverSourceDayIndexes);
+    }
+
+    [Fact]
     public void BuildPlan_WithFiveCookDays_SpreadsCookSessionsAcrossWeekFromLeftoverAllocation()
     {
         var request = new AislePilotRequestModel
@@ -3556,6 +3572,40 @@ public class AislePilotServiceTests
             : Activator.CreateInstance(valueParameterType);
         var args = new[] { (object?)key, removedValue };
         _ = tryRemove.Invoke(dictionary, args);
+    }
+
+    private static IReadOnlyList<int> ExtractLeftoverSourceDayIndexes(IReadOnlyList<AislePilotMealDayViewModel> mealPlan)
+    {
+        var weekDayLookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Monday"] = 0,
+            ["Tuesday"] = 1,
+            ["Wednesday"] = 2,
+            ["Thursday"] = 3,
+            ["Friday"] = 4,
+            ["Saturday"] = 5,
+            ["Sunday"] = 6
+        };
+        var sourceDayIndexes = new List<int>();
+        foreach (var meal in mealPlan)
+        {
+            if (meal.LeftoverDaysCovered <= 0)
+            {
+                continue;
+            }
+
+            if (!weekDayLookup.TryGetValue(meal.Day ?? string.Empty, out var dayIndex))
+            {
+                continue;
+            }
+
+            for (var i = 0; i < meal.LeftoverDaysCovered; i++)
+            {
+                sourceDayIndexes.Add(dayIndex);
+            }
+        }
+
+        return sourceDayIndexes;
     }
 
     private sealed class StaticResponseHandler(HttpStatusCode statusCode, string responseBody) : HttpMessageHandler

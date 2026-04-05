@@ -3964,6 +3964,11 @@
                         showToast(isDessertSwapForm ? "Dessert swapped." : "Meal swapped.", "success");
                     }
 
+                    if (isLeftoverRebalanceForm) {
+                        clearPersistedSwapScroll();
+                        return;
+                    }
+
                     restoreInlineSwapScroll(scrollSnapshot);
                     clearPersistedSwapScroll();
                     animateSwappedMeal(swapDayIndex);

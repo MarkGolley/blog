@@ -1077,6 +1077,73 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task Index_Post_WhenRemovingOneLeftoverAssignment_PreservesOtherAssignedDay()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var baselineForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "7"),
+            new("Request.CookDays", "5"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.LeftoverCookDayIndexesCsv", "0,2"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(baselineForm));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        var baselineHtml = await baselineResponse.Content.ReadAsStringAsync();
+        var baselineAssignedIndexes = ExtractAssignedLeftoverDayIndexesFromCards(baselineHtml);
+        Assert.Equal(2, baselineAssignedIndexes.Count);
+        var keptIndex = baselineAssignedIndexes[1];
+        var baselineMealNames = ExtractRenderedMealNames(baselineHtml);
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var rebalanceForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "7"),
+            new("Request.CookDays", "5"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.LeftoverCookDayIndexesCsv", $"{keptIndex}"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in baselineMealNames)
+        {
+            rebalanceForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var rebalanceResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(rebalanceForm));
+
+        Assert.Equal(HttpStatusCode.OK, rebalanceResponse.StatusCode);
+        var html = await rebalanceResponse.Content.ReadAsStringAsync();
+        var assignedIndexesAfterRemoval = ExtractAssignedLeftoverDayIndexesFromCards(html);
+        Assert.Single(assignedIndexesAfterRemoval);
+        Assert.Equal(keptIndex, assignedIndexesAfterRemoval[0]);
+    }
+
+    [Fact]
     public async Task Index_Post_WithLeftoverDayIndexesCsv_ShowsTwoLeftoverDaysInOverview()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -1335,6 +1402,8 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("zone.classList.toggle(\"is-leftover-locked\", !isAssigned && !canAssignMore);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("toggleButton.textContent = \"++\";", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("toggleButton.textContent = \"-\";", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (isLeftoverRebalanceForm) {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("clearPersistedSwapScroll();", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("if (getAssignedCount() >= maxExtraAllocations)", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("submitLeftoverRebalance();", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("persistSwapScrollPosition(leftoverRebalanceForm);", script, StringComparison.OrdinalIgnoreCase);
@@ -1364,6 +1433,8 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains(".aislepilot-day-meal-panel > .aislepilot-meal-details-panel ol.case-list", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("list-style-position: inside;", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("padding-left: 0;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-day-card:hover {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("transform: none;", css, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1909,6 +1980,45 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
             .Select(match => WebUtility.HtmlDecode(match.Groups[1].Value))
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToList();
+    }
+
+    private static IReadOnlyList<int> ExtractAssignedLeftoverDayIndexesFromCards(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            return [];
+        }
+
+        var assignedDayIndexes = new List<int>();
+        var zoneMatches = Regex.Matches(
+            html,
+            @"<div[^>]*data-leftover-day-zone[^>]*>",
+            RegexOptions.IgnoreCase);
+        foreach (Match zoneMatch in zoneMatches)
+        {
+            var zoneMarkup = zoneMatch.Value;
+            var dayIndexMatch = Regex.Match(zoneMarkup, @"data-day-index=""(?<value>\d+)""", RegexOptions.IgnoreCase);
+            var countMatch = Regex.Match(zoneMarkup, @"data-leftover-count=""(?<value>\d+)""", RegexOptions.IgnoreCase);
+            if (!dayIndexMatch.Success || !countMatch.Success)
+            {
+                continue;
+            }
+
+            if (!int.TryParse(dayIndexMatch.Groups["value"].Value, out var dayIndex) ||
+                !int.TryParse(countMatch.Groups["value"].Value, out var count) ||
+                dayIndex < 0 ||
+                count <= 0)
+            {
+                continue;
+            }
+
+            for (var i = 0; i < count; i++)
+            {
+                assignedDayIndexes.Add(dayIndex);
+            }
+        }
+
+        return assignedDayIndexes;
     }
 
     private static string ExtractOverviewBudgetDifferenceText(string html)

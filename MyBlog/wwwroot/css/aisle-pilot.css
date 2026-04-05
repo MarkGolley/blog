@@ -2163,6 +2163,10 @@ html.aislepilot-restore-pending .aislepilot-app {
     transform: translateY(-1px);
 }
 
+.aislepilot-day-card:hover {
+    transform: none;
+}
+
 .aislepilot-card.is-leftover-source {
     border-color: rgba(16, 63, 101, 0.34);
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(240, 246, 255, 0.88));

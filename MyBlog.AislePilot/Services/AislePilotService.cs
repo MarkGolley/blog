@@ -9674,7 +9674,7 @@ Return JSON only with this schema:
             return defaultMultipliers;
         }
 
-        return candidates
+        var rankedCandidates = candidates
             .Select(candidate =>
             {
                 var sourceWeekDays = BuildLeftoverSourceWeekDays(candidate, normalizedPlanDays);
@@ -9685,6 +9685,18 @@ Return JSON only with this schema:
                     Overlap = CalculateLeftoverSourceOverlap(requestedWeekDays, sourceWeekDays, normalizedPlanDays)
                 };
             })
+            .ToList();
+
+        var exactCandidate = rankedCandidates
+            .Where(item => HasEquivalentLeftoverSourceDayCounts(requestedWeekDays, item.SourceWeekDays, normalizedPlanDays))
+            .OrderBy(item => string.Join(",", item.Candidate))
+            .FirstOrDefault();
+        if (exactCandidate is not null)
+        {
+            return exactCandidate.Candidate;
+        }
+
+        return rankedCandidates
             .OrderByDescending(item => item.Overlap)
             .ThenBy(item => CalculateLeftoverSourceDistance(requestedWeekDays, item.SourceWeekDays, normalizedPlanDays))
             .ThenBy(item => string.Join(",", item.Candidate))
@@ -9849,6 +9861,29 @@ Return JSON only with this schema:
         }
 
         return counts;
+    }
+
+    private static bool HasEquivalentLeftoverSourceDayCounts(
+        IReadOnlyList<int> requestedSourceDays,
+        IReadOnlyList<int> candidateSourceDays,
+        int planDays = 7)
+    {
+        var requestedCounts = BuildWeekDayCountMap(requestedSourceDays, planDays);
+        var candidateCounts = BuildWeekDayCountMap(candidateSourceDays, planDays);
+        if (requestedCounts.Length != candidateCounts.Length)
+        {
+            return false;
+        }
+
+        for (var day = 0; day < requestedCounts.Length; day++)
+        {
+            if (requestedCounts[day] != candidateCounts[day])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string NormalizeSupermarket(string value)
