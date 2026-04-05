@@ -1873,17 +1873,102 @@ public sealed class AislePilotService : IAislePilotService
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Select(name => name.Trim())
             .ToList();
-        if (normalizedMealNames.Count != totalMealCount)
+        if (normalizedMealNames.Count == 0)
         {
             throw new InvalidOperationException("Could not resolve the current plan for export. Generate a fresh plan and try again.");
+        }
+        if (normalizedMealNames.Count > totalMealCount)
+        {
+            normalizedMealNames = normalizedMealNames
+                .Take(totalMealCount)
+                .ToList();
         }
 
         var context = await BuildPlanContextAsync(request, cancellationToken);
         await EnsureAiMealPoolHydratedAsync(cancellationToken);
-        var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(normalizedMealNames, totalMealCount);
-        if (selectedMeals is null)
+        var resolvableMealCount = Math.Min(normalizedMealNames.Count, totalMealCount);
+        var selectedMeals = BuildSelectedMealsFromCurrentPlanNames(normalizedMealNames, resolvableMealCount);
+        var usedTemplateTopUp = false;
+        if (selectedMeals is null || selectedMeals.Count == 0)
         {
-            throw new InvalidOperationException("Could not resolve the current plan for export. Generate a fresh plan and try again.");
+            var fallbackMeals = SelectMeals(
+                MealTemplates,
+                context.DietaryModes,
+                request.WeeklyBudget,
+                context.HouseholdFactor,
+                request.PreferQuickMeals,
+                context.DislikesOrAllergens,
+                totalMealCount,
+                mealTypeSlots,
+                request.IncludeSpecialTreatMeal,
+                request.SelectedSpecialTreatCookDayIndex,
+                savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+            selectedMeals = fallbackMeals.ToList();
+            AddMealsToAiPool(fallbackMeals);
+            usedTemplateTopUp = true;
+        }
+
+        if (selectedMeals.Count < totalMealCount)
+        {
+            try
+            {
+                var fallbackMeals = SelectMeals(
+                    MealTemplates,
+                    context.DietaryModes,
+                    request.WeeklyBudget,
+                    context.HouseholdFactor,
+                    request.PreferQuickMeals,
+                    context.DislikesOrAllergens,
+                    totalMealCount,
+                    mealTypeSlots,
+                    request.IncludeSpecialTreatMeal,
+                    request.SelectedSpecialTreatCookDayIndex,
+                    savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
+                    enableSavedMealRepeats: request.EnableSavedMealRepeats,
+                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+
+                var stitchedMeals = new List<MealTemplate>(totalMealCount);
+                stitchedMeals.AddRange(selectedMeals);
+
+                foreach (var fallbackMeal in fallbackMeals)
+                {
+                    if (stitchedMeals.Count >= totalMealCount)
+                    {
+                        break;
+                    }
+
+                    if (stitchedMeals.Any(existing =>
+                            existing.Name.Equals(fallbackMeal.Name, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
+                    stitchedMeals.Add(fallbackMeal);
+                }
+
+                if (stitchedMeals.Count < totalMealCount)
+                {
+                    foreach (var fallbackMeal in fallbackMeals)
+                    {
+                        if (stitchedMeals.Count >= totalMealCount)
+                        {
+                            break;
+                        }
+
+                        stitchedMeals.Add(fallbackMeal);
+                    }
+                }
+
+                selectedMeals = stitchedMeals;
+                AddMealsToAiPool(fallbackMeals);
+                usedTemplateTopUp = true;
+            }
+            catch (InvalidOperationException)
+            {
+                selectedMeals = NormalizeSelectedMealsForCount(selectedMeals, totalMealCount).ToList();
+            }
         }
 
         return await BuildPlanFromMealsAsync(
@@ -1892,7 +1977,7 @@ public sealed class AislePilotService : IAislePilotService
             selectedMeals,
             cookDays,
             usedAiGeneratedMeals: true,
-            planSourceLabel: "Current plan",
+            planSourceLabel: usedTemplateTopUp ? "Current plan + template top-up" : "Current plan",
             cancellationToken: cancellationToken);
     }
 
@@ -3787,14 +3872,15 @@ Return JSON only with this schema:
         IReadOnlyList<string>? currentPlanMealNames,
         int expectedMealCount)
     {
-        if (currentPlanMealNames is null || currentPlanMealNames.Count != expectedMealCount)
+        if (currentPlanMealNames is null || currentPlanMealNames.Count < expectedMealCount)
         {
             return null;
         }
 
         var selectedMeals = new List<MealTemplate>(expectedMealCount);
-        foreach (var mealName in currentPlanMealNames)
+        for (var mealIndex = 0; mealIndex < expectedMealCount; mealIndex++)
         {
+            var mealName = currentPlanMealNames[mealIndex];
             if (string.IsNullOrWhiteSpace(mealName))
             {
                 return null;
@@ -7557,8 +7643,8 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
         return safeMealsPerDay switch
         {
             1 => ["Dinner"],
-            2 => ["Dinner", "Lunch"],
-            _ => ["Dinner", "Lunch", "Breakfast"]
+            2 => ["Lunch", "Dinner"],
+            _ => ["Breakfast", "Lunch", "Dinner"]
         };
     }
 
@@ -7576,7 +7662,7 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             .Where(type => type is not null)
             .Select(type => type!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(type => type.Equals("Dinner", StringComparison.OrdinalIgnoreCase)
+            .OrderBy(type => type.Equals("Breakfast", StringComparison.OrdinalIgnoreCase)
                 ? 0
                 : type.Equals("Lunch", StringComparison.OrdinalIgnoreCase)
                     ? 1
@@ -9588,7 +9674,7 @@ Return JSON only with this schema:
             return defaultMultipliers;
         }
 
-        return candidates
+        var rankedCandidates = candidates
             .Select(candidate =>
             {
                 var sourceWeekDays = BuildLeftoverSourceWeekDays(candidate, normalizedPlanDays);
@@ -9599,6 +9685,18 @@ Return JSON only with this schema:
                     Overlap = CalculateLeftoverSourceOverlap(requestedWeekDays, sourceWeekDays, normalizedPlanDays)
                 };
             })
+            .ToList();
+
+        var exactCandidate = rankedCandidates
+            .Where(item => HasEquivalentLeftoverSourceDayCounts(requestedWeekDays, item.SourceWeekDays, normalizedPlanDays))
+            .OrderBy(item => string.Join(",", item.Candidate))
+            .FirstOrDefault();
+        if (exactCandidate is not null)
+        {
+            return exactCandidate.Candidate;
+        }
+
+        return rankedCandidates
             .OrderByDescending(item => item.Overlap)
             .ThenBy(item => CalculateLeftoverSourceDistance(requestedWeekDays, item.SourceWeekDays, normalizedPlanDays))
             .ThenBy(item => string.Join(",", item.Candidate))
@@ -9763,6 +9861,29 @@ Return JSON only with this schema:
         }
 
         return counts;
+    }
+
+    private static bool HasEquivalentLeftoverSourceDayCounts(
+        IReadOnlyList<int> requestedSourceDays,
+        IReadOnlyList<int> candidateSourceDays,
+        int planDays = 7)
+    {
+        var requestedCounts = BuildWeekDayCountMap(requestedSourceDays, planDays);
+        var candidateCounts = BuildWeekDayCountMap(candidateSourceDays, planDays);
+        if (requestedCounts.Length != candidateCounts.Length)
+        {
+            return false;
+        }
+
+        for (var day = 0; day < requestedCounts.Length; day++)
+        {
+            if (requestedCounts[day] != candidateCounts[day])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string NormalizeSupermarket(string value)

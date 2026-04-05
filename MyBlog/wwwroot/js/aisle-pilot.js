@@ -6,6 +6,30 @@
     );
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
     const submitLoadingDelayTimers = new WeakMap();
+    const appRoot = document.querySelector(".aislepilot-app");
+    const planLoadingShell = appRoot instanceof HTMLElement
+        ? appRoot.querySelector("[data-plan-loading-shell]")
+        : null;
+
+    const showPlanLoadingShell = () => {
+        if (!(appRoot instanceof HTMLElement) || !(planLoadingShell instanceof HTMLElement)) {
+            return;
+        }
+
+        appRoot.classList.add("is-plan-loading");
+        planLoadingShell.removeAttribute("hidden");
+        planLoadingShell.setAttribute("aria-hidden", "false");
+    };
+
+    const hidePlanLoadingShell = () => {
+        if (!(appRoot instanceof HTMLElement) || !(planLoadingShell instanceof HTMLElement)) {
+            return;
+        }
+
+        appRoot.classList.remove("is-plan-loading");
+        planLoadingShell.setAttribute("hidden", "hidden");
+        planLoadingShell.setAttribute("aria-hidden", "true");
+    };
 
     const selectInputValue = input => {
         if (!(input instanceof HTMLInputElement)) {
@@ -60,12 +84,47 @@
         submitLoadingDelayTimers.delete(form);
     };
 
+    const lockSubmitButtonWidth = submitButton => {
+        if (!(submitButton instanceof HTMLButtonElement) || submitButton.dataset.loadingWidthLocked === "true") {
+            return;
+        }
+
+        const width = Math.ceil(submitButton.getBoundingClientRect().width);
+        if (width <= 0) {
+            return;
+        }
+
+        submitButton.style.minWidth = `${width}px`;
+        submitButton.dataset.loadingWidthLocked = "true";
+    };
+
+    const unlockSubmitButtonWidth = submitButton => {
+        if (!(submitButton instanceof HTMLButtonElement) || submitButton.dataset.loadingWidthLocked !== "true") {
+            return;
+        }
+
+        submitButton.style.removeProperty("min-width");
+        delete submitButton.dataset.loadingWidthLocked;
+    };
+
     const setSubmitButtonLoadingState = submitButton => {
+        lockSubmitButtonWidth(submitButton);
         const loadingLabel = submitButton.dataset.loadingLabel?.trim();
+        const fallbackLoadingLabel = "Loading...";
+
+        if (submitButton.classList.contains("is-icon-only")) {
+            const nextAriaLabel = loadingLabel && loadingLabel.length > 0
+                ? loadingLabel
+                : fallbackLoadingLabel;
+            submitButton.setAttribute("aria-label", nextAriaLabel);
+            submitButton.classList.add("is-loading");
+            return;
+        }
+
         if (loadingLabel && loadingLabel.length > 0) {
             submitButton.textContent = loadingLabel;
         } else {
-            submitButton.textContent = "Loading...";
+            submitButton.textContent = fallbackLoadingLabel;
         }
 
         submitButton.classList.add("is-loading");
@@ -95,9 +154,15 @@
 
             const originalLabel = submitButton.dataset.originalLabel ?? submitButton.textContent ?? "";
             submitButton.dataset.originalLabel = originalLabel.trim();
+            const originalAriaLabel = submitButton.dataset.originalAriaLabel ?? submitButton.getAttribute("aria-label") ?? "";
+            submitButton.dataset.originalAriaLabel = originalAriaLabel.trim();
+            lockSubmitButtonWidth(submitButton);
             targetForm.setAttribute("data-is-submitting", "true");
             submitButton.disabled = true;
             submitButton.setAttribute("aria-busy", "true");
+            if (submitButton.hasAttribute("data-show-plan-skeleton") || targetForm.hasAttribute("data-show-plan-skeleton")) {
+                showPlanLoadingShell();
+            }
             if (targetForm.hasAttribute("data-skip-submit-loading")) {
                 return;
             }
@@ -167,6 +232,60 @@
             form.dataset.exportThemeWired = "true";
             form.addEventListener("submit", syncThemeInput);
         });
+    };
+
+    let toastHost = null;
+    let toastLiveRegion = null;
+
+    const ensureToastHost = () => {
+        if (toastHost instanceof HTMLElement && toastLiveRegion instanceof HTMLElement) {
+            return;
+        }
+
+        const host = document.createElement("div");
+        host.className = "aislepilot-toast-stack";
+        host.setAttribute("aria-hidden", "true");
+
+        const liveRegion = document.createElement("p");
+        liveRegion.className = "aislepilot-toast-live";
+        liveRegion.setAttribute("aria-live", "polite");
+        liveRegion.setAttribute("aria-atomic", "true");
+        liveRegion.textContent = "";
+
+        const appRoot = document.querySelector(".aislepilot-app");
+        if (appRoot instanceof HTMLElement) {
+            appRoot.append(host, liveRegion);
+        } else {
+            document.body.append(host, liveRegion);
+        }
+
+        toastHost = host;
+        toastLiveRegion = liveRegion;
+    };
+
+    const showToast = (message, type = "info") => {
+        const normalizedMessage = typeof message === "string" ? message.trim() : "";
+        if (normalizedMessage.length === 0) {
+            return;
+        }
+
+        ensureToastHost();
+        if (!(toastHost instanceof HTMLElement) || !(toastLiveRegion instanceof HTMLElement)) {
+            return;
+        }
+
+        const toast = document.createElement("div");
+        toast.className = `aislepilot-toast is-${type}`;
+        toast.textContent = normalizedMessage;
+        toastHost.append(toast);
+        toastLiveRegion.textContent = normalizedMessage;
+
+        window.setTimeout(() => {
+            toast.classList.add("is-fading-out");
+            window.setTimeout(() => {
+                toast.remove();
+            }, 220);
+        }, 2200);
     };
 
     wireSubmitLoadingHandlers(document);
@@ -468,6 +587,7 @@
 
             const planDaysSlider = form.querySelector("[data-plan-days-slider]");
             const cookDaysSlider = form.querySelector("[data-cook-days-slider]");
+            const cookDaysHiddenInput = form.querySelector("input[type='hidden'][name='Request.CookDays']");
             const planDaysSliderField = planDaysSlider instanceof HTMLInputElement
                 ? planDaysSlider.closest(".aislepilot-slider-field")
                 : null;
@@ -498,7 +618,7 @@
             };
 
             const syncPlanDaysConstraint = source => {
-                if (!(planDaysSlider instanceof HTMLInputElement) || !(cookDaysSlider instanceof HTMLInputElement)) {
+                if (!(planDaysSlider instanceof HTMLInputElement)) {
                     return;
                 }
 
@@ -506,6 +626,18 @@
                 const safePlanDays = Number.isInteger(rawPlanDays)
                     ? Math.max(1, Math.min(7, rawPlanDays))
                     : 7;
+                if (!(cookDaysSlider instanceof HTMLInputElement)) {
+                    planDaysSlider.value = `${safePlanDays}`;
+                    planDaysSlider.setAttribute("aria-valuetext", `${safePlanDays}`);
+                    if (planDaysValueOutput instanceof HTMLElement) {
+                        planDaysValueOutput.textContent = `${safePlanDays}`;
+                    }
+                    if (cookDaysHiddenInput instanceof HTMLInputElement) {
+                        cookDaysHiddenInput.value = `${safePlanDays}`;
+                    }
+                    syncSliderProgress(planDaysSlider);
+                    return;
+                }
 
                 const rawCookDays = Number.parseInt(cookDaysSlider.value ?? "1", 10);
                 const cookMinRaw = Number.parseInt(cookDaysSlider.min ?? "1", 10);
@@ -539,7 +671,7 @@
                 syncSliderProgress(cookDaysSlider);
             };
 
-            if (planDaysSlider instanceof HTMLInputElement && cookDaysSlider instanceof HTMLInputElement) {
+            if (planDaysSlider instanceof HTMLInputElement) {
                 if (form.dataset.planDaysConstraintWired !== "true") {
                     form.dataset.planDaysConstraintWired = "true";
                     planDaysSlider.addEventListener("input", () => {
@@ -548,12 +680,14 @@
                     planDaysSlider.addEventListener("change", () => {
                         syncPlanDaysConstraint("plan-change");
                     });
-                    cookDaysSlider.addEventListener("input", () => {
-                        syncPlanDaysConstraint("cook-change");
-                    });
-                    cookDaysSlider.addEventListener("change", () => {
-                        syncPlanDaysConstraint("cook-change");
-                    });
+                    if (cookDaysSlider instanceof HTMLInputElement) {
+                        cookDaysSlider.addEventListener("input", () => {
+                            syncPlanDaysConstraint("cook-change");
+                        });
+                        cookDaysSlider.addEventListener("change", () => {
+                            syncPlanDaysConstraint("cook-change");
+                        });
+                    }
                 }
 
                 syncPlanDaysConstraint("init");
@@ -1808,7 +1942,7 @@
             trigger.addEventListener("click", async () => {
                 const notesText = contentField.value?.trim() ?? "";
                 if (notesText.length === 0) {
-                    const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not prepare shopping list.";
+                    const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not prepare shopping list. Try again.";
                     setTemporaryButtonLabel(trigger, failedLabel);
                     return;
                 }
@@ -1951,6 +2085,7 @@
     wireModeScopedPreferenceVisibility(document);
 
     const resetSubmittingState = () => {
+        hidePlanLoadingShell();
         getAislePilotForms().forEach(form => {
             clearSubmitLoadingDelay(form);
             form.removeAttribute("data-is-submitting");
@@ -1968,10 +2103,21 @@
                 button.disabled = false;
                 button.removeAttribute("aria-busy");
 
+                const originalAriaLabel = button.dataset.originalAriaLabel;
+                if (typeof originalAriaLabel === "string") {
+                    if (originalAriaLabel.length > 0) {
+                        button.setAttribute("aria-label", originalAriaLabel);
+                    } else {
+                        button.removeAttribute("aria-label");
+                    }
+                }
+
                 const originalLabel = button.dataset.originalLabel?.trim();
-                if (originalLabel && originalLabel.length > 0) {
+                if (!button.classList.contains("is-icon-only") && originalLabel && originalLabel.length > 0) {
                     button.textContent = originalLabel;
                 }
+
+                unlockSubmitButtonWidth(button);
             });
         });
     };
@@ -1991,6 +2137,9 @@
     });
 
     const swapScrollKey = "aislepilot:swap-scroll";
+    const clearPersistedSwapScroll = () => {
+        sessionStorage.removeItem(swapScrollKey);
+    };
     const clearRestorePending = () => {
         document.documentElement.classList.remove("aislepilot-restore-pending");
     };
@@ -2091,6 +2240,7 @@
         let targetX = window.scrollX;
         let targetY = window.scrollY;
         let anchorDayIndex = null;
+        let anchorPanelId = null;
         let anchorTop = null;
 
         if (form instanceof HTMLFormElement) {
@@ -2112,7 +2262,13 @@
             const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
             if (Number.isInteger(parsedDayIndex) && parsedDayIndex >= 0) {
                 anchorDayIndex = parsedDayIndex;
-                anchorTop = Math.round(form.getBoundingClientRect().top);
+                const panel = form.closest("[data-day-meal-panel]");
+                if (panel instanceof HTMLElement && panel.id) {
+                    anchorPanelId = panel.id;
+                    anchorTop = Math.round(panel.getBoundingClientRect().top);
+                } else {
+                    anchorTop = Math.round(form.getBoundingClientRect().top);
+                }
             }
         }
 
@@ -2122,6 +2278,7 @@
             y: targetY,
             activePanelId,
             anchorDayIndex,
+            anchorPanelId,
             anchorTop,
             at: Date.now()
         };
@@ -2163,6 +2320,9 @@
             const anchorDayIndex = Number.isInteger(parsed.anchorDayIndex)
                 ? parsed.anchorDayIndex
                 : null;
+            const anchorPanelId = typeof parsed.anchorPanelId === "string" && parsed.anchorPanelId.length > 0
+                ? parsed.anchorPanelId
+                : null;
             const anchorTop = typeof parsed.anchorTop === "number"
                 ? parsed.anchorTop
                 : null;
@@ -2171,7 +2331,14 @@
                     return fallbackTargetY;
                 }
 
-                const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${anchorDayIndex}']`;
+                if (anchorPanelId) {
+                    const targetPanel = document.getElementById(anchorPanelId);
+                    if (targetPanel instanceof HTMLElement) {
+                        return window.scrollY + (targetPanel.getBoundingClientRect().top - anchorTop);
+                    }
+                }
+
+                const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${anchorDayIndex}']`;
                 const targetDayInput = document.querySelector(selector);
                 if (!(targetDayInput instanceof HTMLInputElement)) {
                     return fallbackTargetY;
@@ -2412,7 +2579,9 @@
         track.style.transform = `translateX(-${currentIndex * 100}%)`;
 
         panels.forEach((panel, index) => {
-            panel.setAttribute("aria-hidden", index == currentIndex ? "false" : "true");
+            const isActive = index === currentIndex;
+            panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+            panel.setAttribute("tabindex", isActive ? "0" : "-1");
         });
 
         tabs.forEach(tab => {
@@ -2420,6 +2589,8 @@
             const isActive = targetId === panels[currentIndex].id;
             tab.classList.toggle("is-active", isActive);
             tab.setAttribute("aria-selected", isActive ? "true" : "false");
+            tab.setAttribute("aria-current", isActive ? "page" : "false");
+            tab.setAttribute("tabindex", isActive ? "0" : "-1");
         });
 
         if (updateHash && panels[currentIndex].id) {
@@ -2433,17 +2604,68 @@
         observeActivePanelHeight();
     };
 
+    const activateWindowTab = tab => {
+        if (!(tab instanceof HTMLElement)) {
+            return;
+        }
+
+        const targetId = tab.getAttribute("data-window-tab");
+        if (!targetId) {
+            return;
+        }
+
+        const nextIndex = panels.findIndex(panel => panel.id === targetId);
+        if (nextIndex < 0) {
+            return;
+        }
+
+        syncUi(nextIndex, true);
+        tab.focus();
+        markTabHintSeen();
+    };
+
     tabs.forEach(tab => {
         tab.addEventListener("click", () => {
-            const targetId = tab.getAttribute("data-window-tab");
-            if (!targetId) {
+            activateWindowTab(tab);
+        });
+
+        tab.addEventListener("keydown", event => {
+            const tabContainer = tab.parentElement;
+            if (!(tabContainer instanceof HTMLElement)) {
                 return;
             }
 
-            const nextIndex = panels.findIndex(panel => panel.id === targetId);
-            if (nextIndex >= 0) {
-                syncUi(nextIndex, true);
-                markTabHintSeen();
+            const siblingTabs = Array.from(tabContainer.querySelectorAll("[data-window-tab]"));
+            const currentTabIndex = siblingTabs.indexOf(tab);
+            if (currentTabIndex < 0) {
+                return;
+            }
+
+            if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                event.preventDefault();
+                const nextTabIndex = (currentTabIndex + 1) % siblingTabs.length;
+                const nextTab = siblingTabs[nextTabIndex];
+                activateWindowTab(nextTab);
+                return;
+            }
+
+            if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const nextTabIndex = (currentTabIndex - 1 + siblingTabs.length) % siblingTabs.length;
+                const nextTab = siblingTabs[nextTabIndex];
+                activateWindowTab(nextTab);
+                return;
+            }
+
+            if (event.key === "Home") {
+                event.preventDefault();
+                activateWindowTab(siblingTabs[0]);
+                return;
+            }
+
+            if (event.key === "End") {
+                event.preventDefault();
+                activateWindowTab(siblingTabs[siblingTabs.length - 1]);
             }
         });
     });
@@ -2467,6 +2689,7 @@
         let targetX = window.scrollX;
         let targetY = window.scrollY;
         let anchorDayIndex = null;
+        let anchorPanelId = null;
         let anchorTop = null;
 
         if (form instanceof HTMLFormElement) {
@@ -2488,7 +2711,13 @@
             const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
             if (Number.isInteger(parsedDayIndex) && parsedDayIndex >= 0) {
                 anchorDayIndex = parsedDayIndex;
-                anchorTop = Math.round(form.getBoundingClientRect().top);
+                const panel = form.closest("[data-day-meal-panel]");
+                if (panel instanceof HTMLElement && panel.id) {
+                    anchorPanelId = panel.id;
+                    anchorTop = Math.round(panel.getBoundingClientRect().top);
+                } else {
+                    anchorTop = Math.round(form.getBoundingClientRect().top);
+                }
             }
         }
 
@@ -2496,6 +2725,7 @@
             x: targetX,
             y: targetY,
             anchorDayIndex,
+            anchorPanelId,
             anchorTop
         };
     };
@@ -2510,6 +2740,9 @@
         const anchorDayIndex = Number.isInteger(snapshot.anchorDayIndex)
             ? snapshot.anchorDayIndex
             : null;
+        const anchorPanelId = typeof snapshot.anchorPanelId === "string" && snapshot.anchorPanelId.length > 0
+            ? snapshot.anchorPanelId
+            : null;
         const anchorTop = typeof snapshot.anchorTop === "number"
             ? snapshot.anchorTop
             : null;
@@ -2519,7 +2752,14 @@
                 return fallbackTargetY;
             }
 
-            const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${anchorDayIndex}']`;
+            if (anchorPanelId) {
+                const targetPanel = document.getElementById(anchorPanelId);
+                if (targetPanel instanceof HTMLElement) {
+                    return window.scrollY + (targetPanel.getBoundingClientRect().top - anchorTop);
+                }
+            }
+
+            const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${anchorDayIndex}']`;
             const targetDayInput = document.querySelector(selector);
             if (!(targetDayInput instanceof HTMLInputElement)) {
                 return fallbackTargetY;
@@ -2574,11 +2814,6 @@
 
         form.addEventListener("submit", () => {
             stripHashFromFormAction(form);
-
-            if (form.hasAttribute("data-ajax-swap-form")) {
-                return;
-            }
-
             persistSwapScrollPosition(form);
         });
     };
@@ -2669,51 +2904,38 @@
     };
 
     const wireLeftoverPlanner = scope => {
-        const plannerShells = scope instanceof Element
-            ? Array.from(scope.querySelectorAll("[data-leftover-planner]"))
-            : Array.from(document.querySelectorAll("[data-leftover-planner]"));
+        const leftoverRebalanceForms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-leftover-rebalance-form]"))
+            : Array.from(document.querySelectorAll("[data-leftover-rebalance-form]"));
 
-        plannerShells.forEach(plannerShell => {
-            if (!(plannerShell instanceof HTMLElement) || plannerShell.dataset.leftoverPlannerWired === "true") {
+        leftoverRebalanceForms.forEach(leftoverRebalanceForm => {
+            if (!(leftoverRebalanceForm instanceof HTMLFormElement) || leftoverRebalanceForm.dataset.leftoverPlannerWired === "true") {
                 return;
             }
 
-            plannerShell.dataset.leftoverPlannerWired = "true";
-            const mealsPanel = plannerShell.closest("#aislepilot-meals");
-            const container = mealsPanel instanceof HTMLElement ? mealsPanel : plannerShell.parentElement;
+            leftoverRebalanceForm.dataset.leftoverPlannerWired = "true";
+            const mealsPanel = leftoverRebalanceForm.closest("#aislepilot-meals");
+            const container = mealsPanel instanceof HTMLElement ? mealsPanel : leftoverRebalanceForm.parentElement;
             if (!(container instanceof HTMLElement)) {
                 return;
             }
 
-            const leftoverToggleButton = container.querySelector("[data-leftover-toggle]");
-            if (leftoverToggleButton instanceof HTMLButtonElement && leftoverToggleButton.dataset.leftoverToggleWired !== "true") {
-                leftoverToggleButton.dataset.leftoverToggleWired = "true";
-                leftoverToggleButton.addEventListener("click", () => {
-                    const isHidden = plannerShell.hasAttribute("hidden");
-                    if (isHidden) {
-                        plannerShell.removeAttribute("hidden");
-                        leftoverToggleButton.setAttribute("aria-expanded", "true");
-                        leftoverToggleButton.textContent = "Hide leftover rebalance";
-                    } else {
-                        plannerShell.setAttribute("hidden", "hidden");
-                        leftoverToggleButton.setAttribute("aria-expanded", "false");
-                        leftoverToggleButton.textContent = "Rebalance leftovers";
-                    }
-
-                    updateViewportHeight(true);
-                });
-            }
-
-            const leftoverRebalanceForm = container.querySelector("[data-leftover-rebalance-form]");
             const leftoverCsvInput = leftoverRebalanceForm?.querySelector("[data-leftover-csv]");
-            const leftoverZones = Array.from(plannerShell.querySelectorAll("[data-leftover-day-zone]"));
-            let selectedSourceZone = null;
+            const leftoverZones = Array.from(container.querySelectorAll("[data-leftover-day-zone]"));
+            const maxExtraRaw = Number.parseInt(
+                leftoverRebalanceForm.getAttribute("data-leftover-max-extra") ?? "",
+                10);
+            const maxExtraAllocations = Number.isInteger(maxExtraRaw) && maxExtraRaw >= 0
+                ? maxExtraRaw
+                : Math.max(0, leftoverZones.length - 1);
 
-            const submitLeftoverRebalance = () => {
-                if (!(leftoverRebalanceForm instanceof HTMLFormElement) || !(leftoverCsvInput instanceof HTMLInputElement)) {
-                    return;
-                }
-
+            const toCsv = dayIndexes => dayIndexes.join(",");
+            const getZoneCount = zone => {
+                const countRaw = zone.getAttribute("data-leftover-count");
+                const count = Number.parseInt(countRaw ?? "", 10);
+                return Number.isInteger(count) && count > 0 ? count : 0;
+            };
+            const buildRequestedDayIndexes = () => {
                 const requestedDayIndexes = [];
                 leftoverZones.forEach(zone => {
                     const dayIndexRaw = zone.getAttribute("data-day-index");
@@ -2722,95 +2944,320 @@
                         return;
                     }
 
-                    const countRaw = zone.getAttribute("data-leftover-count");
-                    const tokenCount = Number.parseInt(countRaw ?? "", 10);
-                    const normalizedCount = Number.isInteger(tokenCount) && tokenCount > 0 ? tokenCount : 0;
-                    for (let i = 0; i < normalizedCount; i++) {
+                    const normalizedCount = getZoneCount(zone);
+                    for (let i = 0; i < normalizedCount; i += 1) {
                         requestedDayIndexes.push(dayIndex);
                     }
                 });
+                return requestedDayIndexes;
+            };
+            const getAssignedCount = () => buildRequestedDayIndexes().length;
 
-                leftoverCsvInput.value = requestedDayIndexes.join(",");
-                persistSwapScrollPosition(leftoverRebalanceForm);
-                leftoverRebalanceForm.requestSubmit();
+            const syncSubmitPayload = () => {
+                if (!(leftoverCsvInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                leftoverCsvInput.value = toCsv(buildRequestedDayIndexes());
             };
 
-            const getZoneCount = zone => {
-                const countRaw = zone.getAttribute("data-leftover-count");
-                const count = Number.parseInt(countRaw ?? "", 10);
-                return Number.isInteger(count) && count > 0 ? count : 0;
+            const syncZoneCountBadge = (zone, normalizedCount) => {
+                const countBadge = zone.querySelector("[data-leftover-day-count]");
+                if (!(countBadge instanceof HTMLElement)) {
+                    return;
+                }
+
+                const dayCount = Math.max(0, normalizedCount);
+                if (dayCount > 1) {
+                    countBadge.textContent = `x${dayCount}`;
+                    countBadge.removeAttribute("hidden");
+                } else {
+                    countBadge.textContent = "";
+                    countBadge.setAttribute("hidden", "hidden");
+                }
+            };
+
+            const syncZoneAriaLabel = (zone, normalizedCount) => {
+                const dayName = (zone.getAttribute("data-day-name") ?? "").trim();
+                if (dayName.length === 0) {
+                    return;
+                }
+
+                const dayCount = Math.max(0, normalizedCount);
+                const nextLabel = dayCount > 0
+                    ? `${dayName}: cook-extra x${dayCount}`
+                    : `${dayName}: no cook-extra`;
+                zone.setAttribute("aria-label", nextLabel);
             };
 
             const setZoneCount = (zone, count) => {
                 const normalizedCount = Math.max(0, count);
                 zone.setAttribute("data-leftover-count", `${normalizedCount}`);
                 zone.classList.toggle("is-leftover-source", normalizedCount > 0);
+                syncZoneCountBadge(zone, normalizedCount);
+                syncZoneAriaLabel(zone, normalizedCount);
             };
 
-            const clearSourceSelection = () => {
-                if (!selectedSourceZone) {
-                    return;
-                }
+            const syncZoneControlButtons = () => {
+                const assignedCount = getAssignedCount();
+                const canAssignMore = assignedCount < maxExtraAllocations;
+                leftoverZones.forEach(zone => {
+                    if (!(zone instanceof HTMLElement)) {
+                        return;
+                    }
 
-                selectedSourceZone.classList.remove("is-source-selected");
-                selectedSourceZone = null;
-                leftoverZones.forEach(zone => zone.classList.remove("is-drop-ready"));
-            };
-
-            const selectSourceZone = zone => {
-                clearSourceSelection();
-                selectedSourceZone = zone;
-                zone.classList.add("is-source-selected");
-                leftoverZones.forEach(targetZone => {
-                    if (targetZone !== zone) {
-                        targetZone.classList.add("is-drop-ready");
+                    const toggleButton = zone.querySelector("[data-leftover-toggle-sign]");
+                    const zoneCount = getZoneCount(zone);
+                    const dayName = (zone.getAttribute("data-day-name") ?? "").trim();
+                    const isAssigned = zoneCount > 0;
+                    const canAssign = !isAssigned && canAssignMore;
+                    zone.classList.toggle("is-leftover-locked", !isAssigned && !canAssignMore);
+                    if (toggleButton instanceof HTMLButtonElement) {
+                        if (isAssigned) {
+                            toggleButton.hidden = false;
+                            toggleButton.disabled = false;
+                            toggleButton.textContent = "++";
+                            if (dayName.length > 0) {
+                                toggleButton.setAttribute("aria-label", `Remove cook-extra from ${dayName}`);
+                            }
+                        } else if (canAssign && canAssignMore) {
+                            toggleButton.hidden = false;
+                            toggleButton.disabled = false;
+                            toggleButton.textContent = "+";
+                            if (dayName.length > 0) {
+                                toggleButton.setAttribute("aria-label", `Add cook-extra to ${dayName}`);
+                            }
+                        } else {
+                            toggleButton.hidden = true;
+                            toggleButton.disabled = true;
+                        }
                     }
                 });
             };
 
-            const moveOneLeftover = targetZone => {
-                if (!selectedSourceZone || selectedSourceZone === targetZone) {
+            const syncPlannerState = () => {
+                syncSubmitPayload();
+                syncZoneControlButtons();
+            };
+
+            const submitLeftoverRebalance = () => {
+                if (!(leftoverRebalanceForm instanceof HTMLFormElement) || !(leftoverCsvInput instanceof HTMLInputElement)) {
                     return;
                 }
 
-                const sourceCount = getZoneCount(selectedSourceZone);
-                if (sourceCount <= 0) {
-                    clearSourceSelection();
-                    return;
-                }
-
-                const targetCount = getZoneCount(targetZone);
-                setZoneCount(selectedSourceZone, sourceCount - 1);
-                setZoneCount(targetZone, targetCount + 1);
-                clearSourceSelection();
-                submitLeftoverRebalance();
+                syncSubmitPayload();
+                persistSwapScrollPosition(leftoverRebalanceForm);
+                leftoverRebalanceForm.requestSubmit();
             };
 
             if (leftoverZones.length > 0) {
                 leftoverZones.forEach(zone => {
-                    if (!(zone instanceof HTMLButtonElement) || zone.dataset.leftoverZoneWired === "true") {
+                    if (!(zone instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    setZoneCount(zone, getZoneCount(zone));
+                });
+
+                syncPlannerState();
+
+                leftoverZones.forEach(zone => {
+                    if (!(zone instanceof HTMLElement) || zone.dataset.leftoverZoneWired === "true") {
                         return;
                     }
 
                     zone.dataset.leftoverZoneWired = "true";
-                    zone.addEventListener("click", () => {
-                        const zoneCount = getZoneCount(zone);
-                        if (!selectedSourceZone) {
+                    const toggleButton = zone.querySelector("[data-leftover-toggle-sign]");
+                    if (toggleButton instanceof HTMLButtonElement) {
+                        toggleButton.addEventListener("click", () => {
+                            const zoneCount = getZoneCount(zone);
                             if (zoneCount > 0) {
-                                selectSourceZone(zone);
+                                setZoneCount(zone, zoneCount - 1);
+                                submitLeftoverRebalance();
+                                return;
                             }
-                            return;
-                        }
 
-                        if (selectedSourceZone === zone) {
-                            clearSourceSelection();
-                            return;
-                        }
+                            if (getAssignedCount() >= maxExtraAllocations) {
+                                return;
+                            }
 
-                        moveOneLeftover(zone);
-                    });
+                            setZoneCount(zone, zoneCount + 1);
+                            submitLeftoverRebalance();
+                        });
+                    }
                 });
             }
+        });
+    };
+
+    let cardMoreActionsGlobalWired = false;
+
+    const closeOpenCardMoreActions = except => {
+        const openMenus = Array.from(document.querySelectorAll("[data-card-more-actions][open]"));
+        openMenus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement) || menu === except) {
+                return;
+            }
+
+            menu.open = false;
+        });
+    };
+
+    const positionCardMoreActionsMenu = (menu, attempt = 0) => {
+        if (!(menu instanceof HTMLDetailsElement) || !menu.open) {
+            return;
+        }
+
+        const trigger = menu.querySelector("summary");
+        const actionsMenu = menu.querySelector(".aislepilot-card-more-actions-menu");
+        if (!(trigger instanceof HTMLElement) || !(actionsMenu instanceof HTMLElement)) {
+            return;
+        }
+
+        const viewportPadding = 8;
+        actionsMenu.style.removeProperty("max-height");
+        actionsMenu.style.removeProperty("overflow-y");
+        menu.classList.remove("is-drop-up", "is-drop-down", "is-align-left");
+        let actionsRect = actionsMenu.getBoundingClientRect();
+        const triggerRect = trigger.getBoundingClientRect();
+        const availableBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
+        const availableAbove = triggerRect.top - viewportPadding;
+        const canFitBelow = actionsRect.height <= availableBelow;
+        const canFitAbove = actionsRect.height <= availableAbove;
+        const isMobileViewport = window.innerWidth <= 760;
+        const triggerMidpointY = triggerRect.top + (triggerRect.height / 2);
+        const shouldPreferDropUpOnMobile =
+            triggerMidpointY > (window.innerHeight * 0.62) ||
+            availableBelow < (actionsRect.height + 40);
+        let openUp = false;
+
+        if (canFitAbove && !canFitBelow) {
+            openUp = true;
+        } else if (!canFitAbove && canFitBelow) {
+            openUp = false;
+        } else if (canFitAbove && canFitBelow) {
+            openUp = isMobileViewport && shouldPreferDropUpOnMobile;
+        } else {
+            openUp = availableAbove > availableBelow;
+        }
+
+        menu.classList.add(openUp ? "is-drop-up" : "is-drop-down");
+        actionsRect = actionsMenu.getBoundingClientRect();
+
+        const availableInDirection = menu.classList.contains("is-drop-up")
+            ? availableAbove
+            : availableBelow;
+        if (availableInDirection > 0 && actionsRect.height > availableInDirection) {
+            const maxVisibleHeight = window.innerHeight - (viewportPadding * 2);
+            const canFullyFitInViewport = actionsRect.height <= maxVisibleHeight + 1;
+            if (canFullyFitInViewport && attempt < 2) {
+                const neededDelta = Math.ceil(actionsRect.height - availableInDirection + 6);
+                if (neededDelta > 0) {
+                    const scrollDelta = menu.classList.contains("is-drop-up") ? -neededDelta : neededDelta;
+                    window.scrollBy(0, scrollDelta);
+                    window.requestAnimationFrame(() => {
+                        positionCardMoreActionsMenu(menu, attempt + 1);
+                    });
+                    return;
+                }
+            }
+
+            const clampedMaxHeight = Math.max(96, Math.floor(availableInDirection - 6));
+            actionsMenu.style.maxHeight = `${clampedMaxHeight}px`;
+            actionsMenu.style.overflowY = "auto";
+            actionsRect = actionsMenu.getBoundingClientRect();
+        }
+
+        if (actionsRect.left < viewportPadding) {
+            menu.classList.add("is-align-left");
+            actionsRect = actionsMenu.getBoundingClientRect();
+        }
+
+        if (actionsRect.right > window.innerWidth - viewportPadding && menu.classList.contains("is-align-left")) {
+            menu.classList.remove("is-align-left");
+        }
+    };
+
+    const wireCardMoreActions = scope => {
+        const menus = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-card-more-actions]"))
+            : Array.from(document.querySelectorAll("[data-card-more-actions]"));
+
+        menus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement) || menu.dataset.cardMoreActionsWired === "true") {
+                return;
+            }
+
+            menu.dataset.cardMoreActionsWired = "true";
+            menu.addEventListener("toggle", () => {
+                const trigger = menu.querySelector("summary");
+                const actionsMenu = menu.querySelector(".aislepilot-card-more-actions-menu");
+                if (trigger instanceof HTMLElement) {
+                    trigger.setAttribute("aria-expanded", menu.open ? "true" : "false");
+                }
+                if (!menu.open && actionsMenu instanceof HTMLElement) {
+                    actionsMenu.style.removeProperty("max-height");
+                    actionsMenu.style.removeProperty("overflow-y");
+                }
+
+                const dayMealPanel = menu.closest("[data-day-meal-panel]");
+                if (dayMealPanel instanceof HTMLElement) {
+                    const hasOpenMenu = dayMealPanel.querySelector("[data-card-more-actions][open]") instanceof HTMLDetailsElement;
+                    if (hasOpenMenu) {
+                        dayMealPanel.classList.add("has-open-actions");
+                    } else {
+                        dayMealPanel.classList.remove("has-open-actions");
+                    }
+                }
+
+                if (menu.open) {
+                    closeOpenCardMoreActions(menu);
+                    window.requestAnimationFrame(() => {
+                        positionCardMoreActionsMenu(menu);
+                    });
+                }
+            });
+
+            const actionButtons = Array.from(menu.querySelectorAll("button[type='submit']"));
+            actionButtons.forEach(button => {
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                button.addEventListener("click", () => {
+                    menu.open = false;
+                });
+            });
+        });
+
+        if (cardMoreActionsGlobalWired) {
+            return;
+        }
+
+        cardMoreActionsGlobalWired = true;
+        document.addEventListener("click", event => {
+            if (!(event.target instanceof Element)) {
+                return;
+            }
+
+            if (event.target.closest("[data-card-more-actions]")) {
+                return;
+            }
+
+            closeOpenCardMoreActions(null);
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                closeOpenCardMoreActions(null);
+            }
+        });
+
+        window.addEventListener("resize", () => {
+            const openMenus = Array.from(document.querySelectorAll("[data-card-more-actions][open]"));
+            openMenus.forEach(openMenu => {
+                positionCardMoreActionsMenu(openMenu);
+            });
         });
     };
 
@@ -2837,10 +3284,18 @@
             toggle.dataset.inlineDetailsWired = "true";
 
             const syncDetailsPanel = () => {
-                if (toggle.open) {
+                const summary = toggle.querySelector("summary");
+                const isExpanded = toggle.open;
+                if (summary instanceof HTMLElement) {
+                    summary.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+                }
+
+                if (isExpanded) {
                     detailsPanel.removeAttribute("hidden");
+                    detailsPanel.setAttribute("aria-hidden", "false");
                 } else {
                     detailsPanel.setAttribute("hidden", "hidden");
+                    detailsPanel.setAttribute("aria-hidden", "true");
                 }
 
                 updateViewportHeight(true);
@@ -2891,6 +3346,7 @@
                     const isActive = index === currentSlotIndex;
                     tab.classList.toggle("is-active", isActive);
                     tab.setAttribute("aria-selected", isActive ? "true" : "false");
+                    tab.setAttribute("tabindex", isActive ? "0" : "-1");
                 });
 
                 panels.forEach((panel, index) => {
@@ -2898,7 +3354,41 @@
                         return;
                     }
 
-                    panel.setAttribute("aria-hidden", index === currentSlotIndex ? "false" : "true");
+                    const isActive = index === currentSlotIndex;
+                    panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+                    panel.setAttribute("tabindex", isActive ? "0" : "-1");
+                });
+
+                const summaryLabel = card.querySelector("[data-day-card-summary]");
+                if (summaryLabel instanceof HTMLElement) {
+                    const activeTab = tabs[currentSlotIndex];
+                    const summaryValue = activeTab instanceof HTMLButtonElement
+                        ? (activeTab.dataset.dayCardSummaryValue ?? "").trim()
+                        : "";
+                    const defaultSummaryValue = (summaryLabel.dataset.dayCardSummaryDefault ?? "").trim();
+                    const nextSummaryValue = summaryValue.length > 0 ? summaryValue : defaultSummaryValue;
+                    if (nextSummaryValue.length > 0) {
+                        summaryLabel.textContent = nextSummaryValue;
+                    }
+                }
+
+                const headerActions = Array.from(card.querySelectorAll("[data-day-card-header-actions]"));
+                headerActions.forEach(actions => {
+                    if (!(actions instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const slotIndex = Number.parseInt(actions.dataset.slotIndex ?? "-1", 10);
+                    const isActive = slotIndex === currentSlotIndex;
+                    actions.classList.toggle("is-active", isActive);
+                    actions.setAttribute("aria-hidden", isActive ? "false" : "true");
+
+                    if (!isActive) {
+                        const openMenu = actions.querySelector("[data-card-more-actions][open]");
+                        if (openMenu instanceof HTMLDetailsElement) {
+                            openMenu.open = false;
+                        }
+                    }
                 });
 
                 const dayKey = readCardDayKey(card);
@@ -2916,6 +3406,50 @@
 
                 tab.addEventListener("click", () => {
                     syncSlot(index);
+                });
+
+                tab.addEventListener("keydown", event => {
+                    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                        event.preventDefault();
+                        const nextIndex = (currentSlotIndex + 1) % tabs.length;
+                        syncSlot(nextIndex);
+                        const nextTab = tabs[nextIndex];
+                        if (nextTab instanceof HTMLButtonElement) {
+                            nextTab.focus();
+                        }
+                        return;
+                    }
+
+                    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                        event.preventDefault();
+                        const nextIndex = (currentSlotIndex - 1 + tabs.length) % tabs.length;
+                        syncSlot(nextIndex);
+                        const nextTab = tabs[nextIndex];
+                        if (nextTab instanceof HTMLButtonElement) {
+                            nextTab.focus();
+                        }
+                        return;
+                    }
+
+                    if (event.key === "Home") {
+                        event.preventDefault();
+                        syncSlot(0);
+                        const firstTab = tabs[0];
+                        if (firstTab instanceof HTMLButtonElement) {
+                            firstTab.focus();
+                        }
+                        return;
+                    }
+
+                    if (event.key === "End") {
+                        event.preventDefault();
+                        const lastIndex = tabs.length - 1;
+                        syncSlot(lastIndex);
+                        const lastTab = tabs[lastIndex];
+                        if (lastTab instanceof HTMLButtonElement) {
+                            lastTab.focus();
+                        }
+                    }
                 });
             });
 
@@ -2949,7 +3483,7 @@
             return null;
         }
 
-        const selector = `.aislepilot-swap-form input[name='dayIndex'][value='${slotIndex}']`;
+        const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${slotIndex}']`;
         const dayInput = scope.querySelector(selector);
         if (!(dayInput instanceof HTMLInputElement)) {
             return null;
@@ -3074,12 +3608,112 @@
         return currentInputs.length > 0;
     };
 
+    const normalizeMealImageName = value => {
+        if (typeof value !== "string") {
+            return "";
+        }
+
+        return value.trim().toLowerCase();
+    };
+
+    const captureRenderedMealImageSources = scope => {
+        if (!(scope instanceof Document || scope instanceof Element)) {
+            return new Map();
+        }
+
+        const imageElements = Array.from(scope.querySelectorAll("img[data-meal-image][data-meal-name]"));
+        const imageSrcByMealName = new Map();
+        imageElements.forEach(imageElement => {
+            if (!(imageElement instanceof HTMLImageElement)) {
+                return;
+            }
+
+            const mealNameKey = normalizeMealImageName(imageElement.dataset.mealName ?? "");
+            if (!mealNameKey) {
+                return;
+            }
+
+            const imageSrc = (imageElement.getAttribute("src") ?? imageElement.currentSrc ?? "").trim();
+            if (!imageSrc) {
+                return;
+            }
+
+            const preservedEntries = imageSrcByMealName.get(mealNameKey);
+            const nextEntry = {
+                imageElement,
+                imageSrc
+            };
+            if (Array.isArray(preservedEntries)) {
+                preservedEntries.push(nextEntry);
+                return;
+            }
+
+            imageSrcByMealName.set(mealNameKey, [nextEntry]);
+        });
+
+        return imageSrcByMealName;
+    };
+
+    const restoreRenderedMealImageSources = (scope, imageSrcByMealName) => {
+        if (!(scope instanceof Document || scope instanceof Element) || !(imageSrcByMealName instanceof Map) || imageSrcByMealName.size === 0) {
+            return;
+        }
+
+        const imageElements = Array.from(scope.querySelectorAll("img[data-meal-image][data-meal-name]"));
+        imageElements.forEach(imageElement => {
+            if (!(imageElement instanceof HTMLImageElement)) {
+                return;
+            }
+
+            const mealNameKey = normalizeMealImageName(imageElement.dataset.mealName ?? "");
+            if (!mealNameKey) {
+                return;
+            }
+
+            const preservedEntries = imageSrcByMealName.get(mealNameKey);
+            if (!Array.isArray(preservedEntries) || preservedEntries.length === 0) {
+                return;
+            }
+
+            const preservedEntry = preservedEntries.shift();
+            const preservedImageSrc = typeof preservedEntry?.imageSrc === "string"
+                ? preservedEntry.imageSrc.trim()
+                : "";
+            if (!preservedImageSrc) {
+                return;
+            }
+
+            const preservedImageElement = preservedEntry?.imageElement;
+            if (preservedImageElement instanceof HTMLImageElement) {
+                const currentPreservedSrc = (preservedImageElement.getAttribute("src") ?? preservedImageElement.currentSrc ?? "").trim();
+                if (currentPreservedSrc !== preservedImageSrc) {
+                    preservedImageElement.src = preservedImageSrc;
+                }
+
+                preservedImageElement.alt = imageElement.alt;
+                const incomingMealName = imageElement.dataset.mealName ?? "";
+                if (incomingMealName.length > 0) {
+                    preservedImageElement.dataset.mealName = incomingMealName;
+                }
+
+                imageElement.replaceWith(preservedImageElement);
+                return;
+            }
+
+            const currentImageSrc = (imageElement.getAttribute("src") ?? "").trim();
+            if (currentImageSrc !== preservedImageSrc) {
+                imageElement.src = preservedImageSrc;
+            }
+        });
+    };
+
     const applyAjaxSwapResponse = (responseText, slotIndex) => {
         if (typeof DOMParser === "undefined") {
             return false;
         }
 
         rememberDayMealSlots(document);
+        const preservedMealImageSources = captureRenderedMealImageSources(document);
         const wasOverviewExpanded = (() => {
             const currentOverviewContent = getOverviewContent();
             return currentOverviewContent instanceof HTMLElement && !currentOverviewContent.hasAttribute("hidden");
@@ -3096,6 +3730,7 @@
         replaceSectionContent(responseDocument, "#aislepilot-overview");
         replaceSectionContent(responseDocument, "#aislepilot-shop");
         replaceSectionContent(responseDocument, "#aislepilot-export");
+        restoreRenderedMealImageSources(document, preservedMealImageSources);
         if (wasOverviewExpanded) {
             const nextOverviewContent = getOverviewContent();
             if (nextOverviewContent instanceof HTMLElement) {
@@ -3112,6 +3747,7 @@
         wireSetupToggleHandlers(document);
         wireOverviewToggleHandlers(document);
         wireLeftoverPlanner(document);
+        wireCardMoreActions(document);
         wireInlineDetailsPanels(document);
         wireDayMealCards(document);
         wireAjaxSwapHandlers(document);
@@ -3145,6 +3781,46 @@
         return true;
     };
 
+    const parseHtmlDocument = html => {
+        if (typeof DOMParser === "undefined" || typeof html !== "string" || html.length === 0) {
+            return null;
+        }
+
+        return new DOMParser().parseFromString(html, "text/html");
+    };
+
+    const hasAislePilotWindowRoot = responseDocument => {
+        if (!(responseDocument instanceof Document)) {
+            return false;
+        }
+
+        return responseDocument.querySelector("[data-aislepilot-window]") instanceof HTMLElement;
+    };
+
+    const readAjaxFailureMessage = responseDocument => {
+        if (!(responseDocument instanceof Document)) {
+            return "";
+        }
+
+        const alertItem = responseDocument.querySelector(".aislepilot-alert-list li");
+        if (alertItem instanceof HTMLElement) {
+            const text = alertItem.textContent?.trim();
+            if (typeof text === "string" && text.length > 0) {
+                return text;
+            }
+        }
+
+        const summary = responseDocument.querySelector(".text-danger");
+        if (summary instanceof HTMLElement) {
+            const text = summary.textContent?.replace(/\s+/g, " ").trim();
+            if (typeof text === "string" && text.length > 0) {
+                return text;
+            }
+        }
+
+        return "";
+    };
+
     const animateSwappedMeal = dayIndex => {
         if (!Number.isInteger(dayIndex) || dayIndex < 0) {
             return;
@@ -3166,7 +3842,7 @@
         updatedCard.classList.add("is-swap-updated");
         window.setTimeout(() => {
             updatedCard.classList.remove("is-swap-updated");
-        }, 360);
+        }, 520);
     };
 
     const wireAjaxSwapForm = form => {
@@ -3187,7 +3863,18 @@
             }
 
             swapForm.dataset.ajaxSwapSubmitting = "true";
+            const submitButton = getSubmitButton(event);
+            const submitActionLabel = submitButton instanceof HTMLButtonElement
+                ? (submitButton.getAttribute("aria-label") ?? submitButton.textContent ?? "").trim()
+                : "";
             const isFavoriteForm = swapForm.classList.contains("aislepilot-favorite-form");
+            const wasSavedMealFavorite =
+                isFavoriteForm &&
+                submitButton instanceof HTMLButtonElement &&
+                submitButton.classList.contains("is-saved-meal");
+            const isIgnoreForm = swapForm.classList.contains("aislepilot-ignore-form");
+            const isLeftoverRebalanceForm = swapForm.hasAttribute("data-leftover-rebalance-form");
+            const isDessertSwapForm = swapForm.action.toLowerCase().includes("/swap-dessert");
             const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
             const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
                 ? scrollSnapshot.anchorDayIndex
@@ -3222,31 +3909,81 @@
                     responseText.includes("<!DOCTYPE html");
 
                 if (isHtmlResponse) {
+                    const parsedResponseDocument = parseHtmlDocument(responseText);
                     if (isFavoriteForm) {
                         if (!applyAjaxFavoriteResponse(responseText)) {
+                            if (parsedResponseDocument && !hasAislePilotWindowRoot(parsedResponseDocument)) {
+                                const message = readAjaxFailureMessage(parsedResponseDocument);
+                                showToast(
+                                    message.length > 0 ? message : "Could not update saved meals. Try again.",
+                                    "warning");
+                                clearPersistedSwapScroll();
+                                return;
+                            }
+
+                            persistSwapScrollPosition(swapForm);
                             replaceDocumentWithHtml(responseText);
                             return;
                         }
 
+                        showToast(
+                            wasSavedMealFavorite
+                                ? "Meal removed from saved meals."
+                                : "Meal saved.",
+                            "success");
                         restoreInlineSwapScroll(scrollSnapshot);
+                        clearPersistedSwapScroll();
                         return;
                     }
 
                     if (!applyAjaxSwapResponse(responseText, swapDayIndex)) {
+                        if (parsedResponseDocument && !hasAislePilotWindowRoot(parsedResponseDocument)) {
+                            const message = readAjaxFailureMessage(parsedResponseDocument);
+                            showToast(
+                                message.length > 0 ? message : "No alternative meal is available right now. Try another swap or regenerate.",
+                                "warning");
+                            clearPersistedSwapScroll();
+                            return;
+                        }
+
+                        persistSwapScrollPosition(swapForm);
                         replaceDocumentWithHtml(responseText);
                         return;
                     }
 
+                    if (isLeftoverRebalanceForm) {
+                        // Leftover rebalancing is an inline layout tweak; avoid generic swap toast noise.
+                    } else if (isIgnoreForm) {
+                        const normalizedAction = submitActionLabel.toLowerCase();
+                        const ignoreMessage = normalizedAction.includes("ignore")
+                            ? "Meal ignored."
+                            : normalizedAction.includes("include")
+                                ? "Meal included."
+                                : "Meal updated.";
+                        showToast(ignoreMessage, "success");
+                    } else {
+                        showToast(isDessertSwapForm ? "Dessert swapped." : "Meal swapped.", "success");
+                    }
+
+                    if (isLeftoverRebalanceForm) {
+                        clearPersistedSwapScroll();
+                        return;
+                    }
+
                     restoreInlineSwapScroll(scrollSnapshot);
+                    clearPersistedSwapScroll();
                     animateSwappedMeal(swapDayIndex);
                     return;
                 }
 
                 if (response.ok) {
+                    persistSwapScrollPosition(swapForm);
                     window.location.reload();
                     return;
                 }
 
+                showToast("Could not complete that action. Try again.", "warning");
+                clearPersistedSwapScroll();
                 resetSubmittingState();
                 return;
             } catch {
@@ -3274,6 +4011,7 @@
     wireOverviewToggleHandlers(document);
     wirePreserveScrollHandlers(document);
     wireLeftoverPlanner(document);
+    wireCardMoreActions(document);
     wireInlineDetailsPanels(document);
     wireDayMealCards(document);
     wireAjaxSwapHandlers(document);

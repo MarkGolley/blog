@@ -92,7 +92,7 @@
         })
         .Where(type => type.Length > 0)
         .Distinct(StringComparer.OrdinalIgnoreCase)
-        .OrderBy(type => type.Equals("Dinner", StringComparison.OrdinalIgnoreCase)
+        .OrderBy(type => type.Equals("Breakfast", StringComparison.OrdinalIgnoreCase)
             ? 0
             : type.Equals("Lunch", StringComparison.OrdinalIgnoreCase)
                 ? 1
@@ -103,8 +103,8 @@
         selectedMealTypes = Math.Clamp(Model.Request.MealsPerDay, 1, 3) switch
         {
             1 => ["Dinner"],
-            2 => ["Dinner", "Lunch"],
-            _ => ["Dinner", "Lunch", "Breakfast"]
+            2 => ["Lunch", "Dinner"],
+            _ => ["Breakfast", "Lunch", "Dinner"]
         };
     }
 
@@ -323,9 +323,9 @@
         @if (!hasResult)
         {
             <div class="aislepilot-app-head-intro">
-                <h1 id="aislepilot-title" class="aislepilot-app-title">The fastest way to plan meals and shop your supermarket.</h1>
+                <h1 id="aislepilot-title" class="aislepilot-app-title">Plan a full week of meals and shopping in minutes.</h1>
                 <p class="aislepilot-app-subtitle">
-                    Mobile-first weekly planning with supermarket-aware shopping order, recipes, and exports for real in-store use.
+                    Build a practical weekly plan with aisle-ordered shopping, clear recipes, and export-ready lists.
                 </p>
             </div>
         }
@@ -334,19 +334,19 @@
     @if (hasModelErrors)
     {
         var alertTitle = looksLikeSwapIssue
-            ? "Could not swap that meal"
+            ? "Could not swap meal"
             : looksLikeConstraintIssue
-                ? "Constraints are too strict for this plan"
+                ? "Constraints are too strict"
                 : looksLikeAiIssue
                     ? "Meal generation is temporarily unavailable"
-                    : "Something needs attention";
+                    : "Please review your settings";
         var alertGuidance = looksLikeSwapIssue
-            ? "Try swapping again, or regenerate your plan to refresh all meals."
+            ? "Try again or refresh your plan."
             : looksLikeConstraintIssue
-                ? "Remove one dietary constraint or allergen, then generate again."
+                ? "Remove one restriction, then generate again."
                 : looksLikeAiIssue
-                    ? "Wait 15-30 seconds and retry. If it still fails, regenerate with fewer strict constraints."
-                    : "Review the message below and try again.";
+                    ? "Wait 15-30 seconds, then generate again."
+                    : "Review the message below, then try again.";
 
         <section aria-labelledby="aislepilot-alert-title" class="aislepilot-shell aislepilot-alert-shell" data-reveal>
             <h2 id="aislepilot-alert-title" class="aislepilot-section-title">@alertTitle</h2>
@@ -361,8 +361,9 @@
                 <button type="submit"
                         class="aislepilot-alert-btn"
                         form="aislepilot-setup-form"
-                        data-loading-label="Generating plan...">
-                    Try generating again
+                        data-loading-label="Generating plan..."
+                        data-show-plan-skeleton>
+                    Generate again
                 </button>
                 @if (hasResult)
                 {
@@ -371,7 +372,7 @@
                             data-setup-toggle
                             aria-controls="aislepilot-setup"
                             aria-expanded="false">
-                        Edit settings first
+                        Edit settings
                     </button>
                 }
                 else
@@ -528,7 +529,7 @@
                             <input asp-for="Request.EnableSavedMealRepeats" type="checkbox" />
                             <span>Repeat saved meals sometimes</span>
                         </label>
-                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact"
+                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-slider-field--plan-basics-frame"
                              data-saved-repeat-rate-field
                              hidden="@(!savedMealRepeatsEnabled)">
                             <label asp-for="Request.SavedMealRepeatRatePercent">Repeat strength</label>
@@ -696,36 +697,7 @@
                         </fieldset>
                     </details>
 
-                    <details class="aislepilot-collapsible"
-                             data-plan-basic-item="cook-days">
-                        <summary>
-                            <span class="aislepilot-collapsible-title">Cook days</span>
-                            <span class="aislepilot-collapsible-value" data-plan-basic-summary>@($"{selectedCookDays} day{(selectedCookDays == 1 ? string.Empty : "s")}")</span>
-                        </summary>
-                        <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics">
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
-                                <label asp-for="Request.CookDays">Cook days</label>
-                                <div class="aislepilot-slider-track-line">
-                                    <span class="aislepilot-slider-boundary">1</span>
-                                    <input asp-for="Request.CookDays"
-                                           type="range"
-                                           min="1"
-                                           max="7"
-                                           step="1"
-                                           class="aislepilot-slider-input"
-                                           aria-label="Cook days"
-                                           data-number-slider-range
-                                           data-number-slider-decimals="0"
-                                           data-cook-days-slider />
-                                    <span class="aislepilot-slider-boundary">7</span>
-                                </div>
-                                <div class="aislepilot-slider-meta">
-                                    <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
-                                </div>
-                                <span asp-validation-for="Request.CookDays" class="text-danger"></span>
-                            </div>
-                        </fieldset>
-                    </details>
+                    <input asp-for="Request.CookDays" type="hidden" value="@selectedCookDays" />
 
                     <details class="aislepilot-collapsible"
                              data-plan-basic-item="budget">
@@ -809,7 +781,7 @@
                             <span asp-validation-for="Request.SelectedSpecialTreatCookDayIndex" class="text-danger"></span>
                             <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
                                 <input asp-for="Request.IncludeDessertAddOn" type="checkbox" />
-                                <span>Add desert</span>
+                                <span>Add dessert</span>
                             </label>
                         </fieldset>
                     </details>
@@ -953,26 +925,6 @@
                             <span asp-validation-for="Request.PlanDays" class="text-danger"></span>
                         </div>
 
-                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact">
-                            <label asp-for="Request.CookDays">Cook days</label>
-                            <div class="aislepilot-slider-track-line">
-                                <span class="aislepilot-slider-boundary">1</span>
-                                <input asp-for="Request.CookDays"
-                                       type="range"
-                                       min="1"
-                                       max="7"
-                                       step="1"
-                                       class="aislepilot-slider-input"
-                                       data-number-slider-range
-                                       data-number-slider-decimals="0"
-                                       data-cook-days-slider />
-                                <span class="aislepilot-slider-boundary">7</span>
-                            </div>
-                            <div class="aislepilot-slider-meta">
-                                <span class="aislepilot-slider-value" data-number-slider-value>@selectedCookDays</span>
-                            </div>
-                            <span asp-validation-for="Request.CookDays" class="text-danger"></span>
-                        </div>
                     </div>
                     </fieldset>
 
@@ -999,7 +951,10 @@
                 </div>
 
                 <div class="aislepilot-submit-actions">
-                    <button type="submit" data-loading-label="Generating plan..." data-setup-mode-submit="planner">
+                    <button type="submit"
+                            data-loading-label="Generating plan..."
+                            data-setup-mode-submit="planner"
+                            data-show-plan-skeleton>
                         <span class="aislepilot-btn-label">
                             <span class="aislepilot-symbol-glyph" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" focusable="false">
@@ -1020,7 +975,7 @@
                      data-setup-mode-panel="generator"
                      @generatorModeHiddenAttribute>
                 <div class="aislepilot-setup-mode-head">
-                    <p class="aislepilot-setup-mode-copy">Use your foods on hand to generate 3 quick meal ideas in one go.</p>
+                    <p class="aislepilot-setup-mode-copy">Use your on-hand foods to generate 3 quick meal ideas.</p>
                 </div>
                 <div class="aislepilot-submit-actions aislepilot-generator-submit-actions">
                     <button
@@ -1071,12 +1026,17 @@
                      data-fallback-meal-image-url="@fallbackMealImageUrl"
                      data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
                      data-meal-image-poll-url="@mealImagesPollUrl">
+                    @{
+                        var pantrySuggestionIndex = 0;
+                    }
                     @foreach (var suggestion in Model.PantrySuggestions)
                     {
+                        var suggestionIndex = pantrySuggestionIndex++;
                         var meal = suggestion.MealCard;
                         var imageUrl = meal is null
                             ? fallbackMealImageUrl
                             : ResolveClientMealImageUrl(meal.MealImageUrl);
+                        var shouldPrioritizeSuggestionImage = suggestionIndex < 2;
                         <article class="aislepilot-card">
                             <div class="aislepilot-meal-image-shell">
                                 <img class="aislepilot-meal-image"
@@ -1084,7 +1044,8 @@
                                      data-meal-image
                                      data-meal-name="@suggestion.MealName"
                                      alt="@($"{suggestion.MealName} plated meal")"
-                                     loading="lazy"
+                                     loading="@(shouldPrioritizeSuggestionImage ? "eager" : "lazy")"
+                                     fetchpriority="@(shouldPrioritizeSuggestionImage ? "high" : "low")"
                                      decoding="async" />
                             </div>
                             <div class="aislepilot-card-head aislepilot-card-head-with-title">
@@ -1239,6 +1200,30 @@
     {
         <partial name="_AislePilotResultSections" model="Model" />
     }
+
+    <div class="aislepilot-plan-loading-shell" data-plan-loading-shell hidden aria-hidden="true">
+        <div class="aislepilot-plan-loading-surface" role="status" aria-live="polite">
+            <p class="aislepilot-plan-loading-title">Building your weekly plan...</p>
+            <p class="aislepilot-plan-loading-meta">This usually takes around 10-20 seconds.</p>
+            <div class="aislepilot-plan-loading-grid" aria-hidden="true">
+                <div class="aislepilot-plan-loading-card">
+                    <div class="aislepilot-plan-loading-line is-wide"></div>
+                    <div class="aislepilot-plan-loading-line"></div>
+                    <div class="aislepilot-plan-loading-line is-short"></div>
+                </div>
+                <div class="aislepilot-plan-loading-card">
+                    <div class="aislepilot-plan-loading-line is-wide"></div>
+                    <div class="aislepilot-plan-loading-line"></div>
+                    <div class="aislepilot-plan-loading-line is-short"></div>
+                </div>
+                <div class="aislepilot-plan-loading-card">
+                    <div class="aislepilot-plan-loading-line is-wide"></div>
+                    <div class="aislepilot-plan-loading-line"></div>
+                    <div class="aislepilot-plan-loading-line is-short"></div>
+                </div>
+            </div>
+        </div>
+    </div>
     </div>
 </div>
 
@@ -1279,6 +1264,7 @@
             [data-setup-toggle] { display: none !important; }
             [data-aislepilot-window] .aislepilot-window-controls,
             [data-aislepilot-window] .aislepilot-window-tabs { display: none !important; }
+            [data-aislepilot-window] .aislepilot-mobile-context { display: none !important; }
             [data-aislepilot-window] .aislepilot-window-viewport { overflow: visible !important; height: auto !important; }
             [data-aislepilot-window] .aislepilot-window-track { display: block !important; transform: none !important; }
             [data-aislepilot-window] .aislepilot-window-panel { min-width: 100% !important; margin-bottom: 0.75rem; }

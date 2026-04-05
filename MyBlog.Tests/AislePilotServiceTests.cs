@@ -35,6 +35,8 @@ public class AislePilotServiceTests
     [InlineData(0.45, "bottle", "225 ml")]
     [InlineData(0.06, "jar", "15 ml")]
     [InlineData(0.19, "pot", "60 ml")]
+    [InlineData(0.18, "L", "180 ml")]
+    [InlineData(1.5, "litres", "1500 ml")]
     [InlineData(1.24, "kg", "1.2 kg")]
     public void QuantityDisplayFormatter_RecipeFormatting_PreservesPreciseAmounts(decimal quantity, string unit, string expected)
     {
@@ -276,7 +278,7 @@ public class AislePilotServiceTests
     }
 
     [Fact]
-    public void BuildPlan_WithThreeMealsPerDay_ReturnsBreakfastLunchDinnerPerCookDay()
+    public void BuildPlan_WithThreeMealsPerDay_ReturnsMealsInBreakfastLunchDinnerOrderPerCookDay()
     {
         var request = new AislePilotRequestModel
         {
@@ -296,7 +298,7 @@ public class AislePilotServiceTests
         Assert.Equal(9, result.MealPlan.Count);
         Assert.Equal(3, groupedByDay.Count);
         Assert.All(groupedByDay, mealTypes =>
-            Assert.Equal(["Dinner", "Lunch", "Breakfast"], mealTypes));
+            Assert.Equal(["Breakfast", "Lunch", "Dinner"], mealTypes));
     }
 
     [Fact]
@@ -409,7 +411,7 @@ public class AislePilotServiceTests
             PlanDays = 7,
             CookDays = 7,
             MealsPerDay = 3,
-            SelectedMealTypes = ["Dinner", "Lunch", "Breakfast"],
+            SelectedMealTypes = ["Breakfast", "Lunch", "Dinner"],
             EnableSavedMealRepeats = true,
             SavedMealRepeatRatePercent = 100,
             SavedEnjoyedMealNamesState = JsonSerializer.Serialize(new[] { savedMealName })
@@ -686,7 +688,7 @@ public class AislePilotServiceTests
     }
 
     [Fact]
-    public void BuildPlan_WithDinnerAndLunchSlots_ReturnsDinnerThenLunchPerCookDay()
+    public void BuildPlan_WithLunchAndDinnerSlots_ReturnsLunchThenDinnerPerCookDay()
     {
         var request = new AislePilotRequestModel
         {
@@ -705,7 +707,7 @@ public class AislePilotServiceTests
 
         Assert.Equal(2, result.MealsPerDay);
         Assert.Equal(4, result.MealPlan.Count);
-        Assert.All(groupedByDay, mealTypes => Assert.Equal(["Dinner", "Lunch"], mealTypes));
+        Assert.All(groupedByDay, mealTypes => Assert.Equal(["Lunch", "Dinner"], mealTypes));
     }
 
     [Fact]
@@ -831,6 +833,22 @@ public class AislePilotServiceTests
         Assert.Equal(0, result.MealPlan[2].LeftoverDaysCovered);
         Assert.Equal(0, result.MealPlan[3].LeftoverDaysCovered);
         Assert.Equal(2, result.MealPlan[4].LeftoverDaysCovered);
+    }
+
+    [Fact]
+    public void BuildPlan_WithRequestedDistinctLeftoverSourceDays_PreservesRequestedDistributionWhenFeasible()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            CookDays = 5,
+            LeftoverCookDayIndexesCsv = "0,2"
+        };
+
+        var result = _service.BuildPlan(request);
+        var leftoverSourceDayIndexes = ExtractLeftoverSourceDayIndexes(result.MealPlan);
+
+        Assert.Equal([0, 2], leftoverSourceDayIndexes);
     }
 
     [Fact]
@@ -1382,6 +1400,88 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_WithExtraCurrentPlanMealNames_TrimsToExpectedMealCount()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Turkey chilli with beans",
+            "Chicken stir fry with rice"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var resultMealNames = result.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Single(resultMealNames);
+        Assert.Equal("Turkey chilli with beans", resultMealNames[0], StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_WithFewerCurrentPlanMealNames_TopsUpAndPreservesPrefix()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Turkey chilli with beans"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var resultMealNames = result.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(2, resultMealNames.Count);
+        Assert.Equal("Turkey chilli with beans", resultMealNames[0], StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_WithUnresolvableCurrentPlanMealNames_FallsBackToTemplatesWithoutThrowing()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 120m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Meal that does not exist anywhere"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var resultMealNames = result.MealPlan
+            .Select(meal => meal.MealName)
+            .ToList();
+
+        Assert.Equal(2, resultMealNames.Count);
+        Assert.DoesNotContain("Meal that does not exist anywhere", resultMealNames, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task BuildPlanFromCurrentMealsAsync_MacrosRemainPerServingAcrossHouseholdSizes()
     {
         var currentPlanMealNames = new List<string>
@@ -1912,7 +2012,7 @@ public class AislePilotServiceTests
             PlanDays = 5,
             CookDays = 5,
             MealsPerDay = 2,
-            SelectedMealTypes = ["Dinner", "Lunch"],
+            SelectedMealTypes = ["Lunch", "Dinner"],
             DietaryModes = ["Balanced"],
             IncludeSpecialTreatMeal = true
         };
@@ -3472,6 +3572,40 @@ public class AislePilotServiceTests
             : Activator.CreateInstance(valueParameterType);
         var args = new[] { (object?)key, removedValue };
         _ = tryRemove.Invoke(dictionary, args);
+    }
+
+    private static IReadOnlyList<int> ExtractLeftoverSourceDayIndexes(IReadOnlyList<AislePilotMealDayViewModel> mealPlan)
+    {
+        var weekDayLookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Monday"] = 0,
+            ["Tuesday"] = 1,
+            ["Wednesday"] = 2,
+            ["Thursday"] = 3,
+            ["Friday"] = 4,
+            ["Saturday"] = 5,
+            ["Sunday"] = 6
+        };
+        var sourceDayIndexes = new List<int>();
+        foreach (var meal in mealPlan)
+        {
+            if (meal.LeftoverDaysCovered <= 0)
+            {
+                continue;
+            }
+
+            if (!weekDayLookup.TryGetValue(meal.Day ?? string.Empty, out var dayIndex))
+            {
+                continue;
+            }
+
+            for (var i = 0; i < meal.LeftoverDaysCovered; i++)
+            {
+                sourceDayIndexes.Add(dayIndex);
+            }
+        }
+
+        return sourceDayIndexes;
     }
 
     private sealed class StaticResponseHandler(HttpStatusCode statusCode, string responseBody) : HttpMessageHandler

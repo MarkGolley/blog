@@ -18,6 +18,16 @@ public static class QuantityDisplayFormatter
         ["jar"] = 190m,
         ["jars"] = 190m
     };
+    private static readonly HashSet<string> RecipeLitreUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "l",
+        "lt",
+        "ltr",
+        "litre",
+        "litres",
+        "liter",
+        "liters"
+    };
 
     private static readonly HashSet<string> WholePurchaseUnits = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -82,6 +92,16 @@ public static class QuantityDisplayFormatter
         if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
         {
             return FormatKg(quantity);
+        }
+
+        if (RecipeLitreUnits.Contains(normalizedUnit))
+        {
+            var totalMillilitres = decimal.Round(
+                quantity * 1000m,
+                0,
+                MidpointRounding.AwayFromZero);
+            var roundedUpMillilitres = RoundUpToNearest(totalMillilitres, 5m);
+            return $"{roundedUpMillilitres:0} ml";
         }
 
         if (RecipeContainerUnitMillilitres.TryGetValue(normalizedUnit, out var millilitresPerUnit))

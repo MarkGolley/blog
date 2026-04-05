@@ -24,7 +24,7 @@ public class AislePilotController(
     private const int MaxIgnoredMealSlotIndex = 20;
     private const int MaxSavedEnjoyedMealNames = 32;
     private const int MaxSavedMealNameLength = 90;
-    private static readonly string[] MealTypeSlotOrder = ["Dinner", "Lunch", "Breakfast"];
+    private static readonly string[] MealTypeSlotOrder = ["Breakfast", "Lunch", "Dinner"];
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -145,7 +145,6 @@ public class AislePilotController(
     {
         return string.Equals(previousRequest.Supermarket, nextRequest.Supermarket, StringComparison.OrdinalIgnoreCase) &&
                previousRequest.PlanDays == nextRequest.PlanDays &&
-               previousRequest.CookDays == nextRequest.CookDays &&
                previousRequest.MealsPerDay == nextRequest.MealsPerDay &&
                AreEquivalentSelections(previousRequest.SelectedMealTypes, nextRequest.SelectedMealTypes) &&
                AreEquivalentSelections(previousRequest.DietaryModes, nextRequest.DietaryModes) &&
@@ -809,7 +808,16 @@ public class AislePilotController(
             .ToList() ?? [];
         normalized.SavedMealRepeatRatePercent = Math.Clamp(normalized.SavedMealRepeatRatePercent, 10, 100);
         normalized.PlanDays = Math.Clamp(normalized.PlanDays, 1, 7);
-        normalized.CookDays = Math.Clamp(normalized.CookDays, 1, normalized.PlanDays);
+        var maxLeftoverDays = Math.Max(0, normalized.PlanDays - 1);
+        var normalizedLeftoverSourceDays = ParseLeftoverSourceDayIndexes(
+            normalized.LeftoverCookDayIndexesCsv,
+            normalized.PlanDays,
+            maxLeftoverDays);
+        normalized.LeftoverCookDayIndexesCsv = string.Join(",", normalizedLeftoverSourceDays);
+        normalized.CookDays = Math.Clamp(
+            normalized.PlanDays - normalizedLeftoverSourceDays.Count,
+            1,
+            normalized.PlanDays);
         if (normalized.SelectedSpecialTreatCookDayIndex.HasValue)
         {
             normalized.SelectedSpecialTreatCookDayIndex = Math.Clamp(
@@ -884,8 +892,8 @@ public class AislePilotController(
         return safeMealsPerDay switch
         {
             1 => ["Dinner"],
-            2 => ["Dinner", "Lunch"],
-            _ => ["Dinner", "Lunch", "Breakfast"]
+            2 => ["Lunch", "Dinner"],
+            _ => ["Breakfast", "Lunch", "Dinner"]
         };
     }
 
@@ -987,6 +995,45 @@ public class AislePilotController(
             }
 
             result.Add(slotIndex);
+        }
+
+        return result;
+    }
+
+    private static List<int> ParseLeftoverSourceDayIndexes(
+        string? leftoverCookDayIndexesCsv,
+        int planDays,
+        int maxCount)
+    {
+        var normalizedPlanDays = Math.Clamp(planDays, 1, 7);
+        var normalizedMaxCount = Math.Max(0, maxCount);
+        if (normalizedMaxCount == 0 || string.IsNullOrWhiteSpace(leftoverCookDayIndexesCsv))
+        {
+            return [];
+        }
+
+        var result = new List<int>(normalizedMaxCount);
+        var tokens = leftoverCookDayIndexesCsv
+            .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var token in tokens)
+        {
+            if (result.Count >= normalizedMaxCount)
+            {
+                break;
+            }
+
+            if (!int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var dayIndex))
+            {
+                continue;
+            }
+
+            if (dayIndex < 0 || dayIndex >= normalizedPlanDays)
+            {
+                continue;
+            }
+
+            result.Add(dayIndex);
         }
 
         return result;
@@ -1231,10 +1278,6 @@ public class AislePilotController(
             ModelState.AddModelError("Request.DietaryModes", "Choose at least one dietary mode.");
         }
 
-        if (request.CookDays > request.PlanDays)
-        {
-            ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
-        }
         ValidateMealTypeSelection(request);
         if (request.IncludeSpecialTreatMeal &&
             !request.SelectedMealTypes.Contains("Dinner", StringComparer.OrdinalIgnoreCase))
@@ -1310,10 +1353,6 @@ public class AislePilotController(
             ModelState.AddModelError("Request.DietaryModes", "Choose at least one dietary mode.");
         }
 
-        if (request.CookDays > request.PlanDays)
-        {
-            ModelState.AddModelError("Request.CookDays", "Cook days cannot be greater than plan length.");
-        }
         ValidateMealTypeSelection(request);
 
         if (string.IsNullOrWhiteSpace(request.PantryItems))
