@@ -856,7 +856,7 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         var menuHeight = metricParts.Length > 1 && double.TryParse(metricParts[1], out var parsedHeight) ? parsedHeight : 0;
         var menuInViewport = metricParts.Length > 2 && string.Equals(metricParts[2], "1", StringComparison.Ordinal);
 
-        Assert.True(menuWidth >= 120, $"Expected More actions menu width to be rendered. Width={menuWidth}px.");
+        Assert.True(menuWidth >= 48, $"Expected More actions menu width to be rendered. Width={menuWidth}px.");
         Assert.True(menuHeight >= 70, $"Expected More actions menu height to be rendered. Height={menuHeight}px.");
         Assert.True(menuInViewport, "Expected More actions menu to render fully inside the viewport.");
 

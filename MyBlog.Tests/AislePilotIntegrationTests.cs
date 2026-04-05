@@ -2,6 +2,7 @@ using System.Net;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using MyBlog.Services;
 
@@ -9,6 +10,7 @@ namespace MyBlog.Tests;
 
 public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactory>
 {
+    private static int _clientIpCounter = 40;
     private static readonly Regex AntiForgeryTokenRegexPrimary =
         new(@"name=""__RequestVerificationToken""[^>]*value=""([^""]+)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -1933,7 +1935,13 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
             HandleCookies = true
         });
 
-        client.DefaultRequestHeaders.Add("X-Forwarded-For", "10.20.30.40");
+        var ipSuffix = Interlocked.Increment(ref _clientIpCounter) % 240;
+        if (ipSuffix < 2)
+        {
+            ipSuffix += 2;
+        }
+
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", $"10.20.30.{ipSuffix}");
         return client;
     }
 

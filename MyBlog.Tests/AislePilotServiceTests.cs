@@ -758,7 +758,13 @@ public class AislePilotServiceTests
         };
 
         var initialPlan = _service.BuildPlan(request);
-        var breakfastSlotIndex = 2;
+        var breakfastSlotIndex = initialPlan.MealPlan
+            .Select((meal, index) => new { meal.MealType, index })
+            .Where(entry => entry.MealType.Equals("Breakfast", StringComparison.OrdinalIgnoreCase))
+            .Select(entry => entry.index)
+            .DefaultIfEmpty(-1)
+            .First();
+        Assert.True(breakfastSlotIndex >= 0, "Expected at least one breakfast slot in a three-meals-per-day plan.");
         var currentMealName = initialPlan.MealPlan[breakfastSlotIndex].MealName;
         var currentPlanMealNames = initialPlan.MealPlan
             .Select(meal => meal.MealName)
