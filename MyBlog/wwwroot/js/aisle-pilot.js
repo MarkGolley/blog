@@ -2194,6 +2194,7 @@
     let currentIndex = 0;
     let touchStartX = 0;
     let touchStartY = 0;
+    let viewportSwipeStartedInsideDayMealCard = false;
     let activePanelResizeObserver = null;
 
     const hideTabHint = () => {
@@ -2223,6 +2224,24 @@
         } catch {
             // Ignore storage failures in private modes.
         }
+    };
+
+    const isEventWithinDayMealCard = event => {
+        if (!(event instanceof Event)) {
+            return false;
+        }
+
+        const target = event.target;
+        if (target instanceof Element && target.closest("[data-day-meal-card]")) {
+            return true;
+        }
+
+        if (typeof event.composedPath !== "function") {
+            return false;
+        }
+
+        const eventPath = event.composedPath();
+        return eventPath.some(node => node instanceof Element && node.hasAttribute("data-day-meal-card"));
     };
 
     const scrollInstantly = (x, y) => {
@@ -3319,15 +3338,19 @@
             const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
             const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
             const track = card.querySelector("[data-day-meal-track]");
-            const slider = card.querySelector("[data-day-meal-slider]");
-            if (!(track instanceof HTMLElement) || !(slider instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
+            if (!(track instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
                 return;
             }
 
             card.dataset.dayMealCardWired = "true";
             let currentSlotIndex = 0;
-            let touchStartX = 0;
-            let touchStartY = 0;
+            let touchStartX = Number.NaN;
+            let touchStartY = Number.NaN;
+
+            const clearTouchTracking = () => {
+                touchStartX = Number.NaN;
+                touchStartY = Number.NaN;
+            };
 
             const syncSlot = nextIndex => {
                 const slotCount = Math.min(tabs.length, panels.length);
@@ -3453,16 +3476,32 @@
                 });
             });
 
-            slider.addEventListener("touchstart", event => {
+            card.addEventListener("touchstart", event => {
                 const touch = event.changedTouches[0];
+                if (!touch) {
+                    clearTouchTracking();
+                    return;
+                }
+
                 touchStartX = touch.clientX;
                 touchStartY = touch.clientY;
             }, { passive: true });
 
-            slider.addEventListener("touchend", event => {
+            card.addEventListener("touchend", event => {
+                if (!Number.isFinite(touchStartX) || !Number.isFinite(touchStartY)) {
+                    return;
+                }
+
                 const touch = event.changedTouches[0];
-                const deltaX = touch.clientX - touchStartX;
-                const deltaY = touch.clientY - touchStartY;
+                const startX = touchStartX;
+                const startY = touchStartY;
+                clearTouchTracking();
+                if (!touch) {
+                    return;
+                }
+
+                const deltaX = touch.clientX - startX;
+                const deltaY = touch.clientY - startY;
                 if (Math.abs(deltaX) < 32 || Math.abs(deltaX) <= Math.abs(deltaY)) {
                     return;
                 }
@@ -3472,6 +3511,10 @@
                 } else {
                     syncSlot(currentSlotIndex - 1);
                 }
+            }, { passive: true });
+
+            card.addEventListener("touchcancel", () => {
+                clearTouchTracking();
             }, { passive: true });
 
             syncSlot(readRememberedDayMealSlot(card));
@@ -4018,13 +4061,28 @@
     startMealImagePolling();
 
     viewport.addEventListener("touchstart", event => {
+        viewportSwipeStartedInsideDayMealCard = isEventWithinDayMealCard(event);
         const touch = event.changedTouches[0];
+        if (!touch) {
+            return;
+        }
+
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
     }, { passive: true });
 
     viewport.addEventListener("touchend", event => {
+        if (viewportSwipeStartedInsideDayMealCard) {
+            viewportSwipeStartedInsideDayMealCard = false;
+            return;
+        }
+
+        viewportSwipeStartedInsideDayMealCard = false;
         const touch = event.changedTouches[0];
+        if (!touch) {
+            return;
+        }
+
         const deltaX = touch.clientX - touchStartX;
         const deltaY = touch.clientY - touchStartY;
 
@@ -4039,6 +4097,10 @@
         }
 
         markTabHintSeen();
+    }, { passive: true });
+
+    viewport.addEventListener("touchcancel", () => {
+        viewportSwipeStartedInsideDayMealCard = false;
     }, { passive: true });
 
     window.addEventListener("resize", () => {
