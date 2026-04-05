@@ -1393,6 +1393,9 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("if (submitButton.classList.contains(\"is-icon-only\"))", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("submitButton.setAttribute(\"aria-label\", nextAriaLabel);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("if (!button.classList.contains(\"is-icon-only\") && originalLabel && originalLabel.length > 0)", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const visibleLabel = button.querySelector(\"[data-setup-toggle-label]\")", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (visibleLabel instanceof HTMLElement) {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (!srOnlyLabel && !(visibleLabel instanceof HTMLElement)) {", script, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1404,9 +1407,12 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
 
         Assert.Contains("const leftoverRebalanceForms = scope instanceof Element", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const maxExtraRaw = Number.parseInt(", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("const toggleButton = zone.querySelector(\"[data-leftover-toggle-sign]\")", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const getZoneToggleButtons = zone => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-leftover-day-index=\"${dayIndex}\"", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("zone.classList.toggle(\"is-leftover-locked\", !isAssigned && !canAssignMore);", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("toggleButton.textContent = \"++\";", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("toggleButton.dataset.leftoverToggleMode = isAssigned ? \"remove\" : \"add\";", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("buttonText.textContent = nextActionLabel;", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("toggleButton.textContent = \"++\";", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("toggleButton.textContent = \"-\";", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("if (isLeftoverRebalanceForm) {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("clearPersistedSwapScroll();", script, StringComparison.OrdinalIgnoreCase);
@@ -1596,6 +1602,20 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
                 @"<div[^>]*class=""[^""]*aislepilot-card-more-actions-menu[^""]*""[^>]*>[\s\S]*?<form[^>]*action=""[^""]*/swap-meal[^""]*""",
                 RegexOptions.IgnoreCase),
             html);
+        Assert.Matches(
+            new Regex(
+                @"<div[^>]*class=""[^""]*aislepilot-card-more-actions-menu[^""]*""[^>]*>[\s\S]*?data-leftover-toggle-sign[\s\S]*?data-leftover-day-index=""\d+""",
+                RegexOptions.IgnoreCase),
+            html);
+        var dayZoneMatches = Regex.Matches(
+            html,
+            @"<div[^>]*class=""[^""]*aislepilot-day-card-leftover-controls[^""]*""[^>]*>(?<zone>[\s\S]*?)</div>",
+            RegexOptions.IgnoreCase);
+        Assert.True(dayZoneMatches.Count > 0, "Expected at least one day-card leftover zone in generated markup.");
+        foreach (Match dayZoneMatch in dayZoneMatches)
+        {
+            Assert.DoesNotContain("data-leftover-toggle-sign", dayZoneMatch.Groups["zone"].Value, StringComparison.OrdinalIgnoreCase);
+        }
         Assert.DoesNotMatch(
             new Regex(
                 @"<form[^>]*action=""[^""]*/swap-meal[^""]*""[^>]*class=""[^""]*aislepilot-card-action-inline[^""]*""",
@@ -1630,8 +1650,11 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("class=\"aislepilot-overview-regenerate-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"aislepilot-edit-setup-btn is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-overview-regenerate-btn\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-edit-setup-btn\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-setup-toggle-label", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("aislepilot-overview-regenerate-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("aislepilot-edit-setup-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-more-actions-trigger\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-more-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-swap-btn is-secondary is-compact\"", html, StringComparison.OrdinalIgnoreCase);
@@ -1639,8 +1662,8 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("<span class=\"aislepilot-swap-action-label\">Save</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"aislepilot-swap-action-label\">Ignore</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-meal-image-summary\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<span class=\"sr-only\">Refresh plan</span>", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<span class=\"sr-only\">Edit settings</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span>Refresh plan</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span data-setup-toggle-label>Edit settings</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"sr-only\">View details</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<span class=\"sr-only\">Swap meal</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span>View details</span>", html, StringComparison.OrdinalIgnoreCase);

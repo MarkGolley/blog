@@ -38,7 +38,7 @@
         }
 
         if (!(shellHeader instanceof HTMLElement)) {
-            appRoot.style.setProperty("--aislepilot-mobile-context-offset", "0px");
+            appRoot.style.setProperty("--ap-shell-header-offset", "0px");
             return;
         }
 
@@ -46,7 +46,7 @@
         const computedTop = Number.parseFloat(window.getComputedStyle(shellHeader).top ?? "0");
         const safeTop = Number.isFinite(computedTop) ? Math.max(0, computedTop) : 0;
         const safeHeight = Math.max(0, Math.min(220, Math.ceil(headerRect.height + safeTop)));
-        appRoot.style.setProperty("--aislepilot-mobile-context-offset", `${safeHeight}px`);
+        appRoot.style.setProperty("--ap-shell-header-offset", `${safeHeight}px`);
     };
 
     if (shellHeader instanceof HTMLElement && typeof ResizeObserver !== "undefined") {
@@ -2448,6 +2448,7 @@
         const isExpanded = !overviewContent.hasAttribute("hidden");
         overviewToggleButtons.forEach(button => {
             const srOnlyLabel = button.querySelector(".sr-only");
+            const visibleLabel = button.querySelector("[data-overview-toggle-label]");
             const collapsedLabel = button.dataset.overviewToggleCollapsedLabel
                 || srOnlyLabel?.textContent?.trim()
                 || button.getAttribute("aria-label")
@@ -2461,7 +2462,13 @@
 
             if (srOnlyLabel) {
                 srOnlyLabel.textContent = nextLabel;
-            } else {
+            }
+
+            if (visibleLabel instanceof HTMLElement) {
+                visibleLabel.textContent = nextLabel;
+            }
+
+            if (!srOnlyLabel && !(visibleLabel instanceof HTMLElement)) {
                 button.textContent = nextLabel;
             }
 
@@ -2486,6 +2493,7 @@
         const isHidden = setupPanel.hasAttribute("hidden");
         setupToggleButtons.forEach(button => {
             const srOnlyLabel = button.querySelector(".sr-only");
+            const visibleLabel = button.querySelector("[data-setup-toggle-label]");
             const collapsedLabel = button.dataset.setupToggleCollapsedLabel
                 || srOnlyLabel?.textContent?.trim()
                 || button.getAttribute("aria-label")
@@ -2499,7 +2507,13 @@
 
             if (srOnlyLabel) {
                 srOnlyLabel.textContent = nextLabel;
-            } else {
+            }
+
+            if (visibleLabel instanceof HTMLElement) {
+                visibleLabel.textContent = nextLabel;
+            }
+
+            if (!srOnlyLabel && !(visibleLabel instanceof HTMLElement)) {
                 button.textContent = nextLabel;
             }
 
@@ -2977,17 +2991,35 @@
                 : Math.max(0, leftoverZones.length - 1);
 
             const toCsv = dayIndexes => dayIndexes.join(",");
+            const getZoneDayIndex = zone => {
+                const dayIndexRaw = zone.getAttribute("data-day-index");
+                const dayIndex = Number.parseInt(dayIndexRaw ?? "", 10);
+                return Number.isInteger(dayIndex) && dayIndex >= 0 ? dayIndex : -1;
+            };
             const getZoneCount = zone => {
                 const countRaw = zone.getAttribute("data-leftover-count");
                 const count = Number.parseInt(countRaw ?? "", 10);
                 return Number.isInteger(count) && count > 0 ? count : 0;
             };
+            const getZoneToggleButtons = zone => {
+                if (!(zone instanceof HTMLElement)) {
+                    return [];
+                }
+
+                const dayIndex = getZoneDayIndex(zone);
+                if (dayIndex < 0) {
+                    return [];
+                }
+
+                const selector = `[data-leftover-toggle-sign][data-leftover-day-index="${dayIndex}"]`;
+                return Array.from(container.querySelectorAll(selector))
+                    .filter(button => button instanceof HTMLButtonElement);
+            };
             const buildRequestedDayIndexes = () => {
                 const requestedDayIndexes = [];
                 leftoverZones.forEach(zone => {
-                    const dayIndexRaw = zone.getAttribute("data-day-index");
-                    const dayIndex = Number.parseInt(dayIndexRaw ?? "", 10);
-                    if (!Number.isInteger(dayIndex) || dayIndex < 0) {
+                    const dayIndex = getZoneDayIndex(zone);
+                    if (dayIndex < 0) {
                         return;
                     }
 
@@ -3053,24 +3085,22 @@
                         return;
                     }
 
-                    const toggleButton = zone.querySelector("[data-leftover-toggle-sign]");
                     const zoneCount = getZoneCount(zone);
                     const dayName = (zone.getAttribute("data-day-name") ?? "").trim();
                     const isAssigned = zoneCount > 0;
                     const canAssign = !isAssigned && canAssignMore;
+                    const nextActionLabel = isAssigned ? "Remove extra" : "Cook extra";
                     zone.classList.toggle("is-leftover-locked", !isAssigned && !canAssignMore);
-                    if (toggleButton instanceof HTMLButtonElement) {
+                    getZoneToggleButtons(zone).forEach(toggleButton => {
                         if (isAssigned) {
                             toggleButton.hidden = false;
                             toggleButton.disabled = false;
-                            toggleButton.textContent = "++";
                             if (dayName.length > 0) {
                                 toggleButton.setAttribute("aria-label", `Remove cook-extra from ${dayName}`);
                             }
                         } else if (canAssign && canAssignMore) {
                             toggleButton.hidden = false;
                             toggleButton.disabled = false;
-                            toggleButton.textContent = "+";
                             if (dayName.length > 0) {
                                 toggleButton.setAttribute("aria-label", `Add cook-extra to ${dayName}`);
                             }
@@ -3078,7 +3108,14 @@
                             toggleButton.hidden = true;
                             toggleButton.disabled = true;
                         }
-                    }
+
+                        toggleButton.setAttribute("title", nextActionLabel);
+                        toggleButton.dataset.leftoverToggleMode = isAssigned ? "remove" : "add";
+                        const buttonText = toggleButton.querySelector("[data-leftover-toggle-text]");
+                        if (buttonText instanceof HTMLElement) {
+                            buttonText.textContent = nextActionLabel;
+                        }
+                    });
                 });
             };
 
@@ -3114,8 +3151,12 @@
                     }
 
                     zone.dataset.leftoverZoneWired = "true";
-                    const toggleButton = zone.querySelector("[data-leftover-toggle-sign]");
-                    if (toggleButton instanceof HTMLButtonElement) {
+                    getZoneToggleButtons(zone).forEach(toggleButton => {
+                        if (!(toggleButton instanceof HTMLButtonElement) || toggleButton.dataset.leftoverZoneWired === "true") {
+                            return;
+                        }
+
+                        toggleButton.dataset.leftoverZoneWired = "true";
                         toggleButton.addEventListener("click", () => {
                             const zoneCount = getZoneCount(zone);
                             if (zoneCount > 0) {
@@ -3131,7 +3172,7 @@
                             setZoneCount(zone, zoneCount + 1);
                             submitLeftoverRebalance();
                         });
-                    }
+                    });
                 });
             }
         });

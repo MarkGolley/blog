@@ -162,7 +162,7 @@
                     <partial name="_AislePilotHiddenRequestFields"
                              model="BuildHiddenRequestFields()" />
                     <button type="submit"
-                            class="aislepilot-overview-regenerate-btn is-icon-only"
+                            class="aislepilot-overview-regenerate-btn"
                             data-loading-label="Refreshing plan..."
                             data-show-plan-skeleton
                             aria-label="Refresh plan"
@@ -174,13 +174,13 @@
                                     <path d="M20 4v6h-6"></path>
                                 </svg>
                             </span>
-                            <span class="sr-only">Refresh plan</span>
+                            <span>Refresh plan</span>
                         </span>
                     </button>
                 </form>
                 <button
                     type="button"
-                    class="aislepilot-edit-setup-btn is-icon-only"
+                    class="aislepilot-edit-setup-btn"
                     data-setup-toggle
                     aria-controls="aislepilot-setup"
                     aria-expanded="false"
@@ -197,7 +197,7 @@
                                 <circle cx="11" cy="18" r="2"></circle>
                             </svg>
                         </span>
-                        <span class="sr-only">Edit settings</span>
+                        <span data-setup-toggle-label>Edit settings</span>
                     </span>
                 </button>
             </div>
@@ -472,17 +472,19 @@
                                         }
                                     </div>
                                     <div class="aislepilot-day-card-head-actions">
-                                        @if (result.PlanDays > 1)
-                                        {
+                                        @{
                                             var dayWeekIndex = weekDayLookup.TryGetValue(dayGroup.Day, out var resolvedWeekDayIndex)
                                                 ? resolvedWeekDayIndex
                                                 : Math.Clamp(dayGroupIndex, 0, Math.Max(0, result.PlanDays - 1));
+                                        }
+                                        @if (result.PlanDays > 1)
+                                        {
                                             var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0
                                                 ? $"{dayGroup.Day}: cook-extra x{dayGroup.LeftoverDaysCovered}"
                                                 : $"{dayGroup.Day}: no cook-extra";
                                             var dayAllocationControlClass = dayGroup.LeftoverDaysCovered > 0
-                                                ? "aislepilot-day-card-leftover-controls is-leftover-source"
-                                                : "aislepilot-day-card-leftover-controls";
+                                                ? "aislepilot-day-card-leftover-controls is-leftover-source is-menu-only"
+                                                : "aislepilot-day-card-leftover-controls is-menu-only";
                                             <div class="@dayAllocationControlClass"
                                                  data-leftover-day-zone
                                                  data-day-index="@dayWeekIndex"
@@ -492,12 +494,6 @@
                                                 @{
                                                     var dayCountHiddenAttribute = dayGroup.LeftoverDaysCovered > 1 ? null : "hidden";
                                                 }
-                                                <button type="button"
-                                                        class="aislepilot-leftover-step-btn"
-                                                        data-leftover-toggle-sign
-                                                        aria-label="@(dayGroup.LeftoverDaysCovered > 0 ? $"Remove cook-extra from {dayGroup.Day}" : $"Add cook-extra to {dayGroup.Day}")">
-                                                    @(dayGroup.LeftoverDaysCovered > 0 ? "++" : "+")
-                                                </button>
                                                 <span class="aislepilot-leftover-day-count" data-leftover-day-count @dayCountHiddenAttribute>x@dayGroup.LeftoverDaysCovered</span>
                                             </div>
                                         }
@@ -529,6 +525,31 @@
                                                         <span class="aislepilot-swap-action-label">Actions</span>
                                                     </summary>
                                                     <div id="@slotMoreActionsMenuId" class="aislepilot-card-more-actions-menu" role="group" aria-label="Meal actions">
+                                                        @if (result.PlanDays > 1)
+                                                        {
+                                                            var dayAllocationMenuLabel = dayGroup.LeftoverDaysCovered > 0 ? "Remove extra" : "Cook extra";
+                                                            var dayAllocationMenuAriaLabel = dayGroup.LeftoverDaysCovered > 0
+                                                                ? $"Remove cook-extra from {dayGroup.Day}"
+                                                                : $"Add cook-extra to {dayGroup.Day}";
+                                                            <div class="aislepilot-card-more-action-control">
+                                                                <button type="button"
+                                                                        class="aislepilot-swap-btn is-secondary is-compact aislepilot-leftover-more-action-btn"
+                                                                        data-leftover-toggle-sign
+                                                                        data-leftover-day-index="@dayWeekIndex"
+                                                                        aria-label="@dayAllocationMenuAriaLabel"
+                                                                        title="@dayAllocationMenuLabel">
+                                                                    <span class="aislepilot-btn-label">
+                                                                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                                            <svg viewBox="0 0 24 24" focusable="false">
+                                                                                <path d="M12 5v14"></path>
+                                                                                <path d="M5 12h14"></path>
+                                                                            </svg>
+                                                                        </span>
+                                                                        <span class="aislepilot-swap-action-label" data-leftover-toggle-text>@dayAllocationMenuLabel</span>
+                                                                    </span>
+                                                                </button>
+                                                            </div>
+                                                        }
                                                         <form method="post"
                                                               action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
                                                               class="aislepilot-swap-form aislepilot-card-more-action-form"
