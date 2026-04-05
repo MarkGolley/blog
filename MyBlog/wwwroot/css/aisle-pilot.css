@@ -15,6 +15,9 @@
     --ap-shadow-soft: 0 12px 28px rgba(11, 24, 42, 0.08);
     --ap-shadow-lift: 0 8px 16px rgba(11, 24, 42, 0.14);
     --ap-shadow-card: 0 8px 22px rgba(10, 26, 44, 0.07);
+    --ap-focus-ring-color: rgba(11, 92, 142, 0.55);
+    --ap-focus-ring: 0 0 0 3px var(--ap-focus-ring-color);
+    --ap-section-title-size: clamp(1.02rem, 1.8vw, 1.18rem);
     width: min(100%, 52rem);
     margin-inline: auto;
     display: grid;
@@ -36,6 +39,19 @@
 
 .aislepilot-app [hidden] {
     display: none !important;
+}
+
+.aislepilot-app :where(
+    a[href],
+    button,
+    summary,
+    input,
+    select,
+    textarea,
+    [role="tab"]
+):focus-visible {
+    outline: none;
+    box-shadow: var(--ap-focus-ring) !important;
 }
 
 html.aislepilot-restore-pending .aislepilot-app {
@@ -154,6 +170,12 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: var(--brand-deep);
     font-size: 0.92rem;
     font-weight: 700;
+}
+
+.aislepilot-plan-loading-meta {
+    margin: -0.3rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.74rem;
 }
 
 .aislepilot-plan-loading-grid {
@@ -377,7 +399,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.28rem;
-    width: min(100%, 26rem);
+    width: min(100%, 30rem);
     padding: 0.22rem;
     border: 1px solid var(--ap-border-strong);
     border-radius: var(--ap-radius-pill);
@@ -392,7 +414,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: rgba(255, 255, 255, 0.96) !important;
     color: var(--brand-deep) !important;
     box-shadow: none !important;
-    padding: 0.32rem 0.56rem !important;
+    padding: 0.32rem 0.52rem !important;
     font-size: 0.84rem !important;
     font-weight: 700 !important;
     white-space: nowrap;
@@ -409,6 +431,12 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: #fff !important;
     box-shadow: var(--ap-shadow-lift) !important;
     transform: translateY(-1px);
+}
+
+.aislepilot-window-tab .aislepilot-tab-label {
+    gap: 0.26rem;
+    font-size: 0.76rem;
+    letter-spacing: 0.01em;
 }
 
 .aislepilot-window-tab.is-active .aislepilot-symbol-glyph {
@@ -575,6 +603,8 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-section-title {
     margin-top: 0;
     margin-bottom: 0.34rem;
+    font-size: var(--ap-section-title-size);
+    line-height: 1.2;
     letter-spacing: 0.01em;
 }
 
@@ -2672,9 +2702,11 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-card-more-actions-menu {
     position: absolute;
     right: 0;
-    bottom: calc(100% + 0.3rem);
+    top: calc(100% + 0.3rem);
+    bottom: auto;
     z-index: 4;
     min-width: 10.5rem;
+    max-width: min(82vw, 15rem);
     padding: 0.36rem;
     border: 1px solid var(--ap-border-strong);
     border-radius: var(--ap-radius-soft);
@@ -2682,6 +2714,21 @@ html.aislepilot-restore-pending .aislepilot-app {
     box-shadow: 0 14px 24px rgba(11, 24, 42, 0.14);
     display: grid;
     gap: 0.28rem;
+}
+
+.aislepilot-card-more-actions.is-drop-up .aislepilot-card-more-actions-menu {
+    top: auto;
+    bottom: calc(100% + 0.3rem);
+}
+
+.aislepilot-card-more-actions.is-drop-down .aislepilot-card-more-actions-menu {
+    top: calc(100% + 0.3rem);
+    bottom: auto;
+}
+
+.aislepilot-card-more-actions.is-align-left .aislepilot-card-more-actions-menu {
+    left: 0;
+    right: auto;
 }
 
 .aislepilot-card-more-action-form {
@@ -2940,22 +2987,23 @@ html.aislepilot-restore-pending .aislepilot-app {
         gap: 0.22rem;
     }
 
-.aislepilot-mobile-context-jump {
-    min-height: 1.85rem;
-    border: 1px solid rgba(16, 63, 101, 0.2);
-    border-radius: var(--ap-radius-pill);
+    .aislepilot-mobile-context-jump {
+        min-height: 1.85rem;
+        border: 1px solid rgba(16, 63, 101, 0.2);
+        border-radius: var(--ap-radius-pill);
         background: rgba(255, 255, 255, 0.97);
         color: var(--brand-deep);
         font-size: 0.76rem;
         font-weight: 700;
+        transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
     }
 
-.aislepilot-mobile-context-jump.is-active {
-    border: none;
-    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
-    color: #fff;
-    box-shadow: var(--ap-shadow-lift);
-}
+    .aislepilot-mobile-context-jump.is-active {
+        border: none;
+        background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+        color: #fff;
+        box-shadow: var(--ap-shadow-lift);
+    }
 
     .aislepilot-window-nav {
         display: none;
@@ -3770,6 +3818,10 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 :root[data-theme="dark"] .aislepilot-plan-loading-title {
     color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-plan-loading-meta {
+    color: #c7dff7;
 }
 
 :root[data-theme="dark"] .aislepilot-plan-loading-card {

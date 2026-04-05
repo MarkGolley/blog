@@ -348,6 +348,39 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task SuggestFromPantry_UsesPriorityImageLoadingForTopSuggestions()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/suggest-from-pantry", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PantryItems"] = "eggs, rice, frozen mixed veg, soy sauce",
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        var eagerHighMatches = Regex.Matches(
+            html,
+            @"<img[^>]*class=""[^""]*aislepilot-meal-image[^""]*""(?=[^>]*loading=""eager"")(?=[^>]*fetchpriority=""high"")[^>]*>",
+            RegexOptions.IgnoreCase);
+        Assert.True(eagerHighMatches.Count >= 2, $"Expected at least two top suggestion images to be eager/high priority, found {eagerHighMatches.Count}.");
+        Assert.Matches(
+            new Regex(
+                @"<img[^>]*class=""[^""]*aislepilot-meal-image[^""]*""(?=[^>]*loading=""lazy"")(?=[^>]*fetchpriority=""low"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
+    }
+
+    [Fact]
     public async Task SwapPantrySuggestion_ValidRequest_ExcludesCurrentMealFromSuggestions()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -1170,6 +1203,130 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("Use tabs to switch between Meals, Shopping, and Exports.", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aria-label=\"Refresh plan\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-show-plan-skeleton", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithThreeMealsPerDay_RendersAccessibleQuickJumpTabsAndReadableSummarySeparator()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "3",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("class=\"aislepilot-mobile-context-jumps\" role=\"tablist\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-meals"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-meals"")(?=[^>]*aria-selected=""true"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-shop"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-shop"")(?=[^>]*aria-selected=""false"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-export"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-export"")(?=[^>]*aria-selected=""false"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(new Regex(@"(&middot;|·)", RegexOptions.IgnoreCase), html);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithThreeMealsPerDay_RendersWindowTabsAndMealActionsWithImprovedAriaContracts()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "3",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("class=\"aislepilot-window-tab is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"<button[^>]*id=""aislepilot-tab-meals""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<button[^>]*id=""aislepilot-tab-shop""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<button[^>]*id=""aislepilot-tab-export""(?=[^>]*class=""[^""]*aislepilot-window-tab[^""]*"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Contains("aria-haspopup=\"menu\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("role=\"menuitem\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-inline-details-panel hidden aria-hidden=\"true\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithThreeMealsPerDay_PrioritizesFirstMealImagesForFasterPerceivedLoad()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "3",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Matches(
+            new Regex(
+                @"<img[^>]*class=""[^""]*aislepilot-meal-image[^""]*""(?=[^>]*loading=""eager"")(?=[^>]*fetchpriority=""high"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<img[^>]*class=""[^""]*aislepilot-meal-image[^""]*""(?=[^>]*loading=""lazy"")(?=[^>]*fetchpriority=""low"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
     }
 
     [Fact]

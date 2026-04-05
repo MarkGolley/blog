@@ -166,6 +166,8 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
                     return false;
                 }
 
+                pollRoot.dataset.mealImagePollEnabled = "true";
+                window.sessionStorage.removeItem("aislepilot:meal-image-cache");
                 const fallbackImageUrl = pollRoot.dataset.fallbackMealImageUrl?.trim() || "/projects/aisle-pilot/images/aislepilot-icon.svg";
                 targetImage.src = fallbackImageUrl;
 
@@ -199,6 +201,96 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 10000
         });
         Assert.True(await loadingShell.IsVisibleAsync());
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotMealImagePolling_UsesSessionCacheBeforePolling()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var configured = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const pollRoot = document.querySelector("[data-meal-image-poll-root]");
+                if (!(pollRoot instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const targetImage = pollRoot.querySelector("img[data-meal-image][data-meal-name]");
+                if (!(targetImage instanceof HTMLImageElement)) {
+                    return false;
+                }
+
+                pollRoot.dataset.mealImagePollEnabled = "true";
+                const fallbackImageUrl = pollRoot.dataset.fallbackMealImageUrl?.trim() || "/projects/aisle-pilot/images/aislepilot-icon.svg";
+                targetImage.src = fallbackImageUrl;
+
+                const mealName = (targetImage.dataset.mealName || "").trim();
+                if (!mealName) {
+                    return false;
+                }
+
+                const mealKey = mealName.toLowerCase();
+                const cachedImageUrl = "/projects/aisle-pilot/images/aislepilot-meals/egg-fried-rice.png";
+                window.sessionStorage.setItem(
+                    "aislepilot:meal-image-cache",
+                    JSON.stringify({
+                        [mealKey]: {
+                            url: cachedImageUrl,
+                            at: Date.now()
+                        }
+                    }));
+
+                const originalFetch = window.fetch.bind(window);
+                let fetchCalled = false;
+                window.fetch = (...args) => {
+                    fetchCalled = true;
+                    return originalFetch(...args);
+                };
+                window.__aislePilotFetchCalled = () => fetchCalled;
+
+                const controller = window.AislePilotMealImagePolling?.createController({
+                    documentRef: document,
+                    intervalMs: 60000,
+                    maxAttempts: 2
+                });
+                if (!controller || typeof controller.start !== "function") {
+                    window.fetch = originalFetch;
+                    return false;
+                }
+
+                controller.start();
+                return true;
+            }
+            """);
+
+        Assert.True(configured, "Expected to configure meal image cache test state.");
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const image = document.querySelector("[data-meal-image-poll-root] img[data-meal-image][data-meal-name]");
+                if (!(image instanceof HTMLImageElement)) {
+                    return false;
+                }
+
+                const currentSrc = image.getAttribute("src") || image.currentSrc || "";
+                return currentSrc.includes("aislepilot-meals/egg-fried-rice.png");
+            }
+            """,
+            null,
+            new() { Timeout = 10000 });
+
+        var fetchCalled = await page.EvaluateAsync<bool>("() => window.__aislePilotFetchCalled?.() === true");
+        Assert.False(fetchCalled);
     }
 
     [Fact]
@@ -323,6 +415,60 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotMoreActionsMenu_RemainsInsideViewport()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var moreActionsSummary = activeMealPanel.Locator("[data-card-more-actions] > summary").First;
+        var moreActionsMenu = activeMealPanel.Locator("[data-card-more-actions] .aislepilot-card-more-actions-menu").First;
+
+        await moreActionsSummary.ScrollIntoViewIfNeededAsync();
+        await moreActionsSummary.ClickAsync();
+        await moreActionsMenu.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var viewportOverflow = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const menu = document.querySelector("[data-card-more-actions][open] .aislepilot-card-more-actions-menu");
+                if (!(menu instanceof HTMLElement)) {
+                    return Number.POSITIVE_INFINITY;
+                }
+
+                const rect = menu.getBoundingClientRect();
+                const padding = 6;
+                const overflowLeft = Math.max(0, padding - rect.left);
+                const overflowRight = Math.max(0, rect.right - (window.innerWidth - padding));
+                const overflowTop = Math.max(0, padding - rect.top);
+                const overflowBottom = Math.max(0, rect.bottom - (window.innerHeight - padding));
+                return Math.max(overflowLeft, overflowRight, overflowTop, overflowBottom);
+            }
+            """);
+
+        Assert.True(
+            viewportOverflow <= 1.5,
+            $"Expected More actions menu to stay inside viewport bounds. Overflow={viewportOverflow}px.");
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotSaveMeal_ShowsSaveAndUnsaveToasts()
     {
         if (!IsE2EEnabled())
@@ -444,6 +590,41 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotQuickJumpTabs_SupportKeyboardNavigation()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var shoppingJump = page.Locator(".aislepilot-mobile-context-jump[data-window-tab='aislepilot-shop']").First;
+        var exportsJump = page.Locator(".aislepilot-mobile-context-jump[data-window-tab='aislepilot-export']").First;
+
+        await shoppingJump.FocusAsync();
+        await page.Keyboard.PressAsync("ArrowRight");
+        Assert.Equal("true", await exportsJump.GetAttributeAsync("aria-selected"));
+        await page.Locator("#aislepilot-export[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 10000
+        });
+
+        await page.Keyboard.PressAsync("Home");
+        var mealsJump = page.Locator(".aislepilot-mobile-context-jump[data-window-tab='aislepilot-meals']").First;
+        Assert.Equal("true", await mealsJump.GetAttributeAsync("aria-selected"));
+        await page.Locator("#aislepilot-meals[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 10000
+        });
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotGeneratePlan_SubmitHookShowsPlanSkeletonShell()
     {
         if (!IsE2EEnabled())
@@ -492,6 +673,56 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
             """);
 
         Assert.True(skeletonShown, "Expected planner submit handler to show the plan skeleton shell.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotGeneratePlan_SubmitHookLocksButtonWidthToPreventJump()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var widthDelta = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const form = document.querySelector("#aislepilot-setup-form");
+                const plannerButton = form?.querySelector("button[data-setup-mode-submit='planner']");
+                if (!(form instanceof HTMLFormElement) || !(plannerButton instanceof HTMLButtonElement) || typeof SubmitEvent !== "function") {
+                    return Number.POSITIVE_INFINITY;
+                }
+
+                const widthBefore = plannerButton.getBoundingClientRect().width;
+                form.addEventListener("submit", event => {
+                    event.preventDefault();
+                }, { once: true });
+
+                const submitEvent = new SubmitEvent("submit", {
+                    bubbles: true,
+                    cancelable: true,
+                    submitter: plannerButton
+                });
+                form.dispatchEvent(submitEvent);
+
+                const widthDuring = plannerButton.getBoundingClientRect().width;
+                return Math.abs(widthDuring - widthBefore);
+            }
+            """);
+
+        Assert.True(
+            widthDelta <= 1.5,
+            $"Expected submit loading state to preserve button width. Delta={widthDelta}px.");
     }
 
     [Fact]

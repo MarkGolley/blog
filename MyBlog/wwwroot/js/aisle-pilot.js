@@ -84,7 +84,31 @@
         submitLoadingDelayTimers.delete(form);
     };
 
+    const lockSubmitButtonWidth = submitButton => {
+        if (!(submitButton instanceof HTMLButtonElement) || submitButton.dataset.loadingWidthLocked === "true") {
+            return;
+        }
+
+        const width = Math.ceil(submitButton.getBoundingClientRect().width);
+        if (width <= 0) {
+            return;
+        }
+
+        submitButton.style.minWidth = `${width}px`;
+        submitButton.dataset.loadingWidthLocked = "true";
+    };
+
+    const unlockSubmitButtonWidth = submitButton => {
+        if (!(submitButton instanceof HTMLButtonElement) || submitButton.dataset.loadingWidthLocked !== "true") {
+            return;
+        }
+
+        submitButton.style.removeProperty("min-width");
+        delete submitButton.dataset.loadingWidthLocked;
+    };
+
     const setSubmitButtonLoadingState = submitButton => {
+        lockSubmitButtonWidth(submitButton);
         const loadingLabel = submitButton.dataset.loadingLabel?.trim();
         if (loadingLabel && loadingLabel.length > 0) {
             submitButton.textContent = loadingLabel;
@@ -119,6 +143,7 @@
 
             const originalLabel = submitButton.dataset.originalLabel ?? submitButton.textContent ?? "";
             submitButton.dataset.originalLabel = originalLabel.trim();
+            lockSubmitButtonWidth(submitButton);
             targetForm.setAttribute("data-is-submitting", "true");
             submitButton.disabled = true;
             submitButton.setAttribute("aria-busy", "true");
@@ -2054,6 +2079,8 @@
                 if (originalLabel && originalLabel.length > 0) {
                     button.textContent = originalLabel;
                 }
+
+                unlockSubmitButtonWidth(button);
             });
         });
     };
@@ -2515,7 +2542,9 @@
         track.style.transform = `translateX(-${currentIndex * 100}%)`;
 
         panels.forEach((panel, index) => {
-            panel.setAttribute("aria-hidden", index == currentIndex ? "false" : "true");
+            const isActive = index === currentIndex;
+            panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+            panel.setAttribute("tabindex", isActive ? "0" : "-1");
         });
 
         tabs.forEach(tab => {
@@ -2523,6 +2552,7 @@
             const isActive = targetId === panels[currentIndex].id;
             tab.classList.toggle("is-active", isActive);
             tab.setAttribute("aria-selected", isActive ? "true" : "false");
+            tab.setAttribute("tabindex", isActive ? "0" : "-1");
         });
 
         if (updateHash && panels[currentIndex].id) {
@@ -2536,17 +2566,68 @@
         observeActivePanelHeight();
     };
 
+    const activateWindowTab = tab => {
+        if (!(tab instanceof HTMLElement)) {
+            return;
+        }
+
+        const targetId = tab.getAttribute("data-window-tab");
+        if (!targetId) {
+            return;
+        }
+
+        const nextIndex = panels.findIndex(panel => panel.id === targetId);
+        if (nextIndex < 0) {
+            return;
+        }
+
+        syncUi(nextIndex, true);
+        tab.focus();
+        markTabHintSeen();
+    };
+
     tabs.forEach(tab => {
         tab.addEventListener("click", () => {
-            const targetId = tab.getAttribute("data-window-tab");
-            if (!targetId) {
+            activateWindowTab(tab);
+        });
+
+        tab.addEventListener("keydown", event => {
+            const tabContainer = tab.parentElement;
+            if (!(tabContainer instanceof HTMLElement)) {
                 return;
             }
 
-            const nextIndex = panels.findIndex(panel => panel.id === targetId);
-            if (nextIndex >= 0) {
-                syncUi(nextIndex, true);
-                markTabHintSeen();
+            const siblingTabs = Array.from(tabContainer.querySelectorAll("[data-window-tab]"));
+            const currentTabIndex = siblingTabs.indexOf(tab);
+            if (currentTabIndex < 0) {
+                return;
+            }
+
+            if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                event.preventDefault();
+                const nextTabIndex = (currentTabIndex + 1) % siblingTabs.length;
+                const nextTab = siblingTabs[nextTabIndex];
+                activateWindowTab(nextTab);
+                return;
+            }
+
+            if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const nextTabIndex = (currentTabIndex - 1 + siblingTabs.length) % siblingTabs.length;
+                const nextTab = siblingTabs[nextTabIndex];
+                activateWindowTab(nextTab);
+                return;
+            }
+
+            if (event.key === "Home") {
+                event.preventDefault();
+                activateWindowTab(siblingTabs[0]);
+                return;
+            }
+
+            if (event.key === "End") {
+                event.preventDefault();
+                activateWindowTab(siblingTabs[siblingTabs.length - 1]);
             }
         });
     });
@@ -2943,6 +3024,42 @@
         });
     };
 
+    const positionCardMoreActionsMenu = menu => {
+        if (!(menu instanceof HTMLDetailsElement) || !menu.open) {
+            return;
+        }
+
+        const trigger = menu.querySelector("summary");
+        const actionsMenu = menu.querySelector(".aislepilot-card-more-actions-menu");
+        if (!(trigger instanceof HTMLElement) || !(actionsMenu instanceof HTMLElement)) {
+            return;
+        }
+
+        const viewportPadding = 8;
+        menu.classList.remove("is-drop-up", "is-drop-down", "is-align-left");
+        menu.classList.add("is-drop-down");
+
+        let actionsRect = actionsMenu.getBoundingClientRect();
+        const triggerRect = trigger.getBoundingClientRect();
+        const availableBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
+        const availableAbove = triggerRect.top - viewportPadding;
+
+        if (actionsRect.height > availableBelow && availableAbove > availableBelow) {
+            menu.classList.remove("is-drop-down");
+            menu.classList.add("is-drop-up");
+            actionsRect = actionsMenu.getBoundingClientRect();
+        }
+
+        if (actionsRect.left < viewportPadding) {
+            menu.classList.add("is-align-left");
+            actionsRect = actionsMenu.getBoundingClientRect();
+        }
+
+        if (actionsRect.right > window.innerWidth - viewportPadding && menu.classList.contains("is-align-left")) {
+            menu.classList.remove("is-align-left");
+        }
+    };
+
     const wireCardMoreActions = scope => {
         const menus = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-card-more-actions]"))
@@ -2955,8 +3072,16 @@
 
             menu.dataset.cardMoreActionsWired = "true";
             menu.addEventListener("toggle", () => {
+                const trigger = menu.querySelector("summary");
+                if (trigger instanceof HTMLElement) {
+                    trigger.setAttribute("aria-expanded", menu.open ? "true" : "false");
+                }
+
                 if (menu.open) {
                     closeOpenCardMoreActions(menu);
+                    window.requestAnimationFrame(() => {
+                        positionCardMoreActionsMenu(menu);
+                    });
                 }
             });
 
@@ -2994,6 +3119,13 @@
                 closeOpenCardMoreActions(null);
             }
         });
+
+        window.addEventListener("resize", () => {
+            const openMenus = Array.from(document.querySelectorAll("[data-card-more-actions][open]"));
+            openMenus.forEach(openMenu => {
+                positionCardMoreActionsMenu(openMenu);
+            });
+        });
     };
 
     const wireInlineDetailsPanels = scope => {
@@ -3019,10 +3151,18 @@
             toggle.dataset.inlineDetailsWired = "true";
 
             const syncDetailsPanel = () => {
-                if (toggle.open) {
+                const summary = toggle.querySelector("summary");
+                const isExpanded = toggle.open;
+                if (summary instanceof HTMLElement) {
+                    summary.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+                }
+
+                if (isExpanded) {
                     detailsPanel.removeAttribute("hidden");
+                    detailsPanel.setAttribute("aria-hidden", "false");
                 } else {
                     detailsPanel.setAttribute("hidden", "hidden");
+                    detailsPanel.setAttribute("aria-hidden", "true");
                 }
 
                 updateViewportHeight(true);
@@ -3073,6 +3213,7 @@
                     const isActive = index === currentSlotIndex;
                     tab.classList.toggle("is-active", isActive);
                     tab.setAttribute("aria-selected", isActive ? "true" : "false");
+                    tab.setAttribute("tabindex", isActive ? "0" : "-1");
                 });
 
                 panels.forEach((panel, index) => {
@@ -3080,7 +3221,9 @@
                         return;
                     }
 
-                    panel.setAttribute("aria-hidden", index === currentSlotIndex ? "false" : "true");
+                    const isActive = index === currentSlotIndex;
+                    panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+                    panel.setAttribute("tabindex", isActive ? "0" : "-1");
                 });
 
                 const dayKey = readCardDayKey(card);
@@ -3098,6 +3241,50 @@
 
                 tab.addEventListener("click", () => {
                     syncSlot(index);
+                });
+
+                tab.addEventListener("keydown", event => {
+                    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                        event.preventDefault();
+                        const nextIndex = (currentSlotIndex + 1) % tabs.length;
+                        syncSlot(nextIndex);
+                        const nextTab = tabs[nextIndex];
+                        if (nextTab instanceof HTMLButtonElement) {
+                            nextTab.focus();
+                        }
+                        return;
+                    }
+
+                    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                        event.preventDefault();
+                        const nextIndex = (currentSlotIndex - 1 + tabs.length) % tabs.length;
+                        syncSlot(nextIndex);
+                        const nextTab = tabs[nextIndex];
+                        if (nextTab instanceof HTMLButtonElement) {
+                            nextTab.focus();
+                        }
+                        return;
+                    }
+
+                    if (event.key === "Home") {
+                        event.preventDefault();
+                        syncSlot(0);
+                        const firstTab = tabs[0];
+                        if (firstTab instanceof HTMLButtonElement) {
+                            firstTab.focus();
+                        }
+                        return;
+                    }
+
+                    if (event.key === "End") {
+                        event.preventDefault();
+                        const lastIndex = tabs.length - 1;
+                        syncSlot(lastIndex);
+                        const lastTab = tabs[lastIndex];
+                        if (lastTab instanceof HTMLButtonElement) {
+                            lastTab.focus();
+                        }
+                    }
                 });
             });
 

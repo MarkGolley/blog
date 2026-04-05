@@ -339,25 +339,34 @@
             <div class="aislepilot-mobile-context-summary">
                 <p class="aislepilot-mobile-context-title">Weekly plan</p>
                 <p class="aislepilot-mobile-context-meta">
-                    Est. @result.EstimatedTotalCost.ToString("C", ukCulture) · @budgetDeltaSummaryText
+                    Est. @result.EstimatedTotalCost.ToString("C", ukCulture) &middot; @budgetDeltaSummaryText
                 </p>
             </div>
-            <div class="aislepilot-mobile-context-jumps" role="group" aria-label="Jump to section">
+            <div class="aislepilot-mobile-context-jumps" role="tablist" aria-label="Jump to section">
                 <button type="button"
                         class="aislepilot-mobile-context-jump is-active"
                         data-window-tab="aislepilot-meals"
+                        role="tab"
+                        aria-controls="aislepilot-meals"
+                        aria-selected="true"
                         aria-label="Show meals">
                     Meals
                 </button>
                 <button type="button"
                         class="aislepilot-mobile-context-jump"
                         data-window-tab="aislepilot-shop"
+                        role="tab"
+                        aria-controls="aislepilot-shop"
+                        aria-selected="false"
                         aria-label="Show shopping list">
                     Shopping
                 </button>
                 <button type="button"
                         class="aislepilot-mobile-context-jump"
                         data-window-tab="aislepilot-export"
+                        role="tab"
+                        aria-controls="aislepilot-export"
+                        aria-selected="false"
                         aria-label="Show exports">
                     Exports
                 </button>
@@ -372,7 +381,7 @@
                 <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
                     <button type="button"
                             id="aislepilot-tab-meals"
-                            class="aislepilot-window-tab is-icon-only"
+                            class="aislepilot-window-tab"
                             data-window-tab="aislepilot-meals"
                             role="tab"
                             aria-controls="aislepilot-meals"
@@ -388,12 +397,12 @@
                                     <path d="M8 7h11M8 12h11M8 17h11"></path>
                                 </svg>
                             </span>
-                            <span class="sr-only">Meals</span>
+                            <span>Meals</span>
                         </span>
                     </button>
                     <button type="button"
                             id="aislepilot-tab-shop"
-                            class="aislepilot-window-tab is-icon-only"
+                            class="aislepilot-window-tab"
                             data-window-tab="aislepilot-shop"
                             role="tab"
                             aria-controls="aislepilot-shop"
@@ -408,18 +417,18 @@
                                     <path d="M3 4h2l2.4 10h10.8l1.8-7H7"></path>
                                 </svg>
                             </span>
-                            <span class="sr-only">Shopping</span>
+                            <span>Shopping</span>
                         </span>
                     </button>
                     <button type="button"
                             id="aislepilot-tab-export"
-                            class="aislepilot-window-tab is-icon-only"
+                            class="aislepilot-window-tab"
                             data-window-tab="aislepilot-export"
                             role="tab"
                             aria-controls="aislepilot-export"
                             aria-selected="false"
-                            aria-label="Export"
-                            title="Export">
+                            aria-label="Exports"
+                            title="Exports">
                         <span class="aislepilot-tab-label">
                             <span class="aislepilot-symbol-glyph" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" focusable="false">
@@ -428,7 +437,7 @@
                                     <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
                                 </svg>
                             </span>
-                            <span class="sr-only">Export</span>
+                            <span>Exports</span>
                         </span>
                     </button>
                 </div>
@@ -486,8 +495,12 @@
                          data-fallback-meal-image-url="@fallbackMealImageUrl"
                          data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
                          data-meal-image-poll-url="@mealImagesPollUrl">
+                        @{
+                            var dayGroupRenderIndex = 0;
+                        }
                         @foreach (var dayGroup in dayMealGroups)
                         {
+                            var dayGroupIndex = dayGroupRenderIndex++;
                             var firstMealIndex = dayGroup.Entries[0].index;
                             var mealCardClass = dayGroup.LeftoverDaysCovered > 0
                                 ? "aislepilot-card aislepilot-day-card is-leftover-source"
@@ -538,6 +551,9 @@
                                             var panelLabelledBy = dayGroup.Entries.Count > 1
                                                 ? $"{tabPrefix}-tab-{slotIndex}"
                                                 : null;
+                                            var detailsPanelId = $"meal-details-{mealIndex}";
+                                            var moreActionsMenuId = $"meal-actions-{mealIndex}";
+                                            var shouldPrioritizeImage = slotIndex == 0 && dayGroupIndex < 2;
                                             <section id="@($"{tabPrefix}-panel-{slotIndex}")"
                                                      class="aislepilot-day-meal-panel@(isIgnored ? " is-ignored" : string.Empty)"
                                                      data-day-meal-panel
@@ -554,7 +570,8 @@
                                                          data-meal-image
                                                          data-meal-name="@meal.MealName"
                                                          alt="@($"{meal.MealName} plated meal")"
-                                                         loading="lazy"
+                                                         loading="@(shouldPrioritizeImage ? "eager" : "lazy")"
+                                                         fetchpriority="@(shouldPrioritizeImage ? "high" : "low")"
                                                          decoding="async" />
                                                 </div>
                                                 <div class="aislepilot-card-head">
@@ -581,6 +598,8 @@
                                                     <div class="aislepilot-card-action-row is-inline-actions">
                                                         <details class="aislepilot-meal-details" data-inline-details-toggle>
                                                             <summary class="is-icon-only"
+                                                                     aria-controls="@detailsPanelId"
+                                                                     aria-expanded="false"
                                                                      aria-label="View details"
                                                                      title="View details">
                                                                 <span class="aislepilot-btn-label">
@@ -625,6 +644,9 @@
                                                         </form>
                                                         <details class="aislepilot-card-more-actions" data-card-more-actions>
                                                             <summary class="aislepilot-more-actions-trigger is-icon-only"
+                                                                     aria-controls="@moreActionsMenuId"
+                                                                     aria-expanded="false"
+                                                                     aria-haspopup="menu"
                                                                      aria-label="More actions"
                                                                      title="More actions">
                                                                 <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -635,7 +657,7 @@
                                                                     </svg>
                                                                 </span>
                                                             </summary>
-                                                            <div class="aislepilot-card-more-actions-menu" role="menu" aria-label="Meal actions">
+                                                            <div id="@moreActionsMenuId" class="aislepilot-card-more-actions-menu" role="menu" aria-label="Meal actions">
                                                                 <form method="post"
                                                                       action="@Url.Action("ToggleEnjoyedMeal", "AislePilot")#aislepilot-meals"
                                                                       class="aislepilot-swap-form aislepilot-favorite-form aislepilot-card-more-action-form"
@@ -655,6 +677,7 @@
                                                                     }
                                                                     <button type="submit"
                                                                             class="@saveButtonClass"
+                                                                            role="menuitem"
                                                                             aria-label="@saveActionLabel"
                                                                             title="@saveActionLabel">
                                                                         <span class="aislepilot-btn-label">
@@ -685,6 +708,7 @@
                                                                     }
                                                                     <button type="submit"
                                                                             class="@ignoreButtonClass"
+                                                                            role="menuitem"
                                                                             data-loading-label="Updating..."
                                                                             data-loading-delay-ms="180"
                                                                             aria-label="@ignoreActionLabel"
@@ -711,7 +735,7 @@
                                                         </details>
                                                     </div>
                                                 </div>
-                                                <div class="aislepilot-meal-details-panel" data-inline-details-panel hidden>
+                                                <div id="@detailsPanelId" class="aislepilot-meal-details-panel" data-inline-details-panel hidden aria-hidden="true">
                                                     <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
                                                     <div class="aislepilot-meal-details-grid">
                                                         <div class="aislepilot-nutrition-details">
@@ -791,6 +815,7 @@
                                                      data-meal-name="@result.DessertAddOnName"
                                                      alt="@($"{result.DessertAddOnName} plated dessert")"
                                                      loading="lazy"
+                                                     fetchpriority="low"
                                                      decoding="async" />
                                             </div>
                                             <div class="aislepilot-card-head">
@@ -803,6 +828,8 @@
                                                 <div class="aislepilot-card-action-row is-inline-actions">
                                                     <details class="aislepilot-meal-details" data-inline-details-toggle>
                                                         <summary class="is-icon-only"
+                                                                 aria-controls="dessert-details-panel"
+                                                                 aria-expanded="false"
                                                                  aria-label="View details"
                                                                  title="View details">
                                                             <span class="aislepilot-btn-label">
@@ -845,7 +872,7 @@
                                                     </form>
                                                 </div>
                                             </div>
-                                            <div class="aislepilot-meal-details-panel" data-inline-details-panel hidden>
+                                            <div id="dessert-details-panel" class="aislepilot-meal-details-panel" data-inline-details-panel hidden aria-hidden="true">
                                                 <p class="aislepilot-card-meta aislepilot-card-reason">Dessert add-on for a more indulgent week.</p>
                                                 <div class="aislepilot-meal-details-grid">
                                                     <div class="aislepilot-recipe-details">
@@ -909,7 +936,7 @@
                     </div>
                 </section>
 
-                <section id="aislepilot-export" aria-label="Export" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel" data-window-name="Export">
+                <section id="aislepilot-export" aria-label="Exports" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel" data-window-name="Exports">
                     <div class="aislepilot-export-actions">
                         <form method="post" asp-action="ExportPlanPack" data-export-theme-form>
                             @Html.AntiForgeryToken()
@@ -946,3 +973,4 @@
         </div>
     </section>
 }
+

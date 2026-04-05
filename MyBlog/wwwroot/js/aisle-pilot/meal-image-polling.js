@@ -4,11 +4,17 @@
         const documentRef = config.documentRef instanceof Document ? config.documentRef : document;
         const pollIntervalMs = Number.isInteger(config.intervalMs) ? config.intervalMs : 5000;
         const pollMaxAttempts = Number.isInteger(config.maxAttempts) ? config.maxAttempts : 48;
+        const mealImageCacheStorageKey = "aislepilot:meal-image-cache";
+        const mealImageCacheTtlMs = Number.isInteger(config.cacheTtlMs) ? config.cacheTtlMs : 1000 * 60 * 60 * 12;
 
-        let pollIntervalId = null;
+        let pollTimerId = null;
+        let pollLoopActive = false;
         let pollInFlight = false;
         let pollAttempts = 0;
         const preloadCache = new Map();
+        const mealImageCache = new Map();
+        let mealImageCacheLoaded = false;
+        let cacheWriteTimerId = null;
 
         const normalizeImagePath = value => {
             if (typeof value !== "string") {
@@ -28,6 +34,123 @@
             }
         };
 
+        const normalizeMealName = value => {
+            if (typeof value !== "string") {
+                return "";
+            }
+
+            return value.trim().toLowerCase();
+        };
+
+        const loadMealImageCache = () => {
+            if (mealImageCacheLoaded) {
+                return;
+            }
+
+            mealImageCacheLoaded = true;
+            try {
+                const raw = sessionStorage.getItem(mealImageCacheStorageKey);
+                if (!raw) {
+                    return;
+                }
+
+                const parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed !== "object") {
+                    return;
+                }
+
+                const now = Date.now();
+                Object.entries(parsed).forEach(([mealKey, payload]) => {
+                    if (!mealKey || !payload || typeof payload !== "object") {
+                        return;
+                    }
+
+                    const imageUrl = typeof payload.url === "string" ? payload.url.trim() : "";
+                    const storedAt = Number.parseInt(`${payload.at ?? ""}`, 10);
+                    if (!imageUrl || !Number.isFinite(storedAt)) {
+                        return;
+                    }
+
+                    if (now - storedAt > mealImageCacheTtlMs) {
+                        return;
+                    }
+
+                    mealImageCache.set(mealKey, {
+                        url: imageUrl,
+                        at: storedAt
+                    });
+                });
+            } catch {
+                // Ignore storage issues in private browsing modes.
+            }
+        };
+
+        const flushMealImageCache = () => {
+            cacheWriteTimerId = null;
+            try {
+                const payload = {};
+                mealImageCache.forEach((value, mealKey) => {
+                    if (!value || typeof value !== "object") {
+                        return;
+                    }
+
+                    payload[mealKey] = {
+                        url: value.url,
+                        at: value.at
+                    };
+                });
+                sessionStorage.setItem(mealImageCacheStorageKey, JSON.stringify(payload));
+            } catch {
+                // Ignore storage issues in private browsing modes.
+            }
+        };
+
+        const scheduleMealImageCacheFlush = () => {
+            if (typeof cacheWriteTimerId === "number") {
+                return;
+            }
+
+            cacheWriteTimerId = window.setTimeout(() => {
+                flushMealImageCache();
+            }, 120);
+        };
+
+        const getCachedMealImageUrl = mealName => {
+            loadMealImageCache();
+            const mealKey = normalizeMealName(mealName);
+            if (!mealKey) {
+                return "";
+            }
+
+            const cachedEntry = mealImageCache.get(mealKey);
+            if (!cachedEntry || typeof cachedEntry !== "object") {
+                return "";
+            }
+
+            if (Date.now() - cachedEntry.at > mealImageCacheTtlMs) {
+                mealImageCache.delete(mealKey);
+                scheduleMealImageCacheFlush();
+                return "";
+            }
+
+            return cachedEntry.url;
+        };
+
+        const setCachedMealImageUrl = (mealName, imageUrl) => {
+            const mealKey = normalizeMealName(mealName);
+            const normalizedUrl = typeof imageUrl === "string" ? imageUrl.trim() : "";
+            if (!mealKey || !normalizedUrl) {
+                return;
+            }
+
+            loadMealImageCache();
+            mealImageCache.set(mealKey, {
+                url: normalizedUrl,
+                at: Date.now()
+            });
+            scheduleMealImageCacheFlush();
+        };
+
         const preloadImage = url => {
             if (typeof url !== "string" || url.trim().length === 0) {
                 return Promise.resolve(false);
@@ -41,6 +164,8 @@
 
             return new Promise(resolve => {
                 const probe = new Image();
+                probe.decoding = "async";
+                probe.loading = "eager";
                 let settled = false;
                 const finish = didLoad => {
                     if (settled) {
@@ -52,9 +177,24 @@
                     resolve(didLoad);
                 };
 
-                probe.onload = () => finish(true);
+                probe.onload = async () => {
+                    if (typeof probe.decode === "function") {
+                        try {
+                            await probe.decode();
+                        } catch {
+                            // Best effort only.
+                        }
+                    }
+
+                    finish(true);
+                };
                 probe.onerror = () => finish(false);
                 probe.src = normalizedUrl;
+                if (probe.complete && probe.naturalWidth > 0) {
+                    finish(true);
+                    return;
+                }
+
                 window.setTimeout(() => finish(false), 8000);
             });
         };
@@ -146,6 +286,11 @@
                     imageElement.src = pollContext.fallbackUrl;
                     setMealImageLoadingState(imageElement, true);
                 });
+
+                const initialPath = normalizeImagePath(imageElement.getAttribute("src") || imageElement.currentSrc || "");
+                if (imageElement.complete) {
+                    setMealImageLoadingState(imageElement, initialPath === pollContext.fallbackPath);
+                }
             });
         };
 
@@ -200,6 +345,18 @@
 
                 const currentSrc = imageElement.getAttribute("src") || imageElement.currentSrc || "";
                 const currentPath = normalizeImagePath(currentSrc);
+                if (currentPath === pollContext.fallbackPath) {
+                    const cachedImageUrl = getCachedMealImageUrl(mealName);
+                    if (cachedImageUrl && normalizeImagePath(cachedImageUrl) !== pollContext.fallbackPath) {
+                        if (currentSrc.trim() !== cachedImageUrl) {
+                            imageElement.src = cachedImageUrl;
+                        }
+
+                        setMealImageLoadingState(imageElement, true);
+                        return;
+                    }
+                }
+
                 if (currentPath !== pollContext.fallbackPath) {
                     return;
                 }
@@ -216,12 +373,17 @@
             return pendingByMealName;
         };
 
-        const stop = () => {
-            if (typeof pollIntervalId === "number") {
-                window.clearInterval(pollIntervalId);
+        const clearPollTimer = () => {
+            if (typeof pollTimerId === "number") {
+                window.clearTimeout(pollTimerId);
             }
 
-            pollIntervalId = null;
+            pollTimerId = null;
+        };
+
+        const stop = () => {
+            pollLoopActive = false;
+            clearPollTimer();
             pollInFlight = false;
             pollAttempts = 0;
             clearDocumentMealImageLoadingStates();
@@ -297,31 +459,35 @@
                     imageUrlByMealName.set(mealName, imageUrl);
                 });
 
-                for (const [mealName, imageElements] of pendingByMealName.entries()) {
+                const cacheVersionToken = Date.now();
+                const applyUpdateTasks = Array.from(pendingByMealName.entries()).map(async ([mealName, imageElements]) => {
                     const nextImageUrl = imageUrlByMealName.get(mealName);
                     if (!nextImageUrl) {
-                        continue;
+                        return;
                     }
 
                     if (normalizeImagePath(nextImageUrl) === pollContext.fallbackPath) {
-                        continue;
+                        return;
                     }
 
-                    const cacheBustedUrl = `${nextImageUrl}${nextImageUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+                    const cacheBustedUrl = `${nextImageUrl}${nextImageUrl.includes("?") ? "&" : "?"}v=${cacheVersionToken}`;
                     const didLoad = await preloadImage(cacheBustedUrl);
                     if (!didLoad) {
-                        continue;
+                        return;
                     }
 
+                    setCachedMealImageUrl(mealName, nextImageUrl);
                     imageElements.forEach(imageElement => {
                         if (imageElement instanceof HTMLImageElement) {
                             imageElement.src = cacheBustedUrl;
                             setMealImageLoadingState(imageElement, false);
                         }
                     });
-                }
+                });
+                await Promise.all(applyUpdateTasks);
 
-                if (getPendingMealImageNames(getPollContext()).size === 0) {
+                const refreshedPollContext = getPollContext();
+                if (!refreshedPollContext || getPendingMealImageNames(refreshedPollContext).size === 0) {
                     stop();
                 }
             } catch {
@@ -329,6 +495,34 @@
             } finally {
                 pollInFlight = false;
             }
+        };
+
+        const getNextPollDelayMs = () => {
+            if (pollAttempts <= 2) {
+                return 1200;
+            }
+
+            if (pollAttempts <= 7) {
+                return 2500;
+            }
+
+            return pollIntervalMs;
+        };
+
+        const runPollLoop = async () => {
+            if (!pollLoopActive) {
+                return;
+            }
+
+            await pollOnce();
+            if (!pollLoopActive) {
+                return;
+            }
+
+            clearPollTimer();
+            pollTimerId = window.setTimeout(() => {
+                void runPollLoop();
+            }, getNextPollDelayMs());
         };
 
         const start = () => {
@@ -345,15 +539,12 @@
                 return;
             }
 
-            if (typeof pollIntervalId === "number") {
-                window.clearInterval(pollIntervalId);
-            }
-
             pollAttempts = 0;
-            pollIntervalId = window.setInterval(() => {
-                void pollOnce();
-            }, pollIntervalMs);
-            void pollOnce();
+            pollLoopActive = true;
+            clearPollTimer();
+            pollTimerId = window.setTimeout(() => {
+                void runPollLoop();
+            }, 0);
         };
 
         return Object.freeze({
