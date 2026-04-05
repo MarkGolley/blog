@@ -1187,6 +1187,54 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotStickyContext_StaysBelowShellHeader()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var stickyContext = page.Locator(".aislepilot-mobile-context").First;
+        await stickyContext.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        await page.EvaluateAsync(
+            """
+            () => {
+                window.scrollTo(0, 240);
+            }
+            """);
+        await page.WaitForTimeoutAsync(150);
+
+        var headerGap = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const header = document.querySelector(".app-shell-header");
+                const context = document.querySelector(".aislepilot-mobile-context");
+                if (!(header instanceof HTMLElement) || !(context instanceof HTMLElement)) {
+                    return Number.NEGATIVE_INFINITY;
+                }
+
+                const headerRect = header.getBoundingClientRect();
+                const contextRect = context.getBoundingClientRect();
+                return contextRect.top - headerRect.bottom;
+            }
+            """);
+
+        Assert.True(
+            headerGap >= -1,
+            $"Expected sticky context to remain below shell header. Gap={headerGap:F1}px.");
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotDayCardSummary_TracksSelectedMealTab()
     {
         if (!IsE2EEnabled())

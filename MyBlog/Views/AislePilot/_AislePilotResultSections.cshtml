@@ -1,67 +1,14 @@
 @using System.Globalization
 @using System.Text
 @using System.Text.Json
+@using MyBlog.Services
 @model AislePilotPageViewModel
 
 @if (Model.HasResult && Model.Result is not null)
 {
     var result = Model.Result;
     var ukCulture = CultureInfo.GetCultureInfo("en-GB");
-    string ResolveClientMealImageUrl(string? imageUrl)
-    {
-        var normalized = imageUrl?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return "/projects/aisle-pilot/images/aislepilot-icon.svg";
-        }
-
-        if (normalized.StartsWith("/projects/aisle-pilot/images/", StringComparison.OrdinalIgnoreCase))
-        {
-            return normalized;
-        }
-
-        if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"/projects/aisle-pilot/images/{normalized["/images/".Length..]}";
-        }
-
-        normalized = normalized.Replace('\\', '/');
-        if (!normalized.StartsWith("/", StringComparison.Ordinal))
-        {
-            var trimmed = normalized.TrimStart('/');
-            if (trimmed.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"/projects/aisle-pilot/images/{trimmed["images/".Length..]}";
-            }
-
-            if (trimmed.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"/projects/aisle-pilot/images/{trimmed}";
-            }
-
-            var hasImageExtension =
-                trimmed.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
-            if (hasImageExtension)
-            {
-                return $"/projects/aisle-pilot/images/aislepilot-meals/{trimmed}";
-            }
-        }
-
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
-            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
-             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
-        {
-            return normalized;
-        }
-
-        return normalized;
-    }
-
-    var fallbackMealImageUrl = ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
+    var fallbackMealImageUrl = AislePilotMealImageUrlResolver.ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
     var mealImagesPollUrl = Url.Action("MealImages", "AislePilot") ?? "/projects/aisle-pilot/meal-images";
     var aisleRank = result.AisleOrderUsed
         .Select((department, index) => new { department, index })
@@ -570,7 +517,6 @@
                                                     <summary class="aislepilot-more-actions-trigger"
                                                              aria-controls="@slotMoreActionsMenuId"
                                                              aria-expanded="false"
-                                                             aria-haspopup="menu"
                                                              aria-label="More actions"
                                                              title="More actions">
                                                         <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -582,7 +528,7 @@
                                                         </span>
                                                         <span class="aislepilot-swap-action-label">Actions</span>
                                                     </summary>
-                                                    <div id="@slotMoreActionsMenuId" class="aislepilot-card-more-actions-menu" role="menu" aria-label="Meal actions">
+                                                    <div id="@slotMoreActionsMenuId" class="aislepilot-card-more-actions-menu" role="group" aria-label="Meal actions">
                                                         <form method="post"
                                                               action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
                                                               class="aislepilot-swap-form aislepilot-card-more-action-form"
@@ -595,7 +541,6 @@
                                                             <input type="hidden" name="currentMealName" value="@slotMeal.MealName" />
                                                             <button type="submit"
                                                                     class="aislepilot-swap-btn is-secondary is-compact"
-                                                                    role="menuitem"
                                                                     data-loading-label="Swapping..."
                                                                     data-loading-delay-ms="320"
                                                                     aria-label="Swap meal"
@@ -633,7 +578,6 @@
                                                             }
                                                             <button type="submit"
                                                                     class="@saveButtonClass"
-                                                                    role="menuitem"
                                                                     aria-label="@saveActionLabel"
                                                                     title="@saveActionLabel">
                                                                 <span class="aislepilot-btn-label">
@@ -664,7 +608,6 @@
                                                             }
                                                             <button type="submit"
                                                                     class="@ignoreButtonClass"
-                                                                    role="menuitem"
                                                                     data-loading-label="Updating..."
                                                                     data-loading-delay-ms="180"
                                                                     aria-label="@ignoreActionLabel"
@@ -754,7 +697,7 @@
                                                              title="View meal details">
                                                         <div class="aislepilot-meal-image-shell">
                                                             <img class="aislepilot-meal-image"
-                                                                 src="@ResolveClientMealImageUrl(meal.MealImageUrl)"
+                                                                 src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl)"
                                                                  data-meal-image
                                                                  data-meal-name="@meal.MealName"
                                                                  alt="@($"{meal.MealName} plated meal")"

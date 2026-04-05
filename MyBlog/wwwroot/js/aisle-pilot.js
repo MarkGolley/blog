@@ -7,6 +7,7 @@
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
     const submitLoadingDelayTimers = new WeakMap();
     const appRoot = document.querySelector(".aislepilot-app");
+    const shellHeader = document.querySelector(".app-shell-header");
     const planLoadingShell = appRoot instanceof HTMLElement
         ? appRoot.querySelector("[data-plan-loading-shell]")
         : null;
@@ -30,6 +31,30 @@
         planLoadingShell.setAttribute("hidden", "hidden");
         planLoadingShell.setAttribute("aria-hidden", "true");
     };
+
+    const syncMobileContextOffset = () => {
+        if (!(appRoot instanceof HTMLElement)) {
+            return;
+        }
+
+        if (!(shellHeader instanceof HTMLElement)) {
+            appRoot.style.setProperty("--aislepilot-mobile-context-offset", "0px");
+            return;
+        }
+
+        const headerRect = shellHeader.getBoundingClientRect();
+        const computedTop = Number.parseFloat(window.getComputedStyle(shellHeader).top ?? "0");
+        const safeTop = Number.isFinite(computedTop) ? Math.max(0, computedTop) : 0;
+        const safeHeight = Math.max(0, Math.min(220, Math.ceil(headerRect.height + safeTop)));
+        appRoot.style.setProperty("--aislepilot-mobile-context-offset", `${safeHeight}px`);
+    };
+
+    if (shellHeader instanceof HTMLElement && typeof ResizeObserver !== "undefined") {
+        const shellHeaderResizeObserver = new ResizeObserver(() => {
+            syncMobileContextOffset();
+        });
+        shellHeaderResizeObserver.observe(shellHeader);
+    }
 
     const selectInputValue = input => {
         if (!(input instanceof HTMLInputElement)) {
@@ -1303,14 +1328,7 @@
             ? Array.from(scope.querySelectorAll("form"))
             : getAislePilotForms();
 
-        const trimSummary = (value, maxLength = 64) => {
-            const normalized = (value ?? "").trim();
-            if (normalized.length <= maxLength) {
-                return normalized;
-            }
-
-            return `${normalized.slice(0, maxLength)}...`;
-        };
+        const normalizeSummary = value => (value ?? "").trim();
 
         forms.forEach(form => {
             if (!(form instanceof HTMLFormElement)) {
@@ -1486,10 +1504,15 @@
                     return;
                 }
 
-                const exclusionsValue = trimSummary(exclusionsInput?.value ?? "");
-                exclusionSummary.textContent = exclusionsValue.length > 0
-                    ? exclusionsValue
-                    : "No exclusions set";
+                const exclusionsValue = normalizeSummary(exclusionsInput?.value ?? "");
+                if (exclusionsValue.length > 0) {
+                    exclusionSummary.textContent = exclusionsValue;
+                    exclusionSummary.setAttribute("title", exclusionsValue);
+                    return;
+                }
+
+                exclusionSummary.textContent = "No exclusions set";
+                exclusionSummary.removeAttribute("title");
             };
 
             const updatePantrySummary = () => {
@@ -1497,10 +1520,15 @@
                     return;
                 }
 
-                const pantryValue = trimSummary(pantryInput?.value ?? "");
-                pantrySummary.textContent = pantryValue.length > 0
-                    ? pantryValue
-                    : "No foods listed";
+                const pantryValue = normalizeSummary(pantryInput?.value ?? "");
+                if (pantryValue.length > 0) {
+                    pantrySummary.textContent = pantryValue;
+                    pantrySummary.setAttribute("title", pantryValue);
+                    return;
+                }
+
+                pantrySummary.textContent = "No foods listed";
+                pantrySummary.removeAttribute("title");
             };
 
             const updateGeneratorCoreSummary = () => {
@@ -3781,20 +3809,7 @@
             }
         }
 
-        wireSubmitLoadingHandlers(document);
-        wireExportThemeForms(document);
-        wirePlanBasicsSliders(document);
-        wireMealTypeSelectors(document);
-        wireCustomAisleFieldVisibility(document);
-        wirePreserveScrollHandlers(document);
-        wireSetupToggleHandlers(document);
-        wireOverviewToggleHandlers(document);
-        wireLeftoverPlanner(document);
-        wireCardMoreActions(document);
-        wireInlineDetailsPanels(document);
-        wireDayMealCards(document);
-        wireAjaxSwapHandlers(document);
-        wireNotesExportButtons(document);
+        wireModulesAfterAjaxSwap(document);
         startMealImagePolling();
         syncSetupToggleState();
         syncOverviewToggleState();
@@ -3818,9 +3833,7 @@
             return false;
         }
 
-        wireSubmitLoadingHandlers(document);
-        wirePreserveScrollHandlers(document);
-        wireAjaxSwapHandlers(document);
+        wireModulesAfterAjaxFavorite(document);
         return true;
     };
 
@@ -4050,14 +4063,34 @@
         forms.forEach(wireAjaxSwapForm);
     };
 
-    wireSetupToggleHandlers(document);
-    wireOverviewToggleHandlers(document);
-    wirePreserveScrollHandlers(document);
-    wireLeftoverPlanner(document);
-    wireCardMoreActions(document);
-    wireInlineDetailsPanels(document);
-    wireDayMealCards(document);
-    wireAjaxSwapHandlers(document);
+    const wireCardInteractionModules = scope => {
+        wireSetupToggleHandlers(scope);
+        wireOverviewToggleHandlers(scope);
+        wirePreserveScrollHandlers(scope);
+        wireLeftoverPlanner(scope);
+        wireCardMoreActions(scope);
+        wireInlineDetailsPanels(scope);
+        wireDayMealCards(scope);
+        wireAjaxSwapHandlers(scope);
+    };
+
+    const wireModulesAfterAjaxSwap = scope => {
+        wireSubmitLoadingHandlers(scope);
+        wireExportThemeForms(scope);
+        wirePlanBasicsSliders(scope);
+        wireMealTypeSelectors(scope);
+        wireCustomAisleFieldVisibility(scope);
+        wireCardInteractionModules(scope);
+        wireNotesExportButtons(scope);
+    };
+
+    const wireModulesAfterAjaxFavorite = scope => {
+        wireSubmitLoadingHandlers(scope);
+        wirePreserveScrollHandlers(scope);
+        wireAjaxSwapHandlers(scope);
+    };
+
+    wireCardInteractionModules(document);
     startMealImagePolling();
 
     viewport.addEventListener("touchstart", event => {
@@ -4104,6 +4137,7 @@
     }, { passive: true });
 
     window.addEventListener("resize", () => {
+        syncMobileContextOffset();
         updateViewportHeight(false);
         schedulePlanBasicsSliderRefresh(document);
     });
@@ -4128,6 +4162,7 @@
 
     const initialIndex = findIndexFromHash();
     applyTabHintVisibility();
+    syncMobileContextOffset();
     syncUi(initialIndex >= 0 ? initialIndex : 0, false);
     updateViewportHeight(false);
     syncSetupToggleState();

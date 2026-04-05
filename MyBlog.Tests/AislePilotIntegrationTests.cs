@@ -1729,7 +1729,7 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
-    public async Task Index_Post_WithThreeMealsPerDay_RendersWindowTabsAndMealActionsWithImprovedAriaContracts()
+    public async Task Index_Post_WithThreeMealsPerDay_RendersWindowTabsAndMealActionsWithAlignedAriaContracts()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -1770,9 +1770,57 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("<span class=\"aislepilot-tab-text\">Meals</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"aislepilot-tab-text\">Shop</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"aislepilot-tab-text\">Export</span>", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("aria-haspopup=\"menu\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("role=\"menuitem\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("role=\"group\" aria-label=\"Meal actions\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("aria-haspopup=\"menu\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("role=\"menuitem\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-inline-details-panel hidden aria-hidden=\"true\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithLongExclusionsAndPantryValues_RendersFullSettingsSummaries()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        var longExclusions = "peanuts mushrooms shellfish sesame celery mustard lupin gluten dairy soy eggs fish";
+        var longPantry = "brown rice chickpeas chopped tomatoes spinach olive oil garlic ginger spring onions cumin paprika";
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = longExclusions,
+            ["Request.PantryItems"] = longPantry,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        var exclusionSummaryMatch = Regex.Match(
+            html,
+            @"<span[^>]*data-exclusion-summary[^>]*title=""(?<title>[^""]*)""[^>]*>(?<text>[^<]*)</span>",
+            RegexOptions.IgnoreCase);
+        Assert.True(exclusionSummaryMatch.Success, "Expected exclusions summary span with title attribute.");
+        Assert.Equal(longExclusions, WebUtility.HtmlDecode(exclusionSummaryMatch.Groups["title"].Value).Trim());
+        Assert.Equal(longExclusions, WebUtility.HtmlDecode(exclusionSummaryMatch.Groups["text"].Value).Trim());
+        Assert.DoesNotContain($"{longExclusions[..64]}...", html, StringComparison.OrdinalIgnoreCase);
+
+        var pantrySummaryMatch = Regex.Match(
+            html,
+            @"<span[^>]*data-pantry-summary[^>]*title=""(?<title>[^""]*)""[^>]*>(?<text>[^<]*)</span>",
+            RegexOptions.IgnoreCase);
+        Assert.True(pantrySummaryMatch.Success, "Expected pantry summary span with title attribute.");
+        Assert.Equal(longPantry, WebUtility.HtmlDecode(pantrySummaryMatch.Groups["title"].Value).Trim());
+        Assert.Equal(longPantry, WebUtility.HtmlDecode(pantrySummaryMatch.Groups["text"].Value).Trim());
+        Assert.DoesNotContain($"{longPantry[..64]}...", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
