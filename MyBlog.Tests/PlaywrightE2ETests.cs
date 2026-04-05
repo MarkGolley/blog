@@ -513,6 +513,53 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotFirstVisibleDayCardMoreActions_PrefersDropDown()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var firstMoreActionsSummary = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
+        await firstMoreActionsSummary.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        await firstMoreActionsSummary.ScrollIntoViewIfNeededAsync();
+        await firstMoreActionsSummary.ClickAsync();
+
+        var directionMetrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const openMenuHost = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open]");
+                const summary = openMenuHost?.querySelector("summary");
+                const menu = openMenuHost?.querySelector(".aislepilot-card-more-actions-menu");
+                if (!(openMenuHost instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(menu instanceof HTMLElement)) {
+                    return [1, Number.POSITIVE_INFINITY];
+                }
+
+                const summaryRect = summary.getBoundingClientRect();
+                const menuRect = menu.getBoundingClientRect();
+                const opensUpward = openMenuHost.classList.contains("is-drop-up") || menuRect.bottom <= summaryRect.top + 2;
+                return [opensUpward ? 1 : 0, summaryRect.top];
+            }
+            """);
+
+        Assert.Equal(2, directionMetrics.Length);
+        Assert.Equal(0, Convert.ToInt32(directionMetrics[0]));
+        Assert.True(
+            Convert.ToDouble(directionMetrics[1]) < 620,
+            $"Expected first visible More actions trigger to remain in the upper viewport region. Top={directionMetrics[1]}.");
+    }
+
+    [Fact]
     public async Task NarrowMobile_AislePilotMealCardActionButtons_RemainVisibleWithinViewport()
     {
         if (!IsE2EEnabled())
@@ -1251,7 +1298,7 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotOverviewActions_UseSingleRowReadableButtonsAndCompactChevron()
+    public async Task Mobile_AislePilotOverviewActions_UseHamburgerMenuForRefreshAndSettings()
     {
         if (!IsE2EEnabled())
         {
@@ -1269,54 +1316,153 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
                 const actionBar = document.querySelector(".aislepilot-overview-actions");
                 const titleRow = document.querySelector(".aislepilot-overview-title-row");
                 const title = titleRow?.querySelector(".aislepilot-section-title");
-                const toggleButton = titleRow?.querySelector("[data-overview-toggle]");
-                const refreshButton = actionBar?.querySelector(".aislepilot-overview-regenerate-btn");
-                const settingsButton = actionBar?.querySelector(".aislepilot-edit-setup-btn");
+                const titleToggleButton = titleRow?.querySelector("[data-overview-toggle]");
+                const inlineActions = actionBar?.querySelector(".aislepilot-overview-actions-inline");
+                const overviewMenu = actionBar?.querySelector("[data-overview-actions-menu]");
+                const menuTrigger = overviewMenu?.querySelector("summary");
                 if (!(actionBar instanceof HTMLElement) ||
                     !(title instanceof HTMLElement) ||
-                    !(toggleButton instanceof HTMLElement) ||
-                    !(refreshButton instanceof HTMLElement) ||
-                    !(settingsButton instanceof HTMLElement)) {
-                    return [-1, -1, -1, "missing", "missing", -1, -1];
+                    !(titleToggleButton instanceof HTMLElement) ||
+                    !(inlineActions instanceof HTMLElement) ||
+                    !(overviewMenu instanceof HTMLElement) ||
+                    !(menuTrigger instanceof HTMLElement)) {
+                    return ["missing", "missing", -1, -1, -1];
                 }
 
                 const titleRect = title.getBoundingClientRect();
-                const toggleRect = toggleButton.getBoundingClientRect();
-                const refreshRect = refreshButton.getBoundingClientRect();
-                const settingsRect = settingsButton.getBoundingClientRect();
-                const refreshLabel = refreshButton.querySelector(".aislepilot-btn-label > span:not(.aislepilot-symbol-glyph)");
-                const settingsLabel = settingsButton.querySelector(".aislepilot-btn-label > span:not(.aislepilot-symbol-glyph)");
-                const refreshDisplay = refreshLabel instanceof HTMLElement ? window.getComputedStyle(refreshLabel).display : "missing";
-                const settingsDisplay = settingsLabel instanceof HTMLElement ? window.getComputedStyle(settingsLabel).display : "missing";
+                const titleToggleRect = titleToggleButton.getBoundingClientRect();
+                const menuTriggerRect = menuTrigger.getBoundingClientRect();
+                const inlineDisplay = window.getComputedStyle(inlineActions).display;
+                const dropdownDisplay = window.getComputedStyle(overviewMenu).display;
 
                 return [
-                    Math.abs(refreshRect.top - settingsRect.top),
-                    refreshRect.width,
-                    settingsRect.width,
-                    refreshDisplay,
-                    settingsDisplay,
-                    toggleRect.width,
-                    Math.max(0, toggleRect.left - titleRect.right)
+                    inlineDisplay,
+                    dropdownDisplay,
+                    menuTriggerRect.width,
+                    Math.abs(titleToggleRect.top - menuTriggerRect.top),
+                    Math.max(0, titleToggleRect.left - titleRect.right)
                 ];
             }
             """);
 
-        Assert.Equal(7, actionMetrics.Length);
-        Assert.True(Convert.ToDouble(actionMetrics[0]) <= 2.5, $"Expected overview actions to sit on one row. Y delta={actionMetrics[0]}.");
-        Assert.True(Convert.ToDouble(actionMetrics[1]) >= 70, $"Expected refresh button to keep a readable label on mobile. Width={actionMetrics[1]}.");
-        Assert.True(Convert.ToDouble(actionMetrics[2]) >= 70, $"Expected settings button to keep a readable label on mobile. Width={actionMetrics[2]}.");
-        var refreshLabelState = Convert.ToString(actionMetrics[3]) ?? string.Empty;
-        var settingsLabelState = Convert.ToString(actionMetrics[4]) ?? string.Empty;
+        Assert.Equal(5, actionMetrics.Length);
+        Assert.Equal("none", Convert.ToString(actionMetrics[0]));
+        Assert.NotEqual("none", Convert.ToString(actionMetrics[1]));
+        Assert.True(Convert.ToDouble(actionMetrics[2]) <= 48, $"Expected compact overview hamburger width. Width={actionMetrics[2]}.");
+        Assert.True(Convert.ToDouble(actionMetrics[3]) <= 12, $"Expected title and menu trigger to remain visually aligned. Y delta={actionMetrics[3]}.");
+        Assert.True(Convert.ToDouble(actionMetrics[4]) <= 8, $"Expected minimal gap between overview title and chevron toggle. Gap={actionMetrics[4]}.");
+
+        var menuTrigger = page.Locator("[data-overview-actions-menu] > summary").First;
+        await menuTrigger.ClickAsync();
+
+        var openMenu = page.Locator("[data-overview-actions-menu][open] .aislepilot-overview-actions-menu").First;
+        await openMenu.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var menuMetrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const menu = document.querySelector("[data-overview-actions-menu][open] .aislepilot-overview-actions-menu");
+                if (!(menu instanceof HTMLElement)) {
+                    return [-1, -1, -1, "missing", "missing", 0, 0, -1, -1, 0];
+                }
+
+                const rect = menu.getBoundingClientRect();
+                const refresh = menu.querySelector(".aislepilot-overview-regenerate-btn");
+                const settings = menu.querySelector(".aislepilot-edit-setup-btn");
+                const refreshText = refresh instanceof HTMLElement ? (refresh.textContent || "").trim() : "";
+                const settingsText = settings instanceof HTMLElement ? (settings.textContent || "").trim() : "";
+                const mobileContext = document.querySelector(".aislepilot-mobile-context");
+
+                const isButtonCenterVisible = button => {
+                    if (!(button instanceof HTMLElement)) {
+                        return false;
+                    }
+
+                    const buttonRect = button.getBoundingClientRect();
+                    if (buttonRect.width < 2 || buttonRect.height < 2) {
+                        return false;
+                    }
+
+                    const x = Math.min(window.innerWidth - 1, Math.max(0, buttonRect.left + (buttonRect.width / 2)));
+                    const y = Math.min(window.innerHeight - 1, Math.max(0, buttonRect.top + (buttonRect.height / 2)));
+                    const topElement = document.elementFromPoint(x, y);
+                    return topElement instanceof Element &&
+                        (topElement === button || button.contains(topElement) || menu.contains(topElement));
+                };
+
+                const menuZIndex = Number.parseInt(window.getComputedStyle(menu).zIndex || "0", 10);
+                const mobileContextZIndex = mobileContext instanceof HTMLElement
+                    ? Number.parseInt(window.getComputedStyle(mobileContext).zIndex || "0", 10)
+                    : -1;
+                const overviewSection = document.querySelector("#aislepilot-overview");
+                return [
+                    Math.max(0, 8 - rect.left),
+                    Math.max(0, rect.right - (window.innerWidth - 8)),
+                    menu.querySelectorAll(".aislepilot-overview-regenerate-btn, .aislepilot-edit-setup-btn").length,
+                    refreshText,
+                    settingsText,
+                    isButtonCenterVisible(refresh) ? 1 : 0,
+                    isButtonCenterVisible(settings) ? 1 : 0,
+                    Number.isFinite(menuZIndex) ? menuZIndex : -1,
+                    Number.isFinite(mobileContextZIndex) ? mobileContextZIndex : -1,
+                    overviewSection instanceof HTMLElement && overviewSection.classList.contains("is-actions-menu-open") ? 1 : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(10, menuMetrics.Length);
+        Assert.True(Convert.ToDouble(menuMetrics[0]) <= 1.5, $"Expected overview menu to stay inside viewport on left edge. Overflow={menuMetrics[0]}.");
+        Assert.True(Convert.ToDouble(menuMetrics[1]) <= 1.5, $"Expected overview menu to stay inside viewport on right edge. Overflow={menuMetrics[1]}.");
+        Assert.Equal(2, Convert.ToInt32(menuMetrics[2]));
+        Assert.Contains("Refresh plan", Convert.ToString(menuMetrics[3]), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("settings", Convert.ToString(menuMetrics[4]), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, Convert.ToInt32(menuMetrics[5]));
+        Assert.Equal(1, Convert.ToInt32(menuMetrics[6]));
         Assert.True(
-            !string.Equals(refreshLabelState, "none", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(refreshLabelState, "missing", StringComparison.OrdinalIgnoreCase),
-            $"Expected refresh action label to remain visible on mobile. State={refreshLabelState}.");
-        Assert.True(
-            !string.Equals(settingsLabelState, "none", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(settingsLabelState, "missing", StringComparison.OrdinalIgnoreCase),
-            $"Expected settings action label to remain visible on mobile. State={settingsLabelState}.");
-        Assert.True(Convert.ToDouble(actionMetrics[5]) <= 32, $"Expected compact overview toggle button width. Width={actionMetrics[5]}.");
-        Assert.True(Convert.ToDouble(actionMetrics[6]) <= 8, $"Expected minimal gap between overview title and chevron toggle. Gap={actionMetrics[6]}.");
+            Convert.ToDouble(menuMetrics[7]) > Convert.ToDouble(menuMetrics[8]),
+            $"Expected overview menu z-index to exceed sticky context z-index. Menu={menuMetrics[7]}, context={menuMetrics[8]}.");
+        Assert.Equal(1, Convert.ToInt32(menuMetrics[9]));
+    }
+
+    [Fact]
+    public async Task NarrowMobile_AislePilotOverviewCollapsed_DoesNotCreateHorizontalOverflow()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateNarrowMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var overflowMetrics = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const doc = document.documentElement;
+                const body = document.body;
+                const scrollWidth = Math.max(doc?.scrollWidth ?? 0, body?.scrollWidth ?? 0);
+                const overflowX = Math.max(0, scrollWidth - window.innerWidth);
+
+                const overviewHead = document.querySelector(".aislepilot-overview-head");
+                const overviewActions = document.querySelector(".aislepilot-overview-actions");
+                const headRect = overviewHead instanceof HTMLElement ? overviewHead.getBoundingClientRect() : null;
+                const actionsRect = overviewActions instanceof HTMLElement ? overviewActions.getBoundingClientRect() : null;
+                const headOverflow = headRect ? Math.max(0, headRect.right - window.innerWidth) : -1;
+                const actionsOverflow = actionsRect ? Math.max(0, actionsRect.right - window.innerWidth) : -1;
+                return [overflowX, headOverflow, actionsOverflow];
+            }
+            """);
+
+        Assert.Equal(3, overflowMetrics.Length);
+        Assert.True(overflowMetrics[0] <= 1.5, $"Expected collapsed overview not to cause page horizontal overflow. Overflow={overflowMetrics[0]:F1}px.");
+        Assert.True(overflowMetrics[1] <= 1.5, $"Expected overview header to stay inside viewport. Overflow={overflowMetrics[1]:F1}px.");
+        Assert.True(overflowMetrics[2] <= 1.5, $"Expected overview action row to stay inside viewport. Overflow={overflowMetrics[2]:F1}px.");
     }
 
     [Fact]

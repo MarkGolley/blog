@@ -157,49 +157,113 @@
                 </button>
             </div>
             <div class="aislepilot-overview-actions">
-                <form method="post" action="@Url.Action("Index", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
-                    @Html.AntiForgeryToken()
-                    <partial name="_AislePilotHiddenRequestFields"
-                             model="BuildHiddenRequestFields()" />
-                    <button type="submit"
-                            class="aislepilot-overview-regenerate-btn"
-                            data-loading-label="Refreshing plan..."
-                            data-show-plan-skeleton
-                            aria-label="Refresh plan"
-                            title="Refresh plan">
+                <div class="aislepilot-overview-actions-inline">
+                    <form method="post" action="@Url.Action("Index", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
+                        @Html.AntiForgeryToken()
+                        <partial name="_AislePilotHiddenRequestFields"
+                                 model="BuildHiddenRequestFields()" />
+                        <button type="submit"
+                                class="aislepilot-overview-regenerate-btn"
+                                data-loading-label="Refreshing plan..."
+                                data-show-plan-skeleton
+                                aria-label="Refresh plan"
+                                title="Refresh plan">
+                            <span class="aislepilot-btn-label">
+                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
+                                        <path d="M20 4v6h-6"></path>
+                                    </svg>
+                                </span>
+                                <span>Refresh plan</span>
+                            </span>
+                        </button>
+                    </form>
+                    <button
+                        type="button"
+                        class="aislepilot-edit-setup-btn"
+                        data-setup-toggle
+                        aria-controls="aislepilot-setup"
+                        aria-expanded="false"
+                        aria-label="Edit settings"
+                        title="Edit settings">
                         <span class="aislepilot-btn-label">
                             <span class="aislepilot-symbol-glyph" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" focusable="false">
-                                    <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
-                                    <path d="M20 4v6h-6"></path>
+                                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                                    <line x1="4" y1="18" x2="20" y2="18"></line>
+                                    <circle cx="9" cy="6" r="2"></circle>
+                                    <circle cx="15" cy="12" r="2"></circle>
+                                    <circle cx="11" cy="18" r="2"></circle>
                                 </svg>
                             </span>
-                            <span>Refresh plan</span>
+                            <span data-setup-toggle-label>Edit settings</span>
                         </span>
                     </button>
-                </form>
-                <button
-                    type="button"
-                    class="aislepilot-edit-setup-btn"
-                    data-setup-toggle
-                    aria-controls="aislepilot-setup"
-                    aria-expanded="false"
-                    aria-label="Edit settings"
-                    title="Edit settings">
-                    <span class="aislepilot-btn-label">
-                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" focusable="false">
-                                <line x1="4" y1="6" x2="20" y2="6"></line>
-                                <line x1="4" y1="12" x2="20" y2="12"></line>
-                                <line x1="4" y1="18" x2="20" y2="18"></line>
-                                <circle cx="9" cy="6" r="2"></circle>
-                                <circle cx="15" cy="12" r="2"></circle>
-                                <circle cx="11" cy="18" r="2"></circle>
-                            </svg>
+                </div>
+                <details class="aislepilot-overview-actions-dropdown" data-overview-actions-menu>
+                    <summary class="aislepilot-overview-actions-trigger is-icon-only"
+                             aria-label="Overview actions"
+                             aria-expanded="false"
+                             title="Overview actions">
+                        <span class="aislepilot-btn-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <line x1="4" y1="7" x2="20" y2="7"></line>
+                                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                                    <line x1="4" y1="17" x2="20" y2="17"></line>
+                                </svg>
+                            </span>
+                            <span class="sr-only">Overview actions</span>
                         </span>
-                        <span data-setup-toggle-label>Edit settings</span>
-                    </span>
-                </button>
+                    </summary>
+                    <div class="aislepilot-overview-actions-menu" role="group" aria-label="Overview actions">
+                        <form method="post" action="@Url.Action("Index", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
+                            @Html.AntiForgeryToken()
+                            <partial name="_AislePilotHiddenRequestFields"
+                                     model="BuildHiddenRequestFields()" />
+                            <button type="submit"
+                                    class="aislepilot-overview-regenerate-btn"
+                                    data-loading-label="Refreshing plan..."
+                                    data-show-plan-skeleton
+                                    aria-label="Refresh plan"
+                                    title="Refresh plan">
+                                <span class="aislepilot-btn-label">
+                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" focusable="false">
+                                            <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
+                                            <path d="M20 4v6h-6"></path>
+                                        </svg>
+                                    </span>
+                                    <span>Refresh plan</span>
+                                </span>
+                            </button>
+                        </form>
+                        <button
+                            type="button"
+                            class="aislepilot-edit-setup-btn"
+                            data-setup-toggle
+                            aria-controls="aislepilot-setup"
+                            aria-expanded="false"
+                            aria-label="Edit settings"
+                            title="Edit settings">
+                            <span class="aislepilot-btn-label">
+                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <line x1="4" y1="6" x2="20" y2="6"></line>
+                                        <line x1="4" y1="12" x2="20" y2="12"></line>
+                                        <line x1="4" y1="18" x2="20" y2="18"></line>
+                                        <circle cx="9" cy="6" r="2"></circle>
+                                        <circle cx="15" cy="12" r="2"></circle>
+                                        <circle cx="11" cy="18" r="2"></circle>
+                                    </svg>
+                                </span>
+                                <span data-setup-toggle-label>Edit settings</span>
+                            </span>
+                        </button>
+                    </div>
+                </details>
             </div>
         </div>
         <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content hidden>

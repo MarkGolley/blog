@@ -1396,6 +1396,9 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("const visibleLabel = button.querySelector(\"[data-setup-toggle-label]\")", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("if (visibleLabel instanceof HTMLElement) {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("if (!srOnlyLabel && !(visibleLabel instanceof HTMLElement)) {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const closeOpenOverviewActionsMenus = except => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const wireOverviewActionsMenus = scope => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("wireOverviewActionsMenus(scope);", script, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1653,6 +1656,8 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains("class=\"aislepilot-overview-regenerate-btn\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-edit-setup-btn\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-setup-toggle-label", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-overview-actions-menu", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-overview-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("aislepilot-overview-regenerate-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("aislepilot-edit-setup-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-more-actions-trigger\"", html, StringComparison.OrdinalIgnoreCase);
