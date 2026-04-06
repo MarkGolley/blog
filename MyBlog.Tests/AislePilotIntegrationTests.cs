@@ -2211,6 +2211,92 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
     }
 
     [Fact]
+    public async Task SavedMeals_AreRenderedInsideHeaderMenu_AndCanBeRemoved()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var generateForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "85"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        using var generatedResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(generateForm));
+        Assert.Equal(HttpStatusCode.OK, generatedResponse.StatusCode);
+        var generatedHtml = await generatedResponse.Content.ReadAsStringAsync();
+        var generatedMealNames = ExtractRenderedMealNames(generatedHtml);
+        Assert.Equal(2, generatedMealNames.Count);
+        var targetMealName = generatedMealNames[0];
+
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        var saveMealForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "85"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("Request.SavedEnjoyedMealNamesState", string.Empty),
+            new("mealName", targetMealName),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in generatedMealNames)
+        {
+            saveMealForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var savedMealResponse = await client.PostAsync("/projects/aisle-pilot/toggle-enjoyed-meal", new FormUrlEncodedContent(saveMealForm));
+        Assert.Equal(HttpStatusCode.OK, savedMealResponse.StatusCode);
+        var savedMealHtml = await savedMealResponse.Content.ReadAsStringAsync();
+        Assert.Contains("aislepilot-head-saved-meal-list", savedMealHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/projects/aisle-pilot/remove-saved-meal", savedMealHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                $@"<span class=""aislepilot-head-saved-meal-name"">\s*{Regex.Escape(targetMealName)}\s*</span>",
+                RegexOptions.IgnoreCase),
+            savedMealHtml);
+
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        var removeSavedMealForm = new List<KeyValuePair<string, string>>
+        {
+            new("mealName", targetMealName),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        using var removedSavedMealResponse = await client.PostAsync(
+            "/projects/aisle-pilot/remove-saved-meal",
+            new FormUrlEncodedContent(removeSavedMealForm));
+
+        Assert.Equal(HttpStatusCode.OK, removedSavedMealResponse.StatusCode);
+        var removedSavedMealHtml = await removedSavedMealResponse.Content.ReadAsStringAsync();
+        Assert.Contains("No saved meals yet", removedSavedMealHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotMatch(
+            new Regex(
+                $@"<span class=""aislepilot-head-saved-meal-name"">\s*{Regex.Escape(targetMealName)}\s*</span>",
+                RegexOptions.IgnoreCase),
+            removedSavedMealHtml);
+    }
+
+    [Fact]
     public async Task DeleteWeek_RemovesSavedWeekAndBlocksOpen()
     {
         using var client = CreateClient(allowAutoRedirect: true);

@@ -688,6 +688,71 @@ public class AislePilotController(
                 savedWeeks: BuildSavedWeekSummaries(persistedSnapshots)));
     }
 
+    [HttpPost("remove-saved-meal")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveSavedMeal(
+        string? mealName,
+        string? returnUrl,
+        CancellationToken cancellationToken)
+    {
+        var resolvedReturnUrl = ResolveReturnUrl(returnUrl);
+        var request = NormalizeRequest(TryReadSavedSetupState() ?? new AislePilotRequestModel
+        {
+            MealsPerDay = DefaultMealsPerDay
+        });
+
+        var normalizedMealName = string.IsNullOrWhiteSpace(mealName)
+            ? string.Empty
+            : mealName.Trim();
+        if (normalizedMealName.Length == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Saved meal name was missing.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        request.SavedEnjoyedMealNamesState = RemoveSavedEnjoyedMealNameState(
+            request.SavedEnjoyedMealNamesState,
+            normalizedMealName);
+        PersistSetupState(request);
+        RefreshResultModelState();
+
+        try
+        {
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(null);
+            if (resolvedCurrentPlanMealNames is null || resolvedCurrentPlanMealNames.Count == 0)
+            {
+                return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+            }
+
+            var result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                resolvedCurrentPlanMealNames,
+                cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
+            PersistCurrentPlanState(result);
+            return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogInformation(ex, "AislePilot could not refresh current plan after removing a saved meal.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Saved meal was removed, but this plan needs a fresh regenerate.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot remove saved meal failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Saved meal was removed, but the plan could not refresh right now.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+    }
+
     [HttpGet("meal-images")]
     [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> MealImages([FromQuery] List<string>? mealNames, CancellationToken cancellationToken)
@@ -827,6 +892,7 @@ public class AislePilotController(
             ReturnUrl = returnUrl,
             Result = result,
             SavedWeeks = savedWeeks ?? BuildSavedWeekSummaries(TryReadSavedWeekState()),
+            SavedMeals = ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
             PantrySuggestions = pantrySuggestions ?? [],
             SupermarketOptions = aislePilotService.GetSupportedSupermarkets(),
             PortionSizeOptions = aislePilotService.GetSupportedPortionSizes(),
@@ -1899,6 +1965,20 @@ public class AislePilotController(
             savedMealNames.Add(normalizedMealName);
         }
 
+        return SerializeSavedEnjoyedMealNameState(savedMealNames);
+    }
+
+    private static string RemoveSavedEnjoyedMealNameState(string? currentState, string mealName)
+    {
+        var normalizedMealName = string.IsNullOrWhiteSpace(mealName) ? string.Empty : mealName.Trim();
+        if (normalizedMealName.Length == 0 || normalizedMealName.Length > MaxSavedMealNameLength)
+        {
+            return SerializeSavedEnjoyedMealNameState(ParseSavedEnjoyedMealNamesState(currentState));
+        }
+
+        var savedMealNames = ParseSavedEnjoyedMealNamesState(currentState)
+            .Where(name => !name.Equals(normalizedMealName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
         return SerializeSavedEnjoyedMealNameState(savedMealNames);
     }
 

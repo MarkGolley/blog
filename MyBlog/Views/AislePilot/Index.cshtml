@@ -203,6 +203,7 @@
         ? "aislepilot-layout has-results"
         : "aislepilot-layout";
     var hasSavedWeeks = Model.SavedWeeks.Count > 0;
+    var hasSavedMeals = Model.SavedMeals.Count > 0;
     var modelErrors = ViewData.ModelState.Values
         .SelectMany(state => state.Errors)
         .Select(error => error.ErrorMessage?.Trim())
@@ -281,9 +282,9 @@
                         </span>
                     </summary>
                 <div class="aislepilot-head-menu-panel" role="menu" aria-label="AislePilot quick menu">
+                    <p class="aislepilot-head-menu-section-title">Saved weeks</p>
                     @if (hasSavedWeeks)
                     {
-                        <p class="aislepilot-head-menu-section-title">Saved weeks</p>
                         <ul class="aislepilot-head-week-list">
                             @foreach (var savedWeek in Model.SavedWeeks.Take(6))
                             {
@@ -346,6 +347,46 @@
                     else
                     {
                         <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true">No saved weeks yet</p>
+                    }
+
+                    <p class="aislepilot-head-menu-section-title">Saved meals</p>
+                    @if (hasSavedMeals)
+                    {
+                        <ul class="aislepilot-head-saved-meal-list">
+                            @foreach (var savedMealName in Model.SavedMeals.Take(20))
+                            {
+                                <li class="aislepilot-head-saved-meal-row">
+                                    <span class="aislepilot-head-saved-meal-name">@savedMealName</span>
+                                    <form method="post"
+                                          action="@Url.Action("RemoveSavedMeal", "AislePilot")"
+                                          class="aislepilot-head-week-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="mealName" value="@savedMealName" />
+                                        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                                        <button type="submit"
+                                                class="aislepilot-head-week-action-btn is-danger"
+                                                data-loading-label="Removing meal..."
+                                                aria-label="Remove @savedMealName from saved meals"
+                                                title="Remove saved meal">
+                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" focusable="false">
+                                                    <path d="M4 7h16"></path>
+                                                    <path d="M9 7V4h6v3"></path>
+                                                    <path d="M7 7l1 12h8l1-12"></path>
+                                                    <path d="M10 11v6"></path>
+                                                    <path d="M14 11v6"></path>
+                                                </svg>
+                                            </span>
+                                            <span class="sr-only">Remove saved meal</span>
+                                        </button>
+                                    </form>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true">No saved meals yet</p>
                     }
                     </div>
                 </details>

@@ -9,6 +9,7 @@ public sealed class AislePilotPageViewModel
     public AislePilotPlanResultViewModel? Result { get; set; }
     public IReadOnlyList<AislePilotSavedWeekSummaryViewModel> SavedWeeks { get; set; } =
         Array.Empty<AislePilotSavedWeekSummaryViewModel>();
+    public IReadOnlyList<string> SavedMeals { get; set; } = Array.Empty<string>();
     public IReadOnlyList<AislePilotPantrySuggestionViewModel> PantrySuggestions { get; set; } =
         Array.Empty<AislePilotPantrySuggestionViewModel>();
     public IReadOnlyList<string> SupermarketOptions { get; set; } = Array.Empty<string>();

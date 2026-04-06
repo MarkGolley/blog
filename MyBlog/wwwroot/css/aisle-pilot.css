@@ -226,7 +226,28 @@ html.aislepilot-restore-pending .aislepilot-app {
     overflow-y: auto;
 }
 
+.aislepilot-head-saved-meal-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.2rem;
+    max-height: min(18rem, 44vh);
+    overflow-y: auto;
+}
+
 .aislepilot-head-week-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.42rem;
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.97);
+    padding: 0.24rem 0.34rem;
+}
+
+.aislepilot-head-saved-meal-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -242,6 +263,18 @@ html.aislepilot-restore-pending .aislepilot-app {
     font-weight: 700;
     color: var(--brand-deep);
     line-height: 1.2;
+}
+
+.aislepilot-head-saved-meal-name {
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--brand-deep);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .aislepilot-head-week-actions {
@@ -4803,7 +4836,16 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-color: var(--line);
 }
 
+:root[data-theme="dark"] .aislepilot-head-saved-meal-row {
+    background: rgba(21, 34, 52, 0.96);
+    border-color: var(--line);
+}
+
 :root[data-theme="dark"] .aislepilot-head-week-date {
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-head-saved-meal-name {
     color: #deefff;
 }
 
