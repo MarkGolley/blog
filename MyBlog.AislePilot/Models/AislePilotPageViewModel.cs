@@ -7,6 +7,8 @@ public sealed class AislePilotPageViewModel
     public AislePilotRequestModel Request { get; set; } = new();
     public string ReturnUrl { get; set; } = string.Empty;
     public AislePilotPlanResultViewModel? Result { get; set; }
+    public IReadOnlyList<AislePilotSavedWeekSummaryViewModel> SavedWeeks { get; set; } =
+        Array.Empty<AislePilotSavedWeekSummaryViewModel>();
     public IReadOnlyList<AislePilotPantrySuggestionViewModel> PantrySuggestions { get; set; } =
         Array.Empty<AislePilotPantrySuggestionViewModel>();
     public IReadOnlyList<string> SupermarketOptions { get; set; } = Array.Empty<string>();
@@ -14,6 +16,16 @@ public sealed class AislePilotPageViewModel
     public IReadOnlyList<string> DietaryOptions { get; set; } = Array.Empty<string>();
     public bool MealImagePollingEnabled { get; set; }
     public bool HasResult => Result is not null;
+}
+
+public sealed class AislePilotSavedWeekSummaryViewModel
+{
+    public string WeekId { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public DateTimeOffset SavedAtUtc { get; set; }
+    public int PlanDays { get; set; }
+    public int MealCount { get; set; }
+    public string Supermarket { get; set; } = string.Empty;
 }
 
 public sealed class AislePilotPlanResultViewModel

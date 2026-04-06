@@ -91,16 +91,199 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-brand-lockup {
     display: inline-flex;
     align-items: center;
-    padding: 0.35rem 0.5rem;
+    position: relative;
+    padding: 0.35rem 2.9rem 0.35rem 0.5rem;
     border: 1px solid rgba(16, 63, 101, 0.2);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.96);
+}
+
+.aislepilot-brand-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
 }
 
 .aislepilot-brand-logo {
     display: block;
     width: clamp(180px, 42vw, 290px);
     height: auto;
+}
+
+.aislepilot-head-menu {
+    position: absolute;
+    top: 50%;
+    right: 0.36rem;
+    transform: translateY(-50%);
+    z-index: 2;
+}
+
+.aislepilot-head-menu > summary {
+    list-style: none;
+}
+
+.aislepilot-head-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-head-menu-trigger {
+    width: 2.42rem;
+    min-width: 2.42rem;
+    min-height: 2.42rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    position: relative;
+    cursor: pointer;
+}
+
+.aislepilot-head-menu-trigger::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background:
+        url("/images/aislepilot-icon.svg") center / contain no-repeat;
+}
+
+.aislepilot-head-menu-trigger .aislepilot-symbol-glyph {
+    border: none;
+    background: transparent;
+    color: #fff;
+    width: 1.08rem;
+    height: 1.08rem;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 1px 1px rgba(10, 26, 44, 0.28));
+}
+
+.aislepilot-head-menu-trigger .aislepilot-symbol-glyph svg {
+    width: 0.84rem;
+    height: 0.84rem;
+    stroke-width: 2.2;
+}
+
+.aislepilot-head-menu-panel {
+    position: absolute;
+    top: calc(100% + 0.32rem);
+    right: 0;
+    z-index: 25;
+    min-width: 15.2rem;
+    max-width: min(90vw, 20rem);
+    border: 1px solid rgba(16, 63, 101, 0.22);
+    border-radius: 12px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(246, 251, 255, 0.96));
+    box-shadow: 0 12px 22px rgba(10, 26, 44, 0.14);
+    padding: 0.34rem;
+    display: grid;
+    gap: 0.24rem;
+}
+
+.aislepilot-head-menu-item {
+    width: 100%;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.97);
+    color: var(--brand-deep);
+    min-height: 2.2rem;
+    padding: 0.36rem 0.58rem;
+    margin: 0;
+    font-size: 0.86rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.aislepilot-head-menu-item.is-disabled {
+    color: var(--ink-soft);
+    background: rgba(245, 249, 253, 0.96);
+    cursor: default;
+}
+
+.aislepilot-head-menu-section-title {
+    margin: 0;
+    padding: 0.24rem 0.3rem 0.08rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+}
+
+.aislepilot-head-week-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.2rem;
+    max-height: min(22rem, 62vh);
+    overflow-y: auto;
+}
+
+.aislepilot-head-week-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.42rem;
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.97);
+    padding: 0.24rem 0.34rem;
+}
+
+.aislepilot-head-week-date {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--brand-deep);
+    line-height: 1.2;
+}
+
+.aislepilot-head-week-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.24rem;
+}
+
+.aislepilot-head-week-form {
+    margin: 0;
+}
+
+.aislepilot-head-week-action-btn {
+    width: 1.95rem;
+    min-width: 1.95rem;
+    min-height: 1.95rem;
+    border: 1px solid rgba(16, 63, 101, 0.22);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.98);
+    color: var(--brand-deep);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.aislepilot-head-week-action-btn .aislepilot-symbol-glyph {
+    border-color: rgba(16, 63, 101, 0.28);
+    background: rgba(16, 63, 101, 0.08);
+    color: var(--brand-deep);
+}
+
+.aislepilot-head-week-action-btn.is-danger {
+    border-color: rgba(125, 25, 22, 0.48);
+    background: linear-gradient(118deg, #da5b56 0%, #b0302b 100%);
+    color: #fff;
+}
+
+.aislepilot-head-week-action-btn.is-danger .aislepilot-symbol-glyph {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
 }
 
 .aislepilot-app-badge {
@@ -930,6 +1113,48 @@ html.aislepilot-restore-pending .aislepilot-app {
     padding: 0.28rem 0.68rem !important;
     font-size: 0.88rem !important;
     font-weight: 700 !important;
+}
+
+.aislepilot-overview-regenerate-btn.is-secondary {
+    border: 1px solid rgba(16, 63, 101, 0.24) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+}
+
+.aislepilot-overview-regenerate-btn.is-secondary.is-danger {
+    background: linear-gradient(118deg, #da5b56 0%, #b0302b 100%) !important;
+    border-color: rgba(125, 25, 22, 0.55) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 14px rgba(94, 22, 20, 0.22) !important;
+}
+
+.aislepilot-overview-regenerate-btn.is-secondary .aislepilot-symbol-glyph {
+    border-color: rgba(16, 63, 101, 0.32);
+    background: rgba(16, 63, 101, 0.08);
+    color: var(--brand-deep);
+}
+
+.aislepilot-overview-regenerate-btn.is-secondary.is-danger .aislepilot-symbol-glyph {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
+.aislepilot-overview-regenerate-btn.is-icon-only {
+    width: var(--ap-overview-button-size) !important;
+    min-width: var(--ap-overview-button-size) !important;
+    min-height: var(--ap-overview-button-size) !important;
+    padding: 0 !important;
+    justify-content: center !important;
+}
+
+.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-btn-label {
+    gap: 0;
+}
+
+.aislepilot-overview-regenerate-btn.is-icon-only.is-loading::after {
+    margin-left: 0;
 }
 
 .aislepilot-overview-toggle-btn {
@@ -2289,6 +2514,58 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-shopping-grid > .aislepilot-card {
     height: fit-content;
+}
+
+.aislepilot-saved-weeks-shell {
+    background:
+        linear-gradient(155deg, rgba(246, 252, 255, 0.98), rgba(255, 255, 255, 0.98));
+    border-color: rgba(16, 63, 101, 0.24);
+}
+
+.aislepilot-saved-weeks-shell .aislepilot-section-head {
+    align-items: baseline;
+}
+
+.aislepilot-saved-weeks-grid {
+    grid-template-columns: 1fr;
+    gap: 0.42rem;
+}
+
+.aislepilot-saved-week-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.56rem;
+    padding: 0.58rem 0.66rem;
+}
+
+.aislepilot-saved-week-date {
+    margin: 0;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--brand-deep);
+    line-height: 1.2;
+}
+
+.aislepilot-saved-week-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.28rem;
+    justify-content: flex-start;
+}
+
+.aislepilot-saved-week-actions .aislepilot-overview-regenerate-form {
+    margin: 0;
+}
+
+.aislepilot-saved-week-actions .aislepilot-overview-regenerate-btn {
+    min-width: 0;
+}
+
+.aislepilot-saved-week-actions .aislepilot-overview-regenerate-btn.is-icon-only {
+    width: 2.3rem !important;
+    min-width: 2.3rem !important;
+    min-height: 2.3rem !important;
 }
 
 .aislepilot-card {
@@ -4489,6 +4766,81 @@ html.aislepilot-restore-pending .aislepilot-app {
 :root[data-theme="dark"] .aislepilot-overview-actions-menu {
     background: linear-gradient(160deg, rgba(19, 32, 49, 0.98), rgba(14, 25, 40, 0.96));
     border-color: var(--line);
+}
+
+:root[data-theme="dark"] .aislepilot-head-menu-trigger {
+    background: transparent;
+    color: #fff;
+}
+
+:root[data-theme="dark"] .aislepilot-head-menu-trigger .aislepilot-symbol-glyph {
+    border: none;
+    background: transparent;
+    color: #fff;
+}
+
+:root[data-theme="dark"] .aislepilot-head-menu-panel {
+    background: linear-gradient(160deg, rgba(19, 32, 49, 0.98), rgba(14, 25, 40, 0.96));
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .aislepilot-head-menu-item {
+    background: rgba(21, 34, 52, 0.96);
+    border-color: var(--line);
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-head-menu-item.is-disabled {
+    color: rgba(183, 203, 229, 0.82);
+}
+
+:root[data-theme="dark"] .aislepilot-head-menu-section-title {
+    color: rgba(183, 203, 229, 0.84);
+}
+
+:root[data-theme="dark"] .aislepilot-head-week-row {
+    background: rgba(21, 34, 52, 0.96);
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .aislepilot-head-week-date {
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-head-week-action-btn {
+    background: rgba(21, 34, 52, 0.96);
+    border-color: var(--line);
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-head-week-action-btn .aislepilot-symbol-glyph {
+    border-color: rgba(125, 167, 213, 0.44);
+    background: rgba(125, 167, 213, 0.16);
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-regenerate-btn.is-secondary {
+    background: rgba(21, 34, 52, 0.96) !important;
+    border-color: var(--line) !important;
+    color: #deefff !important;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-regenerate-btn.is-secondary.is-danger {
+    background: linear-gradient(118deg, #da5b56 0%, #b0302b 100%) !important;
+    border-color: rgba(125, 25, 22, 0.55) !important;
+    color: #fff !important;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-regenerate-btn.is-secondary .aislepilot-symbol-glyph {
+    border-color: rgba(125, 167, 213, 0.44);
+    background: rgba(125, 167, 213, 0.16);
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-regenerate-btn.is-secondary.is-danger .aislepilot-symbol-glyph {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
 }
 
 :root[data-theme="dark"] .aislepilot-edit-setup-btn {

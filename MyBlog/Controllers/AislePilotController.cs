@@ -16,6 +16,7 @@ public class AislePilotController(
 {
     private const string SetupStateCookieName = "aislepilot.setup.v1";
     private const string CurrentPlanStateCookieName = "aislepilot.plan.v1";
+    private const string SavedWeeksStateCookieName = "aislepilot.weeks.v1";
     private const string AislePilotImagePathPrefix = "/projects/aisle-pilot/images";
     private const int DefaultMealsPerDay = 3;
     private const int MinMealsPerDay = 1;
@@ -24,6 +25,8 @@ public class AislePilotController(
     private const int MaxIgnoredMealSlotIndex = 20;
     private const int MaxSavedEnjoyedMealNames = 32;
     private const int MaxSavedMealNameLength = 90;
+    private const int MaxSavedWeeks = 6;
+    private const int MaxSavedWeekCookiePayloadLength = 3500;
     private static readonly string[] MealTypeSlotOrder = ["Breakfast", "Lunch", "Dinner"];
     private static readonly JsonSerializerOptions SetupStateJsonOptions = new()
     {
@@ -548,6 +551,143 @@ public class AislePilotController(
         }
     }
 
+    [HttpPost("save-week")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveWeek(
+        AislePilotPageViewModel pageModel,
+        string? weekLabel,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
+    {
+        var request = NormalizeRequest(pageModel.Request);
+        PersistSetupState(request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
+
+        try
+        {
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+            if (resolvedCurrentPlanMealNames is null || resolvedCurrentPlanMealNames.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Could not save this week yet. Generate a plan first.");
+                return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+            }
+
+            var savedWeekSnapshots = PersistSavedWeekState(request, resolvedCurrentPlanMealNames, weekLabel);
+            var result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                resolvedCurrentPlanMealNames,
+                cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
+            PersistCurrentPlanState(result);
+            var savedWeeks = BuildSavedWeekSummaries(savedWeekSnapshots);
+            return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl, savedWeeks: savedWeeks));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot save week failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Saving this week hit a temporary issue. Please retry.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+    }
+
+    [HttpPost("open-week")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> OpenWeek(
+        string? weekId,
+        string? returnUrl,
+        CancellationToken cancellationToken)
+    {
+        var resolvedReturnUrl = ResolveReturnUrl(returnUrl);
+        var currentRequest = NormalizeRequest(TryReadSavedSetupState() ?? new AislePilotRequestModel
+        {
+            MealsPerDay = DefaultMealsPerDay
+        });
+
+        var normalizedWeekId = string.IsNullOrWhiteSpace(weekId) ? string.Empty : weekId.Trim();
+        var savedWeeks = TryReadSavedWeekState();
+        var selectedWeek = savedWeeks.FirstOrDefault(snapshot =>
+            snapshot.WeekId.Equals(normalizedWeekId, StringComparison.OrdinalIgnoreCase));
+        if (selectedWeek is null)
+        {
+            ModelState.AddModelError(string.Empty, "Saved week was not found. Save a new week and try again.");
+            return View("Index", BuildPageModel(currentRequest, returnUrl: resolvedReturnUrl));
+        }
+
+        try
+        {
+            var request = NormalizeRequest(selectedWeek.ToRequestModel());
+            PersistSetupState(request);
+            var result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                selectedWeek.CurrentPlanMealNames,
+                cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
+            PersistCurrentPlanState(result);
+            return View("Index", BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("Index", BuildPageModel(currentRequest, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot open saved week failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Could not open that saved week right now. Please retry.");
+            return View("Index", BuildPageModel(currentRequest, returnUrl: resolvedReturnUrl));
+        }
+    }
+
+    [HttpPost("delete-week")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public IActionResult DeleteWeek(string? weekId, string? returnUrl)
+    {
+        var resolvedReturnUrl = ResolveReturnUrl(returnUrl);
+        var currentRequest = NormalizeRequest(TryReadSavedSetupState() ?? new AislePilotRequestModel
+        {
+            MealsPerDay = DefaultMealsPerDay
+        });
+
+        var normalizedWeekId = string.IsNullOrWhiteSpace(weekId) ? string.Empty : weekId.Trim();
+        if (normalizedWeekId.Length == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Saved week id was missing.");
+            return View("Index", BuildPageModel(currentRequest, returnUrl: resolvedReturnUrl));
+        }
+
+        var snapshots = TryReadSavedWeekState().ToList();
+        var removedCount = snapshots.RemoveAll(snapshot =>
+            snapshot.WeekId.Equals(normalizedWeekId, StringComparison.OrdinalIgnoreCase));
+        if (removedCount == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Saved week was not found.");
+        }
+
+        var persistedSnapshots = PersistSavedWeekStateSnapshots(snapshots);
+        return View(
+            "Index",
+            BuildPageModel(
+                currentRequest,
+                returnUrl: resolvedReturnUrl,
+                savedWeeks: BuildSavedWeekSummaries(persistedSnapshots)));
+    }
+
     [HttpGet("meal-images")]
     [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> MealImages([FromQuery] List<string>? mealNames, CancellationToken cancellationToken)
@@ -678,19 +818,242 @@ public class AislePilotController(
         AislePilotRequestModel request,
         AislePilotPlanResultViewModel? result = null,
         IReadOnlyList<AislePilotPantrySuggestionViewModel>? pantrySuggestions = null,
-        string returnUrl = "")
+        string returnUrl = "",
+        IReadOnlyList<AislePilotSavedWeekSummaryViewModel>? savedWeeks = null)
     {
         return new AislePilotPageViewModel
         {
             Request = request,
             ReturnUrl = returnUrl,
             Result = result,
+            SavedWeeks = savedWeeks ?? BuildSavedWeekSummaries(TryReadSavedWeekState()),
             PantrySuggestions = pantrySuggestions ?? [],
             SupermarketOptions = aislePilotService.GetSupportedSupermarkets(),
             PortionSizeOptions = aislePilotService.GetSupportedPortionSizes(),
             DietaryOptions = aislePilotService.GetSupportedDietaryModes(),
             MealImagePollingEnabled = aislePilotService.CanGenerateMealImages()
         };
+    }
+
+    private IReadOnlyList<AislePilotSavedWeekCookieModel> PersistSavedWeekState(
+        AislePilotRequestModel request,
+        IReadOnlyList<string> currentPlanMealNames,
+        string? weekLabel)
+    {
+        var normalizedMealNames = NormalizeCurrentPlanMealNames(currentPlanMealNames);
+        if (normalizedMealNames is null || normalizedMealNames.Count == 0)
+        {
+            return [];
+        }
+
+        var snapshots = TryReadSavedWeekState().ToList();
+        snapshots.RemoveAll(existing => AreEquivalentSelections(existing.CurrentPlanMealNames, normalizedMealNames));
+        snapshots.Insert(0, new AislePilotSavedWeekCookieModel
+        {
+            WeekId = Guid.NewGuid().ToString("N")[..10],
+            Label = BuildSavedWeekLabel(weekLabel),
+            SavedAtUtc = DateTimeOffset.UtcNow,
+            RequestSnapshot = BuildSavedWeekRequestSnapshot(request),
+            CurrentPlanMealNames = normalizedMealNames.ToList()
+        });
+
+        if (snapshots.Count > MaxSavedWeeks)
+        {
+            snapshots = snapshots.Take(MaxSavedWeeks).ToList();
+        }
+
+        return PersistSavedWeekStateSnapshots(snapshots);
+    }
+
+    private IReadOnlyList<AislePilotSavedWeekCookieModel> PersistSavedWeekStateSnapshots(
+        IReadOnlyList<AislePilotSavedWeekCookieModel> snapshots)
+    {
+        var normalizedSnapshots = snapshots
+            .Select(NormalizeSavedWeekSnapshot)
+            .Where(snapshot => snapshot is not null)
+            .Select(snapshot => snapshot!)
+            .Take(MaxSavedWeeks)
+            .ToList();
+        if (normalizedSnapshots.Count == 0)
+        {
+            Response.Cookies.Delete(SavedWeeksStateCookieName);
+            return [];
+        }
+
+        while (normalizedSnapshots.Count > 0)
+        {
+            var payload = JsonSerializer.Serialize(normalizedSnapshots, SetupStateJsonOptions);
+            if (payload.Length <= MaxSavedWeekCookiePayloadLength)
+            {
+                Response.Cookies.Append(
+                    SavedWeeksStateCookieName,
+                    payload,
+                    new CookieOptions
+                    {
+                        Expires = DateTimeOffset.UtcNow.AddDays(45),
+                        IsEssential = true,
+                        HttpOnly = true,
+                        SameSite = SameSiteMode.Lax,
+                        Secure = Request.IsHttps
+                    });
+                return normalizedSnapshots;
+            }
+
+            normalizedSnapshots.RemoveAt(normalizedSnapshots.Count - 1);
+        }
+
+        Response.Cookies.Delete(SavedWeeksStateCookieName);
+        return [];
+    }
+
+    private IReadOnlyList<AislePilotSavedWeekCookieModel> TryReadSavedWeekState()
+    {
+        if (!Request.Cookies.TryGetValue(SavedWeeksStateCookieName, out var payload) || string.IsNullOrWhiteSpace(payload))
+        {
+            return [];
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<List<AislePilotSavedWeekCookieModel>>(payload, SetupStateJsonOptions) ?? [];
+            var normalized = parsed
+                .Select(NormalizeSavedWeekSnapshot)
+                .Where(snapshot => snapshot is not null)
+                .Select(snapshot => snapshot!)
+                .OrderByDescending(snapshot => snapshot.SavedAtUtc)
+                .ToList();
+            return normalized;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static AislePilotSavedWeekCookieModel? NormalizeSavedWeekSnapshot(AislePilotSavedWeekCookieModel? snapshot)
+    {
+        if (snapshot is null)
+        {
+            return null;
+        }
+
+        var normalizedMealNames = NormalizeCurrentPlanMealNames(snapshot.CurrentPlanMealNames);
+        if (normalizedMealNames is null || normalizedMealNames.Count == 0)
+        {
+            return null;
+        }
+
+        var normalizedWeekId = string.IsNullOrWhiteSpace(snapshot.WeekId)
+            ? Guid.NewGuid().ToString("N")[..10]
+            : snapshot.WeekId.Trim();
+        var normalizedSavedAtUtc = snapshot.SavedAtUtc == default
+            ? DateTimeOffset.UtcNow
+            : snapshot.SavedAtUtc;
+
+        var requestSnapshot = NormalizeSavedWeekRequestSnapshot(snapshot.RequestSnapshot);
+
+        return new AislePilotSavedWeekCookieModel
+        {
+            WeekId = normalizedWeekId,
+            Label = BuildSavedWeekLabel(snapshot.Label),
+            SavedAtUtc = normalizedSavedAtUtc,
+            RequestSnapshot = requestSnapshot,
+            CurrentPlanMealNames = normalizedMealNames.ToList()
+        };
+    }
+
+    private static AislePilotSavedWeekRequestCookieModel BuildSavedWeekRequestSnapshot(AislePilotRequestModel request)
+    {
+        return NormalizeSavedWeekRequestSnapshot(new AislePilotSavedWeekRequestCookieModel
+        {
+            Supermarket = request.Supermarket,
+            WeeklyBudget = request.WeeklyBudget,
+            HouseholdSize = request.HouseholdSize,
+            CookDays = request.CookDays,
+            PlanDays = request.PlanDays,
+            MealsPerDay = request.MealsPerDay,
+            SelectedMealTypes = request.SelectedMealTypes.ToList(),
+            PortionSize = request.PortionSize,
+            DietaryModes = request.DietaryModes.ToList(),
+            DislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty,
+            CustomAisleOrder = request.CustomAisleOrder ?? string.Empty,
+            LeftoverCookDayIndexesCsv = request.LeftoverCookDayIndexesCsv ?? string.Empty,
+            IgnoredMealSlotIndexesCsv = request.IgnoredMealSlotIndexesCsv ?? string.Empty,
+            PreferQuickMeals = request.PreferQuickMeals,
+            IncludeSpecialTreatMeal = request.IncludeSpecialTreatMeal,
+            SelectedSpecialTreatCookDayIndex = request.SelectedSpecialTreatCookDayIndex,
+            IncludeDessertAddOn = request.IncludeDessertAddOn,
+            SelectedDessertAddOnName = request.SelectedDessertAddOnName ?? string.Empty
+        });
+    }
+
+    private static AislePilotSavedWeekRequestCookieModel NormalizeSavedWeekRequestSnapshot(
+        AislePilotSavedWeekRequestCookieModel? requestSnapshot)
+    {
+        var snapshot = requestSnapshot ?? new AislePilotSavedWeekRequestCookieModel();
+        snapshot.Supermarket = (snapshot.Supermarket ?? string.Empty).Trim();
+        snapshot.PortionSize = (snapshot.PortionSize ?? string.Empty).Trim();
+        snapshot.DislikesOrAllergens = Truncate((snapshot.DislikesOrAllergens ?? string.Empty).Trim(), 260);
+        snapshot.CustomAisleOrder = Truncate((snapshot.CustomAisleOrder ?? string.Empty).Trim(), 320);
+        snapshot.LeftoverCookDayIndexesCsv = Truncate((snapshot.LeftoverCookDayIndexesCsv ?? string.Empty).Trim(), 140);
+        snapshot.IgnoredMealSlotIndexesCsv = Truncate((snapshot.IgnoredMealSlotIndexesCsv ?? string.Empty).Trim(), 300);
+        snapshot.SelectedDessertAddOnName = Truncate((snapshot.SelectedDessertAddOnName ?? string.Empty).Trim(), 120);
+        snapshot.WeeklyBudget = Math.Clamp(snapshot.WeeklyBudget, 15m, 600m);
+        snapshot.HouseholdSize = Math.Clamp(snapshot.HouseholdSize, 1, 8);
+        snapshot.PlanDays = Math.Clamp(snapshot.PlanDays, 1, 7);
+        snapshot.CookDays = Math.Clamp(snapshot.CookDays, 1, snapshot.PlanDays);
+        snapshot.MealsPerDay = Math.Clamp(snapshot.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
+        snapshot.SelectedMealTypes = NormalizeSelectedMealTypes(snapshot.SelectedMealTypes).ToList();
+        snapshot.DietaryModes = (snapshot.DietaryModes ?? [])
+            .Where(mode => !string.IsNullOrWhiteSpace(mode))
+            .Select(mode => mode.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToList();
+        snapshot.SelectedSpecialTreatCookDayIndex = snapshot.SelectedSpecialTreatCookDayIndex.HasValue
+            ? Math.Clamp(snapshot.SelectedSpecialTreatCookDayIndex.Value, 0, 6)
+            : null;
+        return snapshot;
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return value[..maxLength];
+    }
+
+    private static string BuildSavedWeekLabel(string? requestedLabel)
+    {
+        var normalized = string.IsNullOrWhiteSpace(requestedLabel)
+            ? string.Empty
+            : requestedLabel.Trim();
+        if (normalized.Length > 0)
+        {
+            return Truncate(normalized, 42);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        return $"Week of {now:dd MMM yyyy}";
+    }
+
+    private static IReadOnlyList<AislePilotSavedWeekSummaryViewModel> BuildSavedWeekSummaries(
+        IReadOnlyList<AislePilotSavedWeekCookieModel> snapshots)
+    {
+        return snapshots
+            .Select(snapshot => new AislePilotSavedWeekSummaryViewModel
+            {
+                WeekId = snapshot.WeekId,
+                Label = snapshot.Label,
+                SavedAtUtc = snapshot.SavedAtUtc,
+                PlanDays = Math.Clamp(snapshot.RequestSnapshot.PlanDays, 1, 7),
+                MealCount = snapshot.CurrentPlanMealNames.Count,
+                Supermarket = snapshot.RequestSnapshot.Supermarket
+            })
+            .ToList();
     }
 
     private static void SyncRequestWithResult(AislePilotRequestModel request, AislePilotPlanResultViewModel result)
@@ -1755,6 +2118,62 @@ public class AislePilotController(
         }
 
         return normalized;
+    }
+
+    private sealed class AislePilotSavedWeekCookieModel
+    {
+        public string WeekId { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public DateTimeOffset SavedAtUtc { get; set; }
+        public AislePilotSavedWeekRequestCookieModel RequestSnapshot { get; set; } = new();
+        public List<string> CurrentPlanMealNames { get; set; } = [];
+
+        public AislePilotRequestModel ToRequestModel()
+        {
+            return new AislePilotRequestModel
+            {
+                Supermarket = RequestSnapshot.Supermarket,
+                WeeklyBudget = RequestSnapshot.WeeklyBudget,
+                HouseholdSize = RequestSnapshot.HouseholdSize,
+                CookDays = RequestSnapshot.CookDays,
+                PlanDays = RequestSnapshot.PlanDays,
+                MealsPerDay = RequestSnapshot.MealsPerDay,
+                SelectedMealTypes = RequestSnapshot.SelectedMealTypes.ToList(),
+                PortionSize = RequestSnapshot.PortionSize,
+                DietaryModes = RequestSnapshot.DietaryModes.ToList(),
+                DislikesOrAllergens = RequestSnapshot.DislikesOrAllergens,
+                CustomAisleOrder = RequestSnapshot.CustomAisleOrder,
+                LeftoverCookDayIndexesCsv = RequestSnapshot.LeftoverCookDayIndexesCsv,
+                IgnoredMealSlotIndexesCsv = RequestSnapshot.IgnoredMealSlotIndexesCsv,
+                PreferQuickMeals = RequestSnapshot.PreferQuickMeals,
+                IncludeSpecialTreatMeal = RequestSnapshot.IncludeSpecialTreatMeal,
+                SelectedSpecialTreatCookDayIndex = RequestSnapshot.SelectedSpecialTreatCookDayIndex,
+                IncludeDessertAddOn = RequestSnapshot.IncludeDessertAddOn,
+                SelectedDessertAddOnName = RequestSnapshot.SelectedDessertAddOnName
+            };
+        }
+    }
+
+    private sealed class AislePilotSavedWeekRequestCookieModel
+    {
+        public string Supermarket { get; set; } = "Tesco";
+        public decimal WeeklyBudget { get; set; } = 65m;
+        public int HouseholdSize { get; set; } = 2;
+        public int CookDays { get; set; } = 7;
+        public int PlanDays { get; set; } = 7;
+        public int MealsPerDay { get; set; } = 3;
+        public List<string> SelectedMealTypes { get; set; } = [];
+        public string PortionSize { get; set; } = "Medium";
+        public List<string> DietaryModes { get; set; } = [];
+        public string DislikesOrAllergens { get; set; } = string.Empty;
+        public string CustomAisleOrder { get; set; } = string.Empty;
+        public string LeftoverCookDayIndexesCsv { get; set; } = string.Empty;
+        public string IgnoredMealSlotIndexesCsv { get; set; } = string.Empty;
+        public bool PreferQuickMeals { get; set; } = true;
+        public bool IncludeSpecialTreatMeal { get; set; }
+        public int? SelectedSpecialTreatCookDayIndex { get; set; }
+        public bool IncludeDessertAddOn { get; set; }
+        public string SelectedDessertAddOnName { get; set; } = string.Empty;
     }
 
     private sealed class AislePilotSetupStateCookieModel

@@ -179,6 +179,25 @@
                             </span>
                         </button>
                     </form>
+                    <form method="post" action="@Url.Action("SaveWeek", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
+                        @Html.AntiForgeryToken()
+                        <partial name="_AislePilotHiddenRequestFields"
+                                 model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                        <button type="submit"
+                                class="aislepilot-overview-regenerate-btn"
+                                data-loading-label="Saving week...">
+                            <span class="aislepilot-btn-label">
+                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M5 4h11l3 3v13H5z"></path>
+                                        <path d="M8 4v6h8V4"></path>
+                                        <path d="M9 20v-6h6v6"></path>
+                                    </svg>
+                                </span>
+                                <span>Save week</span>
+                            </span>
+                        </button>
+                    </form>
                     <button
                         type="button"
                         class="aislepilot-edit-setup-btn"
@@ -237,6 +256,25 @@
                                         </svg>
                                     </span>
                                     <span>Refresh plan</span>
+                                </span>
+                            </button>
+                        </form>
+                        <form method="post" action="@Url.Action("SaveWeek", "AislePilot")#aislepilot-overview" class="aislepilot-overview-regenerate-form">
+                            @Html.AntiForgeryToken()
+                            <partial name="_AislePilotHiddenRequestFields"
+                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                            <button type="submit"
+                                    class="aislepilot-overview-regenerate-btn"
+                                    data-loading-label="Saving week...">
+                                <span class="aislepilot-btn-label">
+                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" focusable="false">
+                                            <path d="M5 4h11l3 3v13H5z"></path>
+                                            <path d="M8 4v6h8V4"></path>
+                                            <path d="M9 20v-6h6v6"></path>
+                                        </svg>
+                                    </span>
+                                    <span>Save week</span>
                                 </span>
                             </button>
                         </form>

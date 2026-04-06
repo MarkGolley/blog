@@ -1238,14 +1238,6 @@
             const itemWithError = planBasicItems.find(item => hasValidationError(item));
             if (itemWithError instanceof HTMLDetailsElement) {
                 openOnlyItem(itemWithError);
-            } else {
-                const firstIncompleteItem = planBasicItems.find(item => !isComplete(item));
-                const initialItem = firstIncompleteItem instanceof HTMLDetailsElement
-                    ? firstIncompleteItem
-                    : planBasicItems[0];
-                if (initialItem instanceof HTMLDetailsElement) {
-                    openOnlyItem(initialItem);
-                }
             }
 
             if (form.dataset.planBasicScrollWired !== "true") {
@@ -2201,11 +2193,109 @@
 
     const root = document.querySelector("[data-aislepilot-window]");
     if (!root) {
+        const savedWeeksPanel = document.querySelector("[data-saved-weeks-panel]");
+        const savedWeeksToggleButtons = Array.from(document.querySelectorAll("[data-saved-weeks-toggle]"));
+        const headMenus = Array.from(document.querySelectorAll("[data-head-menu]"));
+
+        const syncSavedWeeksToggleStateWithoutWindow = () => {
+            if (!(savedWeeksPanel instanceof HTMLElement)) {
+                return;
+            }
+
+            const isHidden = savedWeeksPanel.hasAttribute("hidden");
+            savedWeeksToggleButtons.forEach(button => {
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                const visibleLabel = button.querySelector("[data-saved-weeks-toggle-label]");
+                const collapsedLabel = button.dataset.savedWeeksToggleCollapsedLabel || "Saved weeks";
+                const expandedLabel = button.dataset.savedWeeksToggleExpandedLabel || "Hide saved weeks";
+                const nextLabel = isHidden ? collapsedLabel : expandedLabel;
+                if (visibleLabel instanceof HTMLElement) {
+                    visibleLabel.textContent = nextLabel;
+                }
+
+                button.setAttribute("aria-expanded", isHidden ? "false" : "true");
+                button.setAttribute("aria-label", nextLabel);
+                if (button.hasAttribute("title")) {
+                    button.setAttribute("title", nextLabel);
+                }
+            });
+        };
+
+        const closeOpenHeadMenusWithoutWindow = () => {
+            headMenus.forEach(menu => {
+                if (menu instanceof HTMLDetailsElement && menu.open) {
+                    menu.open = false;
+                }
+            });
+        };
+
+        savedWeeksToggleButtons.forEach(button => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            button.addEventListener("click", () => {
+                if (!(savedWeeksPanel instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (savedWeeksPanel.hasAttribute("hidden")) {
+                    savedWeeksPanel.removeAttribute("hidden");
+                    savedWeeksPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else {
+                    savedWeeksPanel.setAttribute("hidden", "hidden");
+                }
+
+                const headMenu = button.closest("[data-head-menu]");
+                if (headMenu instanceof HTMLDetailsElement) {
+                    headMenu.open = false;
+                }
+
+                syncSavedWeeksToggleStateWithoutWindow();
+            });
+        });
+
+        headMenus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement)) {
+                return;
+            }
+
+            menu.addEventListener("toggle", () => {
+                const trigger = menu.querySelector("summary");
+                if (trigger instanceof HTMLElement) {
+                    trigger.setAttribute("aria-expanded", menu.open ? "true" : "false");
+                }
+            });
+        });
+
+        document.addEventListener("click", event => {
+            if (!(event.target instanceof Element)) {
+                return;
+            }
+
+            if (event.target.closest("[data-head-menu]")) {
+                return;
+            }
+
+            closeOpenHeadMenusWithoutWindow();
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                closeOpenHeadMenusWithoutWindow();
+            }
+        });
+
+        syncSavedWeeksToggleStateWithoutWindow();
         clearRestorePending();
         return;
     }
 
     const setupPanel = document.querySelector("[data-setup-panel]");
+    const savedWeeksPanel = document.querySelector("[data-saved-weeks-panel]");
     const getOverviewContent = () => document.querySelector("[data-overview-content]");
 
     const viewport = root.querySelector("[data-window-viewport]");
@@ -2433,6 +2523,7 @@
 
     const getSetupToggleButtons = () => Array.from(document.querySelectorAll("[data-setup-toggle]"));
     const getOverviewToggleButtons = () => Array.from(document.querySelectorAll("[data-overview-toggle]"));
+    const getSavedWeeksToggleButtons = () => Array.from(document.querySelectorAll("[data-saved-weeks-toggle]"));
 
     const syncOverviewToggleState = () => {
         const overviewContent = getOverviewContent();
@@ -2525,6 +2616,51 @@
         });
     };
 
+    const syncSavedWeeksToggleState = () => {
+        if (!(savedWeeksPanel instanceof HTMLElement)) {
+            return;
+        }
+
+        const savedWeeksToggleButtons = getSavedWeeksToggleButtons();
+        if (savedWeeksToggleButtons.length === 0) {
+            return;
+        }
+
+        const isHidden = savedWeeksPanel.hasAttribute("hidden");
+        savedWeeksToggleButtons.forEach(button => {
+            const srOnlyLabel = button.querySelector(".sr-only");
+            const visibleLabel = button.querySelector("[data-saved-weeks-toggle-label]");
+            const collapsedLabel = button.dataset.savedWeeksToggleCollapsedLabel
+                || srOnlyLabel?.textContent?.trim()
+                || button.getAttribute("aria-label")
+                || button.textContent?.trim()
+                || "My weeks";
+            const expandedLabel = button.dataset.savedWeeksToggleExpandedLabel || "Hide weeks";
+            const nextLabel = isHidden ? collapsedLabel : expandedLabel;
+
+            button.dataset.savedWeeksToggleCollapsedLabel = collapsedLabel;
+            button.dataset.savedWeeksToggleExpandedLabel = expandedLabel;
+
+            if (srOnlyLabel) {
+                srOnlyLabel.textContent = nextLabel;
+            }
+
+            if (visibleLabel instanceof HTMLElement) {
+                visibleLabel.textContent = nextLabel;
+            }
+
+            if (!srOnlyLabel && !(visibleLabel instanceof HTMLElement)) {
+                button.textContent = nextLabel;
+            }
+
+            button.setAttribute("aria-label", nextLabel);
+            if (button.hasAttribute("title")) {
+                button.setAttribute("title", nextLabel);
+            }
+            button.setAttribute("aria-expanded", isHidden ? "false" : "true");
+        });
+    };
+
     const wireSetupToggleHandlers = scope => {
         const setupToggleButtons = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-setup-toggle]"))
@@ -2578,6 +2714,39 @@
                 }
 
                 syncOverviewToggleState();
+            });
+        });
+    };
+
+    const wireSavedWeeksToggleHandlers = scope => {
+        const savedWeeksToggleButtons = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-saved-weeks-toggle]"))
+            : getSavedWeeksToggleButtons();
+
+        savedWeeksToggleButtons.forEach(button => {
+            if (!(button instanceof HTMLButtonElement) || button.dataset.savedWeeksToggleWired === "true") {
+                return;
+            }
+
+            button.dataset.savedWeeksToggleWired = "true";
+            button.addEventListener("click", () => {
+                if (!(savedWeeksPanel instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (savedWeeksPanel.hasAttribute("hidden")) {
+                    savedWeeksPanel.removeAttribute("hidden");
+                    savedWeeksPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else {
+                    savedWeeksPanel.setAttribute("hidden", "hidden");
+                }
+
+                const headMenu = button.closest("[data-head-menu]");
+                if (headMenu instanceof HTMLDetailsElement) {
+                    headMenu.open = false;
+                }
+
+                syncSavedWeeksToggleState();
             });
         });
     };
@@ -3303,6 +3472,68 @@
 
     let cardMoreActionsGlobalWired = false;
 
+    let headMenuGlobalWired = false;
+
+    const closeOpenHeadMenus = except => {
+        const openMenus = Array.from(document.querySelectorAll("[data-head-menu][open]"));
+        openMenus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement) || menu === except) {
+                return;
+            }
+
+            menu.open = false;
+        });
+    };
+
+    const wireHeadMenus = scope => {
+        const menus = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-head-menu]"))
+            : Array.from(document.querySelectorAll("[data-head-menu]"));
+
+        menus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement) || menu.dataset.headMenuWired === "true") {
+                return;
+            }
+
+            menu.dataset.headMenuWired = "true";
+            menu.addEventListener("toggle", () => {
+                const trigger = menu.querySelector("summary");
+                if (trigger instanceof HTMLElement) {
+                    trigger.setAttribute("aria-expanded", menu.open ? "true" : "false");
+                }
+
+                if (!menu.open) {
+                    return;
+                }
+
+                closeOpenHeadMenus(menu);
+            });
+        });
+
+        if (headMenuGlobalWired) {
+            return;
+        }
+
+        headMenuGlobalWired = true;
+        document.addEventListener("click", event => {
+            if (!(event.target instanceof Element)) {
+                return;
+            }
+
+            if (event.target.closest("[data-head-menu]")) {
+                return;
+            }
+
+            closeOpenHeadMenus(null);
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                closeOpenHeadMenus(null);
+            }
+        });
+    };
+
     const closeOpenCardMoreActions = except => {
         const openMenus = Array.from(document.querySelectorAll("[data-card-more-actions][open]"));
         openMenus.forEach(menu => {
@@ -3977,6 +4208,7 @@
         startMealImagePolling();
         syncSetupToggleState();
         syncOverviewToggleState();
+        syncSavedWeeksToggleState();
         observeActivePanelHeight();
         updateViewportHeight(true);
         return true;
@@ -4230,6 +4462,8 @@
     const wireCardInteractionModules = scope => {
         wireSetupToggleHandlers(scope);
         wireOverviewToggleHandlers(scope);
+        wireSavedWeeksToggleHandlers(scope);
+        wireHeadMenus(scope);
         wireOverviewActionsMenus(scope);
         wirePreserveScrollHandlers(scope);
         wireLeftoverPlanner(scope);
@@ -4332,6 +4566,7 @@
     updateViewportHeight(false);
     syncSetupToggleState();
     syncOverviewToggleState();
+    syncSavedWeeksToggleState();
     const restored = restoreSwapScrollPosition();
     if (!restored) {
         clearRestorePending();
