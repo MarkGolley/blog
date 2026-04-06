@@ -402,6 +402,83 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void SelectCandidateForSlot_WhenBreakfastCapIsExhausted_DoesNotCollapseToSingleMeal()
+    {
+        var seedMealTemplate = GetMealTemplateSeed();
+        var templates = CreateMealTemplatesFromSeed(
+            seedMealTemplate,
+            ["Breakfast option alpha", "Breakfast option beta", "Lunch option steady", "Dinner option steady"]);
+        var breakfastAlpha = templates[0];
+        var breakfastBeta = templates[1];
+        var lunchSteady = templates[2];
+        var dinnerSteady = templates[3];
+
+        var selectMethod = typeof(AislePilotService).GetMethod("SelectCandidateForSlot", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(selectMethod);
+
+        var mealType = seedMealTemplate.GetType();
+        var mealListType = typeof(List<>).MakeGenericType(mealType);
+        var selectedMeals = Activator.CreateInstance(mealListType) as IList;
+        Assert.NotNull(selectedMeals);
+
+        var slotPattern = new List<string> { "Breakfast", "Lunch", "Dinner" };
+        const int totalSlotCount = 21;
+        for (var slotIndex = 0; slotIndex < totalSlotCount; slotIndex++)
+        {
+            var slotMealType = slotPattern[slotIndex % slotPattern.Count];
+            var slotCompatibleCandidates = Activator.CreateInstance(mealListType) as IList;
+            Assert.NotNull(slotCompatibleCandidates);
+
+            if (slotMealType.Equals("Breakfast", StringComparison.OrdinalIgnoreCase))
+            {
+                slotCompatibleCandidates!.Add(breakfastAlpha);
+                slotCompatibleCandidates.Add(breakfastBeta);
+            }
+            else if (slotMealType.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+            {
+                slotCompatibleCandidates!.Add(lunchSteady);
+            }
+            else
+            {
+                slotCompatibleCandidates!.Add(dinnerSteady);
+            }
+
+            var chosen = selectMethod!.Invoke(
+                null,
+                [slotCompatibleCandidates, selectedMeals, slotPattern, slotIndex, totalSlotCount, null, false]);
+            Assert.NotNull(chosen);
+            selectedMeals!.Add(chosen!);
+        }
+
+        var nameProperty = mealType.GetProperty("Name");
+        Assert.NotNull(nameProperty);
+
+        var breakfastMeals = new List<string>();
+        for (var index = 0; index < selectedMeals!.Count; index++)
+        {
+            if (!slotPattern[index % slotPattern.Count].Equals("Breakfast", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var mealName = nameProperty!.GetValue(selectedMeals[index]) as string;
+            Assert.False(string.IsNullOrWhiteSpace(mealName));
+            breakfastMeals.Add(mealName!);
+        }
+
+        var maxBreakfastRepeatCount = breakfastMeals
+            .GroupBy(mealName => mealName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Count())
+            .DefaultIfEmpty(0)
+            .Max();
+
+        Assert.Equal(7, breakfastMeals.Count);
+        Assert.True(
+            maxBreakfastRepeatCount <= 4,
+            $"Expected breakfast repeats to distribute across available options, but found a repeat count of {maxBreakfastRepeatCount}.");
+    }
+
+    [Fact]
     public void BuildPlan_WithSavedMealRepeatsEnabled_PrefersSavedMealInWeeklyPlan()
     {
         const string savedMealName = "Greek yogurt berry oat pots";

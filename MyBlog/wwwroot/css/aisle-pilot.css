@@ -1,3 +1,7 @@
+html {
+    scroll-behavior: auto;
+}
+
 .aislepilot-app {
     --ap-space-1: 0.5rem;
     --ap-space-2: 0.82rem;
@@ -9,6 +13,7 @@
     --ap-radius-pill: 999px;
     --ap-control-height: 2.5rem;
     --ap-control-height-lg: 2.75rem;
+    --ap-control-height-touch: 2.75rem;
     --ap-elevated-surface: rgba(255, 255, 255, 0.98);
     --ap-border-soft: rgba(16, 63, 101, 0.16);
     --ap-border-strong: rgba(16, 63, 101, 0.22);
@@ -18,15 +23,28 @@
     --ap-focus-ring-color: rgba(11, 92, 142, 0.55);
     --ap-focus-ring: 0 0 0 3px var(--ap-focus-ring-color);
     --ap-section-title-size: clamp(1.12rem, 1.9vw, 1.34rem);
-    --ap-overview-button-size: 2.35rem;
+    --ap-overview-button-size: 2.75rem;
+    --ap-overview-toggle-size: 1.7rem;
     --ap-swap-overlay-cycle: 1.35s;
     --ap-swap-grid-in-duration: 0.34s;
     --ap-swap-card-in-duration: 0.46s;
+    --ap-shell-header-offset: 0px;
+    --ap-mobile-context-gap: 0.38rem;
+    --ap-mobile-context-top: calc(
+        env(safe-area-inset-top, 0px) +
+        var(--ap-shell-header-offset) +
+        var(--ap-mobile-context-gap)
+    );
+    --ap-section-scroll-margin-top: clamp(7rem, 12vh, 9rem);
     width: min(100%, 58rem);
     margin-inline: auto;
     display: grid;
     gap: var(--ap-space-3);
     padding-bottom: 1.5rem;
+}
+
+.app-shell-main.aislepilot-main.container {
+    width: min(84rem, 100% - 2.2rem);
 }
 
 .aislepilot-layout {
@@ -128,6 +146,21 @@ html.aislepilot-restore-pending .aislepilot-app {
     justify-content: space-between;
     gap: 0.62rem;
     flex-wrap: wrap;
+}
+
+.aislepilot-app-head.is-compact .aislepilot-app-head-intro {
+    display: grid;
+    gap: 0.18rem;
+}
+
+.aislepilot-app-head.is-compact .aislepilot-app-title {
+    margin-top: 0;
+    font-size: clamp(1.05rem, 2.1vw, 1.32rem);
+}
+
+.aislepilot-app-head.is-compact .aislepilot-app-subtitle {
+    margin-top: 0;
+    font-size: 0.9rem;
 }
 
 .aislepilot-app-head.is-compact .hero-actions {
@@ -316,51 +349,6 @@ html.aislepilot-restore-pending .aislepilot-app {
     stroke-linejoin: round;
 }
 
-.aislepilot-window-tab.is-icon-only,
-.aislepilot-overview-regenerate-btn.is-icon-only,
-.aislepilot-overview-toggle-btn.is-icon-only,
-.aislepilot-edit-setup-btn.is-icon-only {
-    padding: 0.36rem !important;
-}
-
-.aislepilot-overview-regenerate-btn.is-icon-only,
-.aislepilot-overview-toggle-btn.is-icon-only,
-.aislepilot-edit-setup-btn.is-icon-only {
-    width: 2.75rem !important;
-    min-width: 2.75rem !important;
-    justify-content: center !important;
-}
-
-.aislepilot-window-tab.is-icon-only .aislepilot-tab-label,
-.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-btn-label,
-.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-btn-label,
-.aislepilot-edit-setup-btn.is-icon-only .aislepilot-btn-label {
-    gap: 0;
-}
-
-.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-btn-label,
-.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-btn-label,
-.aislepilot-edit-setup-btn.is-icon-only .aislepilot-btn-label {
-    font-size: 0 !important;
-}
-
-.aislepilot-window-tab.is-icon-only .aislepilot-symbol-glyph,
-.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-symbol-glyph,
-.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-symbol-glyph,
-.aislepilot-edit-setup-btn.is-icon-only .aislepilot-symbol-glyph {
-    width: 1.42rem;
-    height: 1.42rem;
-}
-
-.aislepilot-window-tab.is-icon-only .aislepilot-symbol-glyph svg,
-.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-symbol-glyph svg,
-.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-symbol-glyph svg,
-.aislepilot-edit-setup-btn.is-icon-only .aislepilot-symbol-glyph svg {
-    width: 0.96rem;
-    height: 0.96rem;
-    stroke-width: 2.15;
-}
-
 .aislepilot-window-shell {
     display: grid;
     gap: 0.62rem;
@@ -412,22 +400,22 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-window-tab {
     width: 100%;
-    min-height: var(--ap-control-height-lg) !important;
-    border: 1px solid rgba(16, 63, 101, 0.16) !important;
-    border-radius: var(--ap-radius-pill) !important;
-    background: rgba(255, 255, 255, 0.96) !important;
-    color: var(--ink-soft) !important;
-    box-shadow: none !important;
-    padding: 0.42rem 0.72rem !important;
-    font-size: 0.92rem !important;
-    font-weight: 700 !important;
+    min-height: var(--ap-control-height-lg);
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: var(--ap-radius-pill);
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--ink-soft);
+    box-shadow: none;
+    padding: 0.42rem 0.72rem;
+    font-size: 0.92rem;
+    font-weight: 700;
     white-space: nowrap;
     opacity: 0.86;
     transition: transform 0.14s ease, background 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease, color 0.14s ease;
 }
 
 .aislepilot-window-tab:hover {
-    background: rgba(255, 255, 255, 1) !important;
+    background: rgba(255, 255, 255, 1);
     opacity: 0.95;
 }
 
@@ -438,18 +426,33 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-window-tab.is-active,
 .aislepilot-window-tab[aria-selected="true"],
 .aislepilot-window-tab[aria-current="page"] {
-    border: none !important;
-    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
-    color: #fff !important;
-    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14), 0 0 0 1px rgba(16, 63, 101, 0.18) !important;
+    border: none;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14), 0 0 0 1px rgba(16, 63, 101, 0.18);
     opacity: 1;
     transform: translateY(-1px);
 }
 
 .aislepilot-window-tab .aislepilot-tab-label {
     gap: 0.26rem;
-    font-size: 0.84rem;
+    font-size: 0.88rem;
     letter-spacing: 0.01em;
+}
+
+.aislepilot-tab-text {
+    font-size: 0.84rem;
+    line-height: 1.1;
+}
+
+.aislepilot-window-tab .aislepilot-symbol-glyph {
+    width: 1.08rem;
+    height: 1.08rem;
+}
+
+.aislepilot-window-tab .aislepilot-symbol-glyph svg {
+    width: 0.72rem;
+    height: 0.72rem;
 }
 
 .aislepilot-window-tab.is-active .aislepilot-symbol-glyph,
@@ -694,7 +697,17 @@ html.aislepilot-restore-pending .aislepilot-app {
 #aislepilot-meals,
 #aislepilot-shop,
 #aislepilot-export {
-    scroll-margin-top: clamp(7rem, 12vh, 9rem);
+    scroll-margin-top: var(--ap-section-scroll-margin-top);
+}
+
+#aislepilot-overview {
+    position: relative;
+    z-index: 1;
+    overflow: visible;
+}
+
+#aislepilot-overview.is-actions-menu-open {
+    z-index: 60;
 }
 
 .aislepilot-section-title {
@@ -723,7 +736,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-overview-title-row {
     display: inline-flex;
     align-items: center;
-    gap: 0.24rem;
+    gap: 0.14rem;
     min-width: 0;
 }
 
@@ -768,11 +781,116 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-overview-actions {
     display: inline-flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-end;
     margin-left: auto;
-    gap: 0.24rem;
+    gap: 0.32rem;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.aislepilot-overview-actions-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32rem;
+    min-width: 0;
+}
+
+.aislepilot-overview-actions .aislepilot-btn-label > span:not(.aislepilot-symbol-glyph) {
+    white-space: nowrap;
+}
+
+.aislepilot-overview-actions-dropdown {
+    display: none;
+    margin: 0;
+    position: relative;
+    z-index: 20;
+}
+
+.aislepilot-overview-actions-dropdown > summary {
+    list-style: none;
+}
+
+.aislepilot-overview-actions-dropdown > summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-overview-actions-trigger {
+    min-height: var(--ap-overview-button-size);
+    min-width: var(--ap-overview-button-size);
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: var(--ap-radius-pill);
+    background: rgba(255, 255, 255, 0.98);
+    color: var(--brand-deep);
+    box-shadow: none;
+    padding: 0.26rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.aislepilot-overview-actions-trigger .aislepilot-btn-label {
+    gap: 0;
+}
+
+.aislepilot-overview-actions-trigger .aislepilot-symbol-glyph {
+    width: 1.08rem;
+    height: 1.08rem;
+    border: none;
+    background: transparent;
+    color: currentColor;
+}
+
+.aislepilot-overview-actions-trigger .aislepilot-symbol-glyph svg {
+    width: 0.92rem;
+    height: 0.92rem;
+    stroke-width: 2.2;
+}
+
+.aislepilot-overview-actions-dropdown[open] > .aislepilot-overview-actions-trigger {
+    filter: brightness(1.02);
+}
+
+.aislepilot-overview-actions-dropdown[open] {
+    z-index: 42;
+}
+
+.aislepilot-overview-actions-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.34rem);
+    z-index: 43;
+    min-width: 10.4rem;
+    width: max-content;
+    max-width: min(88vw, 13rem);
+    padding: 0.36rem;
+    border: 1px solid var(--ap-border-strong);
+    border-radius: var(--ap-radius-soft);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(245, 251, 255, 0.97));
+    box-shadow: 0 14px 24px rgba(11, 24, 42, 0.14);
+    display: grid;
+    gap: 0.28rem;
+}
+
+.aislepilot-overview-actions-dropdown.is-align-left .aislepilot-overview-actions-menu {
+    right: auto;
+    left: 0;
+}
+
+.aislepilot-overview-actions-menu .aislepilot-overview-regenerate-form {
+    width: 100%;
+}
+
+.aislepilot-overview-actions-menu .aislepilot-overview-regenerate-btn,
+.aislepilot-overview-actions-menu .aislepilot-edit-setup-btn {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+.aislepilot-overview-actions-menu .aislepilot-btn-label {
+    justify-content: flex-start;
 }
 
 .aislepilot-overview-regenerate-form {
@@ -808,20 +926,20 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-radius: var(--ap-radius-pill) !important;
     background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
     color: #fff !important;
-    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
-    padding: 0.3rem 0.62rem !important;
-    font-size: 0.9rem !important;
+    box-shadow: 0 8px 14px rgba(11, 24, 42, 0.12) !important;
+    padding: 0.28rem 0.68rem !important;
+    font-size: 0.88rem !important;
     font-weight: 700 !important;
 }
 
 .aislepilot-overview-toggle-btn {
-    min-height: var(--ap-overview-button-size) !important;
+    min-height: var(--ap-overview-toggle-size) !important;
     border: none !important;
-    border-radius: var(--ap-radius-pill) !important;
+    border-radius: 10px !important;
     background: transparent !important;
     color: var(--ink-soft) !important;
     box-shadow: none !important;
-    padding: 0.24rem !important;
+    padding: 0.08rem !important;
 }
 
 .aislepilot-overview-toggle-btn .aislepilot-symbol-glyph {
@@ -844,35 +962,38 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-edit-setup-btn {
     min-height: var(--ap-overview-button-size) !important;
-    border: none !important;
+    border: 1px solid rgba(16, 63, 101, 0.24) !important;
     border-radius: var(--ap-radius-pill) !important;
-    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
-    color: #fff !important;
-    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.14) !important;
-    padding: 0.3rem 0.62rem !important;
-    font-size: 0.9rem !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    color: var(--brand-deep) !important;
+    box-shadow: none !important;
+    padding: 0.28rem 0.68rem !important;
+    font-size: 0.88rem !important;
     font-weight: 700 !important;
 }
 
-.aislepilot-overview-regenerate-btn.is-icon-only,
-.aislepilot-overview-toggle-btn.is-icon-only,
-.aislepilot-edit-setup-btn.is-icon-only {
-    width: var(--ap-overview-button-size) !important;
-    min-width: var(--ap-overview-button-size) !important;
+.aislepilot-edit-setup-btn .aislepilot-symbol-glyph {
+    border-color: rgba(16, 63, 101, 0.3);
+    background: rgba(16, 63, 101, 0.1);
+    color: var(--brand-deep);
 }
 
-.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-symbol-glyph,
-.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-symbol-glyph,
-.aislepilot-edit-setup-btn.is-icon-only .aislepilot-symbol-glyph {
-    width: 1.26rem;
-    height: 1.26rem;
+.aislepilot-overview-toggle-btn.is-icon-only {
+    padding: 0.08rem !important;
+    width: var(--ap-overview-toggle-size) !important;
+    min-width: var(--ap-overview-toggle-size) !important;
+    min-height: var(--ap-overview-toggle-size) !important;
+    justify-content: center !important;
 }
 
-.aislepilot-overview-regenerate-btn.is-icon-only .aislepilot-symbol-glyph svg,
-.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-symbol-glyph svg,
-.aislepilot-edit-setup-btn.is-icon-only .aislepilot-symbol-glyph svg {
-    width: 0.84rem;
-    height: 0.84rem;
+.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-symbol-glyph {
+    width: 0.92rem;
+    height: 0.92rem;
+}
+
+.aislepilot-overview-toggle-btn.is-icon-only .aislepilot-symbol-glyph svg {
+    width: 0.76rem;
+    height: 0.76rem;
 }
 
 .aislepilot-form {
@@ -900,6 +1021,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     display: grid;
     gap: 0.36rem;
     margin: 0.12rem 0 0.62rem;
+    position: relative;
+    z-index: 0;
 }
 
 .aislepilot-planner-settings-title {
@@ -927,7 +1050,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.48rem 2rem 0.5rem 0.68rem;
+    padding: 0.56rem 2rem 0.58rem 0.72rem;
     cursor: pointer;
     min-width: 0;
 }
@@ -954,7 +1077,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-collapsible-title {
-    font-size: 0.79rem;
+    font-size: 0.88rem;
     font-weight: 700;
     color: var(--brand-deep);
     line-height: 1.25;
@@ -967,13 +1090,18 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-collapsible-value {
     margin-left: auto;
     max-width: min(70%, 28rem);
-    font-size: 0.74rem;
+    font-size: 0.81rem;
     font-weight: 600;
     color: var(--ink-soft);
-    line-height: 1.25;
+    line-height: 1.3;
     text-align: right;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
     overflow: hidden;
+    overflow-wrap: anywhere;
     text-overflow: ellipsis;
 }
 
@@ -981,7 +1109,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: 0;
     border-top: 1px solid rgba(16, 63, 101, 0.16);
     border-radius: 0;
-    padding: 0.58rem 0.68rem 0.62rem;
+    padding: 0.68rem 0.72rem 0.74rem;
     background: rgba(247, 251, 255, 0.95);
 }
 
@@ -998,7 +1126,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: var(--ink) !important;
     box-shadow: none !important;
     padding: 0.42rem 0.72rem !important;
-    font-size: 0.86rem !important;
+    font-size: 0.9rem !important;
     font-weight: 700 !important;
     transition: background 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
@@ -1023,7 +1151,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-setup-mode-toggle-note {
     display: block;
     color: var(--ink-soft);
-    font-size: 0.76rem;
+    font-size: 0.82rem;
     font-weight: 600;
     line-height: 1.2;
     opacity: 0.9;
@@ -1050,6 +1178,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: linear-gradient(150deg, rgba(247, 251, 255, 0.94), rgba(255, 255, 255, 0.97));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
     animation: aislepilot-setup-mode-enter 0.2s ease;
+    position: relative;
+    z-index: 1;
 }
 
 .aislepilot-setup-mode.is-secondary {
@@ -1285,6 +1415,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     max-width: 22rem;
     margin-inline: 0;
     width: 100%;
+    position: relative;
+    z-index: 2;
 }
 
 .aislepilot-generator-submit-actions {
@@ -1301,7 +1433,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-field-chip > label {
     margin: 0;
-    font-size: 0.66rem;
+    font-size: 0.72rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--ink-soft);
@@ -1739,7 +1871,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: var(--ink-soft) !important;
     box-shadow: none !important;
     padding: 0.2rem 0.6rem !important;
-    font-size: 0.78rem !important;
+    font-size: 0.84rem !important;
     font-weight: 700 !important;
     letter-spacing: 0.01em;
 }
@@ -1822,7 +1954,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-slider-hint {
-    font-size: 0.66rem;
+    font-size: 0.74rem;
     color: var(--ink-soft);
     white-space: nowrap;
     opacity: 0.9;
@@ -2118,7 +2250,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-stat-label {
     margin: 0;
-    font-size: 0.66rem;
+    font-size: 0.72rem;
     color: var(--ink-soft);
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -2306,7 +2438,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: 1px solid rgba(16, 63, 101, 0.25);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.88);
-    font-size: 0.62rem;
+    font-size: 0.7rem;
     line-height: 1.15;
     letter-spacing: 0.02em;
     font-weight: 700;
@@ -2445,14 +2577,25 @@ html.aislepilot-restore-pending .aislepilot-app {
     box-shadow: none;
 }
 
+.aislepilot-day-card-leftover-controls.is-menu-only {
+    display: none;
+}
+
 .aislepilot-day-card-leftover-controls .aislepilot-leftover-step-btn {
-    width: 1.42rem;
-    min-width: 1.42rem;
+    width: 1.34rem;
+    min-width: 1.34rem;
+    height: 1.34rem;
     padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     text-align: center;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.98);
+    font-size: 0.9rem;
+    line-height: 1;
+    box-shadow: none;
 }
 
 .aislepilot-day-card-leftover-controls.is-leftover-locked {
@@ -2463,6 +2606,11 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: none;
     background: transparent;
     box-shadow: none;
+}
+
+.aislepilot-day-card-leftover-controls.is-leftover-source .aislepilot-leftover-step-btn {
+    border-color: rgba(16, 63, 101, 0.32);
+    background: rgba(248, 252, 255, 0.96);
 }
 
 .aislepilot-card-head-with-title {
@@ -2482,7 +2630,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-day-card-meta {
     margin: 0;
     color: var(--ink-soft);
-    font-size: 0.72rem;
+    font-size: 0.76rem;
     font-weight: 700;
     letter-spacing: 0.03em;
     text-transform: uppercase;
@@ -2490,7 +2638,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-day-card-meta[data-day-card-summary] {
     color: var(--brand-deep);
-    font-size: 0.78rem;
+    font-size: 0.84rem;
     letter-spacing: 0;
     text-transform: none;
     white-space: nowrap;
@@ -2726,7 +2874,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-radius: 999px;
     background: rgba(248, 251, 255, 0.96);
     color: var(--ink-soft);
-    font-size: 0.73rem;
+    font-size: 0.8rem;
     font-weight: 600;
     line-height: 1.2;
     max-width: 100%;
@@ -2771,9 +2919,9 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: rgba(255, 255, 255, 0.97);
     box-shadow: none;
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 0.86rem;
     font-weight: 700;
-    color: var(--brand-deep) !important;
+    color: var(--brand-deep);
     list-style: none;
     margin-right: 0;
 }
@@ -2794,7 +2942,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     border-radius: 12px;
     background: transparent;
     box-shadow: none;
-    color: inherit !important;
+    color: inherit;
     cursor: pointer;
     list-style: none;
 }
@@ -2843,29 +2991,33 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin: 0;
 }
 
-.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only {
-    width: 2.02rem;
-    min-width: 2.02rem;
-    min-height: 2.02rem;
-    padding: 0;
-    border: none;
-    background: transparent;
-    box-shadow: none;
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger {
+    min-height: 2.3rem;
+    min-width: 2.3rem;
+    padding: 0.22rem;
+    border-color: rgba(16, 63, 101, 0.22);
+    background: rgba(255, 255, 255, 0.98);
+    justify-content: center;
+    gap: 0;
 }
 
-.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only .aislepilot-symbol-glyph {
-    width: 1.32rem;
-    height: 1.32rem;
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger .aislepilot-symbol-glyph {
+    width: 1.18rem;
+    height: 1.18rem;
     border-color: rgba(16, 63, 101, 0.26);
     background: rgba(16, 63, 101, 0.08);
     color: var(--brand-deep);
 }
 
-.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only:hover {
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger .aislepilot-swap-action-label {
+    display: none;
+}
+
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger:hover {
     filter: none;
 }
 
-.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only:hover .aislepilot-symbol-glyph {
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger:hover .aislepilot-symbol-glyph {
     background: rgba(16, 63, 101, 0.14);
 }
 
@@ -2878,8 +3030,9 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 .aislepilot-meal-details > summary.is-icon-only {
-    width: 1.9rem;
-    min-width: 1.9rem;
+    width: 2.25rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
     padding: 0;
     line-height: 1;
 }
@@ -2965,7 +3118,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: var(--ap-control-height);
+    min-height: var(--ap-control-height-touch);
     border-radius: var(--ap-radius-pill);
     border: 1px solid rgba(16, 63, 101, 0.2);
     background: linear-gradient(110deg, #eef3f8 0%, #dbe7f2 100%);
@@ -2975,7 +3128,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     list-style: none;
     line-height: 1.1;
     padding: 0.34rem 0.72rem;
-    font-size: 0.84rem;
+    font-size: 0.9rem;
     font-weight: 700;
 }
 
@@ -2998,8 +3151,9 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-swap-btn.is-icon-only,
 .aislepilot-more-actions-trigger.is-icon-only {
-    width: 2.2rem;
-    min-width: 2.2rem;
+    width: var(--ap-control-height-touch);
+    min-width: var(--ap-control-height-touch);
+    min-height: var(--ap-control-height-touch);
     padding: 0;
     line-height: 1;
 }
@@ -3008,13 +3162,15 @@ html.aislepilot-restore-pending .aislepilot-app {
     width: 100%;
     justify-content: flex-start;
     text-align: left;
-    padding: 0.34rem 0.6rem;
-    min-height: 2.1rem;
+    padding: 0.38rem 0.66rem;
+    min-height: 2.45rem;
     box-shadow: none;
+    font-size: 0.84rem;
 }
 
 .aislepilot-swap-action-label {
     white-space: nowrap;
+    line-height: 1.15;
 }
 
 .aislepilot-swap-btn.is-icon-only.is-loading {
@@ -3104,16 +3260,16 @@ html.aislepilot-restore-pending .aislepilot-app {
     top: calc(100% + 0.3rem);
     bottom: auto;
     z-index: 4;
-    min-width: 3.4rem;
-    width: 3.4rem;
-    max-width: min(46vw, 3.8rem);
-    padding: 0.3rem;
+    min-width: 8.8rem;
+    width: max-content;
+    max-width: min(84vw, 11rem);
+    padding: 0.34rem;
     border: 1px solid var(--ap-border-strong);
     border-radius: var(--ap-radius-soft);
     background: linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(245, 251, 255, 0.97));
     box-shadow: 0 14px 24px rgba(11, 24, 42, 0.14);
     display: grid;
-    gap: 0.24rem;
+    gap: 0.26rem;
 }
 
 .aislepilot-card-more-actions.is-drop-up .aislepilot-card-more-actions-menu {
@@ -3135,58 +3291,88 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin: 0;
 }
 
-.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-icon-only.is-compact {
-    justify-content: center;
-    min-height: 2rem;
-    padding: 0.28rem 0;
+.aislepilot-card-more-action-control {
+    margin: 0;
 }
 
-.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-icon-only.is-compact .aislepilot-btn-label {
-    gap: 0;
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact {
+    justify-content: flex-start;
+    min-height: 2.4rem;
+    padding: 0.34rem 0.52rem;
 }
 
-.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-icon-only.is-compact .aislepilot-symbol-glyph {
-    width: 1.1rem;
-    height: 1.1rem;
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact .aislepilot-btn-label {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.36rem;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact .aislepilot-symbol-glyph {
+    width: 1.06rem;
+    height: 1.06rem;
     border-width: 1.2px;
 }
 
-.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-icon-only.is-compact .aislepilot-symbol-glyph svg {
-    width: 0.76rem;
-    height: 0.76rem;
-    stroke-width: 2.2;
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact .aislepilot-symbol-glyph svg {
+    width: 0.72rem;
+    height: 0.72rem;
+    stroke-width: 2.15;
 }
 
-.aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact {
+.aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-compact {
     background: linear-gradient(116deg, #e0efff 0%, #cce2f7 100%);
     border-color: rgba(16, 89, 139, 0.34);
     color: #0d4e7f;
 }
 
-.aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact .aislepilot-symbol-glyph {
+.aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-compact .aislepilot-symbol-glyph {
     border-color: rgba(16, 89, 139, 0.38);
     background: rgba(16, 89, 139, 0.14);
     color: #0d4e7f;
 }
 
-.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact:not(.is-saved-meal) {
+.aislepilot-leftover-more-action-btn.is-secondary.is-compact {
+    background: linear-gradient(116deg, #e8f4e6 0%, #d9edd6 100%);
+    border-color: rgba(49, 107, 60, 0.34);
+    color: #2e6537;
+}
+
+.aislepilot-leftover-more-action-btn.is-secondary.is-compact .aislepilot-symbol-glyph {
+    border-color: rgba(49, 107, 60, 0.4);
+    background: rgba(49, 107, 60, 0.14);
+    color: #2e6537;
+}
+
+.aislepilot-leftover-more-action-btn.is-secondary.is-compact[data-leftover-toggle-mode="remove"] {
+    background: linear-gradient(116deg, #f7efe2 0%, #f3e4cf 100%);
+    border-color: rgba(133, 96, 36, 0.34);
+    color: #6a4a1b;
+}
+
+.aislepilot-leftover-more-action-btn.is-secondary.is-compact[data-leftover-toggle-mode="remove"] .aislepilot-symbol-glyph {
+    border-color: rgba(133, 96, 36, 0.4);
+    background: rgba(133, 96, 36, 0.14);
+    color: #6a4a1b;
+}
+
+.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-compact:not(.is-saved-meal) {
     background: linear-gradient(116deg, #fff2d8 0%, #ffe3b7 100%);
     border-color: rgba(152, 95, 22, 0.34);
     color: #7a4d14;
 }
 
-.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact:not(.is-saved-meal) .aislepilot-symbol-glyph {
+.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-compact:not(.is-saved-meal) .aislepilot-symbol-glyph {
     border-color: rgba(152, 95, 22, 0.4);
     background: rgba(152, 95, 22, 0.14);
     color: #7a4d14;
 }
 
-.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact .aislepilot-symbol-glyph svg {
+.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-compact .aislepilot-symbol-glyph svg {
     fill: currentColor;
     stroke: none;
 }
 
-.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-icon-only.is-compact.is-loading {
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact.is-loading {
     width: 100%;
     min-width: 0;
 }
@@ -3221,7 +3407,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     background: rgba(9, 19, 33, 0.94);
     color: #f4fbff;
     box-shadow: 0 14px 24px rgba(7, 17, 31, 0.28);
-    font-size: 0.78rem;
+    font-size: 0.84rem;
     font-weight: 700;
     line-height: 1.3;
     opacity: 1;
@@ -3403,13 +3589,19 @@ html.aislepilot-restore-pending .aislepilot-app {
 }
 
 @media (max-width: 760px) {
+    .aislepilot-app {
+        --ap-section-scroll-margin-top: calc(var(--ap-mobile-context-top) + 7.5rem);
+        --ap-overview-button-size: 2.36rem;
+        --ap-overview-toggle-size: 1.54rem;
+    }
+
     .aislepilot-mobile-context {
         position: sticky;
-        top: calc(env(safe-area-inset-top, 0px) + 0.38rem);
+        top: var(--ap-mobile-context-top);
         z-index: 12;
         display: grid;
-        gap: 0.3rem;
-        padding: 0.44rem;
+        gap: 0.38rem;
+        padding: 0.56rem;
         border: 1px solid rgba(16, 63, 101, 0.22);
         border-radius: 12px;
         background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 255, 0.96));
@@ -3423,7 +3615,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
     .aislepilot-mobile-context-title {
         margin: 0;
-        font-size: 0.76rem;
+        font-size: 0.82rem;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: var(--ink-soft);
@@ -3435,7 +3627,7 @@ html.aislepilot-restore-pending .aislepilot-app {
         display: flex;
         align-items: baseline;
         gap: 0.42rem;
-        font-size: 0.85rem;
+        font-size: 0.94rem;
         color: var(--brand-deep);
         font-weight: 700;
     }
@@ -3455,12 +3647,13 @@ html.aislepilot-restore-pending .aislepilot-app {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 2.2rem;
+        gap: 0.3rem;
+        min-height: 2.75rem;
         border: 1px solid rgba(16, 63, 101, 0.2);
         border-radius: var(--ap-radius-pill);
         background: rgba(255, 255, 255, 0.97);
         color: var(--brand-deep);
-        font-size: 0.82rem;
+        font-size: 0.86rem;
         font-weight: 700;
         transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
     }
@@ -3474,15 +3667,20 @@ html.aislepilot-restore-pending .aislepilot-app {
         box-shadow: var(--ap-shadow-lift);
     }
 
-    .aislepilot-mobile-context-jump.is-icon-only .aislepilot-symbol-glyph {
-        width: 1.25rem;
-        height: 1.25rem;
+    .aislepilot-mobile-context-jump .aislepilot-symbol-glyph {
+        width: 1.2rem;
+        height: 1.2rem;
     }
 
-    .aislepilot-mobile-context-jump.is-icon-only .aislepilot-symbol-glyph svg {
-        width: 0.86rem;
-        height: 0.86rem;
+    .aislepilot-mobile-context-jump .aislepilot-symbol-glyph svg {
+        width: 0.8rem;
+        height: 0.8rem;
         stroke-width: 2.1;
+    }
+
+    .aislepilot-mobile-context-jump-text {
+        font-size: 0.8rem;
+        letter-spacing: 0.01em;
     }
 
     .aislepilot-mobile-context-jump.is-active .aislepilot-symbol-glyph,
@@ -3499,6 +3697,38 @@ html.aislepilot-restore-pending .aislepilot-app {
 
     .aislepilot-window-head {
         align-items: center;
+    }
+
+    .aislepilot-overview-head {
+        flex-wrap: nowrap;
+        align-items: center;
+        row-gap: 0;
+    }
+
+    .aislepilot-overview-title-row {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .aislepilot-overview-actions-inline {
+        display: none;
+    }
+
+    .aislepilot-overview-actions-dropdown {
+        display: inline-block;
+    }
+
+    .aislepilot-overview-actions {
+        flex: 0 0 auto;
+        max-width: none;
+    }
+
+    .aislepilot-overview-actions-menu {
+        max-width: min(86vw, 12rem);
+    }
+
+    #aislepilot-overview.aislepilot-shell {
+        padding: 0.76rem 0.82rem;
     }
 }
 
@@ -3541,7 +3771,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     .aislepilot-window-nav-hint {
         max-width: none;
         text-align: left;
-        font-size: 0.72rem;
+        font-size: 0.78rem;
     }
 
     .aislepilot-window-tabs {
@@ -3549,8 +3779,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 
     .aislepilot-window-tab {
-        min-height: 2.5rem !important;
-        font-size: 0.84rem !important;
+        min-height: 2.75rem;
+        font-size: 0.9rem;
     }
 
     .aislepilot-alert-actions {
@@ -3564,8 +3794,9 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 
     .aislepilot-card-action-row.is-inline-actions .aislepilot-swap-btn:not(.is-compact) {
-        width: 2.2rem;
-        min-width: 2.2rem;
+        width: var(--ap-control-height-touch);
+        min-width: var(--ap-control-height-touch);
+        min-height: var(--ap-control-height-touch);
         padding: 0;
     }
 
@@ -3578,8 +3809,9 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 
     .aislepilot-card-more-actions-menu {
-        min-width: 3.4rem;
-        width: 3.4rem;
+        min-width: 9rem;
+        width: max-content;
+        max-width: min(86vw, 12rem);
     }
 
     .aislepilot-toast-stack {
@@ -3620,16 +3852,15 @@ html.aislepilot-restore-pending .aislepilot-app {
         width: auto;
     }
 
-    .aislepilot-overview-actions .aislepilot-overview-regenerate-btn,
-    .aislepilot-overview-actions .aislepilot-edit-setup-btn {
+    .aislepilot-overview-actions-inline .aislepilot-overview-regenerate-btn,
+    .aislepilot-overview-actions-inline .aislepilot-edit-setup-btn {
         width: auto;
+        min-width: 0;
     }
 
-    .aislepilot-overview-regenerate-btn.is-icon-only,
-    .aislepilot-overview-toggle-btn.is-icon-only,
-    .aislepilot-edit-setup-btn.is-icon-only {
-        width: var(--ap-overview-button-size) !important;
-        min-width: var(--ap-overview-button-size) !important;
+    .aislepilot-overview-toggle-btn.is-icon-only {
+        width: var(--ap-overview-toggle-size) !important;
+        min-width: var(--ap-overview-toggle-size) !important;
     }
 
     .aislepilot-leftover-editor-head {
@@ -3746,7 +3977,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
     .aislepilot-day-card-meta[data-day-card-summary] {
         max-width: min(44vw, 10.8rem);
-        font-size: 0.74rem;
+        font-size: 0.8rem;
     }
 
     .aislepilot-card-action-row {
@@ -3778,10 +4009,9 @@ html.aislepilot-restore-pending .aislepilot-app {
         gap: 0.24rem;
     }
 
-    .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only {
-        width: 1.9rem;
-        min-width: 1.9rem;
-        min-height: 1.9rem;
+    .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger {
+        min-height: 2.4rem;
+        padding: 0.28rem 0.56rem;
     }
 
     .aislepilot-meal-details:not(.aislepilot-meal-details-image-toggle) {
@@ -3797,7 +4027,7 @@ html.aislepilot-restore-pending .aislepilot-app {
         left: 0.44rem;
         bottom: 0.44rem;
         padding: 0.12rem 0.38rem;
-        font-size: 0.64rem;
+        font-size: 0.7rem;
     }
 
     .aislepilot-card-action-inline {
@@ -3814,22 +4044,19 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 }
 
+@media (max-width: 680px) {
+    .app-shell-main.aislepilot-main.container {
+        width: min(84rem, 100% - 1.2rem);
+    }
+}
+
 @media (min-width: 880px) {
     .aislepilot-meal-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .aislepilot-shopping-grid {
-        display: block;
-        column-count: 2;
-        column-gap: 0.62rem;
-    }
-
-    .aislepilot-shopping-grid > .aislepilot-card {
-        display: block;
-        width: 100%;
-        margin-bottom: 0.62rem;
-        break-inside: avoid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .aislepilot-pantry-grid {
@@ -3839,8 +4066,8 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 @media (min-width: 1024px) {
     .aislepilot-app {
-        width: min(100%, 94rem);
-        gap: 1.1rem;
+        width: min(100%, 90rem);
+        gap: 1rem;
     }
 
     .aislepilot-app-head {
@@ -3873,12 +4100,12 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 
     .aislepilot-layout {
-        gap: 1.1rem;
+        gap: 0.95rem;
     }
 
     .aislepilot-layout.has-results {
-        grid-template-columns: minmax(22.5rem, 30rem) minmax(0, 1fr);
-        column-gap: 1.1rem;
+        grid-template-columns: minmax(21.5rem, 27rem) minmax(0, 1fr);
+        column-gap: 0.95rem;
         align-items: start;
     }
 
@@ -3886,9 +4113,6 @@ html.aislepilot-restore-pending .aislepilot-app {
         position: sticky;
         top: 1rem;
         align-self: start;
-        max-height: calc(100dvh - 2rem);
-        overflow: auto;
-        scrollbar-gutter: stable both-edges;
     }
 
     .aislepilot-layout.has-results > #aislepilot-setup[hidden] + .aislepilot-results-stack {
@@ -3930,7 +4154,7 @@ html.aislepilot-restore-pending .aislepilot-app {
         display: block;
         margin: 0;
         padding: 0 0.2rem;
-        font-size: 0.74rem;
+        font-size: 0.78rem;
         font-weight: 700;
         line-height: 1.25;
         font-family: "Space Grotesk", "Segoe UI", sans-serif;
@@ -3952,7 +4176,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings-title {
         margin: 0;
         padding: 0 0.2rem;
-        font-size: 0.74rem;
+        font-size: 0.78rem;
         font-weight: 700;
         line-height: 1.25;
         font-family: "Space Grotesk", "Segoe UI", sans-serif;
@@ -4019,11 +4243,11 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 
     .aislepilot-collapsible-title {
-        font-size: 0.83rem;
+        font-size: 0.9rem;
     }
 
     .aislepilot-collapsible-value {
-        font-size: 0.78rem;
+        font-size: 0.84rem;
     }
 
     .aislepilot-planner-settings-title {
@@ -4049,11 +4273,11 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 @media (min-width: 1280px) {
     .aislepilot-app {
-        width: min(100%, 100rem);
+        width: min(100%, 92rem);
     }
 
     .aislepilot-layout.has-results {
-        grid-template-columns: minmax(24rem, 32rem) minmax(0, 1fr);
+        grid-template-columns: minmax(22rem, 28rem) minmax(0, 1fr);
     }
 
     .aislepilot-budget-grid {
@@ -4065,8 +4289,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     }
 
     .aislepilot-shopping-grid {
-        column-count: 3;
-        column-gap: 0.75rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .aislepilot-pantry-grid {
@@ -4230,7 +4453,6 @@ html.aislepilot-restore-pending .aislepilot-app {
 :root[data-theme="dark"] .aislepilot-leftover-day-chip.is-leftover-source,
 :root[data-theme="dark"] .aislepilot-day-card-leftover-controls.is-leftover-source,
 :root[data-theme="dark"] .aislepilot-overview-regenerate-btn,
-:root[data-theme="dark"] .aislepilot-edit-setup-btn,
 :root[data-theme="dark"] .aislepilot-setup-mode-toggle.is-active,
 :root[data-theme="dark"] .aislepilot-day-meal-tab.is-active,
 :root[data-theme="dark"] .aislepilot-swap-btn:not(.is-secondary),
@@ -4250,6 +4472,35 @@ html.aislepilot-restore-pending .aislepilot-app {
     border: none;
     background: transparent;
     color: currentColor;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-actions-trigger {
+    background: rgba(21, 34, 52, 0.96);
+    border-color: var(--line);
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-actions-trigger .aislepilot-symbol-glyph {
+    border: none;
+    background: transparent;
+    color: currentColor;
+}
+
+:root[data-theme="dark"] .aislepilot-overview-actions-menu {
+    background: linear-gradient(160deg, rgba(19, 32, 49, 0.98), rgba(14, 25, 40, 0.96));
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .aislepilot-edit-setup-btn {
+    background: rgba(21, 34, 52, 0.96) !important;
+    border-color: var(--line) !important;
+    color: #deefff !important;
+}
+
+:root[data-theme="dark"] .aislepilot-edit-setup-btn .aislepilot-symbol-glyph {
+    border-color: rgba(125, 167, 213, 0.44);
+    background: rgba(125, 167, 213, 0.16);
+    color: #deefff;
 }
 
 :root[data-theme="dark"] .aislepilot-setup-mode-toggle:not(.is-active) {
@@ -4298,13 +4549,13 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: #f4faff;
 }
 
-:root[data-theme="dark"] .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only {
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
+:root[data-theme="dark"] .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger {
+    border-color: var(--line);
+    background: rgba(21, 34, 52, 0.96);
+    box-shadow: none;
 }
 
-:root[data-theme="dark"] .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger.is-icon-only .aislepilot-symbol-glyph {
+:root[data-theme="dark"] .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger .aislepilot-symbol-glyph {
     border-color: rgba(125, 167, 213, 0.44);
     background: rgba(125, 167, 213, 0.16);
     color: #deefff;
@@ -4353,6 +4604,13 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: #deefff;
 }
 
+:root[data-theme="dark"] .aislepilot-day-card-leftover-controls .aislepilot-leftover-step-btn {
+    border: 1px solid rgba(125, 167, 213, 0.44);
+    border-radius: 999px;
+    background: rgba(21, 34, 52, 0.96);
+    color: #deefff;
+}
+
 :root[data-theme="dark"] .aislepilot-leftover-day-chip.is-leftover-source .aislepilot-leftover-step-btn {
     color: #f4faff;
 }
@@ -4393,25 +4651,49 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: #e8fff4;
 }
 
-:root[data-theme="dark"] .aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact {
+:root[data-theme="dark"] .aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-compact {
     background: linear-gradient(116deg, #294867 0%, #223e5d 100%);
     border-color: rgba(131, 183, 228, 0.4);
     color: #dceeff;
 }
 
-:root[data-theme="dark"] .aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact .aislepilot-symbol-glyph {
+:root[data-theme="dark"] .aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-compact .aislepilot-symbol-glyph {
     border-color: rgba(131, 183, 228, 0.48);
     background: rgba(131, 183, 228, 0.16);
     color: #dceeff;
 }
 
-:root[data-theme="dark"] .aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact:not(.is-saved-meal) {
+:root[data-theme="dark"] .aislepilot-leftover-more-action-btn.is-secondary.is-compact {
+    background: linear-gradient(116deg, #2f5233 0%, #29482d 100%);
+    border-color: rgba(130, 196, 142, 0.44);
+    color: #e8ffe8;
+}
+
+:root[data-theme="dark"] .aislepilot-leftover-more-action-btn.is-secondary.is-compact .aislepilot-symbol-glyph {
+    border-color: rgba(130, 196, 142, 0.48);
+    background: rgba(130, 196, 142, 0.18);
+    color: #e8ffe8;
+}
+
+:root[data-theme="dark"] .aislepilot-leftover-more-action-btn.is-secondary.is-compact[data-leftover-toggle-mode="remove"] {
+    background: linear-gradient(116deg, #665028 0%, #564423 100%);
+    border-color: rgba(240, 199, 130, 0.44);
+    color: #fff2d8;
+}
+
+:root[data-theme="dark"] .aislepilot-leftover-more-action-btn.is-secondary.is-compact[data-leftover-toggle-mode="remove"] .aislepilot-symbol-glyph {
+    border-color: rgba(240, 199, 130, 0.48);
+    background: rgba(240, 199, 130, 0.18);
+    color: #fff2d8;
+}
+
+:root[data-theme="dark"] .aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-compact:not(.is-saved-meal) {
     background: linear-gradient(116deg, #6d4f22 0%, #5b421d 100%);
     border-color: rgba(240, 199, 130, 0.42);
     color: #fff2d8;
 }
 
-:root[data-theme="dark"] .aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-icon-only.is-compact:not(.is-saved-meal) .aislepilot-symbol-glyph {
+:root[data-theme="dark"] .aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-compact:not(.is-saved-meal) .aislepilot-symbol-glyph {
     border-color: rgba(240, 199, 130, 0.48);
     background: rgba(240, 199, 130, 0.18);
     color: #fff2d8;

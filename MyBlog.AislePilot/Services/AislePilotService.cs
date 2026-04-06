@@ -8143,6 +8143,21 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             return usedSlotMealTypeCounts.TryGetValue(meal.Name, out var count) ? count : 0;
         }
 
+        string? GetMostRecentSlotMealName()
+        {
+            for (var selectedIndex = selectedMeals.Count - 1; selectedIndex >= 0; selectedIndex--)
+            {
+                if (resolvedMealTypeSlots[selectedIndex % resolvedMealTypeSlots.Count].Equals(
+                        slotMealType,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return selectedMeals[selectedIndex].Name;
+                }
+            }
+
+            return null;
+        }
+
         if (shouldPreferPreferredMeals && preferredMealNames is { Count: > 0 })
         {
             MealTemplate? FindPreferredCandidate(Func<MealTemplate, bool> predicate)
@@ -8202,18 +8217,38 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             }
         }
 
-        if (selectedMeals.Count > 0)
+        var previousMealName = selectedMeals.Count > 0 ? selectedMeals[^1].Name : null;
+        var mostRecentSlotMealName = GetMostRecentSlotMealName();
+        var leastRepeatedCandidates = slotCompatibleCandidates
+            .OrderBy(GetSlotTypeRepeatCount)
+            .ThenBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var balancedFallback = leastRepeatedCandidates.FirstOrDefault(meal =>
+            (!isDinnerSlot || !usedDinnerMealNames.Contains(meal.Name)) &&
+            (mostRecentSlotMealName is null || !meal.Name.Equals(mostRecentSlotMealName, StringComparison.OrdinalIgnoreCase)) &&
+            (previousMealName is null || !meal.Name.Equals(previousMealName, StringComparison.OrdinalIgnoreCase)));
+        if (balancedFallback is not null)
         {
-            var previousName = selectedMeals[^1].Name;
-            var nonAdjacentFallback = slotCompatibleCandidates
-                .FirstOrDefault(meal => !meal.Name.Equals(previousName, StringComparison.OrdinalIgnoreCase));
-            if (nonAdjacentFallback is not null)
-            {
-                return nonAdjacentFallback;
-            }
+            return balancedFallback;
         }
 
-        return slotCompatibleCandidates[slotIndex % slotCompatibleCandidates.Count];
+        balancedFallback = leastRepeatedCandidates.FirstOrDefault(meal =>
+            (!isDinnerSlot || !usedDinnerMealNames.Contains(meal.Name)) &&
+            (mostRecentSlotMealName is null || !meal.Name.Equals(mostRecentSlotMealName, StringComparison.OrdinalIgnoreCase)));
+        if (balancedFallback is not null)
+        {
+            return balancedFallback;
+        }
+
+        balancedFallback = leastRepeatedCandidates.FirstOrDefault(meal =>
+            !isDinnerSlot || !usedDinnerMealNames.Contains(meal.Name));
+        if (balancedFallback is not null)
+        {
+            return balancedFallback;
+        }
+
+        return leastRepeatedCandidates[0];
     }
 
     private static int CountSlotsForMealType(

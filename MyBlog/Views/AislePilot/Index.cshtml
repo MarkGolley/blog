@@ -1,4 +1,5 @@
 @using System.Globalization
+@using MyBlog.Services
 @model AislePilotPageViewModel
 @{
     Layout = "_AislePilotLayout";
@@ -173,17 +174,13 @@
     var exclusionsSummaryRaw = string.IsNullOrWhiteSpace(Model.Request.DislikesOrAllergens)
         ? "No exclusions set"
         : Model.Request.DislikesOrAllergens.Trim();
-    var exclusionsSummaryText = exclusionsSummaryRaw.Length > 64
-        ? $"{exclusionsSummaryRaw[..64]}..."
-        : exclusionsSummaryRaw;
+    var exclusionsSummaryText = exclusionsSummaryRaw;
     var hasPantryValidationErrors = ViewData.ModelState.TryGetValue("Request.PantryItems", out var pantryFieldState) &&
         pantryFieldState.Errors.Count > 0;
     var pantrySummaryRaw = string.IsNullOrWhiteSpace(Model.Request.PantryItems)
         ? "No foods listed"
         : Model.Request.PantryItems.Trim();
-    var pantrySummaryText = pantrySummaryRaw.Length > 64
-        ? $"{pantrySummaryRaw[..64]}..."
-        : pantrySummaryRaw;
+    var pantrySummaryText = pantrySummaryRaw;
     var generatorCoreSummaryText = Model.Request.RequireCorePantryIngredients
         ? "Strict core on"
         : "Strict core off";
@@ -213,61 +210,7 @@
         .ToList();
     var hasModelErrors = modelErrors.Count > 0;
     var joinedErrorText = string.Join(" ", modelErrors).ToLowerInvariant();
-    string ResolveClientMealImageUrl(string? imageUrl)
-    {
-        var normalized = imageUrl?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return "/projects/aisle-pilot/images/aislepilot-icon.svg";
-        }
-
-        if (normalized.StartsWith("/projects/aisle-pilot/images/", StringComparison.OrdinalIgnoreCase))
-        {
-            return normalized;
-        }
-
-        if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"/projects/aisle-pilot/images/{normalized["/images/".Length..]}";
-        }
-
-        normalized = normalized.Replace('\\', '/');
-        if (!normalized.StartsWith("/", StringComparison.Ordinal))
-        {
-            var trimmed = normalized.TrimStart('/');
-            if (trimmed.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"/projects/aisle-pilot/images/{trimmed["images/".Length..]}";
-            }
-
-            if (trimmed.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"/projects/aisle-pilot/images/{trimmed}";
-            }
-
-            var hasImageExtension =
-                trimmed.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
-            if (hasImageExtension)
-            {
-                return $"/projects/aisle-pilot/images/aislepilot-meals/{trimmed}";
-            }
-        }
-
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
-            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
-             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
-        {
-            return normalized;
-        }
-
-        return normalized;
-    }
-
-    var fallbackMealImageUrl = ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
+    var fallbackMealImageUrl = AislePilotMealImageUrlResolver.ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
     var mealImagesPollUrl = Url.Action("MealImages", "AislePilot") ?? "/projects/aisle-pilot/meal-images";
     string FormatSetupOptionLabel(string value)
     {
@@ -320,15 +263,18 @@
         <div class="aislepilot-brand-lockup" aria-label="AislePilot brand">
             <img class="aislepilot-brand-logo" src="~/images/aislepilot-logo-horizontal.svg" alt="AislePilot" />
         </div>
-        @if (!hasResult)
-        {
-            <div class="aislepilot-app-head-intro">
-                <h1 id="aislepilot-title" class="aislepilot-app-title">Plan a full week of meals and shopping in minutes.</h1>
-                <p class="aislepilot-app-subtitle">
-                    Build a practical weekly plan with aisle-ordered shopping, clear recipes, and export-ready lists.
-                </p>
-            </div>
-        }
+        <div class="aislepilot-app-head-intro@(hasResult ? " is-results-context" : string.Empty)">
+            <h1 id="aislepilot-title" class="aislepilot-app-title">
+                @(hasResult
+                    ? "AislePilot weekly planner"
+                    : "Plan a full week of meals and shopping in minutes.")
+            </h1>
+            <p class="aislepilot-app-subtitle">
+                @(hasResult
+                    ? "Adjust settings, refine meals, and export your list."
+                    : "Build a practical weekly plan with aisle-ordered shopping, clear recipes, and export-ready lists.")
+            </p>
+        </div>
     </section>
 
     @if (hasModelErrors)
@@ -558,7 +504,9 @@
                 <details class="aislepilot-collapsible" @exclusionsDetailsOpenAttribute>
                     <summary>
                         <span class="aislepilot-collapsible-title">Foods to avoid</span>
-                        <span class="aislepilot-collapsible-value" data-exclusion-summary>@exclusionsSummaryText</span>
+                        <span class="aislepilot-collapsible-value"
+                              data-exclusion-summary
+                              title="@exclusionsSummaryText">@exclusionsSummaryText</span>
                     </summary>
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
                         <div class="aislepilot-field aislepilot-field-optional">
@@ -807,7 +755,9 @@
                     <details class="aislepilot-collapsible" open>
                         <summary>
                             <span class="aislepilot-collapsible-title">Foods on hand</span>
-                            <span class="aislepilot-collapsible-value" data-pantry-summary>@pantrySummaryText</span>
+                            <span class="aislepilot-collapsible-value"
+                                  data-pantry-summary
+                                  title="@pantrySummaryText">@pantrySummaryText</span>
                         </summary>
                         <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-generator-pantry-panel aislepilot-field aislepilot-field-optional aislepilot-pantry-entry-field">
                             <label asp-for="Request.PantryItems" class="sr-only">Pantry items</label>
@@ -1035,7 +985,7 @@
                         var meal = suggestion.MealCard;
                         var imageUrl = meal is null
                             ? fallbackMealImageUrl
-                            : ResolveClientMealImageUrl(meal.MealImageUrl);
+                            : AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl);
                         var shouldPrioritizeSuggestionImage = suggestionIndex < 2;
                         <article class="aislepilot-card">
                             <div class="aislepilot-meal-image-shell">

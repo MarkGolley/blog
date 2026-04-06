@@ -7,6 +7,7 @@
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
     const submitLoadingDelayTimers = new WeakMap();
     const appRoot = document.querySelector(".aislepilot-app");
+    const shellHeader = document.querySelector(".app-shell-header");
     const planLoadingShell = appRoot instanceof HTMLElement
         ? appRoot.querySelector("[data-plan-loading-shell]")
         : null;
@@ -30,6 +31,30 @@
         planLoadingShell.setAttribute("hidden", "hidden");
         planLoadingShell.setAttribute("aria-hidden", "true");
     };
+
+    const syncMobileContextOffset = () => {
+        if (!(appRoot instanceof HTMLElement)) {
+            return;
+        }
+
+        if (!(shellHeader instanceof HTMLElement)) {
+            appRoot.style.setProperty("--ap-shell-header-offset", "0px");
+            return;
+        }
+
+        const headerRect = shellHeader.getBoundingClientRect();
+        const computedTop = Number.parseFloat(window.getComputedStyle(shellHeader).top ?? "0");
+        const safeTop = Number.isFinite(computedTop) ? Math.max(0, computedTop) : 0;
+        const safeHeight = Math.max(0, Math.min(220, Math.ceil(headerRect.height + safeTop)));
+        appRoot.style.setProperty("--ap-shell-header-offset", `${safeHeight}px`);
+    };
+
+    if (shellHeader instanceof HTMLElement && typeof ResizeObserver !== "undefined") {
+        const shellHeaderResizeObserver = new ResizeObserver(() => {
+            syncMobileContextOffset();
+        });
+        shellHeaderResizeObserver.observe(shellHeader);
+    }
 
     const selectInputValue = input => {
         if (!(input instanceof HTMLInputElement)) {
@@ -1303,14 +1328,7 @@
             ? Array.from(scope.querySelectorAll("form"))
             : getAislePilotForms();
 
-        const trimSummary = (value, maxLength = 64) => {
-            const normalized = (value ?? "").trim();
-            if (normalized.length <= maxLength) {
-                return normalized;
-            }
-
-            return `${normalized.slice(0, maxLength)}...`;
-        };
+        const normalizeSummary = value => (value ?? "").trim();
 
         forms.forEach(form => {
             if (!(form instanceof HTMLFormElement)) {
@@ -1486,10 +1504,15 @@
                     return;
                 }
 
-                const exclusionsValue = trimSummary(exclusionsInput?.value ?? "");
-                exclusionSummary.textContent = exclusionsValue.length > 0
-                    ? exclusionsValue
-                    : "No exclusions set";
+                const exclusionsValue = normalizeSummary(exclusionsInput?.value ?? "");
+                if (exclusionsValue.length > 0) {
+                    exclusionSummary.textContent = exclusionsValue;
+                    exclusionSummary.setAttribute("title", exclusionsValue);
+                    return;
+                }
+
+                exclusionSummary.textContent = "No exclusions set";
+                exclusionSummary.removeAttribute("title");
             };
 
             const updatePantrySummary = () => {
@@ -1497,10 +1520,15 @@
                     return;
                 }
 
-                const pantryValue = trimSummary(pantryInput?.value ?? "");
-                pantrySummary.textContent = pantryValue.length > 0
-                    ? pantryValue
-                    : "No foods listed";
+                const pantryValue = normalizeSummary(pantryInput?.value ?? "");
+                if (pantryValue.length > 0) {
+                    pantrySummary.textContent = pantryValue;
+                    pantrySummary.setAttribute("title", pantryValue);
+                    return;
+                }
+
+                pantrySummary.textContent = "No foods listed";
+                pantrySummary.removeAttribute("title");
             };
 
             const updateGeneratorCoreSummary = () => {
@@ -2420,6 +2448,7 @@
         const isExpanded = !overviewContent.hasAttribute("hidden");
         overviewToggleButtons.forEach(button => {
             const srOnlyLabel = button.querySelector(".sr-only");
+            const visibleLabel = button.querySelector("[data-overview-toggle-label]");
             const collapsedLabel = button.dataset.overviewToggleCollapsedLabel
                 || srOnlyLabel?.textContent?.trim()
                 || button.getAttribute("aria-label")
@@ -2433,7 +2462,13 @@
 
             if (srOnlyLabel) {
                 srOnlyLabel.textContent = nextLabel;
-            } else {
+            }
+
+            if (visibleLabel instanceof HTMLElement) {
+                visibleLabel.textContent = nextLabel;
+            }
+
+            if (!srOnlyLabel && !(visibleLabel instanceof HTMLElement)) {
                 button.textContent = nextLabel;
             }
 
@@ -2458,6 +2493,7 @@
         const isHidden = setupPanel.hasAttribute("hidden");
         setupToggleButtons.forEach(button => {
             const srOnlyLabel = button.querySelector(".sr-only");
+            const visibleLabel = button.querySelector("[data-setup-toggle-label]");
             const collapsedLabel = button.dataset.setupToggleCollapsedLabel
                 || srOnlyLabel?.textContent?.trim()
                 || button.getAttribute("aria-label")
@@ -2471,7 +2507,13 @@
 
             if (srOnlyLabel) {
                 srOnlyLabel.textContent = nextLabel;
-            } else {
+            }
+
+            if (visibleLabel instanceof HTMLElement) {
+                visibleLabel.textContent = nextLabel;
+            }
+
+            if (!srOnlyLabel && !(visibleLabel instanceof HTMLElement)) {
                 button.textContent = nextLabel;
             }
 
@@ -2949,17 +2991,35 @@
                 : Math.max(0, leftoverZones.length - 1);
 
             const toCsv = dayIndexes => dayIndexes.join(",");
+            const getZoneDayIndex = zone => {
+                const dayIndexRaw = zone.getAttribute("data-day-index");
+                const dayIndex = Number.parseInt(dayIndexRaw ?? "", 10);
+                return Number.isInteger(dayIndex) && dayIndex >= 0 ? dayIndex : -1;
+            };
             const getZoneCount = zone => {
                 const countRaw = zone.getAttribute("data-leftover-count");
                 const count = Number.parseInt(countRaw ?? "", 10);
                 return Number.isInteger(count) && count > 0 ? count : 0;
             };
+            const getZoneToggleButtons = zone => {
+                if (!(zone instanceof HTMLElement)) {
+                    return [];
+                }
+
+                const dayIndex = getZoneDayIndex(zone);
+                if (dayIndex < 0) {
+                    return [];
+                }
+
+                const selector = `[data-leftover-toggle-sign][data-leftover-day-index="${dayIndex}"]`;
+                return Array.from(container.querySelectorAll(selector))
+                    .filter(button => button instanceof HTMLButtonElement);
+            };
             const buildRequestedDayIndexes = () => {
                 const requestedDayIndexes = [];
                 leftoverZones.forEach(zone => {
-                    const dayIndexRaw = zone.getAttribute("data-day-index");
-                    const dayIndex = Number.parseInt(dayIndexRaw ?? "", 10);
-                    if (!Number.isInteger(dayIndex) || dayIndex < 0) {
+                    const dayIndex = getZoneDayIndex(zone);
+                    if (dayIndex < 0) {
                         return;
                     }
 
@@ -3025,24 +3085,22 @@
                         return;
                     }
 
-                    const toggleButton = zone.querySelector("[data-leftover-toggle-sign]");
                     const zoneCount = getZoneCount(zone);
                     const dayName = (zone.getAttribute("data-day-name") ?? "").trim();
                     const isAssigned = zoneCount > 0;
                     const canAssign = !isAssigned && canAssignMore;
+                    const nextActionLabel = isAssigned ? "Remove extra" : "Cook extra";
                     zone.classList.toggle("is-leftover-locked", !isAssigned && !canAssignMore);
-                    if (toggleButton instanceof HTMLButtonElement) {
+                    getZoneToggleButtons(zone).forEach(toggleButton => {
                         if (isAssigned) {
                             toggleButton.hidden = false;
                             toggleButton.disabled = false;
-                            toggleButton.textContent = "++";
                             if (dayName.length > 0) {
                                 toggleButton.setAttribute("aria-label", `Remove cook-extra from ${dayName}`);
                             }
                         } else if (canAssign && canAssignMore) {
                             toggleButton.hidden = false;
                             toggleButton.disabled = false;
-                            toggleButton.textContent = "+";
                             if (dayName.length > 0) {
                                 toggleButton.setAttribute("aria-label", `Add cook-extra to ${dayName}`);
                             }
@@ -3050,7 +3108,14 @@
                             toggleButton.hidden = true;
                             toggleButton.disabled = true;
                         }
-                    }
+
+                        toggleButton.setAttribute("title", nextActionLabel);
+                        toggleButton.dataset.leftoverToggleMode = isAssigned ? "remove" : "add";
+                        const buttonText = toggleButton.querySelector("[data-leftover-toggle-text]");
+                        if (buttonText instanceof HTMLElement) {
+                            buttonText.textContent = nextActionLabel;
+                        }
+                    });
                 });
             };
 
@@ -3086,8 +3151,12 @@
                     }
 
                     zone.dataset.leftoverZoneWired = "true";
-                    const toggleButton = zone.querySelector("[data-leftover-toggle-sign]");
-                    if (toggleButton instanceof HTMLButtonElement) {
+                    getZoneToggleButtons(zone).forEach(toggleButton => {
+                        if (!(toggleButton instanceof HTMLButtonElement) || toggleButton.dataset.leftoverZoneWired === "true") {
+                            return;
+                        }
+
+                        toggleButton.dataset.leftoverZoneWired = "true";
                         toggleButton.addEventListener("click", () => {
                             const zoneCount = getZoneCount(zone);
                             if (zoneCount > 0) {
@@ -3103,9 +3172,132 @@
                             setZoneCount(zone, zoneCount + 1);
                             submitLeftoverRebalance();
                         });
-                    }
+                    });
                 });
             }
+        });
+    };
+
+    let overviewActionsGlobalWired = false;
+
+    const syncOverviewActionsLayerState = () => {
+        const overviewSection = document.querySelector("#aislepilot-overview");
+        if (!(overviewSection instanceof HTMLElement)) {
+            return;
+        }
+
+        const hasOpenMenu = document.querySelector("[data-overview-actions-menu][open]") instanceof HTMLDetailsElement;
+        overviewSection.classList.toggle("is-actions-menu-open", hasOpenMenu);
+    };
+
+    const closeOpenOverviewActionsMenus = except => {
+        const openMenus = Array.from(document.querySelectorAll("[data-overview-actions-menu][open]"));
+        openMenus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement) || menu === except) {
+                return;
+            }
+
+            menu.open = false;
+        });
+
+        window.requestAnimationFrame(syncOverviewActionsLayerState);
+    };
+
+    const positionOverviewActionsMenu = menu => {
+        if (!(menu instanceof HTMLDetailsElement) || !menu.open) {
+            return;
+        }
+
+        const actionsMenu = menu.querySelector(".aislepilot-overview-actions-menu");
+        if (!(actionsMenu instanceof HTMLElement)) {
+            return;
+        }
+
+        const viewportPadding = 8;
+        menu.classList.remove("is-align-left");
+        let actionsRect = actionsMenu.getBoundingClientRect();
+        if (actionsRect.left < viewportPadding) {
+            menu.classList.add("is-align-left");
+            actionsRect = actionsMenu.getBoundingClientRect();
+        }
+
+        if (actionsRect.right > window.innerWidth - viewportPadding && menu.classList.contains("is-align-left")) {
+            menu.classList.remove("is-align-left");
+        }
+    };
+
+    const wireOverviewActionsMenus = scope => {
+        const menus = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-overview-actions-menu]"))
+            : Array.from(document.querySelectorAll("[data-overview-actions-menu]"));
+
+        menus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement) || menu.dataset.overviewActionsWired === "true") {
+                return;
+            }
+
+            menu.dataset.overviewActionsWired = "true";
+            menu.addEventListener("toggle", () => {
+                const trigger = menu.querySelector("summary");
+                if (trigger instanceof HTMLElement) {
+                    trigger.setAttribute("aria-expanded", menu.open ? "true" : "false");
+                }
+
+                if (!menu.open) {
+                    menu.classList.remove("is-align-left");
+                    syncOverviewActionsLayerState();
+                    return;
+                }
+
+                closeOpenOverviewActionsMenus(menu);
+                syncOverviewActionsLayerState();
+                window.requestAnimationFrame(() => {
+                    positionOverviewActionsMenu(menu);
+                });
+            });
+
+            const actionButtons = Array.from(menu.querySelectorAll("button"));
+            actionButtons.forEach(button => {
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                button.addEventListener("click", () => {
+                    menu.open = false;
+                });
+            });
+        });
+
+        syncOverviewActionsLayerState();
+
+        if (overviewActionsGlobalWired) {
+            return;
+        }
+
+        overviewActionsGlobalWired = true;
+        document.addEventListener("click", event => {
+            if (!(event.target instanceof Element)) {
+                return;
+            }
+
+            if (event.target.closest("[data-overview-actions-menu]")) {
+                return;
+            }
+
+            closeOpenOverviewActionsMenus(null);
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                closeOpenOverviewActionsMenus(null);
+            }
+        });
+
+        window.addEventListener("resize", () => {
+            const openMenus = Array.from(document.querySelectorAll("[data-overview-actions-menu][open]"));
+            openMenus.forEach(openMenu => {
+                positionOverviewActionsMenu(openMenu);
+            });
         });
     };
 
@@ -3144,20 +3336,20 @@
         const canFitBelow = actionsRect.height <= availableBelow;
         const canFitAbove = actionsRect.height <= availableAbove;
         const isMobileViewport = window.innerWidth <= 760;
-        const triggerMidpointY = triggerRect.top + (triggerRect.height / 2);
-        const shouldPreferDropUpOnMobile =
-            triggerMidpointY > (window.innerHeight * 0.62) ||
-            availableBelow < (actionsRect.height + 40);
         let openUp = false;
 
-        if (canFitAbove && !canFitBelow) {
-            openUp = true;
-        } else if (!canFitAbove && canFitBelow) {
+        if (isMobileViewport) {
             openUp = false;
-        } else if (canFitAbove && canFitBelow) {
-            openUp = isMobileViewport && shouldPreferDropUpOnMobile;
         } else {
-            openUp = availableAbove > availableBelow;
+            if (canFitAbove && !canFitBelow) {
+                openUp = true;
+            } else if (!canFitAbove && canFitBelow) {
+                openUp = false;
+            } else if (canFitAbove && canFitBelow) {
+                openUp = false;
+            } else {
+                openUp = availableAbove > availableBelow;
+            }
         }
 
         menu.classList.add(openUp ? "is-drop-up" : "is-drop-down");
@@ -3781,20 +3973,7 @@
             }
         }
 
-        wireSubmitLoadingHandlers(document);
-        wireExportThemeForms(document);
-        wirePlanBasicsSliders(document);
-        wireMealTypeSelectors(document);
-        wireCustomAisleFieldVisibility(document);
-        wirePreserveScrollHandlers(document);
-        wireSetupToggleHandlers(document);
-        wireOverviewToggleHandlers(document);
-        wireLeftoverPlanner(document);
-        wireCardMoreActions(document);
-        wireInlineDetailsPanels(document);
-        wireDayMealCards(document);
-        wireAjaxSwapHandlers(document);
-        wireNotesExportButtons(document);
+        wireModulesAfterAjaxSwap(document);
         startMealImagePolling();
         syncSetupToggleState();
         syncOverviewToggleState();
@@ -3818,9 +3997,7 @@
             return false;
         }
 
-        wireSubmitLoadingHandlers(document);
-        wirePreserveScrollHandlers(document);
-        wireAjaxSwapHandlers(document);
+        wireModulesAfterAjaxFavorite(document);
         return true;
     };
 
@@ -4050,14 +4227,35 @@
         forms.forEach(wireAjaxSwapForm);
     };
 
-    wireSetupToggleHandlers(document);
-    wireOverviewToggleHandlers(document);
-    wirePreserveScrollHandlers(document);
-    wireLeftoverPlanner(document);
-    wireCardMoreActions(document);
-    wireInlineDetailsPanels(document);
-    wireDayMealCards(document);
-    wireAjaxSwapHandlers(document);
+    const wireCardInteractionModules = scope => {
+        wireSetupToggleHandlers(scope);
+        wireOverviewToggleHandlers(scope);
+        wireOverviewActionsMenus(scope);
+        wirePreserveScrollHandlers(scope);
+        wireLeftoverPlanner(scope);
+        wireCardMoreActions(scope);
+        wireInlineDetailsPanels(scope);
+        wireDayMealCards(scope);
+        wireAjaxSwapHandlers(scope);
+    };
+
+    const wireModulesAfterAjaxSwap = scope => {
+        wireSubmitLoadingHandlers(scope);
+        wireExportThemeForms(scope);
+        wirePlanBasicsSliders(scope);
+        wireMealTypeSelectors(scope);
+        wireCustomAisleFieldVisibility(scope);
+        wireCardInteractionModules(scope);
+        wireNotesExportButtons(scope);
+    };
+
+    const wireModulesAfterAjaxFavorite = scope => {
+        wireSubmitLoadingHandlers(scope);
+        wirePreserveScrollHandlers(scope);
+        wireAjaxSwapHandlers(scope);
+    };
+
+    wireCardInteractionModules(document);
     startMealImagePolling();
 
     viewport.addEventListener("touchstart", event => {
@@ -4104,6 +4302,7 @@
     }, { passive: true });
 
     window.addEventListener("resize", () => {
+        syncMobileContextOffset();
         updateViewportHeight(false);
         schedulePlanBasicsSliderRefresh(document);
     });
@@ -4128,6 +4327,7 @@
 
     const initialIndex = findIndexFromHash();
     applyTabHintVisibility();
+    syncMobileContextOffset();
     syncUi(initialIndex >= 0 ? initialIndex : 0, false);
     updateViewportHeight(false);
     syncSetupToggleState();

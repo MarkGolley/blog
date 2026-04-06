@@ -513,6 +513,53 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotFirstVisibleDayCardMoreActions_PrefersDropDown()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var firstMoreActionsSummary = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
+        await firstMoreActionsSummary.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        await firstMoreActionsSummary.ScrollIntoViewIfNeededAsync();
+        await firstMoreActionsSummary.ClickAsync();
+
+        var directionMetrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const openMenuHost = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open]");
+                const summary = openMenuHost?.querySelector("summary");
+                const menu = openMenuHost?.querySelector(".aislepilot-card-more-actions-menu");
+                if (!(openMenuHost instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(menu instanceof HTMLElement)) {
+                    return [1, Number.POSITIVE_INFINITY];
+                }
+
+                const summaryRect = summary.getBoundingClientRect();
+                const menuRect = menu.getBoundingClientRect();
+                const opensUpward = openMenuHost.classList.contains("is-drop-up") || menuRect.bottom <= summaryRect.top + 2;
+                return [opensUpward ? 1 : 0, summaryRect.top];
+            }
+            """);
+
+        Assert.Equal(2, directionMetrics.Length);
+        Assert.Equal(0, Convert.ToInt32(directionMetrics[0]));
+        Assert.True(
+            Convert.ToDouble(directionMetrics[1]) < 620,
+            $"Expected first visible More actions trigger to remain in the upper viewport region. Top={directionMetrics[1]}.");
+    }
+
+    [Fact]
     public async Task NarrowMobile_AislePilotMealCardActionButtons_RemainVisibleWithinViewport()
     {
         if (!IsE2EEnabled())
@@ -1187,6 +1234,301 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotStickyContext_StaysBelowShellHeader()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var stickyContext = page.Locator(".aislepilot-mobile-context").First;
+        await stickyContext.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        await page.EvaluateAsync(
+            """
+            () => {
+                window.scrollTo(0, 240);
+            }
+            """);
+        await page.WaitForTimeoutAsync(150);
+
+        var headerGap = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const header = document.querySelector(".app-shell-header");
+                const context = document.querySelector(".aislepilot-mobile-context");
+                if (!(header instanceof HTMLElement) || !(context instanceof HTMLElement)) {
+                    return Number.NEGATIVE_INFINITY;
+                }
+
+                const headerRect = header.getBoundingClientRect();
+                const contextRect = context.getBoundingClientRect();
+                return contextRect.top - headerRect.bottom;
+            }
+            """);
+        var shellHeaderOffset = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const app = document.querySelector(".aislepilot-app");
+                if (!(app instanceof HTMLElement)) {
+                    return Number.NEGATIVE_INFINITY;
+                }
+
+                const raw = window.getComputedStyle(app).getPropertyValue("--ap-shell-header-offset");
+                const parsed = Number.parseFloat(raw || "0");
+                return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+            }
+            """);
+
+        Assert.True(
+            headerGap >= -1,
+            $"Expected sticky context to remain below shell header. Gap={headerGap:F1}px.");
+        Assert.True(
+            shellHeaderOffset >= 28,
+            $"Expected shell header offset CSS variable to be set from header height. Value={shellHeaderOffset:F1}px.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotOverviewActions_UseHamburgerMenuForRefreshAndSettings()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var actionMetrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const actionBar = document.querySelector(".aislepilot-overview-actions");
+                const titleRow = document.querySelector(".aislepilot-overview-title-row");
+                const title = titleRow?.querySelector(".aislepilot-section-title");
+                const titleToggleButton = titleRow?.querySelector("[data-overview-toggle]");
+                const inlineActions = actionBar?.querySelector(".aislepilot-overview-actions-inline");
+                const overviewMenu = actionBar?.querySelector("[data-overview-actions-menu]");
+                const menuTrigger = overviewMenu?.querySelector("summary");
+                if (!(actionBar instanceof HTMLElement) ||
+                    !(title instanceof HTMLElement) ||
+                    !(titleToggleButton instanceof HTMLElement) ||
+                    !(inlineActions instanceof HTMLElement) ||
+                    !(overviewMenu instanceof HTMLElement) ||
+                    !(menuTrigger instanceof HTMLElement)) {
+                    return ["missing", "missing", -1, -1, -1];
+                }
+
+                const titleRect = title.getBoundingClientRect();
+                const titleToggleRect = titleToggleButton.getBoundingClientRect();
+                const menuTriggerRect = menuTrigger.getBoundingClientRect();
+                const inlineDisplay = window.getComputedStyle(inlineActions).display;
+                const dropdownDisplay = window.getComputedStyle(overviewMenu).display;
+
+                return [
+                    inlineDisplay,
+                    dropdownDisplay,
+                    menuTriggerRect.width,
+                    Math.abs(titleToggleRect.top - menuTriggerRect.top),
+                    Math.max(0, titleToggleRect.left - titleRect.right)
+                ];
+            }
+            """);
+
+        Assert.Equal(5, actionMetrics.Length);
+        Assert.Equal("none", Convert.ToString(actionMetrics[0]));
+        Assert.NotEqual("none", Convert.ToString(actionMetrics[1]));
+        Assert.True(Convert.ToDouble(actionMetrics[2]) <= 48, $"Expected compact overview hamburger width. Width={actionMetrics[2]}.");
+        Assert.True(Convert.ToDouble(actionMetrics[3]) <= 12, $"Expected title and menu trigger to remain visually aligned. Y delta={actionMetrics[3]}.");
+        Assert.True(Convert.ToDouble(actionMetrics[4]) <= 8, $"Expected minimal gap between overview title and chevron toggle. Gap={actionMetrics[4]}.");
+
+        var menuTrigger = page.Locator("[data-overview-actions-menu] > summary").First;
+        await menuTrigger.ClickAsync();
+
+        var openMenu = page.Locator("[data-overview-actions-menu][open] .aislepilot-overview-actions-menu").First;
+        await openMenu.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var menuMetrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const menu = document.querySelector("[data-overview-actions-menu][open] .aislepilot-overview-actions-menu");
+                if (!(menu instanceof HTMLElement)) {
+                    return [-1, -1, -1, "missing", "missing", 0, 0, -1, -1, 0];
+                }
+
+                const rect = menu.getBoundingClientRect();
+                const refresh = menu.querySelector(".aislepilot-overview-regenerate-btn");
+                const settings = menu.querySelector(".aislepilot-edit-setup-btn");
+                const refreshText = refresh instanceof HTMLElement ? (refresh.textContent || "").trim() : "";
+                const settingsText = settings instanceof HTMLElement ? (settings.textContent || "").trim() : "";
+                const mobileContext = document.querySelector(".aislepilot-mobile-context");
+
+                const isButtonCenterVisible = button => {
+                    if (!(button instanceof HTMLElement)) {
+                        return false;
+                    }
+
+                    const buttonRect = button.getBoundingClientRect();
+                    if (buttonRect.width < 2 || buttonRect.height < 2) {
+                        return false;
+                    }
+
+                    const x = Math.min(window.innerWidth - 1, Math.max(0, buttonRect.left + (buttonRect.width / 2)));
+                    const y = Math.min(window.innerHeight - 1, Math.max(0, buttonRect.top + (buttonRect.height / 2)));
+                    const topElement = document.elementFromPoint(x, y);
+                    return topElement instanceof Element &&
+                        (topElement === button || button.contains(topElement) || menu.contains(topElement));
+                };
+
+                const menuZIndex = Number.parseInt(window.getComputedStyle(menu).zIndex || "0", 10);
+                const mobileContextZIndex = mobileContext instanceof HTMLElement
+                    ? Number.parseInt(window.getComputedStyle(mobileContext).zIndex || "0", 10)
+                    : -1;
+                const overviewSection = document.querySelector("#aislepilot-overview");
+                return [
+                    Math.max(0, 8 - rect.left),
+                    Math.max(0, rect.right - (window.innerWidth - 8)),
+                    menu.querySelectorAll(".aislepilot-overview-regenerate-btn, .aislepilot-edit-setup-btn").length,
+                    refreshText,
+                    settingsText,
+                    isButtonCenterVisible(refresh) ? 1 : 0,
+                    isButtonCenterVisible(settings) ? 1 : 0,
+                    Number.isFinite(menuZIndex) ? menuZIndex : -1,
+                    Number.isFinite(mobileContextZIndex) ? mobileContextZIndex : -1,
+                    overviewSection instanceof HTMLElement && overviewSection.classList.contains("is-actions-menu-open") ? 1 : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(10, menuMetrics.Length);
+        Assert.True(Convert.ToDouble(menuMetrics[0]) <= 1.5, $"Expected overview menu to stay inside viewport on left edge. Overflow={menuMetrics[0]}.");
+        Assert.True(Convert.ToDouble(menuMetrics[1]) <= 1.5, $"Expected overview menu to stay inside viewport on right edge. Overflow={menuMetrics[1]}.");
+        Assert.Equal(2, Convert.ToInt32(menuMetrics[2]));
+        Assert.Contains("Refresh plan", Convert.ToString(menuMetrics[3]), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("settings", Convert.ToString(menuMetrics[4]), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, Convert.ToInt32(menuMetrics[5]));
+        Assert.Equal(1, Convert.ToInt32(menuMetrics[6]));
+        Assert.True(
+            Convert.ToDouble(menuMetrics[7]) > Convert.ToDouble(menuMetrics[8]),
+            $"Expected overview menu z-index to exceed sticky context z-index. Menu={menuMetrics[7]}, context={menuMetrics[8]}.");
+        Assert.Equal(1, Convert.ToInt32(menuMetrics[9]));
+    }
+
+    [Fact]
+    public async Task NarrowMobile_AislePilotOverviewCollapsed_DoesNotCreateHorizontalOverflow()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateNarrowMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var overflowMetrics = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const doc = document.documentElement;
+                const body = document.body;
+                const scrollWidth = Math.max(doc?.scrollWidth ?? 0, body?.scrollWidth ?? 0);
+                const overflowX = Math.max(0, scrollWidth - window.innerWidth);
+
+                const overviewHead = document.querySelector(".aislepilot-overview-head");
+                const overviewActions = document.querySelector(".aislepilot-overview-actions");
+                const headRect = overviewHead instanceof HTMLElement ? overviewHead.getBoundingClientRect() : null;
+                const actionsRect = overviewActions instanceof HTMLElement ? overviewActions.getBoundingClientRect() : null;
+                const headOverflow = headRect ? Math.max(0, headRect.right - window.innerWidth) : -1;
+                const actionsOverflow = actionsRect ? Math.max(0, actionsRect.right - window.innerWidth) : -1;
+                return [overflowX, headOverflow, actionsOverflow];
+            }
+            """);
+
+        Assert.Equal(3, overflowMetrics.Length);
+        Assert.True(overflowMetrics[0] <= 1.5, $"Expected collapsed overview not to cause page horizontal overflow. Overflow={overflowMetrics[0]:F1}px.");
+        Assert.True(overflowMetrics[1] <= 1.5, $"Expected overview header to stay inside viewport. Overflow={overflowMetrics[1]:F1}px.");
+        Assert.True(overflowMetrics[2] <= 1.5, $"Expected overview action row to stay inside viewport. Overflow={overflowMetrics[2]:F1}px.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotDayCardHeader_UsesCompactActionsAndMovesLeftoverIntoMoreActionsMenu()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var headerMetrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const trigger = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] > summary");
+                if (!(trigger instanceof HTMLElement)) {
+                    return [-1, -1, "missing", -1];
+                }
+
+                const triggerRect = trigger.getBoundingClientRect();
+                const triggerLabel = trigger.querySelector(".aislepilot-swap-action-label");
+                const triggerLabelDisplay = triggerLabel instanceof HTMLElement
+                    ? window.getComputedStyle(triggerLabel).display
+                    : "missing";
+                const inlineLeftoverButton = document.querySelector("[data-day-card-header-actions].is-active")
+                    ?.closest(".aislepilot-day-card-head-actions")
+                    ?.querySelector(".aislepilot-day-card-leftover-controls [data-leftover-toggle-sign]");
+                return [
+                    triggerRect.width,
+                    triggerRect.height,
+                    triggerLabelDisplay,
+                    inlineLeftoverButton instanceof HTMLElement ? 1 : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(4, headerMetrics.Length);
+        Assert.True(Convert.ToDouble(headerMetrics[0]) <= 44, $"Expected compact more-actions trigger width. Width={headerMetrics[0]}.");
+        Assert.True(Convert.ToDouble(headerMetrics[1]) <= 44, $"Expected compact more-actions trigger height. Height={headerMetrics[1]}.");
+        Assert.Equal("none", Convert.ToString(headerMetrics[2]));
+        Assert.Equal(0, Convert.ToInt32(headerMetrics[3]));
+
+        var moreActionsSummary = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
+        await moreActionsSummary.ClickAsync();
+
+        var leftoverMenuButton = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions][open] [data-leftover-toggle-sign]").First;
+        await leftoverMenuButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var menuLabel = (await leftoverMenuButton.Locator("[data-leftover-toggle-text]").First.InnerTextAsync()).Trim();
+        Assert.True(
+            menuLabel.Equals("Cook extra", StringComparison.OrdinalIgnoreCase) ||
+            menuLabel.Equals("Remove extra", StringComparison.OrdinalIgnoreCase),
+            $"Expected leftover menu action label to be 'Cook extra' or 'Remove extra', but was '{menuLabel}'.");
+        var dayIndex = await leftoverMenuButton.GetAttributeAsync("data-leftover-day-index");
+        Assert.True(int.TryParse(dayIndex, out _), $"Expected leftover menu action to expose a numeric day index. Value='{dayIndex}'.");
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotDayCardSummary_TracksSelectedMealTab()
     {
         if (!IsE2EEnabled())
@@ -1474,7 +1816,7 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardHeader_HasSpacedSummaryAndCompactLeftoverToggle()
+    public async Task Mobile_AislePilotDayCardHeader_HasSpacedSummaryAndLeftoverToggleWorksFromActionsMenu()
     {
         if (!IsE2EEnabled())
         {
@@ -1486,73 +1828,106 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var card = page.Locator("[data-day-meal-card]:has([data-day-card-summary]):has([data-leftover-day-zone])").First;
-        await card.WaitForAsync(new LocatorWaitForOptions
+        await page.Locator("[data-day-meal-card]:has([data-day-card-summary]):has([data-leftover-day-zone])").First.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 15000
         });
 
-        var toggleButton = card.Locator("[data-leftover-toggle-sign]").First;
-        var dayZone = card.Locator("[data-leftover-day-zone]").First;
-        var dayIndex = await dayZone.GetAttributeAsync("data-day-index");
-        Assert.False(string.IsNullOrWhiteSpace(dayIndex));
-
-        var beforeMetrics = await card.EvaluateAsync<double[]>(
+        var dayIndex = await page.EvaluateAsync<string>(
             """
-            cardRoot => {
+            () => {
+                const candidateRows = Array.from(document.querySelectorAll("[data-day-card-header-actions].is-active"));
+                for (const row of candidateRows) {
+                    if (!(row instanceof HTMLElement)) {
+                        continue;
+                    }
+
+                    const toggleButton = row.querySelector("[data-card-more-actions] [data-leftover-toggle-sign]");
+                    if (!(toggleButton instanceof HTMLButtonElement) || toggleButton.hidden) {
+                        continue;
+                    }
+
+                    const rawDayIndex = (toggleButton.getAttribute("data-leftover-day-index") ?? "").trim();
+                    if (rawDayIndex.length > 0) {
+                        return rawDayIndex;
+                    }
+                }
+
+                return "";
+            }
+            """);
+        Assert.True(int.TryParse(dayIndex, out _), "Expected at least one active card to expose an available leftover menu action.");
+        var targetCard = page.Locator($"[data-day-meal-card]:has([data-leftover-day-zone][data-day-index='{dayIndex}'])").First;
+        await targetCard.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var beforeMetrics = await targetCard.EvaluateAsync<double[]>(
+            """
+            (cardRoot, targetDayIndex) => {
                 if (!(cardRoot instanceof HTMLElement)) {
                     return [-1, -1, -1];
                 }
 
                 const kicker = cardRoot.querySelector(".aislepilot-day-card-head-main .aislepilot-card-kicker");
                 const summary = cardRoot.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta[data-day-card-summary]");
-                const zone = cardRoot.querySelector("[data-leftover-day-zone]");
-                const button = zone?.querySelector("[data-leftover-toggle-sign]");
-                if (!(kicker instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(zone instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+                const safeDayIndex = typeof targetDayIndex === "string" ? targetDayIndex : "";
+                const zone = cardRoot.querySelector(`[data-leftover-day-zone][data-day-index="${safeDayIndex}"]`);
+                if (!(kicker instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(zone instanceof HTMLElement)) {
                     return [-1, -1, -1];
                 }
 
                 const kickerRect = kicker.getBoundingClientRect();
                 const summaryRect = summary.getBoundingClientRect();
-                const zoneRect = zone.getBoundingClientRect();
-                const buttonRect = button.getBoundingClientRect();
                 const spacingGap = Math.max(0, summaryRect.left - kickerRect.right);
-                const controlSlack = Math.max(0, zoneRect.width - buttonRect.width);
-                return [spacingGap, zoneRect.width, controlSlack];
+                const count = Number.parseInt(zone.getAttribute("data-leftover-count") ?? "", 10);
+                const zoneDisplay = window.getComputedStyle(zone).display === "none" ? 1 : 0;
+                return [spacingGap, Number.isFinite(count) ? count : -1, zoneDisplay];
             }
-            """);
+            """,
+            dayIndex);
 
         Assert.Equal(3, beforeMetrics.Length);
         Assert.True(beforeMetrics[0] >= 10, $"Expected day-to-summary spacing to be wider. Actual={beforeMetrics[0]:F1}px.");
-        Assert.True(beforeMetrics[1] <= 56, $"Expected compact leftover control width. Actual={beforeMetrics[1]:F1}px.");
-        Assert.True(beforeMetrics[2] <= 20, $"Expected little slack around leftover icon. Actual={beforeMetrics[2]:F1}px.");
+        Assert.True(beforeMetrics[1] >= 0, $"Expected a valid day-zone leftover count. Actual={beforeMetrics[1]:F1}.");
+        Assert.Equal(1, Convert.ToInt32(beforeMetrics[2]));
 
-        await toggleButton.ClickAsync();
+        var moreActionsSummary = targetCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
+        await moreActionsSummary.ClickAsync();
+
+        var toggleButton = targetCard.Locator($"[data-day-card-header-actions].is-active [data-card-more-actions][open] [data-leftover-toggle-sign][data-leftover-day-index='{dayIndex}']").First;
+        await toggleButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+        await toggleButton.EvaluateAsync("button => button.click()");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await page.WaitForTimeoutAsync(220);
 
-        var afterToggleMetrics = await page.EvaluateAsync<double[]>(
+        var afterToggleMetrics = await page.EvaluateAsync<int[]>(
             """
             dayIndex => {
                 const safeDayIndex = typeof dayIndex === "string" ? dayIndex : "";
                 const zone = document.querySelector(`[data-leftover-day-zone][data-day-index="${safeDayIndex}"]`);
-                const button = zone?.querySelector("[data-leftover-toggle-sign]");
-                if (!(zone instanceof HTMLElement) || !(button instanceof HTMLElement)) {
+                if (!(zone instanceof HTMLElement)) {
                     return [-1, -1];
                 }
 
-                const zoneRect = zone.getBoundingClientRect();
-                const buttonRect = button.getBoundingClientRect();
-                const controlSlack = Math.max(0, zoneRect.width - buttonRect.width);
-                return [zoneRect.width, controlSlack];
+                const count = Number.parseInt(zone.getAttribute("data-leftover-count") ?? "", 10);
+                const isHidden = window.getComputedStyle(zone).display === "none" ? 1 : 0;
+                return [Number.isFinite(count) ? count : -1, isHidden];
             }
             """,
             dayIndex ?? string.Empty);
 
         Assert.Equal(2, afterToggleMetrics.Length);
-        Assert.True(afterToggleMetrics[0] <= 56, $"Expected compact leftover control after toggle. Actual={afterToggleMetrics[0]:F1}px.");
-        Assert.True(afterToggleMetrics[1] <= 20, $"Expected minimal control slack after toggle. Actual={afterToggleMetrics[1]:F1}px.");
+        Assert.True(afterToggleMetrics[0] >= 0, $"Expected a valid leftover count after menu toggle. Actual={afterToggleMetrics[0]}.");
+        Assert.Equal(1, afterToggleMetrics[1]);
+        Assert.Equal(1, Math.Abs(afterToggleMetrics[0] - Convert.ToInt32(beforeMetrics[1])));
     }
 
     [Fact]
@@ -1689,6 +2064,72 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(
             widthDelta <= 1.5,
             $"Expected submit loading state to preserve button width. Delta={widthDelta}px.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotGeneratePlan_PrimarySubmitIsNotObstructed()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        // Allow setup-mode reveal/layout hooks to settle before evaluating hit-testing.
+        await page.WaitForTimeoutAsync(350);
+
+        var hitTestReport = await page.EvaluateAsync<string>(
+            """
+            () => {
+                const button = document.querySelector("#aislepilot-setup-form button[data-setup-mode-submit='planner']");
+                if (!(button instanceof HTMLButtonElement)) {
+                    return "button-missing";
+                }
+
+                button.scrollIntoView({ block: "center", inline: "nearest" });
+                const rect = button.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) {
+                    return "button-zero-size";
+                }
+                const scrollSnapshot = `scrollY=${window.scrollY.toFixed(1)} innerH=${window.innerHeight.toFixed(1)} docH=${document.documentElement.scrollHeight.toFixed(1)}`;
+
+                const points = [
+                    [rect.left + (rect.width / 2), rect.top + (rect.height / 2)],
+                    [rect.left + 14, rect.top + (rect.height / 2)],
+                    [rect.right - 14, rect.top + (rect.height / 2)]
+                ];
+
+                for (const [x, y] of points) {
+                    const hit = document.elementFromPoint(x, y);
+                    if (!(hit instanceof Element)) {
+                        return `hit-missing@${x.toFixed(1)},${y.toFixed(1)} ${scrollSnapshot} buttonRect=${rect.left.toFixed(1)},${rect.top.toFixed(1)},${rect.width.toFixed(1)},${rect.height.toFixed(1)}`;
+                    }
+
+                    if (hit !== button && !button.contains(hit)) {
+                        const hitClass = typeof hit.className === "string" ? hit.className : "";
+                        const hitRect = hit.getBoundingClientRect();
+                        return `blocked:${hit.tagName.toLowerCase()}.${hitClass}@${x.toFixed(1)},${y.toFixed(1)} ${scrollSnapshot} buttonRect=${rect.left.toFixed(1)},${rect.top.toFixed(1)},${rect.width.toFixed(1)},${rect.height.toFixed(1)} hitRect=${hitRect.left.toFixed(1)},${hitRect.top.toFixed(1)},${hitRect.width.toFixed(1)},${hitRect.height.toFixed(1)}`;
+                    }
+                }
+
+                return "ok";
+            }
+            """);
+
+        if (!string.Equals(hitTestReport, "ok", StringComparison.Ordinal))
+        {
+            throw new Xunit.Sdk.XunitException(hitTestReport);
+        }
     }
 
     [Fact]
@@ -1884,6 +2325,151 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         Assert.Contains("is-active", exportClass, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Desktop_AislePilotLayout_UsesWideMainContainer()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var mainWidth = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const main = document.querySelector("main.app-shell-main.container");
+                if (!(main instanceof HTMLElement)) {
+                    return 0;
+                }
+
+                return main.getBoundingClientRect().width;
+            }
+            """);
+
+        Assert.True(mainWidth >= 1300, $"Expected a wide desktop container for AislePilot. Actual main width={mainWidth:F1}px.");
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotLayout_UsesComfortableMaxContainerWidth()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var mainWidth = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const main = document.querySelector("main.app-shell-main.aislepilot-main.container");
+                if (!(main instanceof HTMLElement)) {
+                    return 0;
+                }
+
+                return main.getBoundingClientRect().width;
+            }
+            """);
+
+        Assert.True(mainWidth >= 1280, $"Expected a comfortable but still wide container floor. Actual width={mainWidth:F1}px.");
+        Assert.True(mainWidth <= 1365, $"Expected container max width to avoid excessive eye travel. Actual width={mainWidth:F1}px.");
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotShoppingGrid_UsesGridColumnsInsteadOfMasonryColumns()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var shoppingGridMetrics = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const grid = document.querySelector(".aislepilot-shopping-grid");
+                if (!(grid instanceof HTMLElement)) {
+                    return [-1, -1, -1];
+                }
+
+                const styles = window.getComputedStyle(grid);
+                const display = styles.display;
+                const columnCountRaw = (styles.columnCount || "").trim().toLowerCase();
+                const usesMasonryColumns = columnCountRaw.length > 0 && columnCountRaw !== "auto" && columnCountRaw !== "normal";
+                const templateColumns = (styles.gridTemplateColumns || "")
+                    .split(" ")
+                    .map(value => value.trim())
+                    .filter(value => value.length > 0);
+                return [
+                    display === "grid" ? 1 : 0,
+                    templateColumns.length,
+                    usesMasonryColumns ? 1 : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(3, shoppingGridMetrics.Length);
+        Assert.Equal(1, shoppingGridMetrics[0]);
+        Assert.True(shoppingGridMetrics[1] >= 2, $"Expected at least two shopping grid columns on desktop. Actual={shoppingGridMetrics[1]:F0}.");
+        Assert.Equal(0, shoppingGridMetrics[2]);
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotOverview_UsesReadableMinimumLabelFontSizes()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var fontSizes = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const statLabel = document.querySelector(".aislepilot-stat-label");
+                const daySummary = document.querySelector(".aislepilot-day-card-meta[data-day-card-summary]");
+                if (!(statLabel instanceof HTMLElement) || !(daySummary instanceof HTMLElement)) {
+                    return [-1, -1];
+                }
+
+                const statLabelFontSize = Number.parseFloat(window.getComputedStyle(statLabel).fontSize || "0");
+                const daySummaryFontSize = Number.parseFloat(window.getComputedStyle(daySummary).fontSize || "0");
+                return [statLabelFontSize, daySummaryFontSize];
+            }
+            """);
+
+        Assert.Equal(2, fontSizes.Length);
+        Assert.True(fontSizes[0] >= 11.5, $"Expected overview stat labels to be at least 11.5px. Actual={fontSizes[0]:F2}px.");
+        Assert.True(fontSizes[1] >= 13, $"Expected day summary labels to be at least 13px. Actual={fontSizes[1]:F2}px.");
+    }
+
     private static bool IsE2EEnabled()
     {
         var value = Environment.GetEnvironmentVariable(E2EEnvVar);
@@ -1976,7 +2562,10 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         var generateButton = page.Locator("form.aislepilot-form button[type='submit']:has-text('Generate weekly plan')");
-        await generateButton.ClickAsync();
+        await generateButton.ScrollIntoViewIfNeededAsync();
+        // Some mobile emulation runs report transient hit-target interception while layout settles.
+        // Force-click keeps downstream scenario tests deterministic; direct hit-testing has its own regression test.
+        await generateButton.ClickAsync(new LocatorClickOptions { Force = true });
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First.WaitForAsync(new LocatorWaitForOptions
         {
