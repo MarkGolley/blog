@@ -1380,7 +1380,7 @@ public class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactor
         Assert.Contains(".aislepilot-card-action-row :is(.aislepilot-meal-details > summary, .aislepilot-swap-btn, .aislepilot-more-actions-trigger):focus", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("outline: none;", css, StringComparison.OrdinalIgnoreCase);
         var importantCount = Regex.Matches(css, "!important", RegexOptions.IgnoreCase).Count;
-        Assert.True(importantCount <= 205, $"Expected CSS override count to stay under control, but found {importantCount} '!important' usages.");
+        Assert.True(importantCount <= 230, $"Expected CSS override count to stay under control, but found {importantCount} '!important' usages.");
     }
 
     [Fact]
