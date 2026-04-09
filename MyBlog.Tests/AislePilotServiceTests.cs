@@ -2791,6 +2791,47 @@ public class AislePilotServiceTests
     }
 
     [Fact]
+    public void SwapMealForDay_WhenAllSlotCompatibleTemplatesAreSeen_ThrowsInvalidOperationException()
+    {
+        ClearAiPool();
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var initialPlan = _service.BuildPlan(request);
+        Assert.Single(initialPlan.MealPlan);
+        var currentMealName = initialPlan.MealPlan[0].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan.Select(meal => meal.MealName).ToList();
+        var slotCompatibleMealNames = GetCompatibleTemplateMealNamesForSlot(
+            request.DietaryModes,
+            request.DislikesOrAllergens,
+            "Breakfast");
+        Assert.True(slotCompatibleMealNames.Count > 1, "Expected multiple breakfast-compatible templates for the test.");
+
+        var seenMealNames = slotCompatibleMealNames
+            .Where(name => !name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        Assert.NotEmpty(seenMealNames);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.SwapMealForDay(
+                request,
+                dayIndex: 0,
+                currentMealName,
+                currentPlanMealNames,
+                seenMealNames));
+        Assert.Contains("No unique compatible replacement meal is available", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildPlan_WhenAiReturnsRateLimit_FallsBackToTemplatePlan()
     {
         var configuration = new ConfigurationBuilder()
@@ -3231,6 +3272,11 @@ public class AislePilotServiceTests
         Assert.DoesNotContain(recipeSteps, step => step.Contains("serve and enjoy", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(
             recipeSteps,
+            step => step.Contains("chicken", StringComparison.OrdinalIgnoreCase) ||
+                    step.Contains("pepper", StringComparison.OrdinalIgnoreCase) ||
+                    step.Contains("rice", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            recipeSteps,
             step => step.Contains("minute", StringComparison.OrdinalIgnoreCase) ||
                     step.Contains("200C", StringComparison.OrdinalIgnoreCase) ||
                     step.Contains("medium-high", StringComparison.OrdinalIgnoreCase));
@@ -3454,6 +3500,47 @@ public class AislePilotServiceTests
     {
         RemoveFromConcurrentDictionary(GetRequiredStaticField("AiMealPool"), mealName);
         RemoveFromConcurrentDictionary(GetRequiredStaticField("AiMealPoolLastTouchedUtc"), mealName);
+    }
+
+    private static IReadOnlyList<string> GetCompatibleTemplateMealNamesForSlot(
+        IReadOnlyList<string> dietaryModes,
+        string? dislikesOrAllergens,
+        string mealType)
+    {
+        var filterMethod = typeof(AislePilotService).GetMethod("FilterMeals", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(filterMethod);
+        var supportsMealTypeMethod = typeof(AislePilotService).GetMethod("SupportsMealType", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(supportsMealTypeMethod);
+
+        var filteredTemplates = filterMethod!.Invoke(null, [dietaryModes, dislikesOrAllergens ?? string.Empty, null]) as IEnumerable;
+        Assert.NotNull(filteredTemplates);
+
+        var mealNames = new List<string>();
+        foreach (var template in filteredTemplates!)
+        {
+            if (template is null)
+            {
+                continue;
+            }
+
+            var supportsSlot = supportsMealTypeMethod!.Invoke(null, [template, mealType]);
+            Assert.NotNull(supportsSlot);
+            if (!(bool)supportsSlot!)
+            {
+                continue;
+            }
+
+            var name = template.GetType().GetProperty("Name")?.GetValue(template) as string;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                mealNames.Add(name.Trim());
+            }
+        }
+
+        return mealNames
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static void ClearAiPool()
