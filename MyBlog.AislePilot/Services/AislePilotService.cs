@@ -2983,17 +2983,10 @@ public sealed class AislePilotService : IAislePilotService
             var compatibleUnseenPoolMeals = unseenPoolMeals
                 .Where(meal => SupportsMealType(meal, mealType))
                 .ToList();
-            var compatiblePoolMeals = availableAiMeals
-                .Where(meal => SupportsMealType(meal, mealType))
-                .ToList();
-            var aiSwapPool = compatibleUnseenPoolMeals.Count > 0
-                ? compatibleUnseenPoolMeals
-                : compatiblePoolMeals;
-
-            if (aiSwapPool.Count > 0)
+            if (compatibleUnseenPoolMeals.Count > 0)
             {
                 replacement = SelectSwapCandidate(
-                    aiSwapPool,
+                    compatibleUnseenPoolMeals,
                     selectedMeals,
                     dayIndex,
                     currentName,
@@ -3303,9 +3296,13 @@ public sealed class AislePilotService : IAislePilotService
         var unseenTemplates = templateCandidates
             .Where(meal => !seenMealNames.Contains(meal.Name, StringComparer.OrdinalIgnoreCase))
             .ToList();
+        if (unseenTemplates.Count == 0)
+        {
+            return null;
+        }
 
         return SelectSwapCandidate(
-            unseenTemplates.Count > 0 ? unseenTemplates : templateCandidates,
+            unseenTemplates,
             selectedMeals,
             dayIndex,
             currentMealName,
