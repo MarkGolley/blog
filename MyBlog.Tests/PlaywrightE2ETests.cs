@@ -1417,7 +1417,7 @@ public sealed class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(10, menuMetrics.Length);
         Assert.True(Convert.ToDouble(menuMetrics[0]) <= 1.5, $"Expected overview menu to stay inside viewport on left edge. Overflow={menuMetrics[0]}.");
         Assert.True(Convert.ToDouble(menuMetrics[1]) <= 1.5, $"Expected overview menu to stay inside viewport on right edge. Overflow={menuMetrics[1]}.");
-        Assert.Equal(2, Convert.ToInt32(menuMetrics[2]));
+        Assert.Equal(3, Convert.ToInt32(menuMetrics[2]));
         Assert.Contains("Refresh plan", Convert.ToString(menuMetrics[3]), StringComparison.OrdinalIgnoreCase);
         Assert.Contains("settings", Convert.ToString(menuMetrics[4]), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, Convert.ToInt32(menuMetrics[5]));
