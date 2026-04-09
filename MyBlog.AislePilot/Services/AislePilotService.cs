@@ -6085,7 +6085,140 @@ Single plated meal only, neutral background, no people, no text, no logos, no wa
             }
         }
 
-        return BuildFallbackRecipeSteps(mealName);
+        return BuildFallbackRecipeSteps(template, mealName);
+    }
+
+    private static IReadOnlyList<string> BuildFallbackRecipeSteps(
+        MealTemplate template,
+        string mealName)
+    {
+        var baselineFallback = BuildFallbackRecipeSteps(mealName);
+        if (DoRecipeStepsReferenceIngredients(baselineFallback, template))
+        {
+            return baselineFallback;
+        }
+
+        return BuildIngredientAwareFallbackRecipeSteps(template, mealName);
+    }
+
+    private static bool DoRecipeStepsReferenceIngredients(
+        IReadOnlyList<string> recipeSteps,
+        MealTemplate template)
+    {
+        if (recipeSteps.Count == 0 || template.Ingredients.Count == 0)
+        {
+            return false;
+        }
+
+        var ingredientTerms = template.Ingredients
+            .SelectMany(ingredient => BuildIngredientSearchTerms(ingredient.Name))
+            .Where(term => !string.IsNullOrWhiteSpace(term))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (ingredientTerms.Count == 0)
+        {
+            return false;
+        }
+
+        return recipeSteps.Any(step =>
+            ingredientTerms.Any(term => ContainsWholeWord(step, term)));
+    }
+
+    private static IReadOnlyList<string> BuildIngredientAwareFallbackRecipeSteps(
+        MealTemplate template,
+        string mealName)
+    {
+        var ingredientNames = template.Ingredients
+            .Select(ingredient => ClampAndNormalize(ingredient.Name, MaxAiIngredientNameLength))
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(5)
+            .ToList();
+        var primaryIngredient = ingredientNames.ElementAtOrDefault(0) ?? "the main ingredient";
+        var secondaryIngredient = ingredientNames.ElementAtOrDefault(1) ?? primaryIngredient;
+        var thirdIngredient = ingredientNames.ElementAtOrDefault(2) ?? secondaryIngredient;
+        var carbIngredient = ingredientNames.FirstOrDefault(IsLikelyCarbIngredientName);
+
+        if (mealName.Contains("salad", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                $"Cook {primaryIngredient} first if needed, then let it cool for 8-10 minutes.",
+                $"Prepare {secondaryIngredient} and {thirdIngredient} into bite-size pieces.",
+                "Whisk a quick dressing with oil, acid, salt, and pepper.",
+                $"Combine {primaryIngredient}, {secondaryIngredient}, and {thirdIngredient}, then toss through the dressing.",
+                "Taste, adjust seasoning, and chill briefly before serving."
+            ];
+        }
+
+        if (mealName.Contains("baked", StringComparison.OrdinalIgnoreCase) ||
+            mealName.Contains("tray bake", StringComparison.OrdinalIgnoreCase) ||
+            mealName.Contains("roast", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "Preheat oven to 200C (fan 180C) and line a roasting tray.",
+                $"Season {primaryIngredient} and {secondaryIngredient} with oil, salt, and pepper.",
+                $"Roast {secondaryIngredient} for 12-15 minutes to start softening.",
+                $"Add {primaryIngredient} and {thirdIngredient}, then roast for another 12-18 minutes until cooked through.",
+                "Rest for 2 minutes, then serve with tray juices spooned over."
+            ];
+        }
+
+        if (mealName.Contains("curry", StringComparison.OrdinalIgnoreCase) ||
+            mealName.Contains("chilli", StringComparison.OrdinalIgnoreCase) ||
+            mealName.Contains("stew", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "Heat a deep pan over medium heat for 2 minutes with a little oil.",
+                $"Cook {primaryIngredient} for 5-7 minutes until lightly browned and fragrant.",
+                $"Stir in {secondaryIngredient} and {thirdIngredient} with a splash of water or stock.",
+                "Bring to a gentle simmer and cook for 15-20 minutes, stirring occasionally, until thickened.",
+                "Taste, adjust seasoning, and rest for 2 minutes before serving."
+            ];
+        }
+
+        if (mealName.Contains("stir fry", StringComparison.OrdinalIgnoreCase) ||
+            mealName.Contains("noodle", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseIngredient = string.IsNullOrWhiteSpace(carbIngredient) ? "your cooked base" : carbIngredient;
+            return
+            [
+                $"Cook {baseIngredient} according to pack instructions and keep it warm.",
+                "Heat a large pan or wok over medium-high heat for 2 minutes with a little oil.",
+                $"Cook {primaryIngredient} for 4-6 minutes until nearly done.",
+                $"Add {secondaryIngredient} and {thirdIngredient}, then stir-fry for 3-4 minutes until just tender.",
+                $"Toss through {baseIngredient} and any sauce for 1-2 minutes until evenly coated, then serve."
+            ];
+        }
+
+        return
+        [
+            $"Prep {primaryIngredient}, {secondaryIngredient}, and {thirdIngredient} into even pieces.",
+            "Heat a large pan over medium-high heat for 2 minutes and add a little oil.",
+            $"Cook {primaryIngredient} for 6-8 minutes, stirring, until browned and nearly cooked through.",
+            $"Add {secondaryIngredient} and {thirdIngredient} with a splash of water or stock, then cook for 4-6 minutes.",
+            "Taste, adjust seasoning, and rest for 1-2 minutes before serving."
+        ];
+    }
+
+    private static bool IsLikelyCarbIngredientName(string ingredientName)
+    {
+        if (string.IsNullOrWhiteSpace(ingredientName))
+        {
+            return false;
+        }
+
+        return ingredientName.Contains("rice", StringComparison.OrdinalIgnoreCase) ||
+               ingredientName.Contains("pasta", StringComparison.OrdinalIgnoreCase) ||
+               ingredientName.Contains("noodle", StringComparison.OrdinalIgnoreCase) ||
+               ingredientName.Contains("quinoa", StringComparison.OrdinalIgnoreCase) ||
+               ingredientName.Contains("couscous", StringComparison.OrdinalIgnoreCase) ||
+               ingredientName.Contains("potato", StringComparison.OrdinalIgnoreCase) ||
+               ingredientName.Contains("wrap", StringComparison.OrdinalIgnoreCase) ||
+               ingredientName.Contains("bread", StringComparison.OrdinalIgnoreCase) ||
+               ingredientName.Contains("oat", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<string> BuildFallbackRecipeSteps(string mealName)

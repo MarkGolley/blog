@@ -3272,6 +3272,11 @@ public class AislePilotServiceTests
         Assert.DoesNotContain(recipeSteps, step => step.Contains("serve and enjoy", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(
             recipeSteps,
+            step => step.Contains("chicken", StringComparison.OrdinalIgnoreCase) ||
+                    step.Contains("pepper", StringComparison.OrdinalIgnoreCase) ||
+                    step.Contains("rice", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            recipeSteps,
             step => step.Contains("minute", StringComparison.OrdinalIgnoreCase) ||
                     step.Contains("200C", StringComparison.OrdinalIgnoreCase) ||
                     step.Contains("medium-high", StringComparison.OrdinalIgnoreCase));
