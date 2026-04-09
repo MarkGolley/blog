@@ -176,7 +176,7 @@ public sealed partial class AislePilotService
         IReadOnlyList<string> aisleOrder,
         DessertAddOnTemplate? dessertAddOnTemplate)
     {
-        var aggregated = new Dictionary<string, MutableShoppingItem>(StringComparer.OrdinalIgnoreCase);
+        var aggregated = new List<MutableShoppingItem>();
         var mealCount = Math.Min(selectedMeals.Count, mealPortionMultipliers.Count);
         for (var i = 0; i < mealCount; i++)
         {
@@ -189,8 +189,8 @@ public sealed partial class AislePilotService
             var mealPortionMultiplier = Math.Max(1, mealPortionMultipliers[i]);
             foreach (var ingredient in meal.Ingredients)
             {
-                var key = $"{ingredient.Department}|{ingredient.Name}|{ingredient.Unit}";
-                if (!aggregated.TryGetValue(key, out var existing))
+                var existing = FindMatchingShoppingItem(aggregated, ingredient.Department, ingredient.Name, ingredient.Unit);
+                if (existing is null)
                 {
                     existing = new MutableShoppingItem
                     {
@@ -198,7 +198,7 @@ public sealed partial class AislePilotService
                         Name = ingredient.Name,
                         Unit = ingredient.Unit
                     };
-                    aggregated[key] = existing;
+                    aggregated.Add(existing);
                 }
 
                 existing.Quantity += ingredient.QuantityForTwo * householdFactor * mealPortionMultiplier;
@@ -215,7 +215,7 @@ public sealed partial class AislePilotService
             .Select((department, index) => new { department, index })
             .ToDictionary(x => x.department, x => x.index, StringComparer.OrdinalIgnoreCase);
 
-        return aggregated.Values
+        return aggregated
             .Select(item => new AislePilotShoppingItemViewModel
             {
                 Department = item.Department,
@@ -229,16 +229,143 @@ public sealed partial class AislePilotService
             .ToList();
     }
 
+    private static readonly HashSet<string> ShoppingIngredientVariantQualifiers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "can",
+        "canned",
+        "tin",
+        "tinned",
+        "drained"
+    };
+
+    private static MutableShoppingItem? FindMatchingShoppingItem(
+        IEnumerable<MutableShoppingItem> aggregated,
+        string department,
+        string ingredientName,
+        string unit)
+    {
+        var normalizedDepartment = NormalizeShoppingListDepartment(department);
+        var normalizedIngredientName = NormalizeShoppingListIngredientName(ingredientName);
+        var normalizedUnit = NormalizeShoppingListUnit(unit);
+
+        foreach (var item in aggregated)
+        {
+            if (!NormalizeShoppingListDepartment(item.Department).Equals(normalizedDepartment, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (!NormalizeShoppingListUnit(item.Unit).Equals(normalizedUnit, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var existingIngredientName = NormalizeShoppingListIngredientName(item.Name);
+            if (AreEquivalentShoppingIngredientNames(existingIngredientName, normalizedIngredientName))
+            {
+                return item;
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeShoppingListDepartment(string? department)
+    {
+        var normalized = NormalizePantryText(department ?? string.Empty);
+        return string.IsNullOrWhiteSpace(normalized) ? "other" : normalized;
+    }
+
+    private static string NormalizeShoppingListIngredientName(string? ingredientName)
+    {
+        var normalized = NormalizePantryText(ingredientName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        foreach (var aliasEntry in IngredientAliases)
+        {
+            var canonicalName = NormalizePantryText(aliasEntry.Key);
+            if (normalized.Equals(canonicalName, StringComparison.OrdinalIgnoreCase))
+            {
+                return canonicalName;
+            }
+
+            foreach (var alias in aliasEntry.Value)
+            {
+                var normalizedAlias = NormalizePantryText(alias);
+                if (normalized.Equals(normalizedAlias, StringComparison.OrdinalIgnoreCase))
+                {
+                    return canonicalName;
+                }
+            }
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeShoppingListUnit(string? unit)
+    {
+        var normalized = NormalizeAiUnitForPricing(unit);
+        return normalized switch
+        {
+            "can" or "cans" or "tin" or "tins" => "tin",
+            "gram" or "grams" or "g" => "g",
+            "kilogram" or "kilograms" or "kg" or "kgs" => "kg",
+            "milliliter" or "milliliters" or "millilitre" or "millilitres" or "ml" => "ml",
+            "liter" or "liters" or "litre" or "litres" or "l" => "l",
+            "piece" or "pieces" or "pc" or "pcs" => "pcs",
+            _ => normalized
+        };
+    }
+
+    private static bool AreEquivalentShoppingIngredientNames(string leftNormalizedName, string rightNormalizedName)
+    {
+        if (leftNormalizedName.Equals(rightNormalizedName, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(leftNormalizedName) || string.IsNullOrWhiteSpace(rightNormalizedName))
+        {
+            return false;
+        }
+
+        var leftWords = leftNormalizedName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var rightWords = rightNormalizedName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var leftExtras = leftWords
+            .Where(word => !rightWords.Contains(word))
+            .ToList();
+        var rightExtras = rightWords
+            .Where(word => !leftWords.Contains(word))
+            .ToList();
+
+        var leftExtraWordsAreQualifiers = leftExtras.Count == 0 ||
+                                          leftExtras.All(word => ShoppingIngredientVariantQualifiers.Contains(word));
+        var rightExtraWordsAreQualifiers = rightExtras.Count == 0 ||
+                                           rightExtras.All(word => ShoppingIngredientVariantQualifiers.Contains(word));
+
+        return leftExtraWordsAreQualifiers &&
+               rightExtraWordsAreQualifiers &&
+               leftWords.Overlaps(rightWords);
+    }
+
     private static void AddDessertAddOnShoppingItems(
-        IDictionary<string, MutableShoppingItem> aggregated,
+        IList<MutableShoppingItem> aggregated,
         decimal householdFactor,
         DessertAddOnTemplate dessertAddOnTemplate)
     {
         var scale = Math.Clamp(householdFactor, 0.5m, 4m);
         foreach (var ingredient in dessertAddOnTemplate.Ingredients)
         {
-            var key = $"{ingredient.Department}|{ingredient.Name}|{ingredient.Unit}";
-            if (!aggregated.TryGetValue(key, out var existing))
+            var existing = FindMatchingShoppingItem(aggregated, ingredient.Department, ingredient.Name, ingredient.Unit);
+            if (existing is null)
             {
                 existing = new MutableShoppingItem
                 {
@@ -246,7 +373,7 @@ public sealed partial class AislePilotService
                     Name = ingredient.Name,
                     Unit = ingredient.Unit
                 };
-                aggregated[key] = existing;
+                aggregated.Add(existing);
             }
 
             existing.Quantity += ingredient.QuantityForTwo * scale;

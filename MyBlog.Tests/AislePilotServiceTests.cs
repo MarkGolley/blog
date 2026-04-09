@@ -38,6 +38,9 @@ public partial class AislePilotServiceTests
     [InlineData(0.18, "L", "180 ml")]
     [InlineData(1.5, "litres", "1500 ml")]
     [InlineData(1.24, "kg", "1.2 kg")]
+    [InlineData(0.38, "tin", "half a tin")]
+    [InlineData(0.19, "", "1/4")]
+    [InlineData(5.63, "ml", "1 tsp")]
     public void QuantityDisplayFormatter_RecipeFormatting_PreservesPreciseAmounts(decimal quantity, string unit, string expected)
     {
         var formatted = QuantityDisplayFormatter.FormatForRecipe(quantity, unit);
@@ -1006,6 +1009,62 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_MergesEquivalentShoppingItemsAcrossIngredientVariants()
+    {
+        ClearAiPool();
+
+        var mealOneName = $"Smoky bean quinoa bowl {Guid.NewGuid():N}";
+        var mealTwoName = $"Zesty quinoa chilli {Guid.NewGuid():N}";
+        var mealOne = CreateMealTemplateWithIngredients(
+            mealOneName,
+            [
+                ("Black Beans, Canned", "Tins & Dry Goods", 1m, "tin", 0.90m),
+                ("Quinoa", "Tins & Dry Goods", 180m, "grams", 1.20m),
+                ("Lime", "Produce", 1m, "pcs", 0.40m)
+            ]);
+        var mealTwo = CreateMealTemplateWithIngredients(
+            mealTwoName,
+            [
+                ("Black Beans", "Tins & Dry Goods", 1m, "can", 0.80m),
+                ("Quinoa", "Tins & Dry Goods", 120m, "g", 0.80m),
+                ("Onion", "Produce", 1m, "pcs", 0.30m)
+            ]);
+
+        InvokeAddMealsToAiPool([mealOne, mealTwo]);
+
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 80m,
+            HouseholdSize = 2,
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            DietaryModes = ["Balanced"]
+        };
+
+        try
+        {
+            var result = await _service.BuildPlanFromCurrentMealsAsync(request, [mealOneName, mealTwoName]);
+
+            var blackBeanItems = result.ShoppingItems
+                .Where(item => item.Name.Contains("black bean", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var quinoaItems = result.ShoppingItems
+                .Where(item => item.Name.Contains("quinoa", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Assert.Single(blackBeanItems);
+            Assert.Single(quinoaItems);
+            Assert.Equal(2m, blackBeanItems[0].Quantity);
+            Assert.Equal(300m, quinoaItems[0].Quantity);
+        }
+        finally
+        {
+            ClearAiPool();
+        }
+    }
+
+    [Fact]
     public void BuildPlan_CustomAisleOrderWithAtLeastThreeAisles_UsesCustomOrder()
     {
         var request = new AislePilotRequestModel
@@ -1760,6 +1819,57 @@ public partial class AislePilotServiceTests
         }
 
         return templates;
+    }
+
+    private static object CreateMealTemplateWithIngredients(
+        string mealName,
+        IReadOnlyList<(string Name, string Department, decimal QuantityForTwo, string Unit, decimal EstimatedCostForTwo)> ingredients)
+    {
+        var mealTemplateType = typeof(AislePilotService).GetNestedType("MealTemplate", BindingFlags.NonPublic);
+        Assert.NotNull(mealTemplateType);
+        var ingredientTemplateType = typeof(AislePilotService).GetNestedType("IngredientTemplate", BindingFlags.NonPublic);
+        Assert.NotNull(ingredientTemplateType);
+
+        var ingredientConstructor = ingredientTemplateType!.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .FirstOrDefault(candidate =>
+            {
+                var parameters = candidate.GetParameters();
+                return parameters.Length == 5 && parameters[0].ParameterType == typeof(string);
+            });
+        Assert.NotNull(ingredientConstructor);
+
+        var typedIngredientList = Activator.CreateInstance(typeof(List<>).MakeGenericType(ingredientTemplateType)) as IList;
+        Assert.NotNull(typedIngredientList);
+
+        foreach (var ingredient in ingredients)
+        {
+            var ingredientTemplate = ingredientConstructor!.Invoke(
+            [
+                ingredient.Name,
+                ingredient.Department,
+                ingredient.QuantityForTwo,
+                ingredient.Unit,
+                ingredient.EstimatedCostForTwo
+            ]);
+            typedIngredientList!.Add(ingredientTemplate);
+        }
+
+        var mealConstructor = mealTemplateType!.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .FirstOrDefault(candidate =>
+            {
+                var parameters = candidate.GetParameters();
+                return parameters.Length == 5 && parameters[0].ParameterType == typeof(string);
+            });
+        Assert.NotNull(mealConstructor);
+
+        return mealConstructor!.Invoke(
+        [
+            mealName,
+            6m,
+            true,
+            new List<string> { "Balanced" },
+            typedIngredientList!
+        ]);
     }
 
     private static void InvokeAddMealsToAiPool(IReadOnlyList<object> meals)
