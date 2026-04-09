@@ -997,6 +997,11 @@ public sealed partial class AislePilotService : IAislePilotService
     private readonly IWebHostEnvironment? _webHostEnvironment;
     private readonly IAislePilotPlanGenerationOrchestrator _planGenerationOrchestrator;
     private readonly IAislePilotPlanComparisonService _planComparisonService;
+    private readonly IAislePilotBudgetRebalancePipeline _budgetRebalancePipeline;
+    private readonly IAislePilotMealSwapPipeline _mealSwapPipeline;
+    private readonly AislePilotSlotSelectionEngine _slotSelectionEngine;
+    private readonly AislePilotNutritionRecipeFallbackEngine _nutritionRecipeFallbackEngine;
+    private readonly AislePilotPantryRankingEngine _pantryRankingEngine;
 
     public AislePilotService(
         HttpClient? httpClient = null,
@@ -1005,7 +1010,12 @@ public sealed partial class AislePilotService : IAislePilotService
         FirestoreDb? db = null,
         IWebHostEnvironment? webHostEnvironment = null,
         IAislePilotPlanGenerationOrchestrator? planGenerationOrchestrator = null,
-        IAislePilotPlanComparisonService? planComparisonService = null)
+        IAislePilotPlanComparisonService? planComparisonService = null,
+        IAislePilotBudgetRebalancePipeline? budgetRebalancePipeline = null,
+        IAislePilotMealSwapPipeline? mealSwapPipeline = null,
+        AislePilotSlotSelectionEngine? slotSelectionEngine = null,
+        AislePilotNutritionRecipeFallbackEngine? nutritionRecipeFallbackEngine = null,
+        AislePilotPantryRankingEngine? pantryRankingEngine = null)
     {
         _httpClient = httpClient;
         _logger = logger;
@@ -1013,6 +1023,11 @@ public sealed partial class AislePilotService : IAislePilotService
         _webHostEnvironment = webHostEnvironment;
         _planGenerationOrchestrator = planGenerationOrchestrator ?? new AislePilotPlanGenerationOrchestrator();
         _planComparisonService = planComparisonService ?? new AislePilotPlanComparisonService();
+        _budgetRebalancePipeline = budgetRebalancePipeline ?? new AislePilotBudgetRebalancePipeline();
+        _mealSwapPipeline = mealSwapPipeline ?? new AislePilotMealSwapPipeline();
+        _slotSelectionEngine = slotSelectionEngine ?? new AislePilotSlotSelectionEngine();
+        _nutritionRecipeFallbackEngine = nutritionRecipeFallbackEngine ?? new AislePilotNutritionRecipeFallbackEngine();
+        _pantryRankingEngine = pantryRankingEngine ?? new AislePilotPantryRankingEngine();
         _apiKey = configuration?["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         _model = configuration?["AislePilot:Model"] ?? "gpt-4.1-mini";
         _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-1";
@@ -1029,6 +1044,8 @@ public sealed partial class AislePilotService : IAislePilotService
     internal ILogger<AislePilotService>? Logger => _logger;
 
     internal IAislePilotPlanComparisonService PlanComparisonService => _planComparisonService;
+
+    internal bool AllowTemplateFallback => _allowTemplateFallback;
 
     public IReadOnlyList<string> GetSupportedSupermarkets()
     {
@@ -1435,9 +1452,9 @@ public sealed partial class AislePilotService : IAislePilotService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         var excludedMealNameSet = new HashSet<string>(normalizedExcludedMealNames, StringComparer.OrdinalIgnoreCase);
-        var userPantryTokens = ParsePantryTokens(request.PantryItems);
-        var pantryTokensWithAssumedBasics = MergePantryTokensWithAssumedBasics(userPantryTokens);
-        var specificPantryTokens = ParseSpecificPantryTokens(userPantryTokens);
+        var userPantryTokens = _pantryRankingEngine.ParsePantryTokens(request.PantryItems);
+        var pantryTokensWithAssumedBasics = _pantryRankingEngine.MergePantryTokensWithAssumedBasics(userPantryTokens);
+        var specificPantryTokens = _pantryRankingEngine.ParseSpecificPantryTokens(userPantryTokens);
         if (userPantryTokens.Count == 0)
         {
             return [];
@@ -1474,11 +1491,17 @@ public sealed partial class AislePilotService : IAislePilotService
         var allCandidates = candidates
             .Select(template =>
             {
-                var suggestion = BuildPantrySuggestion(template, pantryTokensWithAssumedBasics, householdFactor);
-                var userOnlySuggestion = BuildPantrySuggestion(template, userPantryTokens, householdFactor);
-                var userMatchedTokenCount = CountMatchedPantryTokens(template, userPantryTokens);
-                var specificMatchedTokenCount = CountMatchedPantryTokens(template, specificPantryTokens);
-                var score = ComputePantrySuggestionScore(
+                var suggestion = _pantryRankingEngine.BuildPantrySuggestion(
+                    template,
+                    pantryTokensWithAssumedBasics,
+                    householdFactor);
+                var userOnlySuggestion = _pantryRankingEngine.BuildPantrySuggestion(
+                    template,
+                    userPantryTokens,
+                    householdFactor);
+                var userMatchedTokenCount = _pantryRankingEngine.CountMatchedPantryTokens(template, userPantryTokens);
+                var specificMatchedTokenCount = _pantryRankingEngine.CountMatchedPantryTokens(template, specificPantryTokens);
+                var score = _pantryRankingEngine.ComputePantrySuggestionScore(
                     suggestion,
                     userOnlySuggestion,
                     userMatchedTokenCount,
@@ -1508,9 +1531,11 @@ public sealed partial class AislePilotService : IAislePilotService
 
         if (request.RequireCorePantryIngredients)
         {
-            var strictCoreSuggestions = RankPantrySuggestionCandidates(
+            var strictCoreSuggestions = _pantryRankingEngine.RankPantrySuggestionCandidates(
                     eligibleCandidates
-                        .Where(candidate => TemplateUsesCoreIngredientsFromUserPantry(candidate.Template, userPantryTokens))
+                        .Where(candidate => _pantryRankingEngine.TemplateUsesCoreIngredientsFromUserPantry(
+                            candidate.Template,
+                            userPantryTokens))
                         .Where(candidate => candidate.Suggestion.MissingCoreIngredientCount == 0)
                         .Where(candidate => candidate.Suggestion.MatchPercent >= PantrySuggestionNearMatchThreshold)
                         .ToList(),
@@ -1535,11 +1560,11 @@ public sealed partial class AislePilotService : IAislePilotService
             ? strongCandidates
             : eligibleCandidates;
 
-        var readyNowCandidates = RankPantrySuggestionCandidates(
+        var readyNowCandidates = _pantryRankingEngine.RankPantrySuggestionCandidates(
             primaryCandidates.Where(candidate => candidate.Suggestion.CanCookNow).ToList(),
             cappedResults,
             allowVariation: true);
-        var topUpCandidates = RankPantrySuggestionCandidates(
+        var topUpCandidates = _pantryRankingEngine.RankPantrySuggestionCandidates(
             primaryCandidates
                 .Where(candidate =>
                     !candidate.Suggestion.CanCookNow &&
@@ -1547,7 +1572,7 @@ public sealed partial class AislePilotService : IAislePilotService
                 .ToList(),
             cappedResults,
             allowVariation: true);
-        var stretchCandidates = RankPantrySuggestionCandidates(
+        var stretchCandidates = _pantryRankingEngine.RankPantrySuggestionCandidates(
             primaryCandidates
                 .Where(candidate =>
                     candidate.Suggestion.MissingCoreIngredientCount <= 4 &&
@@ -1587,7 +1612,7 @@ public sealed partial class AislePilotService : IAislePilotService
 
         if (selectedSuggestions.Count < cappedResults)
         {
-            var supplementalCandidates = RankPantrySuggestionCandidates(
+            var supplementalCandidates = _pantryRankingEngine.RankPantrySuggestionCandidates(
                 eligibleCandidates,
                 cappedResults,
                 allowVariation: true);

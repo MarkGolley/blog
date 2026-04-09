@@ -17,7 +17,7 @@ namespace MyBlog.Services;
 
 public sealed partial class AislePilotService
 {
-    private static IReadOnlyList<int> BuildMealPortionMultipliers(
+    internal static IReadOnlyList<int> BuildMealPortionMultipliers(
         int cookDays,
         int leftoverDays,
         IReadOnlyList<int>? requestedLeftoverSourceDays = null,
@@ -83,7 +83,7 @@ public sealed partial class AislePilotService
             .Candidate;
     }
 
-    private static IReadOnlyList<int> ParseRequestedLeftoverSourceDays(
+    internal static IReadOnlyList<int> ParseRequestedLeftoverSourceDays(
         string? leftoverCookDayIndexesCsv,
         int cookDays,
         int leftoverDays,

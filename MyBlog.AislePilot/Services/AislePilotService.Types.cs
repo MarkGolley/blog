@@ -34,7 +34,7 @@ public sealed partial class AislePilotService
         string DislikesOrAllergens,
         string PortionSize);
 
-    private sealed class MealNutritionEstimate
+    internal sealed class MealNutritionEstimate
     {
         public int CaloriesPerServing { get; set; }
         public decimal ProteinGramsPerServing { get; set; }
@@ -53,7 +53,7 @@ public sealed partial class AislePilotService
         public decimal EstimatedCost { get; set; }
     }
 
-    private sealed record MealTemplate(
+    internal sealed record MealTemplate(
         string Name,
         decimal BaseCostForTwo,
         bool IsQuick,
@@ -66,14 +66,14 @@ public sealed partial class AislePilotService
         public IReadOnlyList<string>? SuitableMealTypes { get; init; }
     }
 
-    private sealed record IngredientTemplate(
+    internal sealed record IngredientTemplate(
         string Name,
         string Department,
         decimal QuantityForTwo,
         string Unit,
         decimal EstimatedCostForTwo);
 
-    private sealed record DessertAddOnTemplate(
+    internal sealed record DessertAddOnTemplate(
         string Name,
         IReadOnlyList<IngredientTemplate> Ingredients);
 
@@ -89,7 +89,7 @@ public sealed partial class AislePilotService
         decimal FatPer100g,
         decimal? GramsPerUnit = null);
 
-    private sealed class AiMealNutritionEstimate
+    internal sealed class AiMealNutritionEstimate
     {
         public int CaloriesPerServingMedium { get; set; }
         public decimal ProteinGramsPerServingMedium { get; set; }
@@ -315,7 +315,7 @@ public sealed partial class AislePilotService
         public string? Url { get; set; }
     }
 
-    private sealed record PantrySuggestionCandidate(
+    internal sealed record PantrySuggestionCandidate(
         MealTemplate Template,
         AislePilotPantrySuggestionViewModel Suggestion,
         AislePilotPantrySuggestionViewModel UserOnlySuggestion,

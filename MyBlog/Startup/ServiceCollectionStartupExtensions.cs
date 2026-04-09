@@ -122,6 +122,11 @@ internal static class ServiceCollectionStartupExtensions
         builder.Services.AddSingleton<BlogService>();
         builder.Services.AddSingleton<IAislePilotPlanGenerationOrchestrator, AislePilotPlanGenerationOrchestrator>();
         builder.Services.AddSingleton<IAislePilotPlanComparisonService, AislePilotPlanComparisonService>();
+        builder.Services.AddSingleton<IAislePilotBudgetRebalancePipeline, AislePilotBudgetRebalancePipeline>();
+        builder.Services.AddSingleton<IAislePilotMealSwapPipeline, AislePilotMealSwapPipeline>();
+        builder.Services.AddSingleton<AislePilotSlotSelectionEngine>();
+        builder.Services.AddSingleton<AislePilotNutritionRecipeFallbackEngine>();
+        builder.Services.AddSingleton<AislePilotPantryRankingEngine>();
         builder.Services.AddScoped<CommentService>();
         builder.Services.AddScoped<LikeService>();
         builder.Services.AddScoped<SubscriptionService>();

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
-    [int]$MaxLines = 1400,
+    [int]$MaxLines = 1300,
     [string]$AllowListPath = ""
 )
 

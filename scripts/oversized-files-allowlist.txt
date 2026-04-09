@@ -2,6 +2,4 @@
 # Keep this list short and remove entries as files are split down further.
 
 MyBlog.AislePilot\Services\AislePilotService.cs
-MyBlog.AislePilot\Services\AislePilotService.MealSelection.cs
-MyBlog.AislePilot\Services\AislePilotService.PlanGeneration.cs
 MyBlog.Tests\AislePilotServiceTests.cs
