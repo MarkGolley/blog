@@ -32,6 +32,12 @@ try {
     $testProject = "MyBlog.Tests\MyBlog.Tests.csproj"
     $hasOpenAiKey = -not [string]::IsNullOrWhiteSpace($env:OPENAI_API_KEY)
 
+    Invoke-Step -Name "Checking source file sizes" -Action {
+        powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\check-oversized-files.ps1" `
+            -RepoRoot $root `
+            -AllowListPath ".\scripts\oversized-files-allowlist.txt"
+    }
+
     if ($Mode -eq "Tests" -or $Mode -eq "PreDeploy") {
         $testArgs = @("test", $testProject)
         if (-not $hasOpenAiKey) {

@@ -1279,75 +1279,12 @@
         <partial name="_AislePilotResultSections" model="Model" />
     }
 
-    <div class="aislepilot-plan-loading-shell" data-plan-loading-shell hidden aria-hidden="true">
-        <div class="aislepilot-plan-loading-surface" role="status" aria-live="polite">
-            <p class="aislepilot-plan-loading-title">Building your weekly plan...</p>
-            <p class="aislepilot-plan-loading-meta">This usually takes around 10-20 seconds.</p>
-            <div class="aislepilot-plan-loading-grid" aria-hidden="true">
-                <div class="aislepilot-plan-loading-card">
-                    <div class="aislepilot-plan-loading-line is-wide"></div>
-                    <div class="aislepilot-plan-loading-line"></div>
-                    <div class="aislepilot-plan-loading-line is-short"></div>
-                </div>
-                <div class="aislepilot-plan-loading-card">
-                    <div class="aislepilot-plan-loading-line is-wide"></div>
-                    <div class="aislepilot-plan-loading-line"></div>
-                    <div class="aislepilot-plan-loading-line is-short"></div>
-                </div>
-                <div class="aislepilot-plan-loading-card">
-                    <div class="aislepilot-plan-loading-line is-wide"></div>
-                    <div class="aislepilot-plan-loading-line"></div>
-                    <div class="aislepilot-plan-loading-line is-short"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <partial name="_AislePilotPlanLoadingShell" />
     </div>
 </div>
 
 @section Head {
-    <link rel="icon" type="image/svg+xml" href="~/images/aislepilot-favicon.svg" />
-    <link rel="apple-touch-icon" href="~/images/aislepilot-icon.svg" />
-    <meta name="theme-color" content="#103F65" />
-    <script>
-        (() => {
-            try {
-                const key = "aislepilot:swap-scroll";
-                const raw = sessionStorage.getItem(key);
-                if (!raw) {
-                    return;
-                }
-
-                const parsed = JSON.parse(raw);
-                if (!parsed || typeof parsed.y !== "number") {
-                    sessionStorage.removeItem(key);
-                    return;
-                }
-
-                if (typeof parsed.at === "number" && Date.now() - parsed.at > 60_000) {
-                    sessionStorage.removeItem(key);
-                    return;
-                }
-
-                document.documentElement.classList.add("aislepilot-restore-pending");
-            } catch {
-                // Ignore storage parsing issues.
-            }
-        })();
-    </script>
-    <link rel="stylesheet" href="~/css/aisle-pilot.css" asp-append-version="true" />
-    <noscript>
-        <style>
-            [data-setup-panel][hidden] { display: block !important; }
-            [data-setup-toggle] { display: none !important; }
-            [data-aislepilot-window] .aislepilot-window-controls,
-            [data-aislepilot-window] .aislepilot-window-tabs { display: none !important; }
-            [data-aislepilot-window] .aislepilot-mobile-context { display: none !important; }
-            [data-aislepilot-window] .aislepilot-window-viewport { overflow: visible !important; height: auto !important; }
-            [data-aislepilot-window] .aislepilot-window-track { display: block !important; transform: none !important; }
-            [data-aislepilot-window] .aislepilot-window-panel { min-width: 100% !important; margin-bottom: 0.75rem; }
-        </style>
-    </noscript>
+    <partial name="_AislePilotHeadAssets" />
 }
 
 @section Scripts {
