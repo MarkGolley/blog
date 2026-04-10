@@ -28,6 +28,14 @@ public static class QuantityDisplayFormatter
         "liter",
         "liters"
     };
+    private static readonly HashSet<string> RecipeMillilitreUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ml",
+        "millilitre",
+        "millilitres",
+        "milliliter",
+        "milliliters"
+    };
 
     private static readonly HashSet<string> WholePurchaseUnits = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -96,12 +104,13 @@ public static class QuantityDisplayFormatter
 
         if (RecipeLitreUnits.Contains(normalizedUnit))
         {
-            var totalMillilitres = decimal.Round(
-                quantity * 1000m,
-                0,
-                MidpointRounding.AwayFromZero);
-            var roundedUpMillilitres = RoundUpToNearest(totalMillilitres, 5m);
-            return $"{roundedUpMillilitres:0} ml";
+            var totalMillilitres = quantity * 1000m;
+            return FormatRecipeLiquidVolume(totalMillilitres);
+        }
+
+        if (RecipeMillilitreUnits.Contains(normalizedUnit))
+        {
+            return FormatRecipeLiquidVolume(quantity);
         }
 
         if (RecipeContainerUnitMillilitres.TryGetValue(normalizedUnit, out var millilitresPerUnit))
@@ -112,6 +121,16 @@ public static class QuantityDisplayFormatter
                 MidpointRounding.AwayFromZero);
             var roundedUpMillilitres = RoundUpToNearest(totalMillilitres, 5m);
             return $"{roundedUpMillilitres:0} ml";
+        }
+
+        if (WholePurchaseUnits.Contains(normalizedUnit))
+        {
+            return FormatRecipeCountQuantity(quantity, normalizedUnit);
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedUnit) && quantity < 1m)
+        {
+            return FormatFractionalAmount(RoundToNearestQuarter(quantity), null, null);
         }
 
         var roundedQuantity = decimal.Round(quantity, 2, MidpointRounding.AwayFromZero);
@@ -165,5 +184,109 @@ public static class QuantityDisplayFormatter
         }
 
         return decimal.Ceiling(value / step) * step;
+    }
+
+    private static string FormatRecipeLiquidVolume(decimal totalMillilitres)
+    {
+        if (totalMillilitres <= 0m)
+        {
+            return "-";
+        }
+
+        if (totalMillilitres <= 30m)
+        {
+            var teaspoons = RoundToNearestHalf(totalMillilitres / 5m);
+            var minimumDisplay = 0.5m;
+            if (teaspoons < minimumDisplay)
+            {
+                teaspoons = minimumDisplay;
+            }
+
+            if (teaspoons >= 3m)
+            {
+                var tablespoons = RoundToNearestHalf(teaspoons / 3m);
+                return FormatFractionalAmount(tablespoons, "tbsp", "tbsp");
+            }
+
+            return FormatFractionalAmount(teaspoons, "tsp", "tsp");
+        }
+
+        var roundedUpMillilitres = RoundUpToNearest(
+            decimal.Round(totalMillilitres, 0, MidpointRounding.AwayFromZero),
+            5m);
+        return $"{roundedUpMillilitres:0} ml";
+    }
+
+    private static string FormatRecipeCountQuantity(decimal quantity, string normalizedUnit)
+    {
+        var roundedToQuarter = RoundToNearestQuarter(quantity);
+        if (roundedToQuarter == 0.5m)
+        {
+            return $"half a {ToDisplayUnit(normalizedUnit, 1)}";
+        }
+
+        return FormatFractionalAmount(
+            roundedToQuarter,
+            ToDisplayUnit(normalizedUnit, 1),
+            ToDisplayUnit(normalizedUnit, roundedToQuarter));
+    }
+
+    private static string FormatFractionalAmount(decimal quantity, string? singularUnit, string? pluralUnit)
+    {
+        var whole = decimal.Truncate(quantity);
+        var fraction = quantity - whole;
+        var fractionText = fraction switch
+        {
+            0.25m => "1/4",
+            0.5m => "1/2",
+            0.75m => "3/4",
+            _ => string.Empty
+        };
+
+        var unit = string.Empty;
+        if (!string.IsNullOrWhiteSpace(singularUnit) || !string.IsNullOrWhiteSpace(pluralUnit))
+        {
+            var useSingular = quantity <= 1m;
+            unit = useSingular ? singularUnit ?? string.Empty : pluralUnit ?? string.Empty;
+        }
+
+        if (fraction == 0m)
+        {
+            return string.IsNullOrWhiteSpace(unit)
+                ? $"{whole:0}"
+                : $"{whole:0} {unit}";
+        }
+
+        if (whole == 0m)
+        {
+            return string.IsNullOrWhiteSpace(unit)
+                ? fractionText
+                : $"{fractionText} {unit}";
+        }
+
+        return string.IsNullOrWhiteSpace(unit)
+            ? $"{whole:0} {fractionText}"
+            : $"{whole:0} {fractionText} {unit}";
+    }
+
+    private static decimal RoundToNearestQuarter(decimal value)
+    {
+        if (value <= 0m)
+        {
+            return 0m;
+        }
+
+        var rounded = decimal.Round(value * 4m, 0, MidpointRounding.AwayFromZero) / 4m;
+        return rounded == 0m ? 0.25m : rounded;
+    }
+
+    private static decimal RoundToNearestHalf(decimal value)
+    {
+        if (value <= 0m)
+        {
+            return 0m;
+        }
+
+        return decimal.Round(value * 2m, 0, MidpointRounding.AwayFromZero) / 2m;
     }
 }
