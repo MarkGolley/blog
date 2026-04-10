@@ -50,6 +50,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "E2ESmoke")]
     public async Task Mobile_ModeratedComment_ShowsModerationBannerAtAddCommentSection()
     {
         if (!IsE2EEnabled())

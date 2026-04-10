@@ -21,6 +21,7 @@
       <_ContentIncludedByDefault Remove="wwwroot\BlogStorage\PostsText\pi_hole.txt" />
       <_ContentIncludedByDefault Remove="wwwroot\BlogStorage\PostsText\testing.txt" />
       <_ContentIncludedByDefault Remove="artifacts\**" />
+      <Compile Remove="artifacts\**\*.cs" />
       <Content Remove="artifacts\**" />
       <None Remove="artifacts\**" />
     </ItemGroup>

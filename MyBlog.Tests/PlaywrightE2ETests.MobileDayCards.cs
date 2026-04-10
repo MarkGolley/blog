@@ -10,7 +10,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardHeader_UsesCompactActionsAndMovesLeftoverIntoMoreActionsMenu()
+    public async Task Mobile_AislePilotDayCardHeader_UsesCompactMealActionsWithoutDayLevelControls()
     {
         if (!IsE2EEnabled())
         {
@@ -56,20 +56,53 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var moreActionsSummary = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
         await moreActionsSummary.ClickAsync();
 
-        var leftoverMenuButton = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions][open] [data-leftover-toggle-sign]").First;
-        await leftoverMenuButton.WaitForAsync(new LocatorWaitForOptions
+        var mobileSheetHeader = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions][open] .aislepilot-mobile-meal-sheet-head").First;
+        await mobileSheetHeader.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 10000
         });
+        var sheetModeEnabled = await page.EvaluateAsync<int[]>(
+            """
+            () => {
+                const details = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open]");
+                if (!(details instanceof HTMLDetailsElement)) {
+                    return [0, 0, 0, 0, 0];
+                }
 
-        var menuLabel = (await leftoverMenuButton.Locator("[data-leftover-toggle-text]").First.InnerTextAsync()).Trim();
-        Assert.True(
-            menuLabel.Equals("Cook extra", StringComparison.OrdinalIgnoreCase) ||
-            menuLabel.Equals("Remove extra", StringComparison.OrdinalIgnoreCase),
-            $"Expected leftover menu action label to be 'Cook extra' or 'Remove extra', but was '{menuLabel}'.");
-        var dayIndex = await leftoverMenuButton.GetAttributeAsync("data-leftover-day-index");
-        Assert.True(int.TryParse(dayIndex, out _), $"Expected leftover menu action to expose a numeric day index. Value='{dayIndex}'.");
+                const menu = details.querySelector(".aislepilot-card-more-actions-menu");
+                if (!(menu instanceof HTMLElement)) {
+                    return [0, 0, 0, 0, 0];
+                }
+
+                const rect = menu.getBoundingClientRect();
+                const computed = window.getComputedStyle(menu);
+                const isFixed = computed.position === "fixed" ? 1 : 0;
+                const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight ? 1 : 0;
+                const renderedHeight = rect.height >= 120 ? 1 : 0;
+                return [details.open ? 1 : 0, isFixed, inViewport, renderedHeight];
+            }
+            """);
+        Assert.Equal(4, sheetModeEnabled.Length);
+        Assert.Equal(1, sheetModeEnabled[0]);
+        Assert.Equal(1, sheetModeEnabled[1]);
+        Assert.Equal(1, sheetModeEnabled[2]);
+        Assert.Equal(1, sheetModeEnabled[3]);
+        await page.WaitForTimeoutAsync(220);
+        var sheetPersistence = await page.EvaluateAsync<int[]>(
+            """
+            () => {
+                const details = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions]");
+                const backdrop = document.querySelector(".aislepilot-mobile-meal-sheet-backdrop");
+                const isOpen = details instanceof HTMLDetailsElement && details.open ? 1 : 0;
+                const backdropVisible = backdrop instanceof HTMLElement && !backdrop.hasAttribute("hidden") ? 1 : 0;
+                return [isOpen, backdropVisible];
+            }
+            """);
+        Assert.Equal(2, sheetPersistence.Length);
+        Assert.Equal(1, sheetPersistence[0]);
+        Assert.Equal(1, sheetPersistence[1]);
+        Assert.Equal(0, await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions][open] [data-leftover-toggle-sign]").CountAsync());
     }
 
     [Fact]
@@ -360,7 +393,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardHeader_HasSpacedSummaryAndLeftoverToggleWorksFromActionsMenu()
+    public async Task Mobile_AislePilotDayCardHeader_HasSpacedSummaryAndMealActionsStayMealScoped()
     {
         if (!IsE2EEnabled())
         {
@@ -378,100 +411,65 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 15000
         });
 
-        var dayIndex = await page.EvaluateAsync<string>(
+        var summaryMetrics = await page.EvaluateAsync<double[]>(
             """
             () => {
-                const candidateRows = Array.from(document.querySelectorAll("[data-day-card-header-actions].is-active"));
-                for (const row of candidateRows) {
-                    if (!(row instanceof HTMLElement)) {
-                        continue;
-                    }
-
-                    const toggleButton = row.querySelector("[data-card-more-actions] [data-leftover-toggle-sign]");
-                    if (!(toggleButton instanceof HTMLButtonElement) || toggleButton.hidden) {
-                        continue;
-                    }
-
-                    const rawDayIndex = (toggleButton.getAttribute("data-leftover-day-index") ?? "").trim();
-                    if (rawDayIndex.length > 0) {
-                        return rawDayIndex;
-                    }
+                const card = document.querySelector("[data-day-meal-card]:has([data-day-card-summary]):has([data-leftover-day-zone])");
+                if (!(card instanceof HTMLElement)) {
+                    return [-1, -1];
                 }
 
-                return "";
+                const kicker = card.querySelector(".aislepilot-day-card-head-main .aislepilot-card-kicker");
+                const summary = card.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta[data-day-card-summary]");
+                const zone = card.querySelector("[data-leftover-day-zone]");
+                if (!(kicker instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(zone instanceof HTMLElement)) {
+                    return [-1, -1];
+                }
+
+                const kickerRect = kicker.getBoundingClientRect();
+                const summaryRect = summary.getBoundingClientRect();
+                const spacingGap = Math.max(0, summaryRect.left - kickerRect.right);
+                const zoneHidden = window.getComputedStyle(zone).display === "none" ? 1 : 0;
+                return [spacingGap, zoneHidden];
             }
             """);
-        Assert.True(int.TryParse(dayIndex, out _), "Expected at least one active card to expose an available leftover menu action.");
-        var targetCard = page.Locator($"[data-day-meal-card]:has([data-leftover-day-zone][data-day-index='{dayIndex}'])").First;
+        Assert.Equal(2, summaryMetrics.Length);
+        Assert.True(summaryMetrics[0] >= 10, $"Expected day-to-summary spacing to be wider. Actual={summaryMetrics[0]:F1}px.");
+        Assert.Equal(1, Convert.ToInt32(summaryMetrics[1]));
+
+        var targetCard = page.Locator("[data-day-meal-card]:has([data-leftover-day-zone])").First;
         await targetCard.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 10000
         });
 
-        var beforeMetrics = await targetCard.EvaluateAsync<double[]>(
-            """
-            (cardRoot, targetDayIndex) => {
-                if (!(cardRoot instanceof HTMLElement)) {
-                    return [-1, -1, -1];
-                }
-
-                const kicker = cardRoot.querySelector(".aislepilot-day-card-head-main .aislepilot-card-kicker");
-                const summary = cardRoot.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta[data-day-card-summary]");
-                const safeDayIndex = typeof targetDayIndex === "string" ? targetDayIndex : "";
-                const zone = cardRoot.querySelector(`[data-leftover-day-zone][data-day-index="${safeDayIndex}"]`);
-                if (!(kicker instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(zone instanceof HTMLElement)) {
-                    return [-1, -1, -1];
-                }
-
-                const kickerRect = kicker.getBoundingClientRect();
-                const summaryRect = summary.getBoundingClientRect();
-                const spacingGap = Math.max(0, summaryRect.left - kickerRect.right);
-                const count = Number.parseInt(zone.getAttribute("data-leftover-count") ?? "", 10);
-                const zoneDisplay = window.getComputedStyle(zone).display === "none" ? 1 : 0;
-                return [spacingGap, Number.isFinite(count) ? count : -1, zoneDisplay];
-            }
-            """,
-            dayIndex);
-
-        Assert.Equal(3, beforeMetrics.Length);
-        Assert.True(beforeMetrics[0] >= 10, $"Expected day-to-summary spacing to be wider. Actual={beforeMetrics[0]:F1}px.");
-        Assert.True(beforeMetrics[1] >= 0, $"Expected a valid day-zone leftover count. Actual={beforeMetrics[1]:F1}.");
-        Assert.Equal(1, Convert.ToInt32(beforeMetrics[2]));
-
         var moreActionsSummary = targetCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
         await moreActionsSummary.ClickAsync();
 
-        var toggleButton = targetCard.Locator($"[data-day-card-header-actions].is-active [data-card-more-actions][open] [data-leftover-toggle-sign][data-leftover-day-index='{dayIndex}']").First;
-        await toggleButton.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        await toggleButton.EvaluateAsync("button => button.click()");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.WaitForTimeoutAsync(220);
-
-        var afterToggleMetrics = await page.EvaluateAsync<int[]>(
+        var mealMenuMetrics = await targetCard.EvaluateAsync<string>(
             """
-            dayIndex => {
-                const safeDayIndex = typeof dayIndex === "string" ? dayIndex : "";
-                const zone = document.querySelector(`[data-leftover-day-zone][data-day-index="${safeDayIndex}"]`);
-                if (!(zone instanceof HTMLElement)) {
-                    return [-1, -1];
+            cardRoot => {
+                if (!(cardRoot instanceof HTMLElement)) {
+                    return "0|0";
                 }
 
-                const count = Number.parseInt(zone.getAttribute("data-leftover-count") ?? "", 10);
-                const isHidden = window.getComputedStyle(zone).display === "none" ? 1 : 0;
-                return [Number.isFinite(count) ? count : -1, isHidden];
-            }
-            """,
-            dayIndex ?? string.Empty);
+                const openMenu = cardRoot.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open] .aislepilot-card-more-actions-menu");
+                if (!(openMenu instanceof HTMLElement)) {
+                    return "0|0";
+                }
 
-        Assert.Equal(2, afterToggleMetrics.Length);
-        Assert.True(afterToggleMetrics[0] >= 0, $"Expected a valid leftover count after menu toggle. Actual={afterToggleMetrics[0]}.");
-        Assert.Equal(1, afterToggleMetrics[1]);
-        Assert.Equal(1, Math.Abs(afterToggleMetrics[0] - Convert.ToInt32(beforeMetrics[1])));
+                const hasLeftoverAction = openMenu.querySelector("[data-leftover-toggle-sign]") instanceof HTMLElement ? 1 : 0;
+                const sheetTitle = openMenu.querySelector(".aislepilot-mobile-meal-sheet-title");
+                const hasTitle = sheetTitle instanceof HTMLElement && (sheetTitle.textContent ?? "").trim().length > 0 ? 1 : 0;
+                return `${hasLeftoverAction}|${hasTitle}`;
+            }
+            """);
+        var mealMenuParts = (mealMenuMetrics ?? "0|0").Split('|');
+        var hasLeftoverActionInMealMenu = mealMenuParts.Length > 0 && string.Equals(mealMenuParts[0], "1", StringComparison.Ordinal);
+        var hasSheetTitle = mealMenuParts.Length > 1 && string.Equals(mealMenuParts[1], "1", StringComparison.Ordinal);
+        Assert.False(hasLeftoverActionInMealMenu, "Expected meal menu to contain meal-scoped actions only.");
+        Assert.True(hasSheetTitle, "Expected mobile meal actions sheet to show the active meal title.");
     }
 
     [Fact]
@@ -611,6 +609,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Category", "E2ESmoke")]
     public async Task Mobile_AislePilotGeneratePlan_PrimarySubmitIsNotObstructed()
     {
         if (!IsE2EEnabled())

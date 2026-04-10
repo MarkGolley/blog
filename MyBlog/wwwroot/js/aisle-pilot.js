@@ -1,4 +1,9 @@
 (() => {
+    if (window.__aislePilotScriptWired === true) {
+        return;
+    }
+    window.__aislePilotScriptWired = true;
+
     const quickReplaceInputs = Array.from(
         document.querySelectorAll(
             ".aislepilot-inline-fields input:not([type='hidden']):not([type='checkbox']):not([type='radio'])"
@@ -3534,6 +3539,46 @@
         });
     };
 
+    let cardMoreActionsBackdrop = null;
+    let cardMoreActionsLastOpenedAt = 0;
+    const shouldUseMobileCardActionsSheet = () =>
+        typeof window.matchMedia === "function" && window.matchMedia("(max-width: 760px)").matches;
+
+    const ensureCardMoreActionsBackdrop = () => {
+        if (cardMoreActionsBackdrop instanceof HTMLDivElement) {
+            return cardMoreActionsBackdrop;
+        }
+
+        const backdrop = document.createElement("div");
+        backdrop.className = "aislepilot-mobile-meal-sheet-backdrop";
+        backdrop.setAttribute("hidden", "hidden");
+        backdrop.addEventListener("click", () => {
+            if (Date.now() - cardMoreActionsLastOpenedAt < 260) {
+                return;
+            }
+            closeOpenCardMoreActions(null);
+        });
+        document.body.appendChild(backdrop);
+        cardMoreActionsBackdrop = backdrop;
+        return backdrop;
+    };
+
+    const syncCardMoreActionsSheetState = () => {
+        const hasOpenMobileSheet = shouldUseMobileCardActionsSheet() &&
+            document.querySelector("[data-card-more-actions][open]") instanceof HTMLDetailsElement;
+        const backdrop = ensureCardMoreActionsBackdrop();
+        if (hasOpenMobileSheet) {
+            cardMoreActionsLastOpenedAt = Date.now();
+            backdrop.removeAttribute("hidden");
+            backdrop.classList.add("is-active");
+            document.body.classList.add("aislepilot-mobile-meal-sheet-open");
+        } else {
+            backdrop.setAttribute("hidden", "hidden");
+            backdrop.classList.remove("is-active");
+            document.body.classList.remove("aislepilot-mobile-meal-sheet-open");
+        }
+    };
+
     const closeOpenCardMoreActions = except => {
         const openMenus = Array.from(document.querySelectorAll("[data-card-more-actions][open]"));
         openMenus.forEach(menu => {
@@ -3543,9 +3588,13 @@
 
             menu.open = false;
         });
+
+        window.requestAnimationFrame(() => {
+            syncCardMoreActionsSheetState();
+        });
     };
 
-    const positionCardMoreActionsMenu = (menu, attempt = 0) => {
+    const positionCardMoreActionsMenu = menu => {
         if (!(menu instanceof HTMLDetailsElement) || !menu.open) {
             return;
         }
@@ -3559,65 +3608,21 @@
         const viewportPadding = 8;
         actionsMenu.style.removeProperty("max-height");
         actionsMenu.style.removeProperty("overflow-y");
+        actionsMenu.style.removeProperty("position");
+        actionsMenu.style.removeProperty("left");
+        actionsMenu.style.removeProperty("top");
+        actionsMenu.style.removeProperty("right");
+        actionsMenu.style.removeProperty("bottom");
         menu.classList.remove("is-drop-up", "is-drop-down", "is-align-left");
-        let actionsRect = actionsMenu.getBoundingClientRect();
-        const triggerRect = trigger.getBoundingClientRect();
-        const availableBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
-        const availableAbove = triggerRect.top - viewportPadding;
-        const canFitBelow = actionsRect.height <= availableBelow;
-        const canFitAbove = actionsRect.height <= availableAbove;
-        const isMobileViewport = window.innerWidth <= 760;
-        let openUp = false;
-
-        if (isMobileViewport) {
-            openUp = false;
-        } else {
-            if (canFitAbove && !canFitBelow) {
-                openUp = true;
-            } else if (!canFitAbove && canFitBelow) {
-                openUp = false;
-            } else if (canFitAbove && canFitBelow) {
-                openUp = false;
-            } else {
-                openUp = availableAbove > availableBelow;
-            }
+        if (!shouldUseMobileCardActionsSheet()) {
+            syncCardMoreActionsSheetState();
+            return;
         }
 
-        menu.classList.add(openUp ? "is-drop-up" : "is-drop-down");
-        actionsRect = actionsMenu.getBoundingClientRect();
-
-        const availableInDirection = menu.classList.contains("is-drop-up")
-            ? availableAbove
-            : availableBelow;
-        if (availableInDirection > 0 && actionsRect.height > availableInDirection) {
-            const maxVisibleHeight = window.innerHeight - (viewportPadding * 2);
-            const canFullyFitInViewport = actionsRect.height <= maxVisibleHeight + 1;
-            if (canFullyFitInViewport && attempt < 2) {
-                const neededDelta = Math.ceil(actionsRect.height - availableInDirection + 6);
-                if (neededDelta > 0) {
-                    const scrollDelta = menu.classList.contains("is-drop-up") ? -neededDelta : neededDelta;
-                    window.scrollBy(0, scrollDelta);
-                    window.requestAnimationFrame(() => {
-                        positionCardMoreActionsMenu(menu, attempt + 1);
-                    });
-                    return;
-                }
-            }
-
-            const clampedMaxHeight = Math.max(96, Math.floor(availableInDirection - 6));
-            actionsMenu.style.maxHeight = `${clampedMaxHeight}px`;
-            actionsMenu.style.overflowY = "auto";
-            actionsRect = actionsMenu.getBoundingClientRect();
-        }
-
-        if (actionsRect.left < viewportPadding) {
-            menu.classList.add("is-align-left");
-            actionsRect = actionsMenu.getBoundingClientRect();
-        }
-
-        if (actionsRect.right > window.innerWidth - viewportPadding && menu.classList.contains("is-align-left")) {
-            menu.classList.remove("is-align-left");
-        }
+        const mobileMaxHeight = Math.max(220, Math.floor((window.innerHeight - viewportPadding) * 0.72));
+        actionsMenu.style.maxHeight = `${mobileMaxHeight}px`;
+        actionsMenu.style.overflowY = "auto";
+        syncCardMoreActionsSheetState();
     };
 
     const wireCardMoreActions = scope => {
@@ -3640,6 +3645,14 @@
                 if (!menu.open && actionsMenu instanceof HTMLElement) {
                     actionsMenu.style.removeProperty("max-height");
                     actionsMenu.style.removeProperty("overflow-y");
+                    actionsMenu.style.removeProperty("position");
+                    actionsMenu.style.removeProperty("left");
+                    actionsMenu.style.removeProperty("top");
+                    actionsMenu.style.removeProperty("right");
+                    actionsMenu.style.removeProperty("bottom");
+                }
+                if (!menu.open) {
+                    syncCardMoreActionsSheetState();
                 }
 
                 const dayMealPanel = menu.closest("[data-day-meal-panel]");
@@ -3651,12 +3664,12 @@
                         dayMealPanel.classList.remove("has-open-actions");
                     }
                 }
+                updateViewportHeight(true);
 
                 if (menu.open) {
                     closeOpenCardMoreActions(menu);
-                    window.requestAnimationFrame(() => {
-                        positionCardMoreActionsMenu(menu);
-                    });
+                    positionCardMoreActionsMenu(menu);
+                    window.requestAnimationFrame(() => positionCardMoreActionsMenu(menu));
                 }
             });
 
@@ -3667,6 +3680,18 @@
                 }
 
                 button.addEventListener("click", () => {
+                    menu.open = false;
+                });
+            });
+
+            const closeButtons = Array.from(menu.querySelectorAll("[data-card-more-actions-close]"));
+            closeButtons.forEach(closeButton => {
+                if (!(closeButton instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                closeButton.addEventListener("click", event => {
+                    event.preventDefault();
                     menu.open = false;
                 });
             });
@@ -3700,7 +3725,10 @@
             openMenus.forEach(openMenu => {
                 positionCardMoreActionsMenu(openMenu);
             });
+            updateViewportHeight(true);
         });
+
+        syncCardMoreActionsSheetState();
     };
 
     const wireInlineDetailsPanels = scope => {
@@ -3815,6 +3843,44 @@
                     const nextSummaryValue = summaryValue.length > 0 ? summaryValue : defaultSummaryValue;
                     if (nextSummaryValue.length > 0) {
                         summaryLabel.textContent = nextSummaryValue;
+                    }
+                }
+
+                const expanderMealLabel = card.querySelector("[data-day-card-expander-meal]");
+                const expanderMetaLabel = card.querySelector("[data-day-card-expander-meta]");
+                const expanderImage = card.querySelector("[data-day-card-expander-image]");
+                const activeTab = tabs[currentSlotIndex];
+                if (expanderMealLabel instanceof HTMLElement) {
+                    const mealValue = activeTab instanceof HTMLButtonElement
+                        ? (activeTab.dataset.dayCardMealName ?? "").trim()
+                        : "";
+                    const defaultMealValue = (expanderMealLabel.dataset.dayCardExpanderMealDefault ?? "").trim();
+                    const nextMealValue = mealValue.length > 0 ? mealValue : defaultMealValue;
+                    if (nextMealValue.length > 0) {
+                        expanderMealLabel.textContent = nextMealValue;
+                    }
+                }
+
+                if (expanderMetaLabel instanceof HTMLElement) {
+                    const metaValue = activeTab instanceof HTMLButtonElement
+                        ? (activeTab.dataset.dayCardSummaryValue ?? "").trim()
+                        : "";
+                    const defaultMetaValue = (expanderMetaLabel.dataset.dayCardExpanderMetaDefault ?? "").trim();
+                    const nextMetaValue = metaValue.length > 0 ? metaValue : defaultMetaValue;
+                    if (nextMetaValue.length > 0) {
+                        expanderMetaLabel.textContent = nextMetaValue;
+                    }
+                }
+
+                if (expanderImage instanceof HTMLImageElement) {
+                    const imageValue = activeTab instanceof HTMLButtonElement
+                        ? (activeTab.dataset.dayCardMealImageUrl ?? "").trim()
+                        : "";
+                    const defaultImageValue = (expanderImage.dataset.dayCardExpanderImageDefault ?? "").trim();
+                    const nextImageValue = imageValue.length > 0 ? imageValue : defaultImageValue;
+                    const currentImageValue = (expanderImage.getAttribute("src") ?? "").trim();
+                    if (nextImageValue.length > 0 && currentImageValue !== nextImageValue) {
+                        expanderImage.src = nextImageValue;
                     }
                 }
 
@@ -3941,6 +4007,50 @@
             }, { passive: true });
 
             syncSlot(readRememberedDayMealSlot(card));
+        });
+    };
+
+    const wireDayCardExpanders = scope => {
+        const expanders = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-card-expander]"))
+            : Array.from(document.querySelectorAll("[data-day-card-expander]"));
+
+        const syncSummaryExpandedState = expander => {
+            if (!(expander instanceof HTMLDetailsElement)) {
+                return;
+            }
+
+            const summary = expander.querySelector(":scope > summary");
+            if (!(summary instanceof HTMLElement)) {
+                return;
+            }
+
+            summary.setAttribute("aria-expanded", expander.open ? "true" : "false");
+        };
+
+        expanders.forEach(expander => {
+            if (!(expander instanceof HTMLDetailsElement) || expander.dataset.dayCardExpanderWired === "true") {
+                return;
+            }
+
+            expander.dataset.dayCardExpanderWired = "true";
+            syncSummaryExpandedState(expander);
+            expander.addEventListener("toggle", () => {
+                syncSummaryExpandedState(expander);
+                const isMobileViewport = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 760px)").matches;
+                if (isMobileViewport && expander.open) {
+                    expanders.forEach(otherExpander => {
+                        if (!(otherExpander instanceof HTMLDetailsElement) || otherExpander === expander || !otherExpander.open) {
+                            return;
+                        }
+
+                        otherExpander.open = false;
+                        syncSummaryExpandedState(otherExpander);
+                    });
+                }
+
+                updateViewportHeight(true);
+            });
         });
     };
 
@@ -4469,6 +4579,7 @@
         wireLeftoverPlanner(scope);
         wireCardMoreActions(scope);
         wireInlineDetailsPanels(scope);
+        wireDayCardExpanders(scope);
         wireDayMealCards(scope);
         wireAjaxSwapHandlers(scope);
     };

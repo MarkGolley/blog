@@ -18,6 +18,7 @@ param(
     [switch]$UseLegacyDockerBuilder,
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
+    [switch]$FullPreDeployE2E,
     [switch]$SkipAislePilotSmokeCheck,
     [switch]$SkipProductionSmokeCheck,
     [int]$DockerStartupTimeoutSeconds = 120
@@ -194,6 +195,9 @@ try {
 
         if ($SkipBrowserInstall) {
             $checkArgs += "-SkipBrowserInstall"
+        }
+        if ($FullPreDeployE2E) {
+            $checkArgs += "-FullPreDeployE2E"
         }
 
         Invoke-External `

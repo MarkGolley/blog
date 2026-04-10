@@ -84,6 +84,56 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task Index_Get_RendersStreamlinedHeaderWithPrimarySettingsAction()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Contains("class=\"aislepilot-app-head-main\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-app-head-topline\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-head-primary-action\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("href=\"#aislepilot-setup\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Start with settings", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_RendersOverviewGlanceAndDayMealSummaryRows()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "2"),
+            new("Request.SelectedMealTypes", "Lunch"),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("class=\"aislepilot-overview-glance\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-overview-glance-item", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-meal-summary", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-card aislepilot-shop-card\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-export-action\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-expander", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-day-card-expander-summary", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-expander-image", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-meal-image-url=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AislePilotStylesheet_UsesLargerControlHeightTokensForReadableTapTargets()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -323,17 +373,15 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("data-loading-delay-ms=\"320\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-header-actions", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-card-more-actions", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("aria-label=\"More actions\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"Meal actions\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
                 @"<div[^>]*class=""[^""]*aislepilot-card-more-actions-menu[^""]*""[^>]*>[\s\S]*?<form[^>]*action=""[^""]*/swap-meal[^""]*""",
                 RegexOptions.IgnoreCase),
             html);
-        Assert.Matches(
-            new Regex(
-                @"<div[^>]*class=""[^""]*aislepilot-card-more-actions-menu[^""]*""[^>]*>[\s\S]*?data-leftover-toggle-sign[\s\S]*?data-leftover-day-index=""\d+""",
-                RegexOptions.IgnoreCase),
-            html);
+        Assert.DoesNotContain("data-leftover-toggle-sign", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-mobile-meal-sheet-head", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-card-more-actions-close", html, StringComparison.OrdinalIgnoreCase);
         var dayZoneMatches = Regex.Matches(
             html,
             @"<div[^>]*class=""[^""]*aislepilot-day-card-leftover-controls[^""]*""[^>]*>(?<zone>[\s\S]*?)</div>",
@@ -761,7 +809,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
                 @"<form[^>]*class=""[^""]*aislepilot-leftover-rebalance-form[^""]*""[^>]*(data-leftover-rebalance-form[^>]*data-ajax-swap-form|data-ajax-swap-form[^>]*data-leftover-rebalance-form)",
                 RegexOptions.IgnoreCase),
             html);
-        Assert.Contains("data-leftover-toggle-sign", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-leftover-toggle-sign", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-day-card-leftover-controls", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-name=\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-leftover-day-count\"", html, StringComparison.OrdinalIgnoreCase);

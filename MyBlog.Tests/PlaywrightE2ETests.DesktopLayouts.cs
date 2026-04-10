@@ -10,6 +10,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
 
     [Fact]
+    [Trait("Category", "E2ESmoke")]
     public async Task Desktop_LoginLogoutLogin_DoesNotReturnBadRequest()
     {
         if (!IsE2EEnabled())

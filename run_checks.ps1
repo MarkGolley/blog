@@ -3,6 +3,7 @@ param(
     [ValidateSet("Tests", "E2E", "PreDeploy", "ModerationEval")]
     [string]$Mode = "PreDeploy",
     [switch]$SkipBrowserInstall,
+    [switch]$FullPreDeployE2E,
     [string]$ModerationDataset = "docs/ai-moderation-v2/datasets/smoke-v1.json",
     [string]$ModerationLabel = "smoke-v1"
 )
@@ -65,7 +66,13 @@ try {
 
         Invoke-Step -Name "Running browser E2E checks (desktop + mobile)" -Action {
             $env:RUN_PLAYWRIGHT_E2E = "1"
-            dotnet test $testProject --filter "Category=E2E"
+            $e2eFilter = "Category=E2E"
+            if ($Mode -eq "PreDeploy" -and -not $FullPreDeployE2E) {
+                $e2eFilter = "Category=E2ESmoke"
+                Write-Host "Running Playwright smoke subset for pre-deploy checks. Use -FullPreDeployE2E for the full E2E suite."
+            }
+
+            dotnet test $testProject --filter $e2eFilter
         }
     }
 

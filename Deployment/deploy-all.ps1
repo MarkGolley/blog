@@ -10,6 +10,7 @@ param(
     [string]$AislePilotPublicBaseUrl = "",
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
+    [switch]$FullPreDeployE2E,
     [switch]$SkipAislePilotSmokeCheck,
     [switch]$SkipProductionSmokeCheck,
     [switch]$SkipVersionParityCheck,
@@ -163,6 +164,10 @@ if ($SkipPreDeployChecks) {
 
 if ($SkipBrowserInstall) {
     $blogDeployArgs += "-SkipBrowserInstall"
+}
+
+if ($FullPreDeployE2E) {
+    $blogDeployArgs += "-FullPreDeployE2E"
 }
 
 if ($SkipAislePilotSmokeCheck) {

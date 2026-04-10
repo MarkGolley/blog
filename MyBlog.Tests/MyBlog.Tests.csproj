@@ -24,4 +24,10 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="artifacts\**\*.cs" />
+    <None Remove="artifacts\**" />
+    <Content Remove="artifacts\**" />
+  </ItemGroup>
+
 </Project>
