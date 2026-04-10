@@ -3,6 +3,20 @@
   <component name="UserContentModel">
     <attachedFolders />
     <explicitIncludes />
-    <explicitExcludes />
+    <explicitExcludes>
+      <Path>.artifacts/</Path>
+      <Path>artifacts/</Path>
+      <Path>MyBlog/artifacts/</Path>
+      <Path>MyBlog/bin/</Path>
+      <Path>MyBlog/obj/</Path>
+      <Path>MyBlog.AislePilot/bin/</Path>
+      <Path>MyBlog.AislePilot/obj/</Path>
+      <Path>MyBlog.ModerationEval/bin/</Path>
+      <Path>MyBlog.ModerationEval/obj/</Path>
+      <Path>MyBlog.Tests/bin/</Path>
+      <Path>MyBlog.Tests/obj/</Path>
+      <Path>MyBlog.Tests/TestResults/</Path>
+      <Path>MyBlog/wwwroot/lib/</Path>
+    </explicitExcludes>
   </component>
 </project>
