@@ -401,7 +401,9 @@
                 <p class="aislepilot-mobile-context-meta">
                     <span class="aislepilot-mobile-context-title">Weekly plan</span>
                     <span class="aislepilot-mobile-context-meta-values">
-                        Est. @result.EstimatedTotalCost.ToString("C", ukCulture) &middot; @budgetDeltaSummaryText
+                        <span>Est. @result.EstimatedTotalCost.ToString("C", ukCulture)</span>
+                        <span aria-hidden="true">&middot;</span>
+                        <span class="aislepilot-mobile-context-budget-status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">@budgetDeltaSummaryText</span>
                     </span>
                 </p>
             </div>

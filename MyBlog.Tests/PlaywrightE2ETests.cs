@@ -109,13 +109,13 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary");
+        var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary:visible");
         var moreActionsTriggerCount = await moreActionsTriggers.CountAsync();
         Assert.True(moreActionsTriggerCount > 0, "Expected at least one meal actions menu trigger to be rendered.");
 
         var targetIndex = Math.Min(3, moreActionsTriggerCount - 1);
         var targetTrigger = moreActionsTriggers.Nth(targetIndex);
-        var targetSwapButton = targetTrigger.Locator("xpath=ancestor::details[1]").Locator("button[aria-label='Swap meal']").First;
+        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
         await targetTrigger.ScrollIntoViewIfNeededAsync();
         await targetTrigger.ClickAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
@@ -134,17 +134,99 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         await targetSwapButton.ClickAsync();
         _ = await swapResponseTask;
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.WaitForTimeoutAsync(700);
+        await page.WaitForTimeoutAsync(1100);
 
         // Allow delayed scroll-restore hooks to complete.
-        await page.WaitForTimeoutAsync(500);
+        await page.WaitForTimeoutAsync(250);
 
         var afterScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
         var scrollDelta = Math.Abs(afterScrollY - beforeScrollY);
+        var upwardDelta = beforeScrollY - afterScrollY;
 
         Assert.True(
-            scrollDelta <= 60,
+            scrollDelta <= 8,
             $"Expected swap postback to keep viewport stable. Before={beforeScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
+        Assert.True(
+            upwardDelta <= 4,
+            $"Expected swap postback not to pull the viewport upward. Before={beforeScrollY}, After={afterScrollY}, UpwardDelta={upwardDelta}.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotSwap_ShowsPendingStateWhileKeepingViewportStable()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary:visible");
+        var moreActionsTriggerCount = await moreActionsTriggers.CountAsync();
+        Assert.True(moreActionsTriggerCount > 0, "Expected at least one meal actions menu trigger to be rendered.");
+
+        var targetIndex = Math.Min(2, moreActionsTriggerCount - 1);
+        var targetTrigger = moreActionsTriggers.Nth(targetIndex);
+        var targetCard = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-card][1]");
+        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
+        await targetTrigger.ScrollIntoViewIfNeededAsync();
+        await targetTrigger.ClickAsync();
+        await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var beforeScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
+        Assert.True(beforeScrollY > 100, $"Expected to scroll below hero before swap. Actual scrollY={beforeScrollY}.");
+
+        await page.RouteAsync("**/projects/aisle-pilot/swap-meal", async route =>
+        {
+            await Task.Delay(900);
+            await route.ContinueAsync();
+        });
+
+        var swapResponseTask = page.WaitForResponseAsync(response =>
+            string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            response.Url.Contains("/projects/aisle-pilot/swap-meal", StringComparison.OrdinalIgnoreCase));
+
+        await targetSwapButton.ClickAsync();
+        await page.WaitForTimeoutAsync(150);
+
+        var pendingState = await targetCard.EvaluateAsync<string>(
+            """
+            card => {
+                if (!(card instanceof HTMLElement)) {
+                    return "missing";
+                }
+
+                const swapStatus = window.getComputedStyle(card, "::before").content || "";
+                const isBusy = card.getAttribute("aria-busy") || "";
+                const isPending = card.classList.contains("is-swap-fading-out") ? "1" : "0";
+                return `${isBusy}|${isPending}|${swapStatus}`;
+            }
+            """);
+
+        Assert.Contains("true|1|", pendingState, StringComparison.Ordinal);
+        Assert.Contains("Loading new meal", pendingState, StringComparison.OrdinalIgnoreCase);
+
+        _ = await swapResponseTask;
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.WaitForTimeoutAsync(1100);
+
+        var afterScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
+        var scrollDelta = Math.Abs(afterScrollY - beforeScrollY);
+        var upwardDelta = beforeScrollY - afterScrollY;
+
+        Assert.True(
+            scrollDelta <= 8,
+            $"Expected swap viewport to stay anchored after showing pending state. Before={beforeScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
+        Assert.True(
+            upwardDelta <= 4,
+            $"Expected pending-state swap not to pull the viewport upward. Before={beforeScrollY}, After={afterScrollY}, UpwardDelta={upwardDelta}.");
     }
 
     [Fact]

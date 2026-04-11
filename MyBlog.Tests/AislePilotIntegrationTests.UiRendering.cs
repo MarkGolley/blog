@@ -537,6 +537,40 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task Index_Post_WithThreeMealsPerDay_RendersStyledBudgetStatusInWeeklyPlanSummary()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "3",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.Matches(
+            new Regex(
+                @"<span[^>]*class=""[^""]*aislepilot-mobile-context-budget-status[^""]*(?:is-over-budget|is-on-budget)[^""]*""[^>]*>[^<]*(?:under|over|On budget)[^<]*</span>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Contains(".aislepilot-mobile-context-budget-status.is-over-budget", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-mobile-context-budget-status.is-on-budget", css, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Post_WithThreeMealsPerDay_RendersWindowTabsAndMealActionsWithAlignedAriaContracts()
     {
         using var client = CreateClient(allowAutoRedirect: true);

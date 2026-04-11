@@ -2162,6 +2162,7 @@
     });
 
     const swapScrollKey = "aislepilot:swap-scroll";
+    const swapScrollRestoreDurationMs = 1100;
     const clearPersistedSwapScroll = () => {
         sessionStorage.removeItem(swapScrollKey);
     };
@@ -2503,7 +2504,7 @@
             };
 
             root.classList.add("is-restoring-scroll");
-            const restoreDeadline = Date.now() + 700;
+            const restoreDeadline = Date.now() + swapScrollRestoreDurationMs;
             const restoreLoop = () => {
                 restoreIfDrifted();
                 if (Date.now() < restoreDeadline) {
@@ -2965,53 +2966,43 @@
         };
     };
 
+    const resolveSwapTargetCard = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return null;
+        }
+
+        const inlineCard = form.closest(".aislepilot-card");
+        if (inlineCard instanceof HTMLElement) {
+            return inlineCard;
+        }
+
+        const dayInput = form.querySelector("input[name='dayIndex']");
+        const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
+        if (!Number.isInteger(parsedDayIndex) || parsedDayIndex < 0) {
+            return null;
+        }
+
+        const selector = `[data-day-card-header-actions][data-slot-index='${parsedDayIndex}']`;
+        const matchingActionRow = document.querySelector(selector);
+        if (!(matchingActionRow instanceof HTMLElement)) {
+            return null;
+        }
+
+        const matchingCard = matchingActionRow.closest(".aislepilot-card");
+        return matchingCard instanceof HTMLElement ? matchingCard : null;
+    };
+
     const restoreInlineSwapScroll = snapshot => {
         if (!snapshot || typeof snapshot.y !== "number") {
             return;
         }
 
         const targetX = typeof snapshot.x === "number" ? snapshot.x : 0;
-        const fallbackTargetY = snapshot.y;
-        const anchorDayIndex = Number.isInteger(snapshot.anchorDayIndex)
-            ? snapshot.anchorDayIndex
-            : null;
-        const anchorPanelId = typeof snapshot.anchorPanelId === "string" && snapshot.anchorPanelId.length > 0
-            ? snapshot.anchorPanelId
-            : null;
-        const anchorTop = typeof snapshot.anchorTop === "number"
-            ? snapshot.anchorTop
-            : null;
-
-        const resolveTargetY = () => {
-            if (anchorDayIndex === null || typeof anchorTop !== "number") {
-                return fallbackTargetY;
-            }
-
-            if (anchorPanelId) {
-                const targetPanel = document.getElementById(anchorPanelId);
-                if (targetPanel instanceof HTMLElement) {
-                    return window.scrollY + (targetPanel.getBoundingClientRect().top - anchorTop);
-                }
-            }
-
-            const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${anchorDayIndex}']`;
-            const targetDayInput = document.querySelector(selector);
-            if (!(targetDayInput instanceof HTMLInputElement)) {
-                return fallbackTargetY;
-            }
-
-            const targetForm = targetDayInput.closest("form");
-            if (!(targetForm instanceof HTMLFormElement)) {
-                return fallbackTargetY;
-            }
-
-            return window.scrollY + (targetForm.getBoundingClientRect().top - anchorTop);
-        };
+        const targetY = snapshot.y;
 
         root.classList.add("is-restoring-scroll");
-        const restoreDeadline = Date.now() + 500;
+        const restoreDeadline = Date.now() + swapScrollRestoreDurationMs;
         const restoreLoop = () => {
-            const targetY = resolveTargetY();
             const xDrift = Math.abs(window.scrollX - targetX);
             const yDrift = Math.abs(window.scrollY - targetY);
             if (xDrift > 2 || yDrift > 8) {
@@ -4705,9 +4696,21 @@
             const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
                 ? scrollSnapshot.anchorDayIndex
                 : null;
-            const currentCard = swapForm.closest(".aislepilot-card");
+            const currentCard = resolveSwapTargetCard(swapForm);
             if (!isFavoriteForm && currentCard instanceof HTMLElement) {
                 currentCard.classList.add("is-swap-fading-out");
+                currentCard.setAttribute("aria-busy", "true");
+                currentCard.dataset.swapStatus = isLeftoverRebalanceForm
+                    ? "Updating meal plan..."
+                    : isIgnoreForm
+                        ? "Updating meal..."
+                        : isDessertSwapForm
+                            ? "Loading new dessert..."
+                            : "Loading new meal...";
+            }
+            if (!isFavoriteForm && submitButton instanceof HTMLButtonElement && !swapForm.hasAttribute("data-skip-submit-loading")) {
+                clearSubmitLoadingDelay(swapForm);
+                setSubmitButtonLoadingState(submitButton);
             }
             const actionUrl = stripHashFromFormAction(swapForm);
             if (!actionUrl) {
@@ -4819,6 +4822,8 @@
             } finally {
                 if (!isFavoriteForm && currentCard instanceof HTMLElement && currentCard.isConnected) {
                     currentCard.classList.remove("is-swap-fading-out");
+                    currentCard.removeAttribute("aria-busy");
+                    delete currentCard.dataset.swapStatus;
                 }
                 clearSubmitLoadingDelay(swapForm);
                 delete swapForm.dataset.ajaxSwapSubmitting;

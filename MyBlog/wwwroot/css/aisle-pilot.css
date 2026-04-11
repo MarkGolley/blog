@@ -2764,6 +2764,25 @@ html.aislepilot-restore-pending .aislepilot-app {
     pointer-events: none;
 }
 
+.aislepilot-card.is-swap-fading-out::before {
+    content: attr(data-swap-status);
+    position: absolute;
+    inset: auto 1rem 1rem;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2rem;
+    padding: 0.38rem 0.72rem;
+    border-radius: 999px;
+    background: rgba(16, 63, 101, 0.86);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 22px rgba(16, 39, 69, 0.22);
+}
+
 .aislepilot-card.is-swap-fading-out::after {
     content: "";
     position: absolute;
@@ -4213,6 +4232,18 @@ body.aislepilot-mobile-meal-sheet-open {
     .aislepilot-mobile-context-meta-values {
         margin-left: auto;
         text-align: right;
+    }
+
+    .aislepilot-mobile-context-budget-status {
+        color: var(--ink);
+    }
+
+    .aislepilot-mobile-context-budget-status.is-over-budget {
+        color: #92261f;
+    }
+
+    .aislepilot-mobile-context-budget-status.is-on-budget {
+        color: #166247;
     }
 
     .aislepilot-mobile-context-jumps {
