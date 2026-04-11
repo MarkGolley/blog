@@ -679,6 +679,7 @@
                                                 : null;
                                             var detailsPanelId = $"meal-details-{mealIndex}";
                                             var slotMoreActionsMenuId = $"meal-actions-{mealIndex}-{slotIndex}";
+                                            var slotMoreActionsTitleId = $"meal-actions-title-{mealIndex}-{slotIndex}";
                                             var shouldPrioritizeImage = slotIndex == 0 && dayGroupIndex < 2;
                                             <section id="@($"{tabPrefix}-panel-{slotIndex}")"
                                                      class="aislepilot-day-meal-panel@(isIgnored ? " is-ignored" : string.Empty)"
@@ -741,6 +742,7 @@
                                                         <summary class="aislepilot-more-actions-trigger"
                                                                  aria-controls="@slotMoreActionsMenuId"
                                                                  aria-expanded="false"
+                                                                 aria-haspopup="dialog"
                                                                  aria-label="Meal actions"
                                                                  title="Meal actions">
                                                             <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -752,9 +754,16 @@
                                                             </span>
                                                             <span class="aislepilot-swap-action-label">Actions</span>
                                                         </summary>
-                                                        <div id="@slotMoreActionsMenuId" class="aislepilot-card-more-actions-menu" role="group" aria-label="Meal actions">
+                                                        <div id="@slotMoreActionsMenuId"
+                                                             class="aislepilot-card-more-actions-menu"
+                                                             role="group"
+                                                             aria-label="Meal actions"
+                                                             aria-labelledby="@slotMoreActionsTitleId"
+                                                             data-card-more-actions-panel>
                                                             <div class="aislepilot-mobile-meal-sheet-head">
-                                                                <p class="aislepilot-mobile-meal-sheet-title">@meal.MealName</p>
+                                                                <span class="aislepilot-mobile-meal-sheet-handle" aria-hidden="true"></span>
+                                                                <div class="aislepilot-mobile-meal-sheet-head-row">
+                                                                    <p id="@slotMoreActionsTitleId" class="aislepilot-mobile-meal-sheet-title">@meal.MealName</p>
                                                                 <button type="button"
                                                                         class="aislepilot-mobile-meal-sheet-close"
                                                                         data-card-more-actions-close
@@ -762,6 +771,7 @@
                                                                         title="Close meal actions">
                                                                     <span aria-hidden="true">×</span>
                                                                 </button>
+                                                                </div>
                                                             </div>
                                                             <form method="post"
                                                                   action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"

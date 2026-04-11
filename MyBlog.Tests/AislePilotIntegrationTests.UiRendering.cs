@@ -246,6 +246,11 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
             css,
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains(".aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact .aislepilot-btn-label", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-mobile-meal-sheet-handle", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-card-more-actions.is-closing > .aislepilot-card-more-actions-menu", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-card-more-actions-menu.is-mobile-sheet", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-card-more-actions[open] > .aislepilot-card-more-actions-menu:not(.is-mobile-sheet)", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("will-change: transform, opacity;", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("fill: currentColor;", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("stroke: none;", css, StringComparison.OrdinalIgnoreCase);
     }
@@ -434,11 +439,14 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.DoesNotContain("aislepilot-edit-setup-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-more-actions-trigger\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-more-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-haspopup=\"dialog\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-swap-btn is-secondary is-compact\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("is-secondary is-icon-only is-compact", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"aislepilot-swap-action-label\">Save</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"aislepilot-swap-action-label\">Ignore</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-meal-image-summary\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-card-more-actions-panel", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-mobile-meal-sheet-handle\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span>Refresh plan</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span data-setup-toggle-label>Edit settings</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"sr-only\">View details</span>", html, StringComparison.OrdinalIgnoreCase);

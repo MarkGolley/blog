@@ -67,12 +67,12 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             () => {
                 const details = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open]");
                 if (!(details instanceof HTMLDetailsElement)) {
-                    return [0, 0, 0, 0, 0];
+                    return [0, 0, 0, 0, 0, 0];
                 }
 
-                const menu = details.querySelector(".aislepilot-card-more-actions-menu");
+                const menu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
                 if (!(menu instanceof HTMLElement)) {
-                    return [0, 0, 0, 0, 0];
+                    return [0, 0, 0, 0, 0, 0];
                 }
 
                 const rect = menu.getBoundingClientRect();
@@ -80,14 +80,18 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const isFixed = computed.position === "fixed" ? 1 : 0;
                 const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight ? 1 : 0;
                 const renderedHeight = rect.height >= 120 ? 1 : 0;
-                return [details.open ? 1 : 0, isFixed, inViewport, renderedHeight];
+                const parentIsBody = menu.parentElement === document.body ? 1 : 0;
+                const trappedInsideDetails = details.contains(menu) ? 1 : 0;
+                return [details.open ? 1 : 0, isFixed, inViewport, renderedHeight, parentIsBody, trappedInsideDetails];
             }
             """);
-        Assert.Equal(4, sheetModeEnabled.Length);
+        Assert.Equal(6, sheetModeEnabled.Length);
         Assert.Equal(1, sheetModeEnabled[0]);
         Assert.Equal(1, sheetModeEnabled[1]);
         Assert.Equal(1, sheetModeEnabled[2]);
         Assert.Equal(1, sheetModeEnabled[3]);
+        Assert.Equal(1, sheetModeEnabled[4]);
+        Assert.Equal(0, sheetModeEnabled[5]);
         await page.WaitForTimeoutAsync(220);
         var sheetPersistence = await page.EvaluateAsync<int[]>(
             """
@@ -96,13 +100,101 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const backdrop = document.querySelector(".aislepilot-mobile-meal-sheet-backdrop");
                 const isOpen = details instanceof HTMLDetailsElement && details.open ? 1 : 0;
                 const backdropVisible = backdrop instanceof HTMLElement && !backdrop.hasAttribute("hidden") ? 1 : 0;
-                return [isOpen, backdropVisible];
+                const menuStillPortaled = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet") instanceof HTMLElement ? 1 : 0;
+                return [isOpen, backdropVisible, menuStillPortaled];
             }
             """);
-        Assert.Equal(2, sheetPersistence.Length);
+        Assert.Equal(3, sheetPersistence.Length);
         Assert.Equal(1, sheetPersistence[0]);
         Assert.Equal(1, sheetPersistence[1]);
+        Assert.Equal(1, sheetPersistence[2]);
         Assert.Equal(0, await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions][open] [data-leftover-toggle-sign]").CountAsync());
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotMealActionsSheet_ClosesOnBackdropTapAndActionTap()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var moreActionsSummary = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
+        await moreActionsSummary.ClickAsync();
+
+        var mobileSheetHeader = page.Locator("[data-card-more-actions-panel].is-mobile-sheet .aislepilot-mobile-meal-sheet-head").First;
+        await mobileSheetHeader.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        await page.WaitForTimeoutAsync(260);
+        await page.Locator(".aislepilot-mobile-meal-sheet-backdrop").First.ClickAsync();
+        await page.WaitForTimeoutAsync(520);
+
+        var closedByBackdrop = await page.EvaluateAsync<int[]>(
+            """
+            () => {
+                const details = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions]");
+                const backdrop = document.querySelector(".aislepilot-mobile-meal-sheet-backdrop");
+                const isOpen = details instanceof HTMLDetailsElement && details.open ? 1 : 0;
+                const isClosing = details instanceof HTMLElement && details.classList.contains("is-closing") ? 1 : 0;
+                const backdropVisible = backdrop instanceof HTMLElement && !backdrop.hasAttribute("hidden") ? 1 : 0;
+                const bodyLocked = document.body.classList.contains("aislepilot-mobile-meal-sheet-open") ? 1 : 0;
+                const portaledSheet = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
+                return [isOpen, isClosing, backdropVisible, bodyLocked, portaledSheet instanceof HTMLElement ? 1 : 0];
+            }
+            """);
+
+        Assert.Equal(5, closedByBackdrop.Length);
+        Assert.Equal(0, closedByBackdrop[0]);
+        Assert.Equal(0, closedByBackdrop[1]);
+        Assert.Equal(0, closedByBackdrop[2]);
+        Assert.Equal(0, closedByBackdrop[3]);
+        Assert.Equal(0, closedByBackdrop[4]);
+
+        await moreActionsSummary.ClickAsync();
+        await mobileSheetHeader.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var saveAction = page.Locator("[data-card-more-actions-panel].is-mobile-sheet .aislepilot-favorite-form button[type='submit']").First;
+        await saveAction.ClickAsync();
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var closedAfterAction = await page.EvaluateAsync<int[]>(
+            """
+            () => {
+                const openSheet = document.querySelector("[data-card-more-actions][open]");
+                const closingSheet = document.querySelector("[data-card-more-actions].is-closing");
+                const backdrop = document.querySelector(".aislepilot-mobile-meal-sheet-backdrop");
+                const backdropVisible = backdrop instanceof HTMLElement && !backdrop.hasAttribute("hidden") ? 1 : 0;
+                const bodyLocked = document.body.classList.contains("aislepilot-mobile-meal-sheet-open") ? 1 : 0;
+                const portaledSheet = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
+                return [
+                    openSheet instanceof HTMLDetailsElement ? 1 : 0,
+                    closingSheet instanceof HTMLElement ? 1 : 0,
+                    backdropVisible,
+                    bodyLocked,
+                    portaledSheet instanceof HTMLElement ? 1 : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(5, closedAfterAction.Length);
+        Assert.Equal(0, closedAfterAction[0]);
+        Assert.Equal(0, closedAfterAction[1]);
+        Assert.Equal(0, closedAfterAction[2]);
+        Assert.Equal(0, closedAfterAction[3]);
+        Assert.Equal(0, closedAfterAction[4]);
     }
 
     [Fact]

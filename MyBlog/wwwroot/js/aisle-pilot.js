@@ -3541,8 +3541,141 @@
 
     let cardMoreActionsBackdrop = null;
     let cardMoreActionsLastOpenedAt = 0;
+    const cardMoreActionsCloseAnimationMs = 420;
+    const cardMoreActionsCloseTimers = new WeakMap();
+    const cardMoreActionsAnimationFrames = new WeakMap();
+    const cardMoreActionsPanelPortalState = new WeakMap();
     const shouldUseMobileCardActionsSheet = () =>
         typeof window.matchMedia === "function" && window.matchMedia("(max-width: 760px)").matches;
+    const getVisibleCardMoreActionsMenus = () => Array.from(
+        document.querySelectorAll("[data-card-more-actions][open], [data-card-more-actions].is-closing")
+    );
+    const getCardMoreActionsPanel = menu => {
+        if (!(menu instanceof HTMLDetailsElement)) {
+            return null;
+        }
+
+        const trigger = menu.querySelector("summary");
+        const panelId = trigger instanceof HTMLElement ? trigger.getAttribute("aria-controls") : null;
+        if (typeof panelId === "string" && panelId.length > 0) {
+            const panelById = document.getElementById(panelId);
+            if (panelById instanceof HTMLElement) {
+                return panelById;
+            }
+        }
+
+        const panel = menu.querySelector(".aislepilot-card-more-actions-menu");
+        return panel instanceof HTMLElement ? panel : null;
+    };
+
+    const clearCardMoreActionsCloseTimer = menu => {
+        const closeTimer = cardMoreActionsCloseTimers.get(menu);
+        if (typeof closeTimer === "number") {
+            window.clearTimeout(closeTimer);
+        }
+
+        cardMoreActionsCloseTimers.delete(menu);
+    };
+
+    const stopCardMoreActionsAnimation = menu => {
+        const actionsMenu = getCardMoreActionsPanel(menu);
+        if (!(actionsMenu instanceof HTMLElement)) {
+            return;
+        }
+
+        const activeFrame = cardMoreActionsAnimationFrames.get(actionsMenu);
+        if (typeof activeFrame === "number") {
+            window.cancelAnimationFrame(activeFrame);
+        }
+
+        cardMoreActionsAnimationFrames.delete(actionsMenu);
+        actionsMenu.style.removeProperty("transition");
+    };
+
+    const clearCardMoreActionsMenuInlineStyles = menu => {
+        const actionsMenu = getCardMoreActionsPanel(menu);
+        if (!(actionsMenu instanceof HTMLElement)) {
+            return;
+        }
+
+        actionsMenu.style.removeProperty("max-height");
+        actionsMenu.style.removeProperty("overflow-y");
+        actionsMenu.style.removeProperty("position");
+        actionsMenu.style.removeProperty("left");
+        actionsMenu.style.removeProperty("top");
+        actionsMenu.style.removeProperty("right");
+        actionsMenu.style.removeProperty("bottom");
+    };
+
+    const moveCardMoreActionsPanelToBody = menu => {
+        const actionsMenu = getCardMoreActionsPanel(menu);
+        if (!(actionsMenu instanceof HTMLElement)) {
+            return null;
+        }
+
+        if (!shouldUseMobileCardActionsSheet()) {
+            return actionsMenu;
+        }
+
+        if (actionsMenu.parentElement !== document.body) {
+            cardMoreActionsPanelPortalState.set(actionsMenu, {
+                parent: actionsMenu.parentNode,
+                nextSibling: actionsMenu.nextSibling
+            });
+            document.body.appendChild(actionsMenu);
+        }
+
+        actionsMenu.classList.add("is-mobile-sheet");
+        actionsMenu.classList.remove("is-closing");
+        actionsMenu.style.visibility = "hidden";
+        actionsMenu.style.opacity = "1";
+        actionsMenu.style.transform = "translate3d(0, 110%, 0)";
+        actionsMenu.style.transition = "none";
+        return actionsMenu;
+    };
+
+    const restoreCardMoreActionsPanelFromBody = menu => {
+        const actionsMenu = getCardMoreActionsPanel(menu);
+        if (!(actionsMenu instanceof HTMLElement)) {
+            return;
+        }
+
+        actionsMenu.classList.remove("is-mobile-sheet", "is-closing");
+        actionsMenu.style.removeProperty("visibility");
+        actionsMenu.style.removeProperty("opacity");
+        actionsMenu.style.removeProperty("transform");
+        actionsMenu.style.removeProperty("transition");
+        const portalState = cardMoreActionsPanelPortalState.get(actionsMenu);
+        if (!portalState || actionsMenu.parentElement !== document.body) {
+            return;
+        }
+
+        const parentNode = portalState.parent instanceof Node ? portalState.parent : null;
+        if (parentNode === null) {
+            cardMoreActionsPanelPortalState.delete(actionsMenu);
+            return;
+        }
+
+        const nextSibling = portalState.nextSibling instanceof Node &&
+            portalState.nextSibling.parentNode === parentNode
+            ? portalState.nextSibling
+            : null;
+        parentNode.insertBefore(actionsMenu, nextSibling);
+        cardMoreActionsPanelPortalState.delete(actionsMenu);
+    };
+
+    const syncDayMealPanelOpenActionsState = menu => {
+        const dayMealPanel = menu instanceof HTMLElement
+            ? menu.closest("[data-day-meal-panel]")
+            : null;
+        if (!(dayMealPanel instanceof HTMLElement)) {
+            return;
+        }
+
+        const hasVisibleMenu = dayMealPanel.querySelector("[data-card-more-actions][open], [data-card-more-actions].is-closing")
+            instanceof HTMLDetailsElement;
+        dayMealPanel.classList.toggle("has-open-actions", hasVisibleMenu);
+    };
 
     const ensureCardMoreActionsBackdrop = () => {
         if (cardMoreActionsBackdrop instanceof HTMLDivElement) {
@@ -3556,6 +3689,7 @@
             if (Date.now() - cardMoreActionsLastOpenedAt < 260) {
                 return;
             }
+
             closeOpenCardMoreActions(null);
         });
         document.body.appendChild(backdrop);
@@ -3564,11 +3698,14 @@
     };
 
     const syncCardMoreActionsSheetState = () => {
-        const hasOpenMobileSheet = shouldUseMobileCardActionsSheet() &&
-            document.querySelector("[data-card-more-actions][open]") instanceof HTMLDetailsElement;
+        const hasVisibleMobileSheet = shouldUseMobileCardActionsSheet() &&
+            document.querySelector("[data-card-more-actions][open], [data-card-more-actions].is-closing") instanceof HTMLDetailsElement;
         const backdrop = ensureCardMoreActionsBackdrop();
-        if (hasOpenMobileSheet) {
-            cardMoreActionsLastOpenedAt = Date.now();
+        if (hasVisibleMobileSheet) {
+            if (document.querySelector("[data-card-more-actions][open]") instanceof HTMLDetailsElement) {
+                cardMoreActionsLastOpenedAt = Date.now();
+            }
+
             backdrop.removeAttribute("hidden");
             backdrop.classList.add("is-active");
             document.body.classList.add("aislepilot-mobile-meal-sheet-open");
@@ -3579,14 +3716,118 @@
         }
     };
 
+    const animateCardMoreActionsOpen = menu => {
+        const actionsMenu = getCardMoreActionsPanel(menu);
+        if (!(actionsMenu instanceof HTMLElement) || !shouldUseMobileCardActionsSheet()) {
+            return;
+        }
+
+        stopCardMoreActionsAnimation(menu);
+        actionsMenu.style.transition = "none";
+        actionsMenu.style.visibility = "hidden";
+        actionsMenu.style.transform = "translate3d(0, 110%, 0)";
+        void actionsMenu.offsetHeight;
+
+        const beginAnimation = () => {
+            if (!menu.open) {
+                return;
+            }
+
+            actionsMenu.style.visibility = "visible";
+            actionsMenu.style.transition = `transform ${cardMoreActionsCloseAnimationMs}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+            actionsMenu.style.transform = "translate3d(0, 0, 0)";
+        };
+
+        const frameId = window.requestAnimationFrame(beginAnimation);
+        cardMoreActionsAnimationFrames.set(actionsMenu, frameId);
+    };
+
+    const finishClosingCardMoreActionsMenu = (menu, options = {}) => {
+        if (!(menu instanceof HTMLDetailsElement)) {
+            return;
+        }
+
+        clearCardMoreActionsCloseTimer(menu);
+        stopCardMoreActionsAnimation(menu);
+        menu.classList.remove("is-closing");
+        clearCardMoreActionsMenuInlineStyles(menu);
+        restoreCardMoreActionsPanelFromBody(menu);
+        syncDayMealPanelOpenActionsState(menu);
+        syncCardMoreActionsSheetState();
+        updateViewportHeight(true);
+
+        if (options.restoreFocus === true) {
+            const trigger = menu.querySelector("summary");
+            if (trigger instanceof HTMLElement) {
+                trigger.focus({ preventScroll: true });
+            }
+        }
+    };
+
+    const closeCardMoreActionsMenu = (menu, options = {}) => {
+        if (!(menu instanceof HTMLDetailsElement)) {
+            return;
+        }
+
+        const restoreFocus = options.restoreFocus === true;
+        if (menu.classList.contains("is-closing")) {
+            finishClosingCardMoreActionsMenu(menu, { restoreFocus });
+            return;
+        }
+
+        if (!menu.open) {
+            finishClosingCardMoreActionsMenu(menu, { restoreFocus });
+            return;
+        }
+
+        if (!shouldUseMobileCardActionsSheet()) {
+            menu.open = false;
+            finishClosingCardMoreActionsMenu(menu, { restoreFocus });
+            return;
+        }
+
+        clearCardMoreActionsCloseTimer(menu);
+        stopCardMoreActionsAnimation(menu);
+        menu.classList.add("is-closing");
+        const actionsMenu = getCardMoreActionsPanel(menu);
+        if (!(actionsMenu instanceof HTMLElement)) {
+            menu.open = false;
+            syncDayMealPanelOpenActionsState(menu);
+            syncCardMoreActionsSheetState();
+            updateViewportHeight(true);
+            const closeTimerWithoutPanel = window.setTimeout(() => {
+                finishClosingCardMoreActionsMenu(menu, { restoreFocus });
+            }, cardMoreActionsCloseAnimationMs);
+            cardMoreActionsCloseTimers.set(menu, closeTimerWithoutPanel);
+            return;
+        }
+
+        if (actionsMenu instanceof HTMLElement) {
+            actionsMenu.classList.add("is-closing");
+            actionsMenu.style.visibility = "visible";
+            actionsMenu.style.opacity = "1";
+        }
+        menu.open = false;
+        syncDayMealPanelOpenActionsState(menu);
+        syncCardMoreActionsSheetState();
+        updateViewportHeight(true);
+        actionsMenu.style.transition = `transform ${cardMoreActionsCloseAnimationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+        void actionsMenu.offsetHeight;
+        actionsMenu.style.transform = "translate3d(0, 110%, 0)";
+
+        const closeTimer = window.setTimeout(() => {
+            finishClosingCardMoreActionsMenu(menu, { restoreFocus });
+        }, cardMoreActionsCloseAnimationMs);
+        cardMoreActionsCloseTimers.set(menu, closeTimer);
+    };
+
     const closeOpenCardMoreActions = except => {
-        const openMenus = Array.from(document.querySelectorAll("[data-card-more-actions][open]"));
-        openMenus.forEach(menu => {
+        getVisibleCardMoreActionsMenus().forEach(menu => {
             if (!(menu instanceof HTMLDetailsElement) || menu === except) {
                 return;
             }
 
-            menu.open = false;
+            closeCardMoreActionsMenu(menu);
         });
 
         window.requestAnimationFrame(() => {
@@ -3600,21 +3841,16 @@
         }
 
         const trigger = menu.querySelector("summary");
-        const actionsMenu = menu.querySelector(".aislepilot-card-more-actions-menu");
+        const actionsMenu = getCardMoreActionsPanel(menu);
         if (!(trigger instanceof HTMLElement) || !(actionsMenu instanceof HTMLElement)) {
             return;
         }
 
         const viewportPadding = 8;
-        actionsMenu.style.removeProperty("max-height");
-        actionsMenu.style.removeProperty("overflow-y");
-        actionsMenu.style.removeProperty("position");
-        actionsMenu.style.removeProperty("left");
-        actionsMenu.style.removeProperty("top");
-        actionsMenu.style.removeProperty("right");
-        actionsMenu.style.removeProperty("bottom");
+        clearCardMoreActionsMenuInlineStyles(menu);
         menu.classList.remove("is-drop-up", "is-drop-down", "is-align-left");
         if (!shouldUseMobileCardActionsSheet()) {
+            restoreCardMoreActionsPanelFromBody(menu);
             syncCardMoreActionsSheetState();
             return;
         }
@@ -3636,40 +3872,59 @@
             }
 
             menu.dataset.cardMoreActionsWired = "true";
+            const trigger = menu.querySelector("summary");
+            if (trigger instanceof HTMLElement) {
+                trigger.addEventListener("click", event => {
+                    if (!menu.open || !shouldUseMobileCardActionsSheet()) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    closeCardMoreActionsMenu(menu, { restoreFocus: true });
+                });
+            }
+
             menu.addEventListener("toggle", () => {
-                const trigger = menu.querySelector("summary");
-                const actionsMenu = menu.querySelector(".aislepilot-card-more-actions-menu");
                 if (trigger instanceof HTMLElement) {
                     trigger.setAttribute("aria-expanded", menu.open ? "true" : "false");
                 }
-                if (!menu.open && actionsMenu instanceof HTMLElement) {
-                    actionsMenu.style.removeProperty("max-height");
-                    actionsMenu.style.removeProperty("overflow-y");
-                    actionsMenu.style.removeProperty("position");
-                    actionsMenu.style.removeProperty("left");
-                    actionsMenu.style.removeProperty("top");
-                    actionsMenu.style.removeProperty("right");
-                    actionsMenu.style.removeProperty("bottom");
+
+                if (!menu.open && !menu.classList.contains("is-closing")) {
+                    clearCardMoreActionsMenuInlineStyles(menu);
+                    restoreCardMoreActionsPanelFromBody(menu);
                 }
-                if (!menu.open) {
+
+                syncDayMealPanelOpenActionsState(menu);
+                if (!menu.open && !menu.classList.contains("is-closing")) {
                     syncCardMoreActionsSheetState();
                 }
 
-                const dayMealPanel = menu.closest("[data-day-meal-panel]");
-                if (dayMealPanel instanceof HTMLElement) {
-                    const hasOpenMenu = dayMealPanel.querySelector("[data-card-more-actions][open]") instanceof HTMLDetailsElement;
-                    if (hasOpenMenu) {
-                        dayMealPanel.classList.add("has-open-actions");
-                    } else {
-                        dayMealPanel.classList.remove("has-open-actions");
-                    }
-                }
                 updateViewportHeight(true);
 
                 if (menu.open) {
+                    clearCardMoreActionsCloseTimer(menu);
+                    stopCardMoreActionsAnimation(menu);
+                    menu.classList.remove("is-closing");
+                    const actionsMenu = moveCardMoreActionsPanelToBody(menu);
+                    if (actionsMenu instanceof HTMLElement) {
+                        actionsMenu.classList.remove("is-closing");
+                    }
                     closeOpenCardMoreActions(menu);
                     positionCardMoreActionsMenu(menu);
-                    window.requestAnimationFrame(() => positionCardMoreActionsMenu(menu));
+                    window.requestAnimationFrame(() => {
+                        positionCardMoreActionsMenu(menu);
+                        animateCardMoreActionsOpen(menu);
+                        if (!shouldUseMobileCardActionsSheet()) {
+                            return;
+                        }
+
+                        const closeButton = actionsMenu instanceof HTMLElement
+                            ? actionsMenu.querySelector("[data-card-more-actions-close]")
+                            : null;
+                        if (closeButton instanceof HTMLElement) {
+                            closeButton.focus({ preventScroll: true });
+                        }
+                    });
                 }
             });
 
@@ -3680,7 +3935,7 @@
                 }
 
                 button.addEventListener("click", () => {
-                    menu.open = false;
+                    closeCardMoreActionsMenu(menu);
                 });
             });
 
@@ -3692,7 +3947,7 @@
 
                 closeButton.addEventListener("click", event => {
                     event.preventDefault();
-                    menu.open = false;
+                    closeCardMoreActionsMenu(menu, { restoreFocus: true });
                 });
             });
         });
@@ -3707,7 +3962,7 @@
                 return;
             }
 
-            if (event.target.closest("[data-card-more-actions]")) {
+            if (event.target.closest("[data-card-more-actions]") || event.target.closest("[data-card-more-actions-panel]")) {
                 return;
             }
 
@@ -3721,8 +3976,17 @@
         });
 
         window.addEventListener("resize", () => {
-            const openMenus = Array.from(document.querySelectorAll("[data-card-more-actions][open]"));
-            openMenus.forEach(openMenu => {
+            const visibleMenus = getVisibleCardMoreActionsMenus();
+            visibleMenus.forEach(openMenu => {
+                if (!(openMenu instanceof HTMLDetailsElement)) {
+                    return;
+                }
+
+                if (!openMenu.open) {
+                    finishClosingCardMoreActionsMenu(openMenu);
+                    return;
+                }
+
                 positionCardMoreActionsMenu(openMenu);
             });
             updateViewportHeight(true);
