@@ -24,13 +24,23 @@
 - `Services/AislePilotService*.cs`: planning engine split by responsibility:
   - `AislePilotService.cs`: composition root, static reference data, caches, and service wiring.
   - `AislePilotService.CatalogAndPantry.cs`: supported-option accessors, compatibility checks, dessert/warmup hydration, pantry suggestion orchestration, and request normalization helpers.
-  - `AislePilotService.PlanGeneration.cs`: plan build/swap/rebalance orchestration.
-  - `AislePilotService.MealSelection.cs`: meal selection, scoring, pantry ranking, shopping builders.
-  - `AislePilotService.AiPrompting.cs`: AI prompt construction, payload normalization/validation, retry plumbing.
-  - `AislePilotService.Images.cs`: meal image resolution/storage/recovery/background generation.
+  - `AislePilotService.PlanGeneration.cs`: primary plan-generation fallback and AI/pool orchestration.
+  - `AislePilotService.PlanGeneration.Assembly.cs`: dessert add-on resolution, plan context creation, cloning, and final plan assembly.
+  - `AislePilotService.MealSelection.cs`: core meal selection, filtering, AI-pool compatibility, and Firestore meal mapping.
+  - `AislePilotService.MealSelection.Shopping.cs`: daily-card shaping plus shopping-list/dessert shopping helpers.
+  - `AislePilotService.MealSelection.TypesAndNormalization.cs`: plan day/cook day/meal type normalization and slot suitability helpers.
+  - `AislePilotService.AiPrompting.cs`: AI prompt construction only.
+  - `AislePilotService.AiPrompting.Validation.cs`: AI meal/ingredient/nutrition validation and mapping.
+  - `AislePilotService.AiPrompting.JsonRecovery.cs`: JSON parsing, malformed-payload recovery, and normalization helpers.
+  - `AislePilotService.AiPrompting.Retry.cs`: HTTP retry and low-level request helpers.
+  - `AislePilotService.Images.cs`: image lookup/cache hydration and cached/bundled image resolution.
+  - `AislePilotService.Images.Persistence.cs`: disk restore/read, Firestore chunk persistence, and image URL normalization.
+  - `AislePilotService.Images.BackgroundGeneration.cs`: background image generation, special-treat generation, and dessert recovery queues.
   - `AislePilotService.SupermarketLayouts.cs`: supermarket aisle-order discovery/caching.
   - `AislePilotService.Leftovers.cs`: leftover/cook-day distribution helpers.
   - `AislePilotService.Types.cs`: nested records/data contracts/firestore DTOs.
+  - `AislePilotService.PlanGeneration.Budget.cs`: targeted lower-cost rebalance attempts and shared cost helpers.
+  - `AislePilotService.PlanGeneration.Budget.Floor.cs`: lowest-cost fallback plan selection plus rebalance status/rebase helpers.
 - `Services/AislePilotSlotSelectionEngine.cs`, `AislePilotPantryRankingEngine.cs`, `AislePilotNutritionRecipeFallbackEngine.cs`: DI seams around `AislePilotService` logic. Touch these only when you need a separate injectable boundary; most behavior changes still belong in the matching `AislePilotService.*` partial.
 - `Services/AislePilotPlanGenerationOrchestrator.cs`: injected orchestration for top-level plan generation flow.
 - `Services/AislePilotPlanComparisonService.cs`: injected meal-sequence comparison and changed-day analysis.
@@ -58,9 +68,16 @@
   - Pantry suggestion UX or saved-meal toggles: `AislePilotController.Pantry.cs`.
   - Export and meal-image response behavior: `AislePilotController.Exports.cs`.
 - New plan-generation rules or swap/rebalance logic: `AislePilotService.PlanGeneration.cs` or `AislePilotService.MealSelection.cs`.
+- Final plan assembly, dessert add-on resolution, or plan context shaping: `AislePilotService.PlanGeneration.Assembly.cs`.
+- Shopping-list shaping or daily-card output assembly: `AislePilotService.MealSelection.Shopping.cs`.
+- Meal-type slot normalization and day-count helpers: `AislePilotService.MealSelection.TypesAndNormalization.cs`.
 - New supported-option accessors, pantry orchestration, warmup coverage, or dessert add-on pool behavior: `AislePilotService.CatalogAndPantry.cs`.
-- New AI prompt or payload-recovery logic: `AislePilotService.AiPrompting.cs`.
-- New meal image logic: `AislePilotService.Images.cs`.
+- New AI prompt text: `AislePilotService.AiPrompting.cs`.
+- New AI payload validation or repair logic: `AislePilotService.AiPrompting.Validation.cs` or `AislePilotService.AiPrompting.JsonRecovery.cs`.
+- New meal image lookup/hydration logic: `AislePilotService.Images.cs`.
+- New meal image persistence or background generation logic: `AislePilotService.Images.Persistence.cs` or `AislePilotService.Images.BackgroundGeneration.cs`.
+- New budget rebalance attempt logic: `AislePilotService.PlanGeneration.Budget.cs`.
+- New lowest-cost fallback or rebalance status messaging: `AislePilotService.PlanGeneration.Budget.Floor.cs`.
 - New supermarket aisle discovery behavior: `AislePilotService.SupermarketLayouts.cs`.
 - New AislePilot exports: `AislePilotExportService.cs`.
 - UI-only AislePilot behavior: Razor views and `wwwroot/js/aisle-pilot*`.
@@ -74,7 +91,8 @@
 - Server-rendered/HTTP behavior: `MyBlog.Tests/AislePilotIntegrationTests*.cs`.
   - `AislePilotIntegrationTests.cs`: controller validation, export contracts, saved-week and swap endpoints.
   - `AislePilotIntegrationTests.PantryInteractions.cs`: pantry suggestion forms, strict pantry mode, history, and saved-meal interactions.
-  - `AislePilotIntegrationTests.UiRendering.cs`: Razor output contracts and page-section rendering.
+  - `AislePilotIntegrationTests.UiRendering.cs`: Razor output contracts, layout shell, CSS/JS asset contract checks, and plan card rendering.
+  - `AislePilotIntegrationTests.UiRendering.SavedStateMenus.cs`: saved-week, saved-meal, and header-menu rendering contracts.
 - UX/layout/interaction regressions: `MyBlog.Tests/PlaywrightE2ETests*.cs`.
   - `PlaywrightE2ETests.cs`: high-level happy paths and smoke coverage.
   - `PlaywrightE2ETests.DesktopLayouts.cs`: desktop layout and interaction expectations.
