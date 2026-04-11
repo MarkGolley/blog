@@ -749,13 +749,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     color: #fff;
 }
 
-.aislepilot-edit-setup-btn .aislepilot-symbol-glyph {
-    border-color: #fff;
-    background: #fff;
-    color: var(--brand-deep);
-}
-
-.aislepilot-edit-setup-btn .aislepilot-symbol-glyph svg {
+.aislepilot-overview-regenerate-btn.aislepilot-edit-setup-btn .aislepilot-symbol-glyph svg {
     stroke-width: 2.4;
 }
 
@@ -1206,8 +1200,7 @@ html.aislepilot-restore-pending .aislepilot-app {
     width: 100%;
 }
 
-.aislepilot-overview-actions-menu .aislepilot-overview-regenerate-btn,
-.aislepilot-overview-actions-menu .aislepilot-edit-setup-btn {
+.aislepilot-overview-actions-menu .aislepilot-overview-regenerate-btn {
     width: 100%;
     justify-content: flex-start;
 }
@@ -1323,24 +1316,6 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-overview-toggle-btn[aria-expanded="true"] .aislepilot-symbol-glyph svg {
     transform: rotate(180deg);
-}
-
-.aislepilot-edit-setup-btn {
-    min-height: var(--ap-overview-button-size) !important;
-    border: 1px solid rgba(16, 63, 101, 0.24) !important;
-    border-radius: var(--ap-radius-pill) !important;
-    background: rgba(255, 255, 255, 0.98) !important;
-    color: var(--brand-deep) !important;
-    box-shadow: none !important;
-    padding: 0.28rem 0.68rem !important;
-    font-size: 0.88rem !important;
-    font-weight: 700 !important;
-}
-
-.aislepilot-edit-setup-btn .aislepilot-symbol-glyph {
-    border-color: rgba(16, 63, 101, 0.3);
-    background: rgba(16, 63, 101, 0.1);
-    color: var(--brand-deep);
 }
 
 .aislepilot-overview-toggle-btn.is-icon-only {
@@ -4834,8 +4809,7 @@ body.aislepilot-mobile-meal-sheet-open {
         width: auto;
     }
 
-    .aislepilot-overview-actions-inline .aislepilot-overview-regenerate-btn,
-    .aislepilot-overview-actions-inline .aislepilot-edit-setup-btn {
+    .aislepilot-overview-actions-inline .aislepilot-overview-regenerate-btn {
         width: auto;
         min-width: 0;
     }
@@ -5674,18 +5648,6 @@ body.aislepilot-mobile-meal-sheet-open {
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.16);
     color: #fff;
-}
-
-:root[data-theme="dark"] .aislepilot-edit-setup-btn {
-    background: rgba(21, 34, 52, 0.96) !important;
-    border-color: var(--line) !important;
-    color: #deefff !important;
-}
-
-:root[data-theme="dark"] .aislepilot-edit-setup-btn .aislepilot-symbol-glyph {
-    border-color: rgba(125, 167, 213, 0.44);
-    background: rgba(125, 167, 213, 0.16);
-    color: #deefff;
 }
 
 :root[data-theme="dark"] .aislepilot-setup-mode-toggle:not(.is-active) {

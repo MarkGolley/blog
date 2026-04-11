@@ -267,6 +267,39 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_UsesRecipeSpecificMealTimesInsteadOfFlattenedFallbacks()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 200m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 3,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(
+            request,
+            ["Egg fried rice", "Turkey chilli with beans", "Salmon, potatoes, and broccoli"]);
+
+        Assert.Equal(3, result.MealPlan.Count);
+        Assert.Equal(
+            ["Egg fried rice", "Turkey chilli with beans", "Salmon, potatoes, and broccoli"],
+            result.MealPlan.Select(meal => meal.MealName).ToArray());
+
+        var eggFriedRice = Assert.Single(result.MealPlan, meal => meal.MealName.Equals("Egg fried rice", StringComparison.OrdinalIgnoreCase));
+        var turkeyChilli = Assert.Single(result.MealPlan, meal => meal.MealName.Equals("Turkey chilli with beans", StringComparison.OrdinalIgnoreCase));
+        var salmon = Assert.Single(result.MealPlan, meal => meal.MealName.Equals("Salmon, potatoes, and broccoli", StringComparison.OrdinalIgnoreCase));
+
+        Assert.All(result.MealPlan, meal => Assert.Equal(0, meal.EstimatedPrepMinutes % 5));
+        Assert.True(eggFriedRice.EstimatedPrepMinutes < turkeyChilli.EstimatedPrepMinutes);
+        Assert.True(eggFriedRice.EstimatedPrepMinutes < salmon.EstimatedPrepMinutes);
+        Assert.Equal(3, result.MealPlan.Select(meal => meal.EstimatedPrepMinutes).Distinct().Count());
+    }
+
+    [Fact]
     public void BuildPlan_PopulatesCaloriesAndMacros_ForEveryMeal()
     {
         var request = new AislePilotRequestModel

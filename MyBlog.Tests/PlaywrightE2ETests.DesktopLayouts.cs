@@ -306,7 +306,10 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         });
 
         var customItemInput = page.Locator("[data-custom-shopping-input]").First;
+        var addItemButton = page.Locator("[data-custom-shopping-add]").First;
         await customItemInput.FillAsync("Toilet roll");
+        await customItemInput.PressAsync("Enter");
+        await customItemInput.FillAsync("Kitchen foil");
         await customItemInput.PressAsync("Enter");
 
         var customItem = page.Locator("[data-custom-shopping-list] [data-shopping-item-text]").Filter(new LocatorFilterOptions
@@ -318,32 +321,59 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             State = WaitForSelectorState.Visible,
             Timeout = 10000
         });
+        await page.Locator("[data-custom-shopping-list] [data-shopping-item-text]").Filter(new LocatorFilterOptions
+        {
+            HasTextString = "Kitchen foil"
+        }).First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
 
         var customItemMetrics = await page.EvaluateAsync<object[]>(
             """
             () => {
+                const addButton = document.querySelector("[data-custom-shopping-add]");
                 const notesField = document.querySelector("[data-notes-export-content]");
                 let hasStoredItem = 0;
                 try {
                     const raw = window.localStorage.getItem("aislepilot:custom-shopping-items");
                     const parsed = raw ? JSON.parse(raw) : [];
-                    hasStoredItem = Array.isArray(parsed) && parsed.some(item => (item?.text || "") === "Toilet roll") ? 1 : 0;
+                    hasStoredItem = Array.isArray(parsed)
+                        && parsed.some(item => (item?.text || "") === "Toilet roll")
+                        && parsed.some(item => (item?.text || "") === "Kitchen foil")
+                        ? 1
+                        : 0;
                 } catch {
                     hasStoredItem = 0;
                 }
 
                 return [
-                    document.querySelector("[data-custom-shopping-list] [data-shopping-item-text]")?.textContent?.includes("Toilet roll") ? 1 : 0,
+                    Array.from(document.querySelectorAll("[data-custom-shopping-list] [data-shopping-item-text]"))
+                        .some(item => item.textContent?.includes("Toilet roll")) ? 1 : 0,
+                    Array.from(document.querySelectorAll("[data-custom-shopping-list] [data-shopping-item-text]"))
+                        .some(item => item.textContent?.includes("Kitchen foil")) ? 1 : 0,
                     hasStoredItem,
-                    notesField instanceof HTMLTextAreaElement && notesField.value.includes("Your extra items") && notesField.value.includes("Toilet roll") ? 1 : 0
+                    notesField instanceof HTMLTextAreaElement
+                        && notesField.value.includes("Your extra items")
+                        && notesField.value.includes("Toilet roll")
+                        && notesField.value.includes("Kitchen foil") ? 1 : 0,
+                    addButton instanceof HTMLButtonElement && !addButton.disabled ? 1 : 0,
+                    addButton instanceof HTMLButtonElement && !addButton.classList.contains("is-loading") ? 1 : 0,
+                    addButton instanceof HTMLButtonElement && addButton.textContent?.trim() === "Add item" ? 1 : 0
                 ];
             }
             """);
 
-        Assert.Equal(3, customItemMetrics.Length);
+        Assert.Equal(7, customItemMetrics.Length);
         Assert.Equal(1, Convert.ToInt32(customItemMetrics[0]));
         Assert.Equal(1, Convert.ToInt32(customItemMetrics[1]));
         Assert.Equal(1, Convert.ToInt32(customItemMetrics[2]));
+        Assert.Equal(1, Convert.ToInt32(customItemMetrics[3]));
+        Assert.Equal(1, Convert.ToInt32(customItemMetrics[4]));
+        Assert.Equal(1, Convert.ToInt32(customItemMetrics[5]));
+        Assert.Equal(1, Convert.ToInt32(customItemMetrics[6]));
+        Assert.True(await addItemButton.IsEnabledAsync());
     }
 
     [Fact]

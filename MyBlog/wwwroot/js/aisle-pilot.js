@@ -2109,42 +2109,48 @@
 
     wireModeScopedPreferenceVisibility(document);
 
+    const resetFormSubmittingState = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        clearSubmitLoadingDelay(form);
+        form.removeAttribute("data-is-submitting");
+
+        const buttons = Array.from(form.querySelectorAll("button[type='submit']"));
+        buttons.forEach(button => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            if (button.classList.contains("is-loading")) {
+                button.classList.remove("is-loading");
+            }
+
+            button.disabled = false;
+            button.removeAttribute("aria-busy");
+
+            const originalAriaLabel = button.dataset.originalAriaLabel;
+            if (typeof originalAriaLabel === "string") {
+                if (originalAriaLabel.length > 0) {
+                    button.setAttribute("aria-label", originalAriaLabel);
+                } else {
+                    button.removeAttribute("aria-label");
+                }
+            }
+
+            const originalLabel = button.dataset.originalLabel?.trim();
+            if (!button.classList.contains("is-icon-only") && originalLabel && originalLabel.length > 0) {
+                button.textContent = originalLabel;
+            }
+
+            unlockSubmitButtonWidth(button);
+        });
+    };
+
     const resetSubmittingState = () => {
         hidePlanLoadingShell();
-        getAislePilotForms().forEach(form => {
-            clearSubmitLoadingDelay(form);
-            form.removeAttribute("data-is-submitting");
-
-            const buttons = Array.from(form.querySelectorAll("button[type='submit']"));
-            buttons.forEach(button => {
-                if (!(button instanceof HTMLButtonElement)) {
-                    return;
-                }
-
-                if (button.classList.contains("is-loading")) {
-                    button.classList.remove("is-loading");
-                }
-
-                button.disabled = false;
-                button.removeAttribute("aria-busy");
-
-                const originalAriaLabel = button.dataset.originalAriaLabel;
-                if (typeof originalAriaLabel === "string") {
-                    if (originalAriaLabel.length > 0) {
-                        button.setAttribute("aria-label", originalAriaLabel);
-                    } else {
-                        button.removeAttribute("aria-label");
-                    }
-                }
-
-                const originalLabel = button.dataset.originalLabel?.trim();
-                if (!button.classList.contains("is-icon-only") && originalLabel && originalLabel.length > 0) {
-                    button.textContent = originalLabel;
-                }
-
-                unlockSubmitButtonWidth(button);
-            });
-        });
+        getAislePilotForms().forEach(resetFormSubmittingState);
     };
 
     window.addEventListener("pageshow", event => {
@@ -2596,30 +2602,35 @@
                 form.addEventListener("submit", event => {
                     event.preventDefault();
 
-                    const normalizedText = normalizeCustomShoppingItemText(input.value);
-                    if (normalizedText.length === 0) {
-                        input.focus();
-                        return;
-                    }
+                    try {
+                        const normalizedText = normalizeCustomShoppingItemText(input.value);
+                        if (normalizedText.length === 0) {
+                            input.focus();
+                            return;
+                        }
 
-                    const currentItems = readCustomShoppingItems();
-                    const alreadyExists = currentItems.some(item =>
-                        (item.text ?? "").trim().toLowerCase() === normalizedText.toLowerCase());
-                    if (alreadyExists) {
+                        const currentItems = readCustomShoppingItems();
+                        const alreadyExists = currentItems.some(item =>
+                            (item.text ?? "").trim().toLowerCase() === normalizedText.toLowerCase());
+                        if (alreadyExists) {
+                            input.value = "";
+                            renderCustomShoppingList(shell);
+                            input.focus();
+                            return;
+                        }
+
+                        currentItems.push({
+                            id: createCustomShoppingItemId(),
+                            text: normalizedText
+                        });
+
+                        writeCustomShoppingItems(currentItems);
                         input.value = "";
                         renderCustomShoppingList(shell);
-                        return;
+                        input.focus();
+                    } finally {
+                        resetFormSubmittingState(form);
                     }
-
-                    currentItems.push({
-                        id: createCustomShoppingItemId(),
-                        text: normalizedText
-                    });
-
-                    writeCustomShoppingItems(currentItems);
-                    input.value = "";
-                    renderCustomShoppingList(shell);
-                    input.focus();
                 });
 
                 shell.addEventListener("click", event => {

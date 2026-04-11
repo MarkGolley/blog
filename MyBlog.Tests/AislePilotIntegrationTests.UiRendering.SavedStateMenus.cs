@@ -263,6 +263,84 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task ToggleEnjoyedMeal_WhenSavedMealsMenuIsAlreadyFull_ShowsNewestMealImmediately()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var generateForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "85"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        using var generatedResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(generateForm));
+        Assert.Equal(HttpStatusCode.OK, generatedResponse.StatusCode);
+        var generatedHtml = await generatedResponse.Content.ReadAsStringAsync();
+        var generatedMealNames = ExtractRenderedMealNames(generatedHtml);
+        Assert.Equal(2, generatedMealNames.Count);
+        var targetMealName = generatedMealNames[0];
+
+        var preSavedMeals = Enumerable.Range(1, 20)
+            .Select(index => $"Previously saved meal {index}")
+            .ToArray();
+
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        var saveMealForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "85"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PortionSize", "Medium"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("Request.SavedEnjoyedMealNamesState", JsonSerializer.Serialize(preSavedMeals)),
+            new("mealName", targetMealName),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in generatedMealNames)
+        {
+            saveMealForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var savedMealResponse = await client.PostAsync("/projects/aisle-pilot/toggle-enjoyed-meal", new FormUrlEncodedContent(saveMealForm));
+        Assert.Equal(HttpStatusCode.OK, savedMealResponse.StatusCode);
+        var savedMealHtml = await savedMealResponse.Content.ReadAsStringAsync();
+
+        Assert.Matches(
+            new Regex(
+                $@"<span class=""aislepilot-head-saved-meal-name"">\s*{Regex.Escape(targetMealName)}\s*</span>",
+                RegexOptions.IgnoreCase),
+            savedMealHtml);
+        Assert.DoesNotMatch(
+            new Regex(
+                $@"<span class=""aislepilot-head-saved-meal-name"">\s*{Regex.Escape(preSavedMeals[^1])}\s*</span>",
+                RegexOptions.IgnoreCase),
+            savedMealHtml);
+
+        var savedState = ExtractHiddenInputValue(savedMealHtml, "Request.SavedEnjoyedMealNamesState");
+        Assert.Contains(targetMealName, savedState, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task DeleteWeek_RemovesSavedWeekAndBlocksOpen()
     {
         using var client = CreateClient(allowAutoRedirect: true);

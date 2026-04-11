@@ -353,4 +353,107 @@ public sealed partial class AislePilotService
         return (int)(Math.Round(safeMinutes / 5m, MidpointRounding.AwayFromZero) * 5m);
     }
 
+    private static int EstimateMealPrepMinutes(
+        MealTemplate template,
+        IReadOnlyList<string> recipeSteps,
+        int leftoverDaysCovered)
+    {
+        var explicitRecipeMinutes = recipeSteps.Sum(EstimateRecipeStepMinutes);
+        var ingredientPrepMinutes = Math.Clamp(template.Ingredients.Count * 2, 6, 14);
+        var fallbackBaseMinutes = template.IsQuick ? 18 : 28;
+        var untimedCookMinutes = EstimateUntimedCookInstructionMinutes(template, recipeSteps);
+        var estimatedMinutes = Math.Max(
+            fallbackBaseMinutes,
+            explicitRecipeMinutes + ingredientPrepMinutes + untimedCookMinutes);
+
+        estimatedMinutes += Math.Max(0, leftoverDaysCovered) * 8;
+        return RoundToNearestFiveMinutes(estimatedMinutes);
+    }
+
+    private static int EstimateRecipeStepMinutes(string? recipeStep)
+    {
+        if (string.IsNullOrWhiteSpace(recipeStep))
+        {
+            return 0;
+        }
+
+        var totalMinutes = 0m;
+        foreach (Match match in Regex.Matches(recipeStep, @"\b(?<start>\d{1,3})(?:\s*-\s*(?<end>\d{1,3}))?\s*(?:minutes?|mins?)\b", RegexOptions.IgnoreCase))
+        {
+            if (!int.TryParse(match.Groups["start"].Value, out var startMinutes))
+            {
+                continue;
+            }
+
+            var endGroup = match.Groups["end"];
+            if (endGroup.Success && int.TryParse(endGroup.Value, out var endMinutes) && endMinutes >= startMinutes)
+            {
+                totalMinutes += (startMinutes + endMinutes) / 2m;
+                continue;
+            }
+
+            totalMinutes += startMinutes;
+        }
+
+        return (int)Math.Round(totalMinutes, MidpointRounding.AwayFromZero);
+    }
+
+    private static int EstimateUntimedCookInstructionMinutes(
+        MealTemplate template,
+        IReadOnlyList<string> recipeSteps)
+    {
+        foreach (var recipeStep in recipeSteps)
+        {
+            if (string.IsNullOrWhiteSpace(recipeStep) || EstimateRecipeStepMinutes(recipeStep) > 0)
+            {
+                continue;
+            }
+
+            var normalizedStep = recipeStep.Trim();
+            if (normalizedStep.Contains("according to pack instructions", StringComparison.OrdinalIgnoreCase) ||
+                normalizedStep.StartsWith("Cook rice", StringComparison.OrdinalIgnoreCase) ||
+                normalizedStep.StartsWith("Cook pasta", StringComparison.OrdinalIgnoreCase) ||
+                normalizedStep.StartsWith("Cook noodles", StringComparison.OrdinalIgnoreCase) ||
+                normalizedStep.StartsWith("Cook quinoa", StringComparison.OrdinalIgnoreCase) ||
+                normalizedStep.StartsWith("Cook couscous", StringComparison.OrdinalIgnoreCase))
+            {
+                return ResolveUntimedCookMinutesFromIngredients(template);
+            }
+        }
+
+        return 0;
+    }
+
+    private static int ResolveUntimedCookMinutesFromIngredients(MealTemplate template)
+    {
+        var ingredientNames = template.Ingredients
+            .Select(ingredient => ingredient.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToList();
+
+        if (ingredientNames.Any(name => name.Contains("rice", StringComparison.OrdinalIgnoreCase) ||
+                                        name.Contains("quinoa", StringComparison.OrdinalIgnoreCase)))
+        {
+            return 12;
+        }
+
+        if (ingredientNames.Any(name => name.Contains("pasta", StringComparison.OrdinalIgnoreCase)))
+        {
+            return 10;
+        }
+
+        if (ingredientNames.Any(name => name.Contains("noodle", StringComparison.OrdinalIgnoreCase)))
+        {
+            return 6;
+        }
+
+        if (ingredientNames.Any(name => name.Contains("couscous", StringComparison.OrdinalIgnoreCase) ||
+                                        name.Contains("wrap", StringComparison.OrdinalIgnoreCase)))
+        {
+            return 5;
+        }
+
+        return template.IsQuick ? 4 : 8;
+    }
+
 }

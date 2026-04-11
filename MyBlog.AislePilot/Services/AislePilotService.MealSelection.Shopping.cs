@@ -98,8 +98,8 @@ public sealed partial class AislePilotService
                     return $"{QuantityDisplayFormatter.FormatForRecipe(quantity, ingredient.Unit)} {ingredient.Name}";
                 })
                 .ToList();
-            var basePrepMinutes = template.IsQuick ? 25 : 40;
-            var estimatedPrepMinutes = RoundToNearestFiveMinutes(basePrepMinutes + (leftoverDaysCovered * 8));
+            var recipeSteps = _nutritionRecipeFallbackEngine.BuildRecipeSteps(template);
+            var estimatedPrepMinutes = EstimateMealPrepMinutes(template, recipeSteps, leftoverDaysCovered);
             var nutrition = _nutritionRecipeFallbackEngine.EstimateMealNutritionPerServing(template, portionSizeFactor);
 
             plans.Add(new AislePilotMealDayViewModel
@@ -119,7 +119,7 @@ public sealed partial class AislePilotService
                 CarbsGramsPerServing = nutrition.CarbsGramsPerServing,
                 FatGramsPerServing = nutrition.FatGramsPerServing,
                 IngredientLines = ingredientLines,
-                RecipeSteps = _nutritionRecipeFallbackEngine.BuildRecipeSteps(template)
+                RecipeSteps = recipeSteps
             });
         }
 

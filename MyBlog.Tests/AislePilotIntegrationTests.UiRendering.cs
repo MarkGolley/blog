@@ -486,12 +486,12 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Contains("class=\"aislepilot-overview-regenerate-btn\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"aislepilot-edit-setup-btn\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-overview-regenerate-btn aislepilot-edit-setup-btn\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-setup-toggle-label", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-overview-actions-menu", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-overview-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("aislepilot-overview-regenerate-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("aislepilot-edit-setup-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("aislepilot-overview-regenerate-btn aislepilot-edit-setup-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-more-actions-trigger\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-more-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aria-haspopup=\"dialog\"", html, StringComparison.OrdinalIgnoreCase);
