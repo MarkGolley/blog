@@ -20,9 +20,9 @@ public partial class AislePilotServiceTests
     [InlineData(1.00, "kg", "1000 g")]
     [InlineData(1.24, "kg", "1.2 kg")]
     [InlineData(2.06, "kg", "2.1 kg")]
-    [InlineData(0.45, "bottle", "0.45 bottle")]
-    [InlineData(1.2, "bottle", "1.2 bottles")]
-    [InlineData(0.06, "jar", "0.06 jar")]
+    [InlineData(0.12, "bottle", "12 tsp")]
+    [InlineData(1.2, "bottle", "1 bottle + 20 tsp")]
+    [InlineData(0.06, "jar", "2 1/2 tsp")]
     [InlineData(6, "pcs", "6 pcs")]
     public void QuantityDisplayFormatter_FormatsQuantitiesAsExpected(decimal quantity, string unit, string expected)
     {
@@ -54,6 +54,34 @@ public partial class AislePilotServiceTests
         var formatted = QuantityDisplayFormatter.Format(0.45m, "tin");
 
         Assert.Equal("1 tin", formatted);
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_ShoppingList_ConvertsFractionalBottleUnitsToTeaspoons()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 80m,
+            HouseholdSize = 2,
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+        var currentPlanMealNames = new List<string>
+        {
+            "Chicken stir fry with rice",
+            "Egg fried rice"
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+        var soySauce = Assert.Single(
+            result.ShoppingItems,
+            item => item.Name.Equals("Soy sauce", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal("22 tsp", soySauce.QuantityDisplay);
+        Assert.DoesNotContain("bottle", soySauce.QuantityDisplay, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
