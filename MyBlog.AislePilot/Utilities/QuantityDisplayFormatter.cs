@@ -72,8 +72,7 @@ public static class QuantityDisplayFormatter
 
         if (FractionalContainerUnits.Contains(normalizedUnit))
         {
-            var roundedContainerQuantity = decimal.Round(quantity, 2, MidpointRounding.AwayFromZero);
-            return $"{roundedContainerQuantity:0.##} {ToDisplayUnit(normalizedUnit, roundedContainerQuantity)}";
+            return FormatShoppingListFractionalContainer(quantity, normalizedUnit);
         }
 
         if (WholePurchaseUnits.Contains(normalizedUnit))
@@ -174,6 +173,38 @@ public static class QuantityDisplayFormatter
     private static string ToDisplayUnit(string normalizedUnit, int quantity)
     {
         return ToDisplayUnit(normalizedUnit, (decimal)quantity);
+    }
+
+    private static string FormatShoppingListFractionalContainer(decimal quantity, string normalizedUnit)
+    {
+        var wholeContainers = (int)decimal.Truncate(quantity);
+        var fractionalQuantity = quantity - wholeContainers;
+        var parts = new List<string>(2);
+
+        if (wholeContainers > 0)
+        {
+            parts.Add($"{wholeContainers} {ToDisplayUnit(normalizedUnit, wholeContainers)}");
+        }
+
+        if (fractionalQuantity > 0m &&
+            RecipeContainerUnitMillilitres.TryGetValue(normalizedUnit, out var millilitresPerUnit))
+        {
+            var teaspoons = RoundToNearestHalf((fractionalQuantity * millilitresPerUnit) / 5m);
+            if (teaspoons < 0.5m)
+            {
+                teaspoons = 0.5m;
+            }
+
+            parts.Add(FormatFractionalAmount(teaspoons, "tsp", "tsp"));
+        }
+
+        if (parts.Count > 0)
+        {
+            return string.Join(" + ", parts);
+        }
+
+        var roundedContainerQuantity = decimal.Round(quantity, 2, MidpointRounding.AwayFromZero);
+        return $"{roundedContainerQuantity:0.##} {ToDisplayUnit(normalizedUnit, roundedContainerQuantity)}";
     }
 
     private static decimal RoundUpToNearest(decimal value, decimal step)
