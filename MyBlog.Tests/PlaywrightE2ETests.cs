@@ -443,6 +443,77 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotMealDetailSections_StartCollapsedAndExpandIndependently()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var viewSummaryButton = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
+        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
+        await viewSummaryButton.ScrollIntoViewIfNeededAsync();
+        await viewSummaryButton.ClickAsync();
+        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var nutritionSection = activeMealPanel.Locator("[data-meal-section='nutrition']").First;
+        var ingredientsSection = activeMealPanel.Locator("[data-meal-section='ingredients']").First;
+        var methodSection = activeMealPanel.Locator("[data-meal-section='method']").First;
+        var nutritionSummary = nutritionSection.Locator("[data-meal-section-summary]").First;
+        var ingredientsSummary = ingredientsSection.Locator("[data-meal-section-summary]").First;
+        var nutritionContent = nutritionSection.Locator("[data-meal-section-content]").First;
+        var ingredientsContent = ingredientsSection.Locator("[data-meal-section-content]").First;
+        var methodContent = methodSection.Locator("[data-meal-section-content]").First;
+
+        Assert.False(await nutritionSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await ingredientsSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await methodSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await nutritionContent.IsVisibleAsync());
+        Assert.False(await ingredientsContent.IsVisibleAsync());
+        Assert.False(await methodContent.IsVisibleAsync());
+
+        await nutritionSummary.ScrollIntoViewIfNeededAsync();
+        await nutritionSummary.ClickAsync();
+        await nutritionContent.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        Assert.True(await nutritionSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await ingredientsSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await methodSection.EvaluateAsync<bool>("details => details.open"));
+
+        await ingredientsSummary.ScrollIntoViewIfNeededAsync();
+        await ingredientsSummary.ClickAsync();
+        await ingredientsContent.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        Assert.True(await nutritionSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.True(await ingredientsSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await methodSection.EvaluateAsync<bool>("details => details.open"));
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotMoreActions_OpensWithoutViewingDetails()
     {
         if (!IsE2EEnabled())

@@ -2310,6 +2310,85 @@
     const panels = Array.from(root.querySelectorAll(".aislepilot-window-panel"));
     const tabHint = root.querySelector("[data-window-hint]");
     const tabHintSeenStorageKey = "aislepilot:tab-hint-seen";
+    const shoppingItemStateStorageKey = "aislepilot:shopping-item-state";
+    const customShoppingItemsStorageKey = "aislepilot:custom-shopping-items";
+    let shoppingItemStateCache = null;
+    let customShoppingItemsCache = null;
+
+    const readShoppingItemState = () => {
+        if (shoppingItemStateCache && typeof shoppingItemStateCache === "object") {
+            return shoppingItemStateCache;
+        }
+
+        try {
+            const raw = window.localStorage.getItem(shoppingItemStateStorageKey);
+            if (!raw) {
+                shoppingItemStateCache = {};
+                return shoppingItemStateCache;
+            }
+
+            const parsed = JSON.parse(raw);
+            shoppingItemStateCache = parsed && typeof parsed === "object" ? parsed : {};
+        } catch {
+            shoppingItemStateCache = {};
+        }
+
+        return shoppingItemStateCache;
+    };
+
+    const writeShoppingItemState = () => {
+        try {
+            const state = readShoppingItemState();
+            window.localStorage.setItem(shoppingItemStateStorageKey, JSON.stringify(state));
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
+
+    const syncShoppingItemVisualState = (label, isChecked) => {
+        if (!(label instanceof HTMLElement)) {
+            return;
+        }
+
+        label.classList.toggle("is-checked", isChecked);
+    };
+
+    const readCustomShoppingItems = () => {
+        if (Array.isArray(customShoppingItemsCache)) {
+            return customShoppingItemsCache;
+        }
+
+        try {
+            const raw = window.localStorage.getItem(customShoppingItemsStorageKey);
+            if (!raw) {
+                customShoppingItemsCache = [];
+                return customShoppingItemsCache;
+            }
+
+            const parsed = JSON.parse(raw);
+            customShoppingItemsCache = Array.isArray(parsed)
+                ? parsed.filter(item =>
+                    item &&
+                    typeof item === "object" &&
+                    typeof item.id === "string" &&
+                    typeof item.text === "string")
+                : [];
+        } catch {
+            customShoppingItemsCache = [];
+        }
+
+        return customShoppingItemsCache;
+    };
+
+    const writeCustomShoppingItems = items => {
+        customShoppingItemsCache = Array.isArray(items) ? items : [];
+
+        try {
+            window.localStorage.setItem(customShoppingItemsStorageKey, JSON.stringify(customShoppingItemsCache));
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
 
     if (!viewport || !track || panels.length === 0) {
         return;
@@ -2348,6 +2427,229 @@
         } catch {
             // Ignore storage failures in private modes.
         }
+    };
+
+    const wireShoppingChecklist = scope => {
+        const labels = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-shopping-item-label]"))
+            : Array.from(document.querySelectorAll("[data-shopping-item-label]"));
+
+        labels.forEach(label => {
+            if (!(label instanceof HTMLElement) || label.dataset.shoppingItemWired === "true") {
+                return;
+            }
+
+            const checkbox = label.querySelector("[data-shopping-item-input]");
+            const shoppingItemKey = (label.dataset.shoppingItemKey ?? "").trim();
+            if (!(checkbox instanceof HTMLInputElement) || shoppingItemKey.length === 0) {
+                return;
+            }
+
+            label.dataset.shoppingItemWired = "true";
+
+            const savedState = readShoppingItemState();
+            const isChecked = savedState[shoppingItemKey] === true;
+            checkbox.checked = isChecked;
+            syncShoppingItemVisualState(label, isChecked);
+
+            checkbox.addEventListener("change", () => {
+                const nextCheckedState = checkbox.checked;
+                const currentState = readShoppingItemState();
+                if (nextCheckedState) {
+                    currentState[shoppingItemKey] = true;
+                } else {
+                    delete currentState[shoppingItemKey];
+                }
+
+                syncShoppingItemVisualState(label, nextCheckedState);
+                writeShoppingItemState();
+            });
+        });
+    };
+
+    const syncShoppingNotesExportContent = () => {
+        const fields = Array.from(document.querySelectorAll("[data-notes-export-content]"));
+        const customItems = readCustomShoppingItems();
+
+        fields.forEach(field => {
+            if (!(field instanceof HTMLTextAreaElement)) {
+                return;
+            }
+
+            const baseContent = field.dataset.notesBaseContent?.trim() ?? field.value.trim();
+            field.dataset.notesBaseContent = baseContent;
+
+            let nextContent = baseContent;
+            if (customItems.length > 0) {
+                const customItemLines = customItems
+                    .map(item => (item.text ?? "").trim())
+                    .filter(text => text.length > 0)
+                    .map(text => `- ${text}`)
+                    .join("\n");
+                if (customItemLines.length > 0) {
+                    nextContent = `${baseContent}\n\nYour extra items\n${customItemLines}`.trim();
+                }
+            }
+
+            field.value = nextContent.trim();
+        });
+    };
+
+    const normalizeCustomShoppingItemText = value => {
+        if (typeof value !== "string") {
+            return "";
+        }
+
+        return value.replace(/\s+/g, " ").trim();
+    };
+
+    const buildCustomShoppingItemKey = itemId => `custom|${itemId}`;
+
+    const createCustomShoppingItemId = () =>
+        `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const buildCustomShoppingListItem = item => {
+        const listItem = document.createElement("li");
+        listItem.className = "aislepilot-custom-shopping-item";
+        listItem.dataset.customShoppingItemId = item.id;
+
+        const row = document.createElement("div");
+        row.className = "aislepilot-custom-shopping-row";
+
+        const label = document.createElement("label");
+        label.className = "aislepilot-checkbox-item";
+        label.dataset.shoppingItemLabel = "";
+        label.dataset.shoppingItemKey = buildCustomShoppingItemKey(item.id);
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.shoppingItemInput = "";
+        checkbox.setAttribute("aria-label", `Mark ${item.text} as already have this item`);
+
+        const text = document.createElement("span");
+        text.dataset.shoppingItemText = "";
+        text.textContent = item.text;
+
+        label.append(checkbox, text);
+
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "aislepilot-custom-shopping-remove";
+        removeButton.dataset.customShoppingRemove = item.id;
+        removeButton.setAttribute("aria-label", `Remove ${item.text}`);
+        removeButton.textContent = "Remove";
+
+        row.append(label, removeButton);
+        listItem.appendChild(row);
+        return listItem;
+    };
+
+    const renderCustomShoppingList = shell => {
+        if (!(shell instanceof HTMLElement)) {
+            return;
+        }
+
+        const list = shell.querySelector("[data-custom-shopping-list]");
+        const emptyState = shell.querySelector("[data-custom-shopping-empty]");
+        if (!(list instanceof HTMLElement) || !(emptyState instanceof HTMLElement)) {
+            return;
+        }
+
+        list.replaceChildren();
+
+        const customItems = readCustomShoppingItems();
+        customItems.forEach(item => {
+            list.appendChild(buildCustomShoppingListItem(item));
+        });
+
+        if (customItems.length > 0) {
+            list.removeAttribute("hidden");
+            emptyState.setAttribute("hidden", "hidden");
+            wireShoppingChecklist(list);
+        } else {
+            list.setAttribute("hidden", "hidden");
+            emptyState.removeAttribute("hidden");
+        }
+
+        syncShoppingNotesExportContent();
+    };
+
+    const wireCustomShoppingList = scope => {
+        const shells = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-custom-shopping-shell]"))
+            : Array.from(document.querySelectorAll("[data-custom-shopping-shell]"));
+
+        shells.forEach(shell => {
+            if (!(shell instanceof HTMLElement)) {
+                return;
+            }
+
+            const form = shell.querySelector("[data-custom-shopping-form]");
+            const input = shell.querySelector("[data-custom-shopping-input]");
+            if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            if (shell.dataset.customShoppingWired !== "true") {
+                shell.dataset.customShoppingWired = "true";
+
+                form.addEventListener("submit", event => {
+                    event.preventDefault();
+
+                    const normalizedText = normalizeCustomShoppingItemText(input.value);
+                    if (normalizedText.length === 0) {
+                        input.focus();
+                        return;
+                    }
+
+                    const currentItems = readCustomShoppingItems();
+                    const alreadyExists = currentItems.some(item =>
+                        (item.text ?? "").trim().toLowerCase() === normalizedText.toLowerCase());
+                    if (alreadyExists) {
+                        input.value = "";
+                        renderCustomShoppingList(shell);
+                        return;
+                    }
+
+                    currentItems.push({
+                        id: createCustomShoppingItemId(),
+                        text: normalizedText
+                    });
+
+                    writeCustomShoppingItems(currentItems);
+                    input.value = "";
+                    renderCustomShoppingList(shell);
+                    input.focus();
+                });
+
+                shell.addEventListener("click", event => {
+                    if (!(event.target instanceof Element)) {
+                        return;
+                    }
+
+                    const removeButton = event.target.closest("[data-custom-shopping-remove]");
+                    if (!(removeButton instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    const itemId = (removeButton.dataset.customShoppingRemove ?? "").trim();
+                    if (itemId.length === 0) {
+                        return;
+                    }
+
+                    const nextItems = readCustomShoppingItems().filter(item => item.id !== itemId);
+                    writeCustomShoppingItems(nextItems);
+
+                    const currentState = readShoppingItemState();
+                    delete currentState[buildCustomShoppingItemKey(itemId)];
+                    writeShoppingItemState();
+
+                    renderCustomShoppingList(shell);
+                });
+            }
+
+            renderCustomShoppingList(shell);
+        });
     };
 
     const isEventWithinDayMealCard = event => {
@@ -4044,6 +4346,7 @@
             const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
             const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
             const track = card.querySelector("[data-day-meal-track]");
+            const swipeSurfaces = Array.from(card.querySelectorAll("[data-day-meal-swipe-surface]"));
             if (!(track instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
                 return;
             }
@@ -4220,46 +4523,52 @@
                 });
             });
 
-            card.addEventListener("touchstart", event => {
-                const touch = event.changedTouches[0];
-                if (!touch) {
+            swipeSurfaces.forEach(surface => {
+                if (!(surface instanceof HTMLElement)) {
+                    return;
+                }
+
+                surface.addEventListener("touchstart", event => {
+                    const touch = event.changedTouches[0];
+                    if (!touch) {
+                        clearTouchTracking();
+                        return;
+                    }
+
+                    touchStartX = touch.clientX;
+                    touchStartY = touch.clientY;
+                }, { passive: true });
+
+                surface.addEventListener("touchend", event => {
+                    if (!Number.isFinite(touchStartX) || !Number.isFinite(touchStartY)) {
+                        return;
+                    }
+
+                    const touch = event.changedTouches[0];
+                    const startX = touchStartX;
+                    const startY = touchStartY;
                     clearTouchTracking();
-                    return;
-                }
+                    if (!touch) {
+                        return;
+                    }
 
-                touchStartX = touch.clientX;
-                touchStartY = touch.clientY;
-            }, { passive: true });
+                    const deltaX = touch.clientX - startX;
+                    const deltaY = touch.clientY - startY;
+                    if (Math.abs(deltaX) < 32 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+                        return;
+                    }
 
-            card.addEventListener("touchend", event => {
-                if (!Number.isFinite(touchStartX) || !Number.isFinite(touchStartY)) {
-                    return;
-                }
+                    if (deltaX < 0) {
+                        syncSlot(currentSlotIndex + 1);
+                    } else {
+                        syncSlot(currentSlotIndex - 1);
+                    }
+                }, { passive: true });
 
-                const touch = event.changedTouches[0];
-                const startX = touchStartX;
-                const startY = touchStartY;
-                clearTouchTracking();
-                if (!touch) {
-                    return;
-                }
-
-                const deltaX = touch.clientX - startX;
-                const deltaY = touch.clientY - startY;
-                if (Math.abs(deltaX) < 32 || Math.abs(deltaX) <= Math.abs(deltaY)) {
-                    return;
-                }
-
-                if (deltaX < 0) {
-                    syncSlot(currentSlotIndex + 1);
-                } else {
-                    syncSlot(currentSlotIndex - 1);
-                }
-            }, { passive: true });
-
-            card.addEventListener("touchcancel", () => {
-                clearTouchTracking();
-            }, { passive: true });
+                surface.addEventListener("touchcancel", () => {
+                    clearTouchTracking();
+                }, { passive: true });
+            });
 
             syncSlot(readRememberedDayMealSlot(card));
         });
@@ -4850,6 +5159,8 @@
         wireInlineDetailsPanels(scope);
         wireDayCardExpanders(scope);
         wireDayMealCards(scope);
+        wireShoppingChecklist(scope);
+        wireCustomShoppingList(scope);
         wireAjaxSwapHandlers(scope);
     };
 

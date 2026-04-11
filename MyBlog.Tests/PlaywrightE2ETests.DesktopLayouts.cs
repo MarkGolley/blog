@@ -223,6 +223,130 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Desktop_AislePilotShoppingItems_CanBeCheckedOff()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var shoppingTab = page.Locator("#aislepilot-tab-shop").First;
+        await shoppingTab.ClickAsync();
+        await page.Locator("#aislepilot-shop[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 10000
+        });
+
+        var firstShoppingItem = page.Locator("#aislepilot-shop [data-shopping-item-label]").First;
+        var firstShoppingItemCheckbox = firstShoppingItem.Locator("[data-shopping-item-input]").First;
+        await firstShoppingItem.ScrollIntoViewIfNeededAsync();
+        await firstShoppingItem.ClickAsync();
+
+        Assert.True(await firstShoppingItemCheckbox.IsCheckedAsync());
+
+        var shoppingItemMetrics = await firstShoppingItem.EvaluateAsync<object[]>(
+            """
+            label => {
+                if (!(label instanceof HTMLElement)) {
+                    return [0, "", 0];
+                }
+
+                const itemKey = label.dataset.shoppingItemKey ?? "";
+                const text = label.querySelector("[data-shopping-item-text]");
+                const checkbox = label.querySelector("[data-shopping-item-input]");
+                const textStyle = text instanceof HTMLElement ? window.getComputedStyle(text) : null;
+                let persisted = 0;
+                try {
+                    const raw = window.localStorage.getItem("aislepilot:shopping-item-state");
+                    const parsed = raw ? JSON.parse(raw) : {};
+                    persisted = parsed && parsed[itemKey] === true ? 1 : 0;
+                } catch {
+                    persisted = 0;
+                }
+
+                return [
+                    label.classList.contains("is-checked") ? 1 : 0,
+                    textStyle?.textDecorationLine ?? "",
+                    checkbox instanceof HTMLInputElement && checkbox.checked ? persisted : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(3, shoppingItemMetrics.Length);
+        Assert.Equal(1, Convert.ToInt32(shoppingItemMetrics[0]));
+        Assert.Contains("line-through", Convert.ToString(shoppingItemMetrics[1]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, Convert.ToInt32(shoppingItemMetrics[2]));
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotShoppingList_AllowsAddingCustomItems()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var shoppingTab = page.Locator("#aislepilot-tab-shop").First;
+        await shoppingTab.ClickAsync();
+        await page.Locator("#aislepilot-shop[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 10000
+        });
+
+        var customItemInput = page.Locator("[data-custom-shopping-input]").First;
+        await customItemInput.FillAsync("Toilet roll");
+        await customItemInput.PressAsync("Enter");
+
+        var customItem = page.Locator("[data-custom-shopping-list] [data-shopping-item-text]").Filter(new LocatorFilterOptions
+        {
+            HasTextString = "Toilet roll"
+        }).First;
+        await customItem.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var customItemMetrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const notesField = document.querySelector("[data-notes-export-content]");
+                let hasStoredItem = 0;
+                try {
+                    const raw = window.localStorage.getItem("aislepilot:custom-shopping-items");
+                    const parsed = raw ? JSON.parse(raw) : [];
+                    hasStoredItem = Array.isArray(parsed) && parsed.some(item => (item?.text || "") === "Toilet roll") ? 1 : 0;
+                } catch {
+                    hasStoredItem = 0;
+                }
+
+                return [
+                    document.querySelector("[data-custom-shopping-list] [data-shopping-item-text]")?.textContent?.includes("Toilet roll") ? 1 : 0,
+                    hasStoredItem,
+                    notesField instanceof HTMLTextAreaElement && notesField.value.includes("Your extra items") && notesField.value.includes("Toilet roll") ? 1 : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(3, customItemMetrics.Length);
+        Assert.Equal(1, Convert.ToInt32(customItemMetrics[0]));
+        Assert.Equal(1, Convert.ToInt32(customItemMetrics[1]));
+        Assert.Equal(1, Convert.ToInt32(customItemMetrics[2]));
+    }
+
+    [Fact]
     public async Task Desktop_AislePilotOverview_UsesReadableMinimumLabelFontSizes()
     {
         if (!IsE2EEnabled())

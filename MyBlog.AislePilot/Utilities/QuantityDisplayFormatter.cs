@@ -36,6 +36,20 @@ public static class QuantityDisplayFormatter
         "milliliter",
         "milliliters"
     };
+    private static readonly HashSet<string> TeaspoonUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "tsp",
+        "tsps",
+        "teaspoon",
+        "teaspoons"
+    };
+    private static readonly HashSet<string> TablespoonUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "tbsp",
+        "tbsps",
+        "tablespoon",
+        "tablespoons"
+    };
 
     private static readonly HashSet<string> WholePurchaseUnits = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -70,6 +84,11 @@ public static class QuantityDisplayFormatter
             return FormatKg(quantity);
         }
 
+        if (TryFormatSpoonQuantity(quantity, normalizedUnit, out var spoonQuantityDisplay))
+        {
+            return spoonQuantityDisplay;
+        }
+
         if (FractionalContainerUnits.Contains(normalizedUnit))
         {
             return FormatShoppingListFractionalContainer(quantity, normalizedUnit);
@@ -99,6 +118,11 @@ public static class QuantityDisplayFormatter
         if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
         {
             return FormatKg(quantity);
+        }
+
+        if (TryFormatSpoonQuantity(quantity, normalizedUnit, out var spoonQuantityDisplay))
+        {
+            return spoonQuantityDisplay;
         }
 
         if (RecipeLitreUnits.Contains(normalizedUnit))
@@ -215,6 +239,33 @@ public static class QuantityDisplayFormatter
         }
 
         return decimal.Ceiling(value / step) * step;
+    }
+
+    private static bool TryFormatSpoonQuantity(decimal quantity, string normalizedUnit, out string formattedQuantity)
+    {
+        formattedQuantity = string.Empty;
+
+        if (TeaspoonUnits.Contains(normalizedUnit))
+        {
+            formattedQuantity = FormatFractionalAmount(RoundToNearestQuarter(quantity), "tsp", "tsp");
+            return true;
+        }
+
+        if (!TablespoonUnits.Contains(normalizedUnit))
+        {
+            return false;
+        }
+
+        var roundedTablespoons = RoundToNearestQuarter(quantity);
+        if (roundedTablespoons < 1m)
+        {
+            var teaspoons = RoundToNearestQuarter(quantity * 3m);
+            formattedQuantity = FormatFractionalAmount(teaspoons, "tsp", "tsp");
+            return true;
+        }
+
+        formattedQuantity = FormatFractionalAmount(roundedTablespoons, "tbsp", "tbsp");
+        return true;
     }
 
     private static string FormatRecipeLiquidVolume(decimal totalMillilitres)

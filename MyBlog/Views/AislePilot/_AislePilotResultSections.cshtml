@@ -700,7 +700,7 @@
                                                              aria-expanded="false"
                                                              aria-label="View meal details"
                                                              title="View meal details">
-                                                        <div class="aislepilot-meal-image-shell">
+                                                        <div class="aislepilot-meal-image-shell" data-day-meal-swipe-surface>
                                                             <img class="aislepilot-meal-image"
                                                                  src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl)"
                                                                  data-meal-image
@@ -873,27 +873,45 @@
                                                 }
                                                 <div id="@detailsPanelId" class="aislepilot-meal-details-panel" data-inline-details-panel hidden aria-hidden="true">
                                                     <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
-                                                    <p class="aislepilot-card-kicker">Est. calories + macros</p>
-                                                    <ul class="aislepilot-nutrition-list">
-                                                        <li>@meal.CaloriesPerServing kcal per serving</li>
-                                                        <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
-                                                        <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
-                                                        <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
-                                                    </ul>
-                                                    <p class="aislepilot-card-kicker">Ingredients</p>
-                                                    <ul class="case-list">
-                                                        @foreach (var ingredientLine in meal.IngredientLines)
-                                                        {
-                                                            <li>@ingredientLine</li>
-                                                        }
-                                                    </ul>
-                                                    <p class="aislepilot-card-kicker">Method</p>
-                                                    <ol class="case-list">
-                                                        @foreach (var step in meal.RecipeSteps)
-                                                        {
-                                                            <li>@step</li>
-                                                        }
-                                                    </ol>
+                                                    <details class="aislepilot-meal-section" data-meal-section="nutrition">
+                                                        <summary class="aislepilot-meal-section-summary" data-meal-section-summary>
+                                                            Est. calories + macros
+                                                        </summary>
+                                                        <div class="aislepilot-meal-section-content" data-meal-section-content>
+                                                            <ul class="aislepilot-nutrition-list">
+                                                                <li>@meal.CaloriesPerServing kcal per serving</li>
+                                                                <li>Protein: @meal.ProteinGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
+                                                                <li>Carbs: @meal.CarbsGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
+                                                                <li>Fat: @meal.FatGramsPerServing.ToString("0.#", ukCulture) g per serving</li>
+                                                            </ul>
+                                                        </div>
+                                                    </details>
+                                                    <details class="aislepilot-meal-section" data-meal-section="ingredients">
+                                                        <summary class="aislepilot-meal-section-summary" data-meal-section-summary>
+                                                            Ingredients
+                                                        </summary>
+                                                        <div class="aislepilot-meal-section-content" data-meal-section-content>
+                                                            <ul class="case-list">
+                                                                @foreach (var ingredientLine in meal.IngredientLines)
+                                                                {
+                                                                    <li>@ingredientLine</li>
+                                                                }
+                                                            </ul>
+                                                        </div>
+                                                    </details>
+                                                    <details class="aislepilot-meal-section" data-meal-section="method">
+                                                        <summary class="aislepilot-meal-section-summary" data-meal-section-summary>
+                                                            Method
+                                                        </summary>
+                                                        <div class="aislepilot-meal-section-content" data-meal-section-content>
+                                                            <ol class="case-list">
+                                                                @foreach (var step in meal.RecipeSteps)
+                                                                {
+                                                                    <li>@step</li>
+                                                                }
+                                                            </ol>
+                                                        </div>
+                                                    </details>
                                                 </div>
                                             </section>
                                         }
@@ -958,7 +976,7 @@
                                                          aria-expanded="false"
                                                          aria-label="View dessert details"
                                                          title="View dessert details">
-                                                    <div class="aislepilot-meal-image-shell">
+                                                    <div class="aislepilot-meal-image-shell" data-day-meal-swipe-surface>
                                                         <img class="aislepilot-meal-image"
                                                              src="@fallbackMealImageUrl"
                                                              data-meal-image
@@ -1034,16 +1052,42 @@
                                 <ul class="aislepilot-shop-list">
                                     @foreach (var item in department)
                                     {
+                                        var shoppingItemKey = $"{department.Key}|{item.Name}|{item.QuantityDisplay}|{item.EstimatedCost.ToString("0.00", CultureInfo.InvariantCulture)}";
                                         <li>
-                                            <label class="aislepilot-checkbox-item">
-                                                <input type="checkbox" />
-                                                <span>@item.Name (@item.QuantityDisplay) - @item.EstimatedCost.ToString("C", ukCulture)</span>
+                                            <label class="aislepilot-checkbox-item"
+                                                   data-shopping-item-label
+                                                   data-shopping-item-key="@shoppingItemKey">
+                                                <input type="checkbox"
+                                                       data-shopping-item-input
+                                                       aria-label="Mark @item.Name as already have this ingredient" />
+                                                <span data-shopping-item-text>@item.Name (@item.QuantityDisplay) - @item.EstimatedCost.ToString("C", ukCulture)</span>
                                             </label>
                                         </li>
                                     }
                                 </ul>
                             </article>
                         }
+                        <article class="aislepilot-card aislepilot-shop-card aislepilot-shop-card-custom"
+                                 data-custom-shopping-shell>
+                            <h3>Your extra items</h3>
+                            <p class="aislepilot-card-meta">Add common purchases like toilet roll, cleaning supplies, or anything else you want on this trip.</p>
+                            <form class="aislepilot-custom-shopping-form" data-custom-shopping-form>
+                                <label class="sr-only" for="aislepilot-custom-shopping-input">Add your own shopping item</label>
+                                <input id="aislepilot-custom-shopping-input"
+                                       type="text"
+                                       class="aislepilot-custom-shopping-input"
+                                       data-custom-shopping-input
+                                       maxlength="80"
+                                       placeholder="Add your own item" />
+                                <button type="submit"
+                                        class="aislepilot-swap-btn is-secondary is-compact"
+                                        data-custom-shopping-add>
+                                    Add item
+                                </button>
+                            </form>
+                            <p class="aislepilot-card-meta" data-custom-shopping-empty>No extra items yet.</p>
+                            <ul class="aislepilot-shop-list" data-custom-shopping-list hidden></ul>
+                        </article>
                     </div>
                 </section>
 

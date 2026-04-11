@@ -296,7 +296,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardSwipe_OnCardSurfaceChangesMealSlot()
+    public async Task Mobile_AislePilotDayCardSwipe_OnMealImageChangesMealSlot()
     {
         if (!IsE2EEnabled())
         {
@@ -310,6 +310,12 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         var card = page.Locator("[data-day-meal-card]:has([data-day-meal-tab])").First;
         await card.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+        var swipeSurface = card.Locator("[data-day-meal-swipe-surface]").First;
+        await swipeSurface.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 15000
@@ -338,9 +344,14 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(tabCount >= 2, "Expected at least two meal tabs on the swipe target card.");
         Assert.True(activeIndexBeforeSwipe >= 0, "Expected one active meal panel before swiping.");
 
-        var swipeDispatched = await card.EvaluateAsync<bool>(
+        var swipeDispatched = await swipeSurface.EvaluateAsync<bool>(
             """
-            cardRoot => {
+            swipeRoot => {
+                if (!(swipeRoot instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const cardRoot = swipeRoot.closest("[data-day-meal-card]");
                 if (!(cardRoot instanceof HTMLElement)) {
                     return false;
                 }
@@ -350,7 +361,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     return false;
                 }
 
-                const rect = cardRoot.getBoundingClientRect();
+                const rect = swipeRoot.getBoundingClientRect();
                 if (rect.width < 90 || rect.height < 40) {
                     return false;
                 }
@@ -369,12 +380,12 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     return event;
                 };
 
-                cardRoot.dispatchEvent(createTouchEvent("touchstart", startX, y));
-                cardRoot.dispatchEvent(createTouchEvent("touchend", endX, y));
+                swipeRoot.dispatchEvent(createTouchEvent("touchstart", startX, y));
+                swipeRoot.dispatchEvent(createTouchEvent("touchend", endX, y));
                 return true;
             }
             """);
-        Assert.True(swipeDispatched, "Expected to dispatch a swipe gesture on the day meal card.");
+        Assert.True(swipeDispatched, "Expected to dispatch a swipe gesture on the meal image.");
         await page.WaitForTimeoutAsync(100);
 
         var activeIndexAfterSwipe = await card.EvaluateAsync<int>(
@@ -422,9 +433,21 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             """);
         Assert.Equal("aislepilot-meals", activePanelBeforeSwipe);
 
-        var swipeState = await card.EvaluateAsync<int[]>(
+        var swipeSurface = card.Locator("[data-day-meal-swipe-surface]").First;
+        await swipeSurface.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var swipeState = await swipeSurface.EvaluateAsync<int[]>(
             """
-            cardRoot => {
+            swipeRoot => {
+                if (!(swipeRoot instanceof HTMLElement)) {
+                    return [-1, -1, -1];
+                }
+
+                const cardRoot = swipeRoot.closest("[data-day-meal-card]");
                 if (!(cardRoot instanceof HTMLElement)) {
                     return [-1, -1, -1];
                 }
@@ -437,7 +460,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const panels = Array.from(cardRoot.querySelectorAll("[data-day-meal-panel]"));
                 const beforeIndex = panels.findIndex(panel => panel instanceof HTMLElement && panel.getAttribute("aria-hidden") !== "true");
 
-                const rect = cardRoot.getBoundingClientRect();
+                const rect = swipeRoot.getBoundingClientRect();
                 if (rect.width < 90 || rect.height < 40) {
                     return [tabs.length, beforeIndex, -1];
                 }
@@ -456,8 +479,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     return event;
                 };
 
-                cardRoot.dispatchEvent(createTouchEvent("touchstart", startX, y));
-                cardRoot.dispatchEvent(createTouchEvent("touchend", endX, y));
+                swipeRoot.dispatchEvent(createTouchEvent("touchstart", startX, y));
+                swipeRoot.dispatchEvent(createTouchEvent("touchend", endX, y));
 
                 const afterIndex = panels.findIndex(panel => panel instanceof HTMLElement && panel.getAttribute("aria-hidden") !== "true");
                 return [tabs.length, beforeIndex, afterIndex];
@@ -482,6 +505,82 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             }
             """);
         Assert.Equal("aislepilot-meals", activePanelAfterSwipe);
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotDayCardSwipe_OnNonImageCardSurfaceDoesNotChangeMealSlot()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var card = page.Locator("[data-day-meal-card]:has([data-day-meal-tab])").First;
+        await card.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var swipeState = await card.EvaluateAsync<int[]>(
+            """
+            cardRoot => {
+                if (!(cardRoot instanceof HTMLElement)) {
+                    return [-1, -1, -1];
+                }
+
+                const tabs = Array.from(cardRoot.querySelectorAll("[data-day-meal-tab]"));
+                if (tabs.length < 2) {
+                    return [-1, -1, -1];
+                }
+
+                const panels = Array.from(cardRoot.querySelectorAll("[data-day-meal-panel]"));
+                const beforeIndex = panels.findIndex(panel => panel instanceof HTMLElement && panel.getAttribute("aria-hidden") !== "true");
+                const summary = cardRoot.querySelector("[data-day-meal-summary]");
+                if (!(summary instanceof HTMLElement)) {
+                    return [tabs.length, beforeIndex, -1];
+                }
+
+                const rect = summary.getBoundingClientRect();
+                if (rect.width < 40 || rect.height < 20) {
+                    return [tabs.length, beforeIndex, -1];
+                }
+
+                const edgeInset = Math.min(28, rect.width * 0.15);
+                const startX = rect.right - edgeInset;
+                const endX = rect.left + edgeInset;
+                const y = rect.top + (rect.height / 2);
+
+                const createTouchEvent = (type, x, y) => {
+                    const event = new Event(type, { bubbles: true, cancelable: true });
+                    Object.defineProperty(event, "changedTouches", {
+                        configurable: true,
+                        value: [{ clientX: x, clientY: y }]
+                    });
+                    return event;
+                };
+
+                summary.dispatchEvent(createTouchEvent("touchstart", startX, y));
+                summary.dispatchEvent(createTouchEvent("touchend", endX, y));
+
+                const afterIndex = panels.findIndex(panel => panel instanceof HTMLElement && panel.getAttribute("aria-hidden") !== "true");
+                return [tabs.length, beforeIndex, afterIndex];
+            }
+            """);
+
+        Assert.True(swipeState.Length >= 3, "Expected swipe state to include tab count and panel indexes.");
+        var tabCount = swipeState[0];
+        var beforeIndex = swipeState[1];
+        var afterIndex = swipeState[2];
+        Assert.True(tabCount >= 2, "Expected at least two meal tabs on the swipe target card.");
+        Assert.True(beforeIndex >= 0, "Expected one active meal panel before swiping.");
+        Assert.True(afterIndex >= 0, "Expected one active meal panel after swiping.");
+        Assert.Equal(beforeIndex, afterIndex);
     }
 
     [Fact]

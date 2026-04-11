@@ -130,7 +130,50 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("data-day-card-expander", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-day-card-expander-summary", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-expander-image", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-meal-swipe-surface", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-meal-image-url=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_RendersMealDetailSectionsAsCollapsedDisclosures()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Matches(
+            new Regex(
+                @"<details[^>]*class=""[^""]*aislepilot-meal-section[^""]*""[^>]*data-meal-section=""nutrition""[\s\S]*?<summary[^>]*data-meal-section-summary[^>]*>\s*Est\. calories \+ macros\s*</summary>[\s\S]*?<div[^>]*data-meal-section-content",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<details[^>]*class=""[^""]*aislepilot-meal-section[^""]*""[^>]*data-meal-section=""ingredients""[\s\S]*?<summary[^>]*data-meal-section-summary[^>]*>\s*Ingredients\s*</summary>[\s\S]*?<div[^>]*data-meal-section-content",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<details[^>]*class=""[^""]*aislepilot-meal-section[^""]*""[^>]*data-meal-section=""method""[\s\S]*?<summary[^>]*data-meal-section-summary[^>]*>\s*Method\s*</summary>[\s\S]*?<div[^>]*data-meal-section-content",
+                RegexOptions.IgnoreCase),
+            html);
     }
 
     [Fact]
@@ -155,6 +198,18 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("outline: none;", css, StringComparison.OrdinalIgnoreCase);
         var importantCount = Regex.Matches(css, "!important", RegexOptions.IgnoreCase).Count;
         Assert.True(importantCount <= 240, $"Expected CSS override count to stay under control, but found {importantCount} '!important' usages.");
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_DoesNotRenderDayCardChevronAffordance()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.DoesNotContain(".aislepilot-day-card-expander > summary::after", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(".aislepilot-day-card-expander[open] > summary::after", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":root[data-theme=\"dark\"] .aislepilot-day-card-expander > summary::after", css, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -765,6 +820,69 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains("Share shopping list", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("iPhone Notes", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithResult_RendersCheckableShoppingItems()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("data-shopping-item-label", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-item-key=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-item-input", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-item-text", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithResult_RendersCustomShoppingItemsSection()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("data-custom-shopping-shell", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-custom-shopping-form", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-custom-shopping-input", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-custom-shopping-list", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Your extra items", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

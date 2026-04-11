@@ -3571,10 +3571,6 @@ html.aislepilot-restore-pending .aislepilot-app {
     margin-top: 0;
 }
 
-.aislepilot-day-meal-panel > .aislepilot-meal-details-panel .aislepilot-card-kicker {
-    margin-top: 0.14rem;
-}
-
 .aislepilot-day-meal-panel > .aislepilot-meal-details-panel :is(.aislepilot-nutrition-list, .case-list) {
     margin: 0.12rem 0 0.14rem;
 }
@@ -3586,6 +3582,61 @@ html.aislepilot-restore-pending .aislepilot-app {
 .aislepilot-day-meal-panel > .aislepilot-meal-details-panel ol.case-list {
     list-style-position: inside;
     padding-left: 0;
+}
+
+.aislepilot-meal-section {
+    border: 1px solid rgba(16, 63, 101, 0.14);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    overflow: clip;
+}
+
+.aislepilot-meal-section > summary {
+    position: relative;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding: 0.56rem 2rem 0.58rem 0.72rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--brand-deep);
+}
+
+.aislepilot-meal-section > summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-meal-section > summary::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 0.72rem;
+    width: 0.48rem;
+    height: 0.48rem;
+    border-right: 2px solid rgba(16, 63, 101, 0.58);
+    border-bottom: 2px solid rgba(16, 63, 101, 0.58);
+    transform: translateY(-65%) rotate(45deg);
+    transition: transform 0.16s ease;
+}
+
+.aislepilot-meal-section[open] > summary::after {
+    transform: translateY(-35%) rotate(225deg);
+}
+
+.aislepilot-meal-section-content {
+    padding: 0.06rem 0.72rem 0.64rem;
+    border-top: 1px solid rgba(16, 63, 101, 0.12);
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) {
+    margin: 0.16rem 0 0;
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list):last-child {
+    margin-bottom: 0;
 }
 
 .aislepilot-meal-details-grid {
@@ -4057,6 +4108,74 @@ body.aislepilot-mobile-meal-sheet-open {
     border-radius: 10px;
     padding: 0.48rem 0.54rem;
     background: rgba(255, 255, 255, 0.96);
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+}
+
+.aislepilot-shop-list .aislepilot-checkbox-item [data-shopping-item-text] {
+    transition: color 0.16s ease, opacity 0.16s ease, text-decoration-color 0.16s ease;
+}
+
+.aislepilot-shop-list .aislepilot-checkbox-item.is-checked {
+    background: rgba(232, 238, 244, 0.96);
+    border-color: rgba(16, 63, 101, 0.12);
+}
+
+.aislepilot-shop-list .aislepilot-checkbox-item.is-checked [data-shopping-item-text] {
+    color: rgba(58, 79, 102, 0.82);
+    opacity: 0.72;
+    text-decoration: line-through;
+    text-decoration-thickness: 1.6px;
+}
+
+.aislepilot-shop-card-custom {
+    display: grid;
+    gap: 0.58rem;
+}
+
+.aislepilot-custom-shopping-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.42rem;
+    margin: 0;
+}
+
+.aislepilot-custom-shopping-input {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.56rem 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.18);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.98);
+    font: inherit;
+    color: var(--ink);
+}
+
+.aislepilot-custom-shopping-input::placeholder {
+    color: rgba(58, 79, 102, 0.72);
+}
+
+.aislepilot-custom-shopping-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.42rem;
+    align-items: stretch;
+}
+
+.aislepilot-custom-shopping-row .aislepilot-checkbox-item {
+    margin: 0;
+}
+
+.aislepilot-custom-shopping-remove {
+    min-width: 2.4rem;
+    padding: 0.48rem 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 10px;
+    background: rgba(244, 248, 252, 0.98);
+    font: inherit;
+    font-weight: 700;
+    color: var(--brand-deep);
+    cursor: pointer;
 }
 
 .aislepilot-shop-card {
@@ -4416,28 +4535,10 @@ body.aislepilot-mobile-meal-sheet-open {
         white-space: nowrap;
     }
 
-    .aislepilot-day-card-expander > summary::after {
-        content: "";
-        grid-column: 3;
-        grid-row: 2;
-        justify-self: center;
-        align-self: center;
-        width: 0.5rem;
-        height: 0.5rem;
-        border-right: 2px solid rgba(16, 63, 101, 0.6);
-        border-bottom: 2px solid rgba(16, 63, 101, 0.6);
-        transform: translateY(-1px) rotate(45deg);
-        transition: transform 0.16s ease;
-    }
-
     .aislepilot-day-card-expander[open] > summary {
         margin-bottom: 0.46rem;
         padding-bottom: 0.46rem;
         border-bottom: 1px solid rgba(16, 63, 101, 0.14);
-    }
-
-    .aislepilot-day-card-expander[open] > summary::after {
-        transform: translateY(1px) rotate(225deg);
     }
 
     .aislepilot-day-card-expander:not([open]) > .aislepilot-day-card-expander-body {
@@ -5207,6 +5308,31 @@ body.aislepilot-mobile-meal-sheet-open {
     border-color: var(--line);
 }
 
+:root[data-theme="dark"] .aislepilot-shop-list .aislepilot-checkbox-item.is-checked {
+    background: rgba(34, 46, 61, 0.94);
+    border-color: rgba(112, 168, 222, 0.18);
+}
+
+:root[data-theme="dark"] .aislepilot-shop-list .aislepilot-checkbox-item.is-checked [data-shopping-item-text] {
+    color: rgba(197, 223, 247, 0.72);
+}
+
+:root[data-theme="dark"] .aislepilot-custom-shopping-input {
+    border-color: rgba(112, 168, 222, 0.16);
+    background: rgba(13, 22, 35, 0.94);
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-custom-shopping-input::placeholder {
+    color: rgba(197, 223, 247, 0.56);
+}
+
+:root[data-theme="dark"] .aislepilot-custom-shopping-remove {
+    border-color: rgba(112, 168, 222, 0.16);
+    background: rgba(18, 30, 46, 0.94);
+    color: #deefff;
+}
+
 :root[data-theme="dark"] .aislepilot-brand-lockup,
 :root[data-theme="dark"] .aislepilot-window-tabs,
 :root[data-theme="dark"] .aislepilot-section-head-row,
@@ -5268,14 +5394,23 @@ body.aislepilot-mobile-meal-sheet-open {
     color: #c7dff7;
 }
 
-:root[data-theme="dark"] .aislepilot-day-card-expander > summary::after {
+:root[data-theme="dark"] .aislepilot-day-card-expander-thumb {
+    border-color: rgba(125, 167, 213, 0.38);
+    background: rgba(22, 39, 59, 0.92);
+}
+
+:root[data-theme="dark"] .aislepilot-meal-section {
+    border-color: rgba(112, 168, 222, 0.18);
+    background: rgba(16, 28, 42, 0.7);
+}
+
+:root[data-theme="dark"] .aislepilot-meal-section > summary::after {
     border-right-color: rgba(186, 212, 240, 0.78);
     border-bottom-color: rgba(186, 212, 240, 0.78);
 }
 
-:root[data-theme="dark"] .aislepilot-day-card-expander-thumb {
-    border-color: rgba(125, 167, 213, 0.38);
-    background: rgba(22, 39, 59, 0.92);
+:root[data-theme="dark"] .aislepilot-meal-section-content {
+    border-top-color: rgba(112, 168, 222, 0.16);
 }
 
 :root[data-theme="dark"] .aislepilot-day-card-expander > .aislepilot-day-card-expander-body .aislepilot-meal-panel-image-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger {
