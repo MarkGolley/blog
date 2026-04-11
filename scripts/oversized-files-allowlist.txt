@@ -1,5 +1,4 @@
 # Relative paths (wildcards allowed) excluded from oversized-file failures.
 # Keep this list short and remove entries as files are split down further.
 
-MyBlog.AislePilot\Services\AislePilotService.cs
 MyBlog.Tests\AislePilotServiceTests.cs
