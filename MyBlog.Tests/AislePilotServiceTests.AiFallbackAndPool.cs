@@ -466,6 +466,91 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WhenColdBreakfastMethodContainsDinnerStyleCooking_FallsBackToColdBreakfastSteps()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var payloadContent = """
+{
+  "meals": [
+    {
+      "name": "Greek yogurt berry oat pots",
+      "baseCostForTwo": 4.1,
+      "isQuick": true,
+      "tags": ["Balanced", "Vegetarian", "High-Protein"],
+      "recipeSteps": [
+        "Heat a saucepan over medium heat with a drizzle of oil.",
+        "Cook the stock on the hob for 4 minutes until simmering.",
+        "Stir in Greek yogurt and oats until smooth.",
+        "Add frozen berries and honey, then cook for 2 minutes.",
+        "Divide between bowls and serve warm."
+      ],
+      "ingredients": [
+        { "name": "Greek yogurt", "department": "Dairy & Eggs", "quantityForTwo": 0.40, "unit": "kg", "estimatedCostForTwo": 1.50 },
+        { "name": "Oats", "department": "Tins & Dry Goods", "quantityForTwo": 0.22, "unit": "kg", "estimatedCostForTwo": 0.40 },
+        { "name": "Frozen berries", "department": "Frozen", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 1.50 },
+        { "name": "Honey", "department": "Spices & Sauces", "quantityForTwo": 0.10, "unit": "jar", "estimatedCostForTwo": 0.70 }
+      ]
+    }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            CookDays = 1,
+            PlanDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Single(result.MealPlan);
+        var meal = result.MealPlan[0];
+        Assert.Equal("Breakfast", meal.MealType);
+
+        var recipeSteps = meal.RecipeSteps;
+        Assert.True(recipeSteps.Count >= 5);
+        Assert.DoesNotContain(recipeSteps, step => step.Contains("stock", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(recipeSteps, step => step.Contains("hob", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(recipeSteps, step => step.Contains("saucepan", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(recipeSteps, step => step.Contains("yogurt", StringComparison.OrdinalIgnoreCase) || step.Contains("yoghurt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(recipeSteps, step => step.Contains("oat", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(recipeSteps, step => step.Contains("chill", StringComparison.OrdinalIgnoreCase) || step.Contains("bowl", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void BuildPlan_WhenAiNutritionLooksExtreme_UsesIngredientBasedNutritionGuardrails()
     {
         ClearAiPool();

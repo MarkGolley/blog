@@ -33,4 +33,18 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(expected, formatted);
     }
+
+    [Theory]
+    [InlineData(5.63, "ml", "1 1/4 tsp")]
+    [InlineData(16.88, "ml", "1 1/4 tbsp")]
+    [InlineData(0.02, "l", "1 1/4 tbsp")]
+    public void QuantityDisplayFormatter_ShoppingListFormatting_NormalizesLiquidVolumesToSpoonMeasures(
+        decimal quantity,
+        string unit,
+        string expected)
+    {
+        var formatted = QuantityDisplayFormatter.Format(quantity, unit);
+
+        Assert.Equal(expected, formatted);
+    }
 }

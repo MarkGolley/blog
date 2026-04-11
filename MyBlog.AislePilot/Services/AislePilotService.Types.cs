@@ -46,8 +46,8 @@ public sealed partial class AislePilotService
 
     private sealed class MutableShoppingItem
     {
-        public string Department { get; init; } = string.Empty;
-        public string Name { get; init; } = string.Empty;
+        public string Department { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
         public string Unit { get; init; } = string.Empty;
         public decimal Quantity { get; set; }
         public decimal EstimatedCost { get; set; }

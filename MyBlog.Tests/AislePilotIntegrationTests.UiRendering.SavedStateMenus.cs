@@ -233,6 +233,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         using var savedMealResponse = await client.PostAsync("/projects/aisle-pilot/toggle-enjoyed-meal", new FormUrlEncodedContent(saveMealForm));
         Assert.Equal(HttpStatusCode.OK, savedMealResponse.StatusCode);
         var savedMealHtml = await savedMealResponse.Content.ReadAsStringAsync();
+        Assert.Contains("data-saved-meals-menu-section", savedMealHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-head-saved-meal-list", savedMealHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/projects/aisle-pilot/remove-saved-meal", savedMealHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(

@@ -4748,6 +4748,162 @@
         return currentInputs.length > 0;
     };
 
+    const readSavedMealNamesFromHiddenState = () => {
+        const stateInput = document.querySelector("input[name='Request.SavedEnjoyedMealNamesState']");
+        if (!(stateInput instanceof HTMLInputElement)) {
+            return [];
+        }
+
+        const serializedState = stateInput.value?.trim() ?? "";
+        if (!serializedState) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(serializedState);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            return parsed
+                .filter(name => typeof name === "string")
+                .map(name => name.trim())
+                .filter(name => name.length > 0)
+                .filter((name, index, values) =>
+                    values.findIndex(candidate => candidate.localeCompare(name, undefined, { sensitivity: "accent" }) === 0) === index);
+        } catch {
+            return [];
+        }
+    };
+
+    const syncFavoriteButtonsFromSavedState = () => {
+        const savedMealNames = readSavedMealNamesFromHiddenState();
+        const savedMealNameSet = new Set(savedMealNames.map(name => name.toLowerCase()));
+        const favoriteForms = Array.from(document.querySelectorAll("#aislepilot-meals .aislepilot-favorite-form"));
+        let syncedButtons = 0;
+
+        favoriteForms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const mealNameInput = form.querySelector("input[name='mealName']");
+            const submitButton = form.querySelector("button[type='submit']");
+            const label = submitButton?.querySelector(".aislepilot-swap-action-label");
+            if (!(mealNameInput instanceof HTMLInputElement) || !(submitButton instanceof HTMLButtonElement) || !(label instanceof HTMLElement)) {
+                return;
+            }
+
+            const mealName = mealNameInput.value.trim();
+            const isSavedMeal = mealName.length > 0 && savedMealNameSet.has(mealName.toLowerCase());
+            submitButton.classList.toggle("is-saved-meal", isSavedMeal);
+            submitButton.setAttribute("aria-label", isSavedMeal ? "Unsave meal" : "Save meal");
+            submitButton.setAttribute("title", isSavedMeal ? "Unsave meal" : "Save meal");
+            label.textContent = isSavedMeal ? "Unsave" : "Save";
+            syncedButtons += 1;
+        });
+
+        return syncedButtons > 0;
+    };
+
+    const createSavedMealRemoveGlyph = () => {
+        const glyph = document.createElement("span");
+        glyph.className = "aislepilot-symbol-glyph";
+        glyph.setAttribute("aria-hidden", "true");
+        glyph.innerHTML = "<svg viewBox='0 0 24 24' focusable='false'><path d='M4 7h16'></path><path d='M9 7V4h6v3'></path><path d='M7 7l1 12h8l1-12'></path><path d='M10 11v6'></path><path d='M14 11v6'></path></svg>";
+        return glyph;
+    };
+
+    const syncSavedMealsMenuFromHiddenState = () => {
+        const section = document.querySelector("[data-saved-meals-menu-section]");
+        if (!(section instanceof HTMLElement)) {
+            return false;
+        }
+
+        const savedMealNames = readSavedMealNamesFromHiddenState();
+        const title = section.querySelector(".aislepilot-head-menu-section-title");
+        section.replaceChildren();
+        if (title instanceof HTMLElement) {
+            section.appendChild(title);
+        } else {
+            const nextTitle = document.createElement("p");
+            nextTitle.className = "aislepilot-head-menu-section-title";
+            nextTitle.textContent = "Saved meals";
+            section.appendChild(nextTitle);
+        }
+
+        if (savedMealNames.length === 0) {
+            const emptyState = document.createElement("p");
+            emptyState.className = "aislepilot-head-menu-item is-disabled";
+            emptyState.setAttribute("aria-disabled", "true");
+            emptyState.textContent = "No saved meals yet";
+            section.appendChild(emptyState);
+            return true;
+        }
+
+        const antiForgeryTokenInput = document.querySelector("input[name='__RequestVerificationToken']");
+        const antiForgeryToken = antiForgeryTokenInput instanceof HTMLInputElement ? antiForgeryTokenInput.value : "";
+        const returnUrlInput = document.querySelector("input[name='returnUrl']");
+        const returnUrl = returnUrlInput instanceof HTMLInputElement ? returnUrlInput.value : "";
+        const list = document.createElement("ul");
+        list.className = "aislepilot-head-saved-meal-list";
+
+        savedMealNames.slice(0, 20).forEach(savedMealName => {
+            const row = document.createElement("li");
+            row.className = "aislepilot-head-saved-meal-row";
+
+            const name = document.createElement("span");
+            name.className = "aislepilot-head-saved-meal-name";
+            name.textContent = savedMealName;
+            row.appendChild(name);
+
+            const form = document.createElement("form");
+            form.method = "post";
+            form.action = "/projects/aisle-pilot/remove-saved-meal";
+            form.className = "aislepilot-head-week-form";
+
+            if (antiForgeryToken.length > 0) {
+                const tokenInput = document.createElement("input");
+                tokenInput.type = "hidden";
+                tokenInput.name = "__RequestVerificationToken";
+                tokenInput.value = antiForgeryToken;
+                form.appendChild(tokenInput);
+            }
+
+            const mealNameInput = document.createElement("input");
+            mealNameInput.type = "hidden";
+            mealNameInput.name = "mealName";
+            mealNameInput.value = savedMealName;
+            form.appendChild(mealNameInput);
+
+            const returnUrlHiddenInput = document.createElement("input");
+            returnUrlHiddenInput.type = "hidden";
+            returnUrlHiddenInput.name = "returnUrl";
+            returnUrlHiddenInput.value = returnUrl;
+            form.appendChild(returnUrlHiddenInput);
+
+            const button = document.createElement("button");
+            button.type = "submit";
+            button.className = "aislepilot-head-week-action-btn is-danger";
+            button.setAttribute("data-loading-label", "Removing meal...");
+            button.setAttribute("aria-label", `Remove ${savedMealName} from saved meals`);
+            button.setAttribute("title", "Remove saved meal");
+            button.appendChild(createSavedMealRemoveGlyph());
+
+            const srOnly = document.createElement("span");
+            srOnly.className = "sr-only";
+            srOnly.textContent = "Remove saved meal";
+            button.appendChild(srOnly);
+
+            form.appendChild(button);
+            row.appendChild(form);
+            list.appendChild(row);
+        });
+
+        section.appendChild(list);
+        return true;
+    };
+
     const normalizeMealImageName = value => {
         if (typeof value !== "string") {
             return "";
@@ -4899,7 +5055,9 @@
             responseDocument,
             "Request.SavedEnjoyedMealNamesState"
         );
-        if (!didSyncForms && !didSyncSavedState) {
+        const didSyncFavoriteButtons = syncFavoriteButtonsFromSavedState();
+        const didSyncSavedMealsMenu = syncSavedMealsMenuFromHiddenState();
+        if (!didSyncForms && !didSyncSavedState && !didSyncFavoriteButtons && !didSyncSavedMealsMenu) {
             return false;
         }
 
