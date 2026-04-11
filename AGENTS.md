@@ -28,3 +28,9 @@
   - interaction/layout in `PlaywrightE2ETests*.cs`
 - Run `run_checks.ps1 -Mode Tests` (or equivalent targeted `dotnet test`) for touched areas.
 - Run `scripts/check-oversized-files.ps1` and keep files under threshold unless explicitly allowlisted.
+
+## Agent Memory Hygiene
+
+- Do not scan or read generated directories unless the task explicitly requires them: `.git/`, `.idea/`, `.vs/`, `bin/`, `obj/`, `.playwright/`, `playwright-report/`, `TestResults/`, `coverage/`, `node_modules/`, `wwwroot/lib/`.
+- Prefer source paths over generated outputs when searching, diffing, or reviewing.
+- If generated build or Playwright artifacts accumulate and are not relevant to the task, clean them before doing broad searches so agent mode keeps a smaller working set.

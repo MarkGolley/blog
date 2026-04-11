@@ -79,4 +79,7 @@ bin/
 obj/
 artifacts/
 .artifacts/
+TestResults/
+playwright-report/
+.playwright/
 MyBlog/wwwroot/images/aislepilot-meals/
