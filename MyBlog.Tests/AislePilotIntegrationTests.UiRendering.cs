@@ -98,7 +98,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_RendersOverviewGlanceAndDayMealSummaryRows()
+    public async Task Index_Post_RendersDayMealSummaryRowsWithoutOverviewGlanceMetrics()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -122,8 +122,8 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("class=\"aislepilot-overview-glance\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-overview-glance-item", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("class=\"aislepilot-overview-glance\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-overview-glance-item", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-meal-summary", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-card aislepilot-shop-card\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-action\"", html, StringComparison.OrdinalIgnoreCase);

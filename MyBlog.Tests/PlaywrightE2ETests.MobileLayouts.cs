@@ -1013,7 +1013,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotOverviewGlance_RemainsVisibleWhenOverviewDetailsAreCollapsed()
+    public async Task Mobile_AislePilotOverviewCollapsed_DoesNotRenderDuplicateGlanceMetrics()
     {
         if (!IsE2EEnabled())
         {
@@ -1025,29 +1025,24 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var glanceMetrics = await page.EvaluateAsync<object[]>(
+        var overviewMetrics = await page.EvaluateAsync<object[]>(
             """
             () => {
                 const glance = document.querySelector(".aislepilot-overview-glance");
                 const overviewContent = document.querySelector("[data-overview-content]");
-                if (!(glance instanceof HTMLElement) || !(overviewContent instanceof HTMLElement)) {
-                    return [0, 0, 0, "missing"];
+                if (!(overviewContent instanceof HTMLElement)) {
+                    return [0, "missing"];
                 }
 
-                const glanceRect = glance.getBoundingClientRect();
-                const itemCount = glance.querySelectorAll("[data-overview-glance-item]").length;
-                const isVisible = glanceRect.width > 12 && glanceRect.height > 12 ? 1 : 0;
                 const collapsed = overviewContent.hasAttribute("hidden") ? 1 : 0;
-                const text = (glance.textContent || "").replace(/\s+/g, " ").trim();
-                return [isVisible, itemCount, collapsed, text];
+                const glanceExists = glance instanceof HTMLElement ? 1 : 0;
+                return [collapsed, glanceExists];
             }
             """);
 
-        Assert.Equal(4, glanceMetrics.Length);
-        Assert.Equal(1, Convert.ToInt32(glanceMetrics[0]));
-        Assert.True(Convert.ToInt32(glanceMetrics[1]) >= 3, $"Expected at least three overview glance tiles. Count={glanceMetrics[1]}.");
-        Assert.Equal(1, Convert.ToInt32(glanceMetrics[2]));
-        Assert.Contains("Estimated total", Convert.ToString(glanceMetrics[3]), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, overviewMetrics.Length);
+        Assert.Equal(1, Convert.ToInt32(overviewMetrics[0]));
+        Assert.Equal(0, Convert.ToInt32(overviewMetrics[1]));
     }
 
     [Fact]

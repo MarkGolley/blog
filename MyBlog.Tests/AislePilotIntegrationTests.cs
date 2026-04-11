@@ -903,7 +903,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         var match = Regex.Match(
             html,
-            @"<span class=""aislepilot-mobile-context-meta-values"">\s*(?<value>[\s\S]*?)\s*</span>",
+            @"<span class=""aislepilot-mobile-context-budget-status[^""]*"">\s*(?<value>[^<]+)\s*</span>",
             RegexOptions.IgnoreCase);
         Assert.True(match.Success, "Could not find weekly summary budget text.");
         var raw = WebUtility.HtmlDecode(match.Groups["value"].Value);

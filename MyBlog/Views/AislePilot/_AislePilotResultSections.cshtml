@@ -379,20 +379,6 @@
                 }
             </div>
         </div>
-        <div class="aislepilot-overview-glance" aria-label="Overview quick stats">
-            <article class="aislepilot-overview-glance-item" data-overview-glance-item>
-                <p class="aislepilot-overview-glance-label">Estimated total</p>
-                <p class="aislepilot-overview-glance-value">@result.EstimatedTotalCost.ToString("C", ukCulture)</p>
-            </article>
-            <article class="aislepilot-overview-glance-item" data-overview-glance-item>
-                <p class="aislepilot-overview-glance-label">Budget status</p>
-                <p class="aislepilot-overview-glance-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">@budgetDeltaSummaryText</p>
-            </article>
-            <article class="aislepilot-overview-glance-item" data-overview-glance-item>
-                <p class="aislepilot-overview-glance-label">Cook days</p>
-                <p class="aislepilot-overview-glance-value">@result.CookDays of @result.PlanDays</p>
-            </article>
-        </div>
     </section>
 
     <section class="aislepilot-shell aislepilot-window-shell" aria-labelledby="aislepilot-window-title" data-aislepilot-window data-reveal>
