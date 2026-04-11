@@ -390,7 +390,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("data-day-card-summary-value=", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
-                @"<section[^>]*class=""[^""]*aislepilot-day-meal-panel[^""]*""[^>]*>[\s\S]*?<h3>[^<]+</h3>[\s\S]*?<div class=""aislepilot-meal-image-shell"">",
+                @"<section[^>]*class=""[^""]*aislepilot-day-meal-panel[^""]*""[^>]*>[\s\S]*?<h3>[^<]+</h3>[\s\S]*?<summary[^>]*class=""[^""]*aislepilot-meal-image-summary[^""]*""[^>]*>[\s\S]*?<div class=""aislepilot-meal-image-shell""[^>]*data-day-meal-swipe-surface",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
