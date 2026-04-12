@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -6,6 +7,86 @@ using Microsoft.Playwright;
 namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
+    [Fact]
+    public async Task NarrowMobile_AislePilotPeopleSlider_UsesThumbFriendlyTouchTarget()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateNarrowMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        await page.EvaluateAsync(
+            """
+            () => {
+                const servingDetails = Array.from(document.querySelectorAll(".aislepilot-collapsible"))
+                    .find(section => section.querySelector(".aislepilot-collapsible-title")?.textContent?.trim() === "Cooking for");
+                if (servingDetails instanceof HTMLDetailsElement) {
+                    servingDetails.open = true;
+                }
+            }
+            """);
+
+        var peopleSlider = page.Locator(".aislepilot-slider-field--thumb-friendly input[name='Request.HouseholdSize']").First;
+        await peopleSlider.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var metricsText = await page.EvaluateAsync<string>(
+            """
+            () => {
+                const field = document.querySelector(".aislepilot-slider-field--thumb-friendly");
+                if (!(field instanceof HTMLElement)) {
+                    return "NaN|NaN|NaN";
+                }
+
+                const input = field.querySelector("input[name='Request.HouseholdSize']");
+                const valueBubble = field.querySelector("[data-number-slider-value]");
+                if (!(input instanceof HTMLInputElement) || !(valueBubble instanceof HTMLElement)) {
+                    return "NaN|NaN|NaN";
+                }
+
+                const inputRect = input.getBoundingClientRect();
+                const valueRect = valueBubble.getBoundingClientRect();
+                return `${inputRect.height}|${valueRect.width}|${valueRect.height}`;
+            }
+            """);
+
+        static double ParseMetric(string raw)
+        {
+            return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : double.NaN;
+        }
+
+        var metrics = (metricsText ?? "NaN|NaN|NaN").Split('|');
+        var inputHeight = metrics.Length > 0 ? ParseMetric(metrics[0]) : double.NaN;
+        var bubbleWidth = metrics.Length > 1 ? ParseMetric(metrics[1]) : double.NaN;
+        var bubbleHeight = metrics.Length > 2 ? ParseMetric(metrics[2]) : double.NaN;
+
+        Assert.True(
+            inputHeight >= 32,
+            $"Expected the people slider input to keep at least a 32px mobile hit area. Actual={inputHeight}px.");
+        Assert.True(
+            bubbleWidth >= 34,
+            $"Expected the people slider value bubble to stay wide enough for thumb dragging on mobile. Actual={bubbleWidth}px.");
+        Assert.True(
+            bubbleHeight >= 27,
+            $"Expected the people slider value bubble to stay tall enough for thumb dragging on mobile. Actual={bubbleHeight}px.");
+    }
+
     [Fact]
     public async Task NarrowMobile_AislePilotMealCardActionButtons_RemainVisibleWithinViewport()
     {
@@ -537,121 +618,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotSaveMeal_ShowsSaveAndUnsaveToasts()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
-        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var activeMealCard = page.Locator("[data-day-meal-card]:has(.aislepilot-day-meal-panel[aria-hidden='false'])").First;
-        var moreActionsSummary = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        var saveButton = activeMealCard.Locator(
-            "[data-day-card-header-actions].is-active [data-card-more-actions] .aislepilot-favorite-form button[type='submit']").First;
-        var toasts = page.Locator(".aislepilot-toast");
-
-        await moreActionsSummary.EvaluateAsync("element => element instanceof HTMLElement && element.scrollIntoView({ block: 'center' })");
-        await moreActionsSummary.ClickAsync(new LocatorClickOptions { Force = true });
-        await activeMealCard.EvaluateAsync(
-            """
-            card => {
-                if (!(card instanceof HTMLElement)) {
-                    return;
-                }
-
-                const details = card.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions]");
-                if (details instanceof HTMLDetailsElement && !details.open) {
-                    details.open = true;
-                }
-            }
-            """);
-        await saveButton.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        await saveButton.EvaluateAsync("element => element instanceof HTMLElement && element.scrollIntoView({ block: 'center' })");
-
-        var initiallySaved = await saveButton.EvaluateAsync<bool>(
-            "button => button instanceof HTMLButtonElement && button.classList.contains('is-saved-meal')");
-        var expectedFirstToast = initiallySaved
-            ? "Meal removed from saved meals."
-            : "Meal saved.";
-        var expectedSecondToast = expectedFirstToast.Equals("Meal saved.", StringComparison.Ordinal)
-            ? "Meal removed from saved meals."
-            : "Meal saved.";
-
-        var beforeFirstToastCount = await toasts.CountAsync();
-        await saveButton.EvaluateAsync(
-            """
-            button => {
-                if (!(button instanceof HTMLButtonElement)) {
-                    return;
-                }
-
-                button.form?.requestSubmit(button);
-            }
-            """);
-        await page.WaitForFunctionAsync(
-            "previousCount => document.querySelectorAll('.aislepilot-toast').length > previousCount",
-            beforeFirstToastCount,
-            new() { Timeout = 10000 });
-        var firstToastText = (await toasts.Last.InnerTextAsync()).Trim();
-        Assert.Equal(expectedFirstToast, firstToastText);
-
-        await moreActionsSummary.EvaluateAsync("element => element instanceof HTMLElement && element.scrollIntoView({ block: 'center' })");
-        await moreActionsSummary.ClickAsync(new LocatorClickOptions { Force = true });
-        await activeMealCard.EvaluateAsync(
-            """
-            card => {
-                if (!(card instanceof HTMLElement)) {
-                    return;
-                }
-
-                const details = card.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions]");
-                if (details instanceof HTMLDetailsElement && !details.open) {
-                    details.open = true;
-                }
-            }
-            """);
-        await saveButton.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-
-        var beforeSecondToastCount = await toasts.CountAsync();
-        await saveButton.EvaluateAsync(
-            """
-            button => {
-                if (!(button instanceof HTMLButtonElement)) {
-                    return;
-                }
-
-                button.form?.requestSubmit(button);
-            }
-            """);
-        await page.WaitForFunctionAsync(
-            "previousCount => document.querySelectorAll('.aislepilot-toast').length > previousCount",
-            beforeSecondToastCount,
-            new() { Timeout = 10000 });
-        var secondToastText = (await toasts.Last.InnerTextAsync()).Trim();
-        Assert.Equal(expectedSecondToast, secondToastText);
-    }
-
-    [Fact]
     public async Task Mobile_AislePilotSavedMealsMenu_ShowsReadableMealRowsWithoutTruncation()
     {
         if (!IsE2EEnabled())
@@ -1013,7 +979,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotOverviewGlance_RemainsVisibleWhenOverviewDetailsAreCollapsed()
+    public async Task Mobile_AislePilotOverviewCollapsed_DoesNotRenderDuplicateGlanceMetrics()
     {
         if (!IsE2EEnabled())
         {
@@ -1025,29 +991,24 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var glanceMetrics = await page.EvaluateAsync<object[]>(
+        var overviewMetrics = await page.EvaluateAsync<object[]>(
             """
             () => {
                 const glance = document.querySelector(".aislepilot-overview-glance");
                 const overviewContent = document.querySelector("[data-overview-content]");
-                if (!(glance instanceof HTMLElement) || !(overviewContent instanceof HTMLElement)) {
-                    return [0, 0, 0, "missing"];
+                if (!(overviewContent instanceof HTMLElement)) {
+                    return [0, "missing"];
                 }
 
-                const glanceRect = glance.getBoundingClientRect();
-                const itemCount = glance.querySelectorAll("[data-overview-glance-item]").length;
-                const isVisible = glanceRect.width > 12 && glanceRect.height > 12 ? 1 : 0;
                 const collapsed = overviewContent.hasAttribute("hidden") ? 1 : 0;
-                const text = (glance.textContent || "").replace(/\s+/g, " ").trim();
-                return [isVisible, itemCount, collapsed, text];
+                const glanceExists = glance instanceof HTMLElement ? 1 : 0;
+                return [collapsed, glanceExists];
             }
             """);
 
-        Assert.Equal(4, glanceMetrics.Length);
-        Assert.Equal(1, Convert.ToInt32(glanceMetrics[0]));
-        Assert.True(Convert.ToInt32(glanceMetrics[1]) >= 3, $"Expected at least three overview glance tiles. Count={glanceMetrics[1]}.");
-        Assert.Equal(1, Convert.ToInt32(glanceMetrics[2]));
-        Assert.Contains("Estimated total", Convert.ToString(glanceMetrics[3]), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, overviewMetrics.Length);
+        Assert.Equal(1, Convert.ToInt32(overviewMetrics[0]));
+        Assert.Equal(0, Convert.ToInt32(overviewMetrics[1]));
     }
 
     [Fact]

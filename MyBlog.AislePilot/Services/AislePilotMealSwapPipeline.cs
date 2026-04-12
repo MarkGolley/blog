@@ -35,7 +35,7 @@ public sealed class AislePilotMealSwapPipeline : IAislePilotMealSwapPipeline
                 context,
                 cookDays,
                 totalMealCount,
-                cancellationToken);
+                cancellationToken: cancellationToken);
             selectedMeals = AislePilotService.BuildSelectedMealsFromCurrentPlanNames(
                 fallbackPlan.MealPlan.Select(meal => meal.MealName).ToList(),
                 totalMealCount);
@@ -69,6 +69,7 @@ public sealed class AislePilotMealSwapPipeline : IAislePilotMealSwapPipeline
             .Select(name => name.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        var currentMeal = selectedMeals[dayIndex];
 
         AislePilotService.MealTemplate? replacement = null;
         var planSourceLabel = "AI meal pool";
@@ -86,6 +87,7 @@ public sealed class AislePilotMealSwapPipeline : IAislePilotMealSwapPipeline
                     compatibleUnseenPoolMeals,
                     selectedMeals,
                     dayIndex,
+                    currentMeal,
                     currentName,
                     request.WeeklyBudget,
                     context.HouseholdFactor,
@@ -121,6 +123,7 @@ public sealed class AislePilotMealSwapPipeline : IAislePilotMealSwapPipeline
                 context,
                 selectedMeals,
                 dayIndex,
+                currentMeal,
                 currentName,
                 request.WeeklyBudget,
                 request.PreferQuickMeals,

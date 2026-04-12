@@ -10,6 +10,7 @@
         )
     );
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
+    const supermarketSelectionStorageKey = "aislepilot:setup-supermarket";
     const submitLoadingDelayTimers = new WeakMap();
     const appRoot = document.querySelector(".aislepilot-app");
     const shellHeader = document.querySelector(".app-shell-header");
@@ -262,6 +263,64 @@
             form.dataset.exportThemeWired = "true";
             form.addEventListener("submit", syncThemeInput);
         });
+    };
+
+    const getExportDownloadFallbackName = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return "aislepilot-export";
+        }
+
+        const fallbackName = form.dataset.exportDownloadFallbackName?.trim();
+        return fallbackName && fallbackName.length > 0
+            ? fallbackName
+            : "aislepilot-export";
+    };
+
+    const readExportDownloadFileName = (response, form) => {
+        if (!(response instanceof Response)) {
+            return getExportDownloadFallbackName(form);
+        }
+
+        const contentDisposition = response.headers.get("content-disposition") ?? "";
+        const encodedNameMatch = contentDisposition.match(/filename\*\s*=\s*([^;]+)/i);
+        if (encodedNameMatch) {
+            const encodedName = encodedNameMatch[1].trim().replace(/^UTF-8''/i, "").replace(/^"|"$/g, "");
+            if (encodedName.length > 0) {
+                try {
+                    return decodeURIComponent(encodedName);
+                } catch {
+                    return encodedName;
+                }
+            }
+        }
+
+        const plainNameMatch = contentDisposition.match(/filename\s*=\s*"?(.*?)"?($|;)/i);
+        const plainName = plainNameMatch?.[1]?.trim();
+        if (plainName && plainName.length > 0) {
+            return plainName;
+        }
+
+        return getExportDownloadFallbackName(form);
+    };
+
+    const triggerFileDownload = (blob, fileName) => {
+        if (!(blob instanceof Blob)) {
+            return;
+        }
+
+        const anchor = document.createElement("a");
+        const objectUrl = URL.createObjectURL(blob);
+        anchor.href = objectUrl;
+        anchor.download = typeof fileName === "string" && fileName.trim().length > 0
+            ? fileName.trim()
+            : "aislepilot-export";
+        anchor.hidden = true;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => {
+            URL.revokeObjectURL(objectUrl);
+        }, 1000);
     };
 
     let toastHost = null;
@@ -1778,15 +1837,66 @@
 
     wireSharedPreferenceSummaries(document);
 
+    const getSupermarketRadioOptions = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return [];
+        }
+
+        return Array.from(form.querySelectorAll("[data-supermarket-option]"))
+            .filter(input => input instanceof HTMLInputElement);
+    };
+
+    const normalizeSupermarketValue = value => typeof value === "string" ? value.trim() : "";
+
+    const readPersistedSupermarketSelection = () => {
+        try {
+            return normalizeSupermarketValue(window.localStorage.getItem(supermarketSelectionStorageKey));
+        } catch {
+            return "";
+        }
+    };
+
+    const persistSupermarketSelection = value => {
+        const normalizedValue = normalizeSupermarketValue(value);
+        if (normalizedValue.length === 0) {
+            return;
+        }
+
+        try {
+            window.localStorage.setItem(supermarketSelectionStorageKey, normalizedValue);
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
+
+    const resolveSupermarketOptionValue = (options, candidateValue) => {
+        const normalizedCandidate = normalizeSupermarketValue(candidateValue).toLowerCase();
+        if (normalizedCandidate.length === 0) {
+            return "";
+        }
+
+        const matchedOption = options.find(option =>
+            normalizeSupermarketValue(option.value).toLowerCase() === normalizedCandidate);
+        return matchedOption instanceof HTMLInputElement ? matchedOption.value : "";
+    };
+
     const getSelectedSupermarket = form => {
         if (!(form instanceof HTMLFormElement)) {
             return "";
         }
 
-        const supermarketRadioOptions = Array.from(form.querySelectorAll("[data-supermarket-option]"))
-            .filter(input => input instanceof HTMLInputElement);
+        const supermarketRadioOptions = getSupermarketRadioOptions(form);
         if (supermarketRadioOptions.length > 0) {
-            const selectedOption = supermarketRadioOptions.find(input => input.checked);
+            const enabledCheckedOption = [...supermarketRadioOptions]
+                .reverse()
+                .find(input => input.checked && !input.matches(":disabled"));
+            if (enabledCheckedOption instanceof HTMLInputElement) {
+                return enabledCheckedOption.value;
+            }
+
+            const selectedOption = [...supermarketRadioOptions]
+                .reverse()
+                .find(input => input.checked);
             return selectedOption instanceof HTMLInputElement ? selectedOption.value : "";
         }
 
@@ -1797,6 +1907,101 @@
 
         return "";
     };
+
+    const syncSupermarketSelection = (form, selectedValue) => {
+        if (!(form instanceof HTMLFormElement)) {
+            return "";
+        }
+
+        const supermarketRadioOptions = getSupermarketRadioOptions(form);
+        if (supermarketRadioOptions.length === 0) {
+            const supermarketSelect = form.querySelector("[data-supermarket-select]");
+            if (supermarketSelect instanceof HTMLSelectElement || supermarketSelect instanceof HTMLInputElement) {
+                const normalizedValue = normalizeSupermarketValue(selectedValue);
+                if (normalizedValue.length > 0) {
+                    supermarketSelect.value = normalizedValue;
+                    persistSupermarketSelection(normalizedValue);
+                }
+
+                return supermarketSelect.value;
+            }
+
+            return "";
+        }
+
+        const resolvedSelectedValue =
+            resolveSupermarketOptionValue(supermarketRadioOptions, selectedValue) ||
+            resolveSupermarketOptionValue(supermarketRadioOptions, getSelectedSupermarket(form)) ||
+            supermarketRadioOptions.find(option => !option.matches(":disabled"))?.value ||
+            supermarketRadioOptions[0]?.value ||
+            "";
+
+        const selectedOption =
+            supermarketRadioOptions.find(option =>
+                !option.matches(":disabled") &&
+                normalizeSupermarketValue(option.value).toLowerCase() ===
+                normalizeSupermarketValue(resolvedSelectedValue).toLowerCase()) ||
+            supermarketRadioOptions.find(option =>
+                normalizeSupermarketValue(option.value).toLowerCase() ===
+                normalizeSupermarketValue(resolvedSelectedValue).toLowerCase()) ||
+            null;
+
+        supermarketRadioOptions.forEach(option => {
+            option.checked = option === selectedOption;
+        });
+
+        if (resolvedSelectedValue.length > 0) {
+            persistSupermarketSelection(resolvedSelectedValue);
+        }
+
+        return resolvedSelectedValue;
+    };
+
+    const wireSupermarketSelectionPersistence = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const supermarketRadioOptions = getSupermarketRadioOptions(form);
+            if (supermarketRadioOptions.length === 0) {
+                return;
+            }
+
+            supermarketRadioOptions.forEach(option => {
+                if (option.dataset.supermarketPersistenceWired === "true") {
+                    return;
+                }
+
+                option.dataset.supermarketPersistenceWired = "true";
+                option.addEventListener("change", () => {
+                    syncSupermarketSelection(form, option.value);
+                });
+            });
+
+            const currentSelection = normalizeSupermarketValue(getSelectedSupermarket(form));
+            const persistedSelection = resolveSupermarketOptionValue(
+                supermarketRadioOptions,
+                readPersistedSupermarketSelection());
+            const preferredSelection = persistedSelection || currentSelection;
+            const resolvedSelection = syncSupermarketSelection(form, preferredSelection);
+            if (
+                resolvedSelection.length > 0 &&
+                resolvedSelection.localeCompare(currentSelection, undefined, { sensitivity: "accent" }) !== 0
+            ) {
+                const selectedOption = supermarketRadioOptions.find(option => option.checked);
+                if (selectedOption instanceof HTMLInputElement) {
+                    selectedOption.dispatchEvent(new Event("change", { bubbles: true }));
+                }
+            }
+        });
+    };
+
+    wireSupermarketSelectionPersistence(document);
 
     const syncCustomAisleFieldVisibility = (selectedSupermarket, customAisleField, storeLayoutSection) => {
         if (!(customAisleField instanceof HTMLElement) && !(storeLayoutSection instanceof HTMLElement)) {
@@ -2109,48 +2314,58 @@
 
     wireModeScopedPreferenceVisibility(document);
 
+    const resetFormSubmittingState = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        clearSubmitLoadingDelay(form);
+        form.removeAttribute("data-is-submitting");
+
+        const buttons = Array.from(form.querySelectorAll("button[type='submit']"));
+        buttons.forEach(button => {
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            if (button.classList.contains("is-loading")) {
+                button.classList.remove("is-loading");
+            }
+
+            button.disabled = false;
+            button.removeAttribute("aria-busy");
+
+            const originalAriaLabel = button.dataset.originalAriaLabel;
+            if (typeof originalAriaLabel === "string") {
+                if (originalAriaLabel.length > 0) {
+                    button.setAttribute("aria-label", originalAriaLabel);
+                } else {
+                    button.removeAttribute("aria-label");
+                }
+            }
+
+            const originalLabel = button.dataset.originalLabel?.trim();
+            if (!button.classList.contains("is-icon-only") && originalLabel && originalLabel.length > 0) {
+                button.textContent = originalLabel;
+            }
+
+            unlockSubmitButtonWidth(button);
+        });
+    };
+
     const resetSubmittingState = () => {
         hidePlanLoadingShell();
-        getAislePilotForms().forEach(form => {
-            clearSubmitLoadingDelay(form);
-            form.removeAttribute("data-is-submitting");
-
-            const buttons = Array.from(form.querySelectorAll("button[type='submit']"));
-            buttons.forEach(button => {
-                if (!(button instanceof HTMLButtonElement)) {
-                    return;
-                }
-
-                if (button.classList.contains("is-loading")) {
-                    button.classList.remove("is-loading");
-                }
-
-                button.disabled = false;
-                button.removeAttribute("aria-busy");
-
-                const originalAriaLabel = button.dataset.originalAriaLabel;
-                if (typeof originalAriaLabel === "string") {
-                    if (originalAriaLabel.length > 0) {
-                        button.setAttribute("aria-label", originalAriaLabel);
-                    } else {
-                        button.removeAttribute("aria-label");
-                    }
-                }
-
-                const originalLabel = button.dataset.originalLabel?.trim();
-                if (!button.classList.contains("is-icon-only") && originalLabel && originalLabel.length > 0) {
-                    button.textContent = originalLabel;
-                }
-
-                unlockSubmitButtonWidth(button);
-            });
-        });
+        getAislePilotForms().forEach(resetFormSubmittingState);
     };
 
     window.addEventListener("pageshow", event => {
         if (event.persisted) {
             resetSubmittingState();
         }
+
+        requestAnimationFrame(() => {
+            wireSupermarketSelectionPersistence(document);
+        });
     });
 
     document.addEventListener("visibilitychange", () => {
@@ -2162,6 +2377,7 @@
     });
 
     const swapScrollKey = "aislepilot:swap-scroll";
+    const swapScrollRestoreDurationMs = 1100;
     const clearPersistedSwapScroll = () => {
         sessionStorage.removeItem(swapScrollKey);
     };
@@ -2309,6 +2525,85 @@
     const panels = Array.from(root.querySelectorAll(".aislepilot-window-panel"));
     const tabHint = root.querySelector("[data-window-hint]");
     const tabHintSeenStorageKey = "aislepilot:tab-hint-seen";
+    const shoppingItemStateStorageKey = "aislepilot:shopping-item-state";
+    const customShoppingItemsStorageKey = "aislepilot:custom-shopping-items";
+    let shoppingItemStateCache = null;
+    let customShoppingItemsCache = null;
+
+    const readShoppingItemState = () => {
+        if (shoppingItemStateCache && typeof shoppingItemStateCache === "object") {
+            return shoppingItemStateCache;
+        }
+
+        try {
+            const raw = window.localStorage.getItem(shoppingItemStateStorageKey);
+            if (!raw) {
+                shoppingItemStateCache = {};
+                return shoppingItemStateCache;
+            }
+
+            const parsed = JSON.parse(raw);
+            shoppingItemStateCache = parsed && typeof parsed === "object" ? parsed : {};
+        } catch {
+            shoppingItemStateCache = {};
+        }
+
+        return shoppingItemStateCache;
+    };
+
+    const writeShoppingItemState = () => {
+        try {
+            const state = readShoppingItemState();
+            window.localStorage.setItem(shoppingItemStateStorageKey, JSON.stringify(state));
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
+
+    const syncShoppingItemVisualState = (label, isChecked) => {
+        if (!(label instanceof HTMLElement)) {
+            return;
+        }
+
+        label.classList.toggle("is-checked", isChecked);
+    };
+
+    const readCustomShoppingItems = () => {
+        if (Array.isArray(customShoppingItemsCache)) {
+            return customShoppingItemsCache;
+        }
+
+        try {
+            const raw = window.localStorage.getItem(customShoppingItemsStorageKey);
+            if (!raw) {
+                customShoppingItemsCache = [];
+                return customShoppingItemsCache;
+            }
+
+            const parsed = JSON.parse(raw);
+            customShoppingItemsCache = Array.isArray(parsed)
+                ? parsed.filter(item =>
+                    item &&
+                    typeof item === "object" &&
+                    typeof item.id === "string" &&
+                    typeof item.text === "string")
+                : [];
+        } catch {
+            customShoppingItemsCache = [];
+        }
+
+        return customShoppingItemsCache;
+    };
+
+    const writeCustomShoppingItems = items => {
+        customShoppingItemsCache = Array.isArray(items) ? items : [];
+
+        try {
+            window.localStorage.setItem(customShoppingItemsStorageKey, JSON.stringify(customShoppingItemsCache));
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
 
     if (!viewport || !track || panels.length === 0) {
         return;
@@ -2347,6 +2642,234 @@
         } catch {
             // Ignore storage failures in private modes.
         }
+    };
+
+    const wireShoppingChecklist = scope => {
+        const labels = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-shopping-item-label]"))
+            : Array.from(document.querySelectorAll("[data-shopping-item-label]"));
+
+        labels.forEach(label => {
+            if (!(label instanceof HTMLElement) || label.dataset.shoppingItemWired === "true") {
+                return;
+            }
+
+            const checkbox = label.querySelector("[data-shopping-item-input]");
+            const shoppingItemKey = (label.dataset.shoppingItemKey ?? "").trim();
+            if (!(checkbox instanceof HTMLInputElement) || shoppingItemKey.length === 0) {
+                return;
+            }
+
+            label.dataset.shoppingItemWired = "true";
+
+            const savedState = readShoppingItemState();
+            const isChecked = savedState[shoppingItemKey] === true;
+            checkbox.checked = isChecked;
+            syncShoppingItemVisualState(label, isChecked);
+
+            checkbox.addEventListener("change", () => {
+                const nextCheckedState = checkbox.checked;
+                const currentState = readShoppingItemState();
+                if (nextCheckedState) {
+                    currentState[shoppingItemKey] = true;
+                } else {
+                    delete currentState[shoppingItemKey];
+                }
+
+                syncShoppingItemVisualState(label, nextCheckedState);
+                writeShoppingItemState();
+            });
+        });
+    };
+
+    const syncShoppingNotesExportContent = () => {
+        const fields = Array.from(document.querySelectorAll("[data-notes-export-content]"));
+        const customItems = readCustomShoppingItems();
+
+        fields.forEach(field => {
+            if (!(field instanceof HTMLTextAreaElement)) {
+                return;
+            }
+
+            const baseContent = field.dataset.notesBaseContent?.trim() ?? field.value.trim();
+            field.dataset.notesBaseContent = baseContent;
+
+            let nextContent = baseContent;
+            if (customItems.length > 0) {
+                const customItemLines = customItems
+                    .map(item => (item.text ?? "").trim())
+                    .filter(text => text.length > 0)
+                    .map(text => `- ${text}`)
+                    .join("\n");
+                if (customItemLines.length > 0) {
+                    nextContent = `${baseContent}\n\nYour extra items\n${customItemLines}`.trim();
+                }
+            }
+
+            field.value = nextContent.trim();
+        });
+    };
+
+    const normalizeCustomShoppingItemText = value => {
+        if (typeof value !== "string") {
+            return "";
+        }
+
+        return value.replace(/\s+/g, " ").trim();
+    };
+
+    const buildCustomShoppingItemKey = itemId => `custom|${itemId}`;
+
+    const createCustomShoppingItemId = () =>
+        `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const buildCustomShoppingListItem = item => {
+        const listItem = document.createElement("li");
+        listItem.className = "aislepilot-custom-shopping-item";
+        listItem.dataset.customShoppingItemId = item.id;
+
+        const row = document.createElement("div");
+        row.className = "aislepilot-custom-shopping-row";
+
+        const label = document.createElement("label");
+        label.className = "aislepilot-checkbox-item";
+        label.dataset.shoppingItemLabel = "";
+        label.dataset.shoppingItemKey = buildCustomShoppingItemKey(item.id);
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.shoppingItemInput = "";
+        checkbox.setAttribute("aria-label", `Mark ${item.text} as already have this item`);
+
+        const text = document.createElement("span");
+        text.dataset.shoppingItemText = "";
+        text.textContent = item.text;
+
+        label.append(checkbox, text);
+
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "aislepilot-custom-shopping-remove";
+        removeButton.dataset.customShoppingRemove = item.id;
+        removeButton.setAttribute("aria-label", `Remove ${item.text}`);
+        removeButton.textContent = "Remove";
+
+        row.append(label, removeButton);
+        listItem.appendChild(row);
+        return listItem;
+    };
+
+    const renderCustomShoppingList = shell => {
+        if (!(shell instanceof HTMLElement)) {
+            return;
+        }
+
+        const list = shell.querySelector("[data-custom-shopping-list]");
+        const emptyState = shell.querySelector("[data-custom-shopping-empty]");
+        if (!(list instanceof HTMLElement) || !(emptyState instanceof HTMLElement)) {
+            return;
+        }
+
+        list.replaceChildren();
+
+        const customItems = readCustomShoppingItems();
+        customItems.forEach(item => {
+            list.appendChild(buildCustomShoppingListItem(item));
+        });
+
+        if (customItems.length > 0) {
+            list.removeAttribute("hidden");
+            emptyState.setAttribute("hidden", "hidden");
+            wireShoppingChecklist(list);
+        } else {
+            list.setAttribute("hidden", "hidden");
+            emptyState.removeAttribute("hidden");
+        }
+
+        syncShoppingNotesExportContent();
+    };
+
+    const wireCustomShoppingList = scope => {
+        const shells = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-custom-shopping-shell]"))
+            : Array.from(document.querySelectorAll("[data-custom-shopping-shell]"));
+
+        shells.forEach(shell => {
+            if (!(shell instanceof HTMLElement)) {
+                return;
+            }
+
+            const form = shell.querySelector("[data-custom-shopping-form]");
+            const input = shell.querySelector("[data-custom-shopping-input]");
+            if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement)) {
+                return;
+            }
+
+            if (shell.dataset.customShoppingWired !== "true") {
+                shell.dataset.customShoppingWired = "true";
+
+                form.addEventListener("submit", event => {
+                    event.preventDefault();
+
+                    try {
+                        const normalizedText = normalizeCustomShoppingItemText(input.value);
+                        if (normalizedText.length === 0) {
+                            input.focus();
+                            return;
+                        }
+
+                        const currentItems = readCustomShoppingItems();
+                        const alreadyExists = currentItems.some(item =>
+                            (item.text ?? "").trim().toLowerCase() === normalizedText.toLowerCase());
+                        if (alreadyExists) {
+                            input.value = "";
+                            renderCustomShoppingList(shell);
+                            input.focus();
+                            return;
+                        }
+
+                        currentItems.push({
+                            id: createCustomShoppingItemId(),
+                            text: normalizedText
+                        });
+
+                        writeCustomShoppingItems(currentItems);
+                        input.value = "";
+                        renderCustomShoppingList(shell);
+                        input.focus();
+                    } finally {
+                        resetFormSubmittingState(form);
+                    }
+                });
+
+                shell.addEventListener("click", event => {
+                    if (!(event.target instanceof Element)) {
+                        return;
+                    }
+
+                    const removeButton = event.target.closest("[data-custom-shopping-remove]");
+                    if (!(removeButton instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    const itemId = (removeButton.dataset.customShoppingRemove ?? "").trim();
+                    if (itemId.length === 0) {
+                        return;
+                    }
+
+                    const nextItems = readCustomShoppingItems().filter(item => item.id !== itemId);
+                    writeCustomShoppingItems(nextItems);
+
+                    const currentState = readShoppingItemState();
+                    delete currentState[buildCustomShoppingItemKey(itemId)];
+                    writeShoppingItemState();
+
+                    renderCustomShoppingList(shell);
+                });
+            }
+
+            renderCustomShoppingList(shell);
+        });
     };
 
     const isEventWithinDayMealCard = event => {
@@ -2503,7 +3026,7 @@
             };
 
             root.classList.add("is-restoring-scroll");
-            const restoreDeadline = Date.now() + 700;
+            const restoreDeadline = Date.now() + swapScrollRestoreDurationMs;
             const restoreLoop = () => {
                 restoreIfDrifted();
                 if (Date.now() < restoreDeadline) {
@@ -2965,53 +3488,43 @@
         };
     };
 
+    const resolveSwapTargetCard = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return null;
+        }
+
+        const inlineCard = form.closest(".aislepilot-card");
+        if (inlineCard instanceof HTMLElement) {
+            return inlineCard;
+        }
+
+        const dayInput = form.querySelector("input[name='dayIndex']");
+        const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
+        if (!Number.isInteger(parsedDayIndex) || parsedDayIndex < 0) {
+            return null;
+        }
+
+        const selector = `[data-day-card-header-actions][data-slot-index='${parsedDayIndex}']`;
+        const matchingActionRow = document.querySelector(selector);
+        if (!(matchingActionRow instanceof HTMLElement)) {
+            return null;
+        }
+
+        const matchingCard = matchingActionRow.closest(".aislepilot-card");
+        return matchingCard instanceof HTMLElement ? matchingCard : null;
+    };
+
     const restoreInlineSwapScroll = snapshot => {
         if (!snapshot || typeof snapshot.y !== "number") {
             return;
         }
 
         const targetX = typeof snapshot.x === "number" ? snapshot.x : 0;
-        const fallbackTargetY = snapshot.y;
-        const anchorDayIndex = Number.isInteger(snapshot.anchorDayIndex)
-            ? snapshot.anchorDayIndex
-            : null;
-        const anchorPanelId = typeof snapshot.anchorPanelId === "string" && snapshot.anchorPanelId.length > 0
-            ? snapshot.anchorPanelId
-            : null;
-        const anchorTop = typeof snapshot.anchorTop === "number"
-            ? snapshot.anchorTop
-            : null;
-
-        const resolveTargetY = () => {
-            if (anchorDayIndex === null || typeof anchorTop !== "number") {
-                return fallbackTargetY;
-            }
-
-            if (anchorPanelId) {
-                const targetPanel = document.getElementById(anchorPanelId);
-                if (targetPanel instanceof HTMLElement) {
-                    return window.scrollY + (targetPanel.getBoundingClientRect().top - anchorTop);
-                }
-            }
-
-            const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${anchorDayIndex}']`;
-            const targetDayInput = document.querySelector(selector);
-            if (!(targetDayInput instanceof HTMLInputElement)) {
-                return fallbackTargetY;
-            }
-
-            const targetForm = targetDayInput.closest("form");
-            if (!(targetForm instanceof HTMLFormElement)) {
-                return fallbackTargetY;
-            }
-
-            return window.scrollY + (targetForm.getBoundingClientRect().top - anchorTop);
-        };
+        const targetY = snapshot.y;
 
         root.classList.add("is-restoring-scroll");
-        const restoreDeadline = Date.now() + 500;
+        const restoreDeadline = Date.now() + swapScrollRestoreDurationMs;
         const restoreLoop = () => {
-            const targetY = resolveTargetY();
             const xDrift = Math.abs(window.scrollX - targetX);
             const yDrift = Math.abs(window.scrollY - targetY);
             if (xDrift > 2 || yDrift > 8) {
@@ -4053,6 +4566,7 @@
             const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
             const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
             const track = card.querySelector("[data-day-meal-track]");
+            const swipeSurfaces = Array.from(card.querySelectorAll("[data-day-meal-swipe-surface]"));
             if (!(track instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
                 return;
             }
@@ -4229,48 +4743,406 @@
                 });
             });
 
-            card.addEventListener("touchstart", event => {
-                const touch = event.changedTouches[0];
-                if (!touch) {
+            swipeSurfaces.forEach(surface => {
+                if (!(surface instanceof HTMLElement)) {
+                    return;
+                }
+
+                surface.addEventListener("touchstart", event => {
+                    const touch = event.changedTouches[0];
+                    if (!touch) {
+                        clearTouchTracking();
+                        return;
+                    }
+
+                    touchStartX = touch.clientX;
+                    touchStartY = touch.clientY;
+                }, { passive: true });
+
+                surface.addEventListener("touchend", event => {
+                    if (!Number.isFinite(touchStartX) || !Number.isFinite(touchStartY)) {
+                        return;
+                    }
+
+                    const touch = event.changedTouches[0];
+                    const startX = touchStartX;
+                    const startY = touchStartY;
                     clearTouchTracking();
-                    return;
-                }
+                    if (!touch) {
+                        return;
+                    }
 
-                touchStartX = touch.clientX;
-                touchStartY = touch.clientY;
-            }, { passive: true });
+                    const deltaX = touch.clientX - startX;
+                    const deltaY = touch.clientY - startY;
+                    if (Math.abs(deltaX) < 32 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+                        return;
+                    }
 
-            card.addEventListener("touchend", event => {
-                if (!Number.isFinite(touchStartX) || !Number.isFinite(touchStartY)) {
-                    return;
-                }
+                    if (deltaX < 0) {
+                        syncSlot(currentSlotIndex + 1);
+                    } else {
+                        syncSlot(currentSlotIndex - 1);
+                    }
+                }, { passive: true });
 
-                const touch = event.changedTouches[0];
-                const startX = touchStartX;
-                const startY = touchStartY;
-                clearTouchTracking();
-                if (!touch) {
-                    return;
-                }
-
-                const deltaX = touch.clientX - startX;
-                const deltaY = touch.clientY - startY;
-                if (Math.abs(deltaX) < 32 || Math.abs(deltaX) <= Math.abs(deltaY)) {
-                    return;
-                }
-
-                if (deltaX < 0) {
-                    syncSlot(currentSlotIndex + 1);
-                } else {
-                    syncSlot(currentSlotIndex - 1);
-                }
-            }, { passive: true });
-
-            card.addEventListener("touchcancel", () => {
-                clearTouchTracking();
-            }, { passive: true });
+                surface.addEventListener("touchcancel", () => {
+                    clearTouchTracking();
+                }, { passive: true });
+            });
 
             syncSlot(readRememberedDayMealSlot(card));
+        });
+    };
+
+    const parseDayCardJsonArray = (serializedValue, itemMapper) => {
+        if (typeof serializedValue !== "string" || serializedValue.trim().length === 0) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(serializedValue);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            return typeof itemMapper === "function"
+                ? parsed.map(itemMapper)
+                : parsed;
+        } catch {
+            return [];
+        }
+    };
+
+    const readDayCardMealNames = card => {
+        if (!(card instanceof HTMLElement)) {
+            return [];
+        }
+
+        return parseDayCardJsonArray(card.dataset.dayCardMealNames, value =>
+            typeof value === "string" ? value.trim() : "").filter(value => value.length > 0);
+    };
+
+    const readDayCardIgnoredFlags = card => {
+        if (!(card instanceof HTMLElement)) {
+            return [];
+        }
+
+        const mealNames = readDayCardMealNames(card);
+        const parsedFlags = parseDayCardJsonArray(card.dataset.dayCardIgnoredFlags, value => value === true);
+        if (parsedFlags.length === mealNames.length) {
+            return parsedFlags;
+        }
+
+        return mealNames.map(() => false);
+    };
+
+    const getReorderableDayCards = scope => {
+        const root = scope instanceof Element ? scope : document;
+        return Array.from(root.querySelectorAll("[data-day-meal-card][data-day-card-meal-names]"))
+            .filter(card => card instanceof HTMLElement);
+    };
+
+    const buildDayCardCurrentPlanMealNames = cards => {
+        const mealNames = [];
+        cards.forEach(card => {
+            readDayCardMealNames(card).forEach(mealName => {
+                if (mealName.length > 0) {
+                    mealNames.push(mealName);
+                }
+            });
+        });
+        return mealNames;
+    };
+
+    const buildDayCardIgnoredIndexesCsv = cards => {
+        const ignoredIndexes = [];
+        let slotIndex = 0;
+        cards.forEach(card => {
+            readDayCardIgnoredFlags(card).forEach(isIgnored => {
+                if (isIgnored) {
+                    ignoredIndexes.push(slotIndex);
+                }
+
+                slotIndex += 1;
+            });
+        });
+
+        return ignoredIndexes.join(",");
+    };
+
+    const buildDayCardLeftoverSourceIndexesCsv = cards => {
+        const sourceIndexes = [];
+        let weekDayIndex = 0;
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+
+            const leftoverCount = Number.parseInt(card.dataset.dayCardLeftoverCount ?? "0", 10);
+            const safeLeftoverCount = Number.isInteger(leftoverCount)
+                ? Math.max(0, leftoverCount)
+                : 0;
+            for (let index = 0; index < safeLeftoverCount; index += 1) {
+                sourceIndexes.push(weekDayIndex);
+            }
+
+            weekDayIndex += Math.max(1, safeLeftoverCount + 1);
+        });
+
+        return sourceIndexes.join(",");
+    };
+
+    const syncDayReorderFormState = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return false;
+        }
+
+        const cards = getReorderableDayCards(form.parentElement ?? document);
+        const reorderedMealNames = buildDayCardCurrentPlanMealNames(cards);
+        if (reorderedMealNames.length <= 1) {
+            return false;
+        }
+
+        const leftoverInput = form.querySelector("input[name='Request.LeftoverCookDayIndexesCsv']");
+        if (leftoverInput instanceof HTMLInputElement) {
+            leftoverInput.value = buildDayCardLeftoverSourceIndexesCsv(cards);
+        }
+
+        const ignoredInput = form.querySelector("input[name='Request.IgnoredMealSlotIndexesCsv']");
+        if (ignoredInput instanceof HTMLInputElement) {
+            ignoredInput.value = buildDayCardIgnoredIndexesCsv(cards);
+        }
+
+        const swapHistoryInput = form.querySelector("input[name='Request.SwapHistoryState']");
+        if (swapHistoryInput instanceof HTMLInputElement) {
+            swapHistoryInput.value = "";
+        }
+
+        const specialTreatInput = form.querySelector("input[name='Request.SelectedSpecialTreatCookDayIndex']");
+        if (specialTreatInput instanceof HTMLInputElement) {
+            const specialTreatCardIndex = cards.findIndex(card =>
+                card instanceof HTMLElement && card.dataset.dayCardHasSpecialTreat === "true");
+            if (specialTreatCardIndex >= 0) {
+                specialTreatInput.value = `${specialTreatCardIndex}`;
+            }
+        }
+
+        Array.from(form.querySelectorAll("input[name='currentPlanMealNames']")).forEach(input => {
+            input.remove();
+        });
+
+        reorderedMealNames.forEach(mealName => {
+            const hiddenInput = document.createElement("input");
+            hiddenInput.type = "hidden";
+            hiddenInput.name = "currentPlanMealNames";
+            hiddenInput.value = mealName;
+            form.append(hiddenInput);
+        });
+
+        return true;
+    };
+
+    const wireDayCardReorder = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-reorder-form]"))
+            : Array.from(document.querySelectorAll("[data-day-reorder-form]"));
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement) || form.dataset.dayReorderWired === "true") {
+                return;
+            }
+
+            const root = form.parentElement;
+            if (!(root instanceof Element)) {
+                return;
+            }
+
+            const handles = Array.from(root.querySelectorAll("[data-day-reorder-handle]"));
+            if (handles.length === 0) {
+                return;
+            }
+
+            form.dataset.dayReorderWired = "true";
+            let activePointerId = null;
+            let activeHandle = null;
+            let activeCard = null;
+            let pointerStartY = 0;
+            let lastSwapY = 0;
+            let hasMoved = false;
+            let activationTimerId = null;
+            let reorderActivated = false;
+
+            const clearActivationTimer = () => {
+                if (typeof activationTimerId === "number") {
+                    window.clearTimeout(activationTimerId);
+                }
+
+                activationTimerId = null;
+            };
+
+            const activateReorder = () => {
+                if (!(activeCard instanceof HTMLElement) || !(activeHandle instanceof HTMLElement) || reorderActivated) {
+                    return;
+                }
+
+                reorderActivated = true;
+                activeCard.classList.add("is-reorder-active");
+                activeHandle.classList.add("is-reorder-active");
+            };
+
+            const cleanupReorder = shouldSubmit => {
+                clearActivationTimer();
+                if (activeCard instanceof HTMLElement) {
+                    activeCard.classList.remove("is-reorder-active");
+                }
+
+                if (activeHandle instanceof HTMLElement) {
+                    activeHandle.classList.remove("is-reorder-active");
+                }
+
+                const reorderChanged = hasMoved;
+                activePointerId = null;
+                activeHandle = null;
+                activeCard = null;
+                hasMoved = false;
+                reorderActivated = false;
+
+                if (!shouldSubmit || !reorderChanged || form.dataset.ajaxSwapSubmitting === "true") {
+                    return;
+                }
+
+                if (!syncDayReorderFormState(form)) {
+                    return;
+                }
+
+                persistSwapScrollPosition(form);
+                form.requestSubmit();
+            };
+
+            const moveCardInDirection = direction => {
+                if (!(activeCard instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const cards = getReorderableDayCards(root);
+                const currentIndex = cards.indexOf(activeCard);
+                if (currentIndex < 0) {
+                    return false;
+                }
+
+                if (direction < 0 && currentIndex > 0) {
+                    cards[currentIndex - 1].before(activeCard);
+                    return true;
+                }
+
+                if (direction > 0 && currentIndex < cards.length - 1) {
+                    cards[currentIndex + 1].after(activeCard);
+                    return true;
+                }
+
+                return false;
+            };
+
+            handles.forEach(handle => {
+                if (!(handle instanceof HTMLElement) || handle.dataset.dayReorderHandleWired === "true") {
+                    return;
+                }
+
+                handle.dataset.dayReorderHandleWired = "true";
+                handle.addEventListener("click", event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                });
+
+                handle.addEventListener("pointerdown", event => {
+                    if (form.dataset.ajaxSwapSubmitting === "true") {
+                        return;
+                    }
+
+                    if (event.pointerType === "mouse" && event.button !== 0) {
+                        return;
+                    }
+
+                    const card = handle.closest("[data-day-meal-card][data-day-card-meal-names]");
+                    if (!(card instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    activePointerId = event.pointerId;
+                    activeHandle = handle;
+                    activeCard = card;
+                    pointerStartY = event.clientY;
+                    lastSwapY = event.clientY;
+                    hasMoved = false;
+                    reorderActivated = false;
+                    clearActivationTimer();
+                    activationTimerId = window.setTimeout(() => {
+                        activateReorder();
+                    }, 140);
+                    handle.setPointerCapture(event.pointerId);
+                    event.preventDefault();
+                    event.stopPropagation();
+                });
+
+                handle.addEventListener("pointermove", event => {
+                    if (activePointerId === null || event.pointerId !== activePointerId) {
+                        return;
+                    }
+
+                    if (!reorderActivated && Math.abs(event.clientY - pointerStartY) >= 8) {
+                        activateReorder();
+                    }
+
+                    if (!reorderActivated) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    const movementThreshold = Math.max(
+                        32,
+                        activeCard instanceof HTMLElement ? Math.round(activeCard.getBoundingClientRect().height * 0.22) : 32);
+                    const deltaY = event.clientY - lastSwapY;
+                    if (Math.abs(deltaY) < movementThreshold) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    const moved = moveCardInDirection(deltaY < 0 ? -1 : 1);
+                    if (moved) {
+                        hasMoved = true;
+                        lastSwapY = event.clientY;
+                    }
+
+                    event.preventDefault();
+                });
+
+                handle.addEventListener("pointerup", event => {
+                    if (activePointerId === null || event.pointerId !== activePointerId) {
+                        return;
+                    }
+
+                    try {
+                        handle.releasePointerCapture(event.pointerId);
+                    } catch {
+                        // Pointer capture can already be released if the browser cancels the gesture.
+                    }
+                    event.preventDefault();
+                    cleanupReorder(true);
+                });
+
+                handle.addEventListener("pointercancel", event => {
+                    if (activePointerId === null || event.pointerId !== activePointerId) {
+                        return;
+                    }
+
+                    try {
+                        handle.releasePointerCapture(event.pointerId);
+                    } catch {
+                        // Pointer capture can already be released if the browser cancels the gesture.
+                    }
+                    cleanupReorder(false);
+                });
+            });
         });
     };
 
@@ -4333,6 +5205,41 @@
         return card instanceof HTMLElement ? card : null;
     };
 
+    const closeCardMoreActionsWithinCard = card => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const menus = Array.from(card.querySelectorAll("[data-card-more-actions]"));
+        menus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement)) {
+                return;
+            }
+
+            finishClosingCardMoreActionsMenu(menu);
+        });
+    };
+
+    const preserveReplacementCardUiState = (currentCard, replacementCard) => {
+        if (!(currentCard instanceof HTMLElement) || !(replacementCard instanceof HTMLElement)) {
+            return;
+        }
+
+        const dayKey = readCardDayKey(currentCard);
+        if (dayKey) {
+            dayMealSlotState.set(dayKey, readActiveDayMealSlotIndex(currentCard));
+        }
+
+        const currentExpander = currentCard.querySelector("[data-day-card-expander]");
+        const replacementExpander = replacementCard.querySelector("[data-day-card-expander]");
+        if (currentExpander instanceof HTMLDetailsElement && replacementExpander instanceof HTMLDetailsElement) {
+            replacementExpander.open = currentExpander.open;
+            if (!currentExpander.open) {
+                replacementExpander.removeAttribute("open");
+            }
+        }
+    };
+
     const replaceSwappedMealCard = (responseDocument, slotIndex) => {
         const currentCard = findMealCardBySlotIndex(document, slotIndex);
         const nextCard = findMealCardBySlotIndex(responseDocument, slotIndex);
@@ -4345,6 +5252,8 @@
             return false;
         }
 
+        closeCardMoreActionsWithinCard(currentCard);
+        preserveReplacementCardUiState(currentCard, replacement);
         currentCard.replaceWith(replacement);
         return true;
     };
@@ -4446,6 +5355,162 @@
             input.value = nextValue;
         });
         return currentInputs.length > 0;
+    };
+
+    const readSavedMealNamesFromHiddenState = () => {
+        const stateInput = document.querySelector("input[name='Request.SavedEnjoyedMealNamesState']");
+        if (!(stateInput instanceof HTMLInputElement)) {
+            return [];
+        }
+
+        const serializedState = stateInput.value?.trim() ?? "";
+        if (!serializedState) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(serializedState);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            return parsed
+                .filter(name => typeof name === "string")
+                .map(name => name.trim())
+                .filter(name => name.length > 0)
+                .filter((name, index, values) =>
+                    values.findIndex(candidate => candidate.localeCompare(name, undefined, { sensitivity: "accent" }) === 0) === index);
+        } catch {
+            return [];
+        }
+    };
+
+    const syncFavoriteButtonsFromSavedState = () => {
+        const savedMealNames = readSavedMealNamesFromHiddenState();
+        const savedMealNameSet = new Set(savedMealNames.map(name => name.toLowerCase()));
+        const favoriteForms = Array.from(document.querySelectorAll("#aislepilot-meals .aislepilot-favorite-form"));
+        let syncedButtons = 0;
+
+        favoriteForms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const mealNameInput = form.querySelector("input[name='mealName']");
+            const submitButton = form.querySelector("button[type='submit']");
+            const label = submitButton?.querySelector(".aislepilot-swap-action-label");
+            if (!(mealNameInput instanceof HTMLInputElement) || !(submitButton instanceof HTMLButtonElement) || !(label instanceof HTMLElement)) {
+                return;
+            }
+
+            const mealName = mealNameInput.value.trim();
+            const isSavedMeal = mealName.length > 0 && savedMealNameSet.has(mealName.toLowerCase());
+            submitButton.classList.toggle("is-saved-meal", isSavedMeal);
+            submitButton.setAttribute("aria-label", isSavedMeal ? "Unsave meal" : "Save meal");
+            submitButton.setAttribute("title", isSavedMeal ? "Unsave meal" : "Save meal");
+            label.textContent = isSavedMeal ? "Unsave" : "Save";
+            syncedButtons += 1;
+        });
+
+        return syncedButtons > 0;
+    };
+
+    const createSavedMealRemoveGlyph = () => {
+        const glyph = document.createElement("span");
+        glyph.className = "aislepilot-symbol-glyph";
+        glyph.setAttribute("aria-hidden", "true");
+        glyph.innerHTML = "<svg viewBox='0 0 24 24' focusable='false'><path d='M4 7h16'></path><path d='M9 7V4h6v3'></path><path d='M7 7l1 12h8l1-12'></path><path d='M10 11v6'></path><path d='M14 11v6'></path></svg>";
+        return glyph;
+    };
+
+    const syncSavedMealsMenuFromHiddenState = () => {
+        const section = document.querySelector("[data-saved-meals-menu-section]");
+        if (!(section instanceof HTMLElement)) {
+            return false;
+        }
+
+        const savedMealNames = readSavedMealNamesFromHiddenState();
+        const title = section.querySelector(".aislepilot-head-menu-section-title");
+        section.replaceChildren();
+        if (title instanceof HTMLElement) {
+            section.appendChild(title);
+        } else {
+            const nextTitle = document.createElement("p");
+            nextTitle.className = "aislepilot-head-menu-section-title";
+            nextTitle.textContent = "Saved meals";
+            section.appendChild(nextTitle);
+        }
+
+        if (savedMealNames.length === 0) {
+            const emptyState = document.createElement("p");
+            emptyState.className = "aislepilot-head-menu-item is-disabled";
+            emptyState.setAttribute("aria-disabled", "true");
+            emptyState.textContent = "No saved meals yet";
+            section.appendChild(emptyState);
+            return true;
+        }
+
+        const antiForgeryTokenInput = document.querySelector("input[name='__RequestVerificationToken']");
+        const antiForgeryToken = antiForgeryTokenInput instanceof HTMLInputElement ? antiForgeryTokenInput.value : "";
+        const returnUrlInput = document.querySelector("input[name='returnUrl']");
+        const returnUrl = returnUrlInput instanceof HTMLInputElement ? returnUrlInput.value : "";
+        const list = document.createElement("ul");
+        list.className = "aislepilot-head-saved-meal-list";
+
+        savedMealNames.slice(0, 20).forEach(savedMealName => {
+            const row = document.createElement("li");
+            row.className = "aislepilot-head-saved-meal-row";
+
+            const name = document.createElement("span");
+            name.className = "aislepilot-head-saved-meal-name";
+            name.textContent = savedMealName;
+            row.appendChild(name);
+
+            const form = document.createElement("form");
+            form.method = "post";
+            form.action = "/projects/aisle-pilot/remove-saved-meal";
+            form.className = "aislepilot-head-week-form";
+
+            if (antiForgeryToken.length > 0) {
+                const tokenInput = document.createElement("input");
+                tokenInput.type = "hidden";
+                tokenInput.name = "__RequestVerificationToken";
+                tokenInput.value = antiForgeryToken;
+                form.appendChild(tokenInput);
+            }
+
+            const mealNameInput = document.createElement("input");
+            mealNameInput.type = "hidden";
+            mealNameInput.name = "mealName";
+            mealNameInput.value = savedMealName;
+            form.appendChild(mealNameInput);
+
+            const returnUrlHiddenInput = document.createElement("input");
+            returnUrlHiddenInput.type = "hidden";
+            returnUrlHiddenInput.name = "returnUrl";
+            returnUrlHiddenInput.value = returnUrl;
+            form.appendChild(returnUrlHiddenInput);
+
+            const button = document.createElement("button");
+            button.type = "submit";
+            button.className = "aislepilot-head-week-action-btn is-danger";
+            button.setAttribute("data-loading-label", "Removing meal...");
+            button.setAttribute("aria-label", `Remove ${savedMealName} from saved meals`);
+            button.setAttribute("title", "Remove saved meal");
+            button.appendChild(createSavedMealRemoveGlyph());
+
+            const srOnly = document.createElement("span");
+            srOnly.className = "sr-only";
+            srOnly.textContent = "Remove saved meal";
+            button.appendChild(srOnly);
+
+            form.appendChild(button);
+            row.appendChild(form);
+            list.appendChild(row);
+        });
+
+        section.appendChild(list);
+        return true;
     };
 
     const normalizeMealImageName = value => {
@@ -4599,7 +5664,9 @@
             responseDocument,
             "Request.SavedEnjoyedMealNamesState"
         );
-        if (!didSyncForms && !didSyncSavedState) {
+        const didSyncFavoriteButtons = syncFavoriteButtonsFromSavedState();
+        const didSyncSavedMealsMenu = syncSavedMealsMenuFromHiddenState();
+        if (!didSyncForms && !didSyncSavedState && !didSyncFavoriteButtons && !didSyncSavedMealsMenu) {
             return false;
         }
 
@@ -4645,6 +5712,152 @@
         }
 
         return "";
+    };
+
+    const readJsonFailureMessage = responseText => {
+        if (typeof responseText !== "string" || responseText.length === 0) {
+            return "";
+        }
+
+        try {
+            const payload = JSON.parse(responseText);
+            if (!payload || typeof payload !== "object") {
+                return "";
+            }
+
+            if (typeof payload.detail === "string" && payload.detail.trim().length > 0) {
+                return payload.detail.trim();
+            }
+
+            if (typeof payload.title === "string" && payload.title.trim().length > 0) {
+                return payload.title.trim();
+            }
+
+            const errorValues = payload.errors && typeof payload.errors === "object"
+                ? Object.values(payload.errors)
+                : [];
+            for (const errorValue of errorValues) {
+                if (Array.isArray(errorValue)) {
+                    const firstMessage = errorValue.find(message => typeof message === "string" && message.trim().length > 0);
+                    if (typeof firstMessage === "string") {
+                        return firstMessage.trim();
+                    }
+                }
+            }
+        } catch {
+            return "";
+        }
+
+        return "";
+    };
+
+    const readExportFailureMessage = (responseText, contentType) => {
+        const normalizedContentType = typeof contentType === "string"
+            ? contentType.toLowerCase()
+            : "";
+        if (normalizedContentType.includes("json")) {
+            const jsonMessage = readJsonFailureMessage(responseText);
+            if (jsonMessage.length > 0) {
+                return jsonMessage;
+            }
+        }
+
+        const responseDocument = parseHtmlDocument(responseText);
+        const htmlMessage = readAjaxFailureMessage(responseDocument);
+        if (htmlMessage.length > 0) {
+            return htmlMessage;
+        }
+
+        const plainMessage = typeof responseText === "string"
+            ? responseText.replace(/\s+/g, " ").trim()
+            : "";
+        return plainMessage.length > 0
+            ? plainMessage
+            : "Could not complete that export. Try again.";
+    };
+
+    const wireExportDownloadForms = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-export-download-form]"))
+            : Array.from(document.querySelectorAll("[data-export-download-form]"));
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement) || form.dataset.exportDownloadWired === "true") {
+                return;
+            }
+
+            form.dataset.exportDownloadWired = "true";
+            form.addEventListener("submit", async event => {
+                if (!(event.currentTarget instanceof HTMLFormElement) || typeof fetch !== "function") {
+                    return;
+                }
+
+                event.preventDefault();
+                const exportForm = event.currentTarget;
+                if (exportForm.dataset.exportDownloadSubmitting === "true") {
+                    return;
+                }
+
+                const submitButton = getSubmitButton(event);
+                if (!(submitButton instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                exportForm.dataset.exportDownloadSubmitting = "true";
+                clearSubmitLoadingDelay(exportForm);
+                setSubmitButtonLoadingState(submitButton);
+
+                const actionUrl = stripHashFromFormAction(exportForm);
+                if (!actionUrl) {
+                    delete exportForm.dataset.exportDownloadSubmitting;
+                    HTMLFormElement.prototype.submit.call(exportForm);
+                    return;
+                }
+
+                try {
+                    const response = await fetch(actionUrl, {
+                        method: (exportForm.method || "POST").toUpperCase(),
+                        body: new FormData(exportForm),
+                        credentials: "same-origin",
+                        headers: {
+                            "Accept": "application/pdf,text/plain,application/json,text/html,*/*",
+                            "X-Requested-With": "XMLHttpRequest"
+                        }
+                    });
+                    const contentType = response.headers.get("content-type") ?? "";
+                    const normalizedContentType = contentType.toLowerCase();
+
+                    if (normalizedContentType.includes("text/html") || normalizedContentType.includes("application/xhtml+xml")) {
+                        const responseText = await response.text();
+                        if (response.ok) {
+                            replaceDocumentWithHtml(responseText);
+                            return;
+                        }
+
+                        showToast(readExportFailureMessage(responseText, contentType), "warning");
+                        resetFormSubmittingState(exportForm);
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        const responseText = await response.text();
+                        showToast(readExportFailureMessage(responseText, contentType), "warning");
+                        resetFormSubmittingState(exportForm);
+                        return;
+                    }
+
+                    const blob = await response.blob();
+                    triggerFileDownload(blob, readExportDownloadFileName(response, exportForm));
+                    resetFormSubmittingState(exportForm);
+                } catch {
+                    delete exportForm.dataset.exportDownloadSubmitting;
+                    HTMLFormElement.prototype.submit.call(exportForm);
+                    return;
+                } finally {
+                    delete exportForm.dataset.exportDownloadSubmitting;
+                }
+            });
+        });
     };
 
     const animateSwappedMeal = dayIndex => {
@@ -4701,13 +5914,28 @@
             const isIgnoreForm = swapForm.classList.contains("aislepilot-ignore-form");
             const isLeftoverRebalanceForm = swapForm.hasAttribute("data-leftover-rebalance-form");
             const isDessertSwapForm = swapForm.action.toLowerCase().includes("/swap-dessert");
+            const isDayReorderForm = swapForm.hasAttribute("data-day-reorder-form");
             const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
             const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
                 ? scrollSnapshot.anchorDayIndex
                 : null;
-            const currentCard = swapForm.closest(".aislepilot-card");
+            const currentCard = resolveSwapTargetCard(swapForm);
             if (!isFavoriteForm && currentCard instanceof HTMLElement) {
                 currentCard.classList.add("is-swap-fading-out");
+                currentCard.setAttribute("aria-busy", "true");
+                currentCard.dataset.swapStatus = isLeftoverRebalanceForm
+                    ? "Updating meal plan..."
+                    : isDayReorderForm
+                        ? "Moving meal card..."
+                    : isIgnoreForm
+                        ? "Updating meal..."
+                        : isDessertSwapForm
+                            ? "Loading new dessert..."
+                            : "Loading new meal...";
+            }
+            if (!isFavoriteForm && submitButton instanceof HTMLButtonElement && !swapForm.hasAttribute("data-skip-submit-loading")) {
+                clearSubmitLoadingDelay(swapForm);
+                setSubmitButtonLoadingState(submitButton);
             }
             const actionUrl = stripHashFromFormAction(swapForm);
             if (!actionUrl) {
@@ -4779,6 +6007,8 @@
 
                     if (isLeftoverRebalanceForm) {
                         // Leftover rebalancing is an inline layout tweak; avoid generic swap toast noise.
+                    } else if (isDayReorderForm) {
+                        showToast("Meal day updated.", "success");
                     } else if (isIgnoreForm) {
                         const normalizedAction = submitActionLabel.toLowerCase();
                         const ignoreMessage = normalizedAction.includes("ignore")
@@ -4819,6 +6049,8 @@
             } finally {
                 if (!isFavoriteForm && currentCard instanceof HTMLElement && currentCard.isConnected) {
                     currentCard.classList.remove("is-swap-fading-out");
+                    currentCard.removeAttribute("aria-busy");
+                    delete currentCard.dataset.swapStatus;
                 }
                 clearSubmitLoadingDelay(swapForm);
                 delete swapForm.dataset.ajaxSwapSubmitting;
@@ -4844,13 +6076,17 @@
         wireCardMoreActions(scope);
         wireInlineDetailsPanels(scope);
         wireDayCardExpanders(scope);
+        wireDayCardReorder(scope);
         wireDayMealCards(scope);
+        wireShoppingChecklist(scope);
+        wireCustomShoppingList(scope);
         wireAjaxSwapHandlers(scope);
     };
 
     const wireModulesAfterAjaxSwap = scope => {
         wireSubmitLoadingHandlers(scope);
         wireExportThemeForms(scope);
+        wireExportDownloadForms(scope);
         wirePlanBasicsSliders(scope);
         wireMealTypeSelectors(scope);
         wireCustomAisleFieldVisibility(scope);
@@ -4864,6 +6100,7 @@
         wireAjaxSwapHandlers(scope);
     };
 
+    wireExportDownloadForms(document);
     wireCardInteractionModules(document);
     startMealImagePolling();
 

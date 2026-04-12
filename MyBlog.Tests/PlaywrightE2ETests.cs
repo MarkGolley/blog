@@ -109,13 +109,13 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary");
+        var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary:visible");
         var moreActionsTriggerCount = await moreActionsTriggers.CountAsync();
         Assert.True(moreActionsTriggerCount > 0, "Expected at least one meal actions menu trigger to be rendered.");
 
         var targetIndex = Math.Min(3, moreActionsTriggerCount - 1);
         var targetTrigger = moreActionsTriggers.Nth(targetIndex);
-        var targetSwapButton = targetTrigger.Locator("xpath=ancestor::details[1]").Locator("button[aria-label='Swap meal']").First;
+        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
         await targetTrigger.ScrollIntoViewIfNeededAsync();
         await targetTrigger.ClickAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
@@ -134,17 +134,237 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         await targetSwapButton.ClickAsync();
         _ = await swapResponseTask;
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.WaitForTimeoutAsync(700);
+        await page.WaitForTimeoutAsync(1100);
 
         // Allow delayed scroll-restore hooks to complete.
-        await page.WaitForTimeoutAsync(500);
+        await page.WaitForTimeoutAsync(250);
 
         var afterScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
         var scrollDelta = Math.Abs(afterScrollY - beforeScrollY);
+        var upwardDelta = beforeScrollY - afterScrollY;
 
         Assert.True(
-            scrollDelta <= 60,
+            scrollDelta <= 8,
             $"Expected swap postback to keep viewport stable. Before={beforeScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
+        Assert.True(
+            upwardDelta <= 4,
+            $"Expected swap postback not to pull the viewport upward. Before={beforeScrollY}, After={afterScrollY}, UpwardDelta={upwardDelta}.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotSwap_ShowsPendingStateWhileKeepingViewportStable()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary:visible");
+        var moreActionsTriggerCount = await moreActionsTriggers.CountAsync();
+        Assert.True(moreActionsTriggerCount > 0, "Expected at least one meal actions menu trigger to be rendered.");
+
+        var targetIndex = Math.Min(2, moreActionsTriggerCount - 1);
+        var targetTrigger = moreActionsTriggers.Nth(targetIndex);
+        var targetCard = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-card][1]");
+        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
+        await targetTrigger.ScrollIntoViewIfNeededAsync();
+        await targetTrigger.ClickAsync();
+        await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var beforeScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
+        Assert.True(beforeScrollY > 100, $"Expected to scroll below hero before swap. Actual scrollY={beforeScrollY}.");
+
+        await page.RouteAsync("**/projects/aisle-pilot/swap-meal", async route =>
+        {
+            await Task.Delay(900);
+            await route.ContinueAsync();
+        });
+
+        var swapResponseTask = page.WaitForResponseAsync(response =>
+            string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            response.Url.Contains("/projects/aisle-pilot/swap-meal", StringComparison.OrdinalIgnoreCase));
+
+        await targetSwapButton.ClickAsync();
+        await page.WaitForTimeoutAsync(150);
+
+        var pendingState = await targetCard.EvaluateAsync<string>(
+            """
+            card => {
+                if (!(card instanceof HTMLElement)) {
+                    return "missing";
+                }
+
+                const swapStatus = window.getComputedStyle(card, "::before").content || "";
+                const isBusy = card.getAttribute("aria-busy") || "";
+                const isPending = card.classList.contains("is-swap-fading-out") ? "1" : "0";
+                return `${isBusy}|${isPending}|${swapStatus}`;
+            }
+            """);
+
+        Assert.Contains("true|1|", pendingState, StringComparison.Ordinal);
+        Assert.Contains("Loading new meal", pendingState, StringComparison.OrdinalIgnoreCase);
+
+        _ = await swapResponseTask;
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.WaitForTimeoutAsync(1100);
+
+        var afterScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
+        var scrollDelta = Math.Abs(afterScrollY - beforeScrollY);
+        var upwardDelta = beforeScrollY - afterScrollY;
+
+        Assert.True(
+            scrollDelta <= 8,
+            $"Expected swap viewport to stay anchored after showing pending state. Before={beforeScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
+        Assert.True(
+            upwardDelta <= 4,
+            $"Expected pending-state swap not to pull the viewport upward. Before={beforeScrollY}, After={afterScrollY}, UpwardDelta={upwardDelta}.");
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotSwap_ClosesActionsSheetAndPreservesActiveDayAndSlot()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var targetCardIndex = await page.EvaluateAsync<int>(
+            """
+            () => {
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                return cards.findIndex((card, index) =>
+                    index > 0 &&
+                    card instanceof HTMLElement &&
+                    card.querySelectorAll("[data-day-meal-tab]").length > 1 &&
+                    card.querySelector("[data-day-card-expander]") instanceof HTMLDetailsElement);
+            }
+            """);
+
+        Assert.True(targetCardIndex > 0, $"Expected a non-default day card with multiple meal slots. Actual index={targetCardIndex}.");
+
+        var targetCard = page.Locator("[data-day-meal-card]").Nth(targetCardIndex);
+        var targetExpanderSummary = targetCard.Locator("[data-day-card-expander] > summary").First;
+        var targetExpander = targetCard.Locator("[data-day-card-expander]").First;
+        var wasTargetExpanderOpen = await targetExpander.EvaluateAsync<bool>(
+            "element => element instanceof HTMLDetailsElement && element.open");
+        if (!wasTargetExpanderOpen)
+        {
+            await targetExpanderSummary.ScrollIntoViewIfNeededAsync();
+            await targetExpanderSummary.ClickAsync();
+        }
+
+        var mealTabs = targetCard.Locator("[data-day-meal-tab]");
+        var mealTabCount = await mealTabs.CountAsync();
+        Assert.True(mealTabCount > 1, $"Expected target day card to expose multiple meal slots. Actual count={mealTabCount}.");
+
+        var targetSlotIndex = Math.Min(2, mealTabCount - 1);
+        var targetMealTab = mealTabs.Nth(targetSlotIndex);
+        await targetMealTab.ClickAsync();
+
+        var expectedDayLabel = (await targetCard.Locator(".aislepilot-day-card-expander-day").First.InnerTextAsync()).Trim();
+        var expectedSlotLabel = (await targetMealTab.InnerTextAsync()).Trim();
+        var activeMealPanel = targetCard.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        var previousMealName = (await activeMealPanel.Locator("h3").First.InnerTextAsync()).Trim();
+
+        var targetMoreActionsSummary = targetCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
+        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
+        await targetMoreActionsSummary.ScrollIntoViewIfNeededAsync();
+        await targetMoreActionsSummary.ClickAsync();
+        await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var swapResponseTask = page.WaitForResponseAsync(response =>
+            string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            response.Url.Contains("/projects/aisle-pilot/swap-meal", StringComparison.OrdinalIgnoreCase));
+
+        await targetSwapButton.ClickAsync();
+        _ = await swapResponseTask;
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        await page.WaitForFunctionAsync(
+            """
+            ([cardIndex, dayLabel, slotLabel, priorMealName]) => {
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                const card = cards[cardIndex];
+                if (!(card instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const expander = card.querySelector("[data-day-card-expander]");
+                const isOpen = !(expander instanceof HTMLDetailsElement) || expander.open;
+                const currentDayLabel = (card.querySelector(".aislepilot-day-card-expander-day")?.textContent ?? "").trim();
+                const activeTab = card.querySelector("[data-day-meal-tab].is-active");
+                const currentSlotLabel = (activeTab?.textContent ?? "").trim();
+                const currentMealName = (card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false'] h3")?.textContent ?? "").trim();
+                const openMenuCount = document.querySelectorAll("[data-card-more-actions][open]").length;
+                const visibleLoadingButtons = Array.from(document.querySelectorAll(".aislepilot-swap-btn.is-loading"))
+                    .filter(button => button instanceof HTMLElement && button.offsetParent !== null)
+                    .length;
+
+                return isOpen &&
+                    currentDayLabel === dayLabel &&
+                    currentSlotLabel === slotLabel &&
+                    currentMealName.length > 0 &&
+                    currentMealName !== priorMealName &&
+                    openMenuCount === 0 &&
+                    visibleLoadingButtons === 0;
+            }
+            """,
+            new object[] { targetCardIndex, expectedDayLabel, expectedSlotLabel, previousMealName },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = 10000
+            });
+
+        var postSwapState = await page.EvaluateAsync<string>(
+            """
+            ([cardIndex, priorMealName]) => {
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                const card = cards[cardIndex];
+                if (!(card instanceof HTMLElement)) {
+                    return "missing";
+                }
+
+                const expander = card.querySelector("[data-day-card-expander]");
+                const isOpen = expander instanceof HTMLDetailsElement && expander.open ? "1" : "0";
+                const dayLabel = (card.querySelector(".aislepilot-day-card-expander-day")?.textContent ?? "").trim();
+                const slotLabel = (card.querySelector("[data-day-meal-tab].is-active")?.textContent ?? "").trim();
+                const mealName = (card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false'] h3")?.textContent ?? "").trim();
+                const sheetOpen = document.querySelector("[data-card-more-actions][open]") ? "1" : "0";
+                const loadingButtons = Array.from(document.querySelectorAll(".aislepilot-swap-btn.is-loading"))
+                    .filter(button => button instanceof HTMLElement && button.offsetParent !== null)
+                    .length;
+                const mealChanged = mealName.length > 0 && mealName !== priorMealName ? "1" : "0";
+                return `${isOpen}|${dayLabel}|${slotLabel}|${mealChanged}|${sheetOpen}|${loadingButtons}`;
+            }
+            """,
+            new object[] { targetCardIndex, previousMealName });
+
+        var stateParts = postSwapState.Split('|', StringSplitOptions.None);
+        Assert.True(stateParts.Length >= 6, $"Expected swap state payload. Actual='{postSwapState}'.");
+        Assert.Equal("1", stateParts[0]);
+        Assert.Equal(expectedDayLabel, stateParts[1]);
+        Assert.Equal(expectedSlotLabel, stateParts[2]);
+        Assert.Equal("1", stateParts[3]);
+        Assert.Equal("0", stateParts[4]);
+        Assert.Equal("0", stateParts[5]);
     }
 
     [Fact]
@@ -358,6 +578,77 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             actionRowShift <= 20,
             $"Expected action icons to remain fixed when details open. Relative delta={actionRowShift}.");
         Assert.Equal("true", await viewSummaryButton.GetAttributeAsync("aria-expanded"));
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotMealDetailSections_StartCollapsedAndExpandIndependently()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var viewSummaryButton = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
+        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
+        await viewSummaryButton.ScrollIntoViewIfNeededAsync();
+        await viewSummaryButton.ClickAsync();
+        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var nutritionSection = activeMealPanel.Locator("[data-meal-section='nutrition']").First;
+        var ingredientsSection = activeMealPanel.Locator("[data-meal-section='ingredients']").First;
+        var methodSection = activeMealPanel.Locator("[data-meal-section='method']").First;
+        var nutritionSummary = nutritionSection.Locator("[data-meal-section-summary]").First;
+        var ingredientsSummary = ingredientsSection.Locator("[data-meal-section-summary]").First;
+        var nutritionContent = nutritionSection.Locator("[data-meal-section-content]").First;
+        var ingredientsContent = ingredientsSection.Locator("[data-meal-section-content]").First;
+        var methodContent = methodSection.Locator("[data-meal-section-content]").First;
+
+        Assert.False(await nutritionSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await ingredientsSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await methodSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await nutritionContent.IsVisibleAsync());
+        Assert.False(await ingredientsContent.IsVisibleAsync());
+        Assert.False(await methodContent.IsVisibleAsync());
+
+        await nutritionSummary.ScrollIntoViewIfNeededAsync();
+        await nutritionSummary.ClickAsync();
+        await nutritionContent.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        Assert.True(await nutritionSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await ingredientsSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await methodSection.EvaluateAsync<bool>("details => details.open"));
+
+        await ingredientsSummary.ScrollIntoViewIfNeededAsync();
+        await ingredientsSummary.ClickAsync();
+        await ingredientsContent.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        Assert.True(await nutritionSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.True(await ingredientsSection.EvaluateAsync<bool>("details => details.open"));
+        Assert.False(await methodSection.EvaluateAsync<bool>("details => details.open"));
     }
 
     [Fact]

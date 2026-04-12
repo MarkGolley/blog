@@ -389,4 +389,107 @@ public partial class AislePilotServiceTests
                 seenMealNames));
         Assert.Contains("No unique compatible replacement meal is available", ex.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SwapMealForDay_WhenSessionAlreadySawCandidate_SkipsSeenMealName()
+    {
+        ClearAiPool();
+
+        var currentMeal = CreateMealTemplateWithIngredients(
+            "Current sesame chicken bowl",
+            [
+                ("Chicken breast", "Meat & Fish", 2m, "fillets", 3.40m),
+                ("Rice", "Tins & Dry Goods", 180m, "g", 0.60m),
+                ("Broccoli", "Produce", 1m, "head", 0.85m)
+            ]);
+        var seenMeal = CreateMealTemplateWithIngredients(
+            "Aubergine chicken skillet",
+            [
+                ("Chicken breast", "Meat & Fish", 2m, "fillets", 3.10m),
+                ("Aubergine", "Produce", 1m, "pcs", 0.90m),
+                ("Tomatoes", "Produce", 3m, "pcs", 0.75m)
+            ]);
+        var unseenMeal = CreateMealTemplateWithIngredients(
+            "Zesty chickpea tray bake",
+            [
+                ("Chickpeas", "Tins & Dry Goods", 2m, "tins", 1.10m),
+                ("Courgettes", "Produce", 2m, "pcs", 1.00m),
+                ("Lemon", "Produce", 1m, "pcs", 0.40m)
+            ]);
+
+        InvokeAddMealsToAiPool([currentMeal, seenMeal, unseenMeal]);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"]
+        };
+
+        var swappedPlan = _service.SwapMealForDay(
+            request,
+            dayIndex: 0,
+            currentMealName: "Current sesame chicken bowl",
+            currentPlanMealNames: ["Current sesame chicken bowl"],
+            seenMealNames: ["Current sesame chicken bowl", "Aubergine chicken skillet"]);
+
+        Assert.Single(swappedPlan.MealPlan);
+        Assert.Equal("Zesty chickpea tray bake", swappedPlan.MealPlan[0].MealName);
+    }
+
+    [Fact]
+    public void SwapMealForDay_WhenCandidateSharesKeyIngredient_PrefersMoreAdventurousReplacement()
+    {
+        ClearAiPool();
+
+        var currentMeal = CreateMealTemplateWithIngredients(
+            "Mackerel rice bowl",
+            [
+                ("Mackerel fillets", "Meat & Fish", 2m, "fillets", 4.20m),
+                ("Rice", "Tins & Dry Goods", 180m, "g", 0.55m),
+                ("Spinach", "Produce", 1m, "bag", 0.95m)
+            ]);
+        var similarMeal = CreateMealTemplateWithIngredients(
+            "Aubergine mackerel skillet",
+            [
+                ("Mackerel", "Meat & Fish", 2m, "fillets", 4.10m),
+                ("Aubergine", "Produce", 1m, "pcs", 0.90m),
+                ("Tomatoes", "Produce", 2m, "pcs", 0.70m)
+            ]);
+        var adventurousMeal = CreateMealTemplateWithIngredients(
+            "Zesty chickpea tray bake",
+            [
+                ("Chickpeas", "Tins & Dry Goods", 2m, "tins", 1.10m),
+                ("Courgettes", "Produce", 2m, "pcs", 1.00m),
+                ("Lemon", "Produce", 1m, "pcs", 0.40m)
+            ]);
+
+        InvokeAddMealsToAiPool([currentMeal, similarMeal, adventurousMeal]);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"]
+        };
+
+        var swappedPlan = _service.SwapMealForDay(
+            request,
+            dayIndex: 0,
+            currentMealName: "Mackerel rice bowl",
+            currentPlanMealNames: ["Mackerel rice bowl"],
+            seenMealNames: ["Mackerel rice bowl"]);
+
+        Assert.Single(swappedPlan.MealPlan);
+        Assert.Equal("Zesty chickpea tray bake", swappedPlan.MealPlan[0].MealName);
+        Assert.NotEqual("Aubergine mackerel skillet", swappedPlan.MealPlan[0].MealName);
+    }
 }

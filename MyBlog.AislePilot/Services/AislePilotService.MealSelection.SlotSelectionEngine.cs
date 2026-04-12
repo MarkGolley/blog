@@ -17,10 +17,85 @@ namespace MyBlog.Services;
 
 public sealed partial class AislePilotService
 {
+    private static readonly HashSet<string> SwapSimilarityNoiseWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "bread",
+        "breast",
+        "breasts",
+        "broth",
+        "couscous",
+        "fillet",
+        "fillets",
+        "garlic",
+        "herb",
+        "herbs",
+        "leaf",
+        "leaves",
+        "lettuce",
+        "milk",
+        "noodle",
+        "noodles",
+        "oil",
+        "onion",
+        "onions",
+        "pasta",
+        "pepper",
+        "peppers",
+        "potato",
+        "potatoes",
+        "quinoa",
+        "rice",
+        "salad",
+        "sauce",
+        "sauces",
+        "stock",
+        "tomato",
+        "tomatoes",
+        "wrap",
+        "wraps"
+    };
+
+    private static readonly HashSet<string> SwapSimilarityProteinTokens = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "anchovy",
+        "beef",
+        "bean",
+        "beans",
+        "chickpea",
+        "chickpeas",
+        "chicken",
+        "cod",
+        "egg",
+        "eggs",
+        "halloumi",
+        "lentil",
+        "lentils",
+        "lamb",
+        "mackerel",
+        "mince",
+        "mushroom",
+        "mushrooms",
+        "paneer",
+        "pork",
+        "prawn",
+        "prawns",
+        "quorn",
+        "salmon",
+        "sausage",
+        "sausages",
+        "shrimp",
+        "tofu",
+        "tuna",
+        "turkey",
+        "yogurt",
+        "yoghurt"
+    };
+
     internal static MealTemplate? SelectSwapCandidate(
         IReadOnlyList<MealTemplate> allCandidates,
         IReadOnlyList<MealTemplate> selectedMeals,
         int dayIndex,
+        MealTemplate? currentMeal,
         string currentMealName,
         decimal weeklyBudget,
         decimal householdFactor,
@@ -66,7 +141,10 @@ public sealed partial class AislePilotService
             return null;
         }
 
-        return slotCompatiblePool
+        var adventurousPool = PreferAdventurousSwapCandidates(slotCompatiblePool, currentMeal);
+        var effectivePool = adventurousPool.Count > 0 ? adventurousPool : slotCompatiblePool;
+
+        return effectivePool
             .Select(template => new
             {
                 template,
@@ -85,6 +163,125 @@ public sealed partial class AislePilotService
             .First()
             .template;
     }
+
+    private static IReadOnlyList<MealTemplate> PreferAdventurousSwapCandidates(
+        IReadOnlyList<MealTemplate> candidates,
+        MealTemplate? currentMeal)
+    {
+        if (currentMeal is null || candidates.Count <= 1)
+        {
+            return candidates;
+        }
+
+        var adventurous = candidates
+            .Where(candidate => !SharesKeySwapIngredients(candidate, currentMeal))
+            .ToList();
+
+        return adventurous.Count > 0 ? adventurous : candidates;
+    }
+
+    private static bool SharesKeySwapIngredients(MealTemplate candidate, MealTemplate currentMeal)
+    {
+        var candidateSignature = BuildSwapIngredientSignature(candidate);
+        var currentSignature = BuildSwapIngredientSignature(currentMeal);
+        if (candidateSignature.AllTokens.Count == 0 || currentSignature.AllTokens.Count == 0)
+        {
+            return false;
+        }
+
+        if (candidateSignature.ProteinTokens.Overlaps(currentSignature.ProteinTokens))
+        {
+            return true;
+        }
+
+        var sharedTokenCount = candidateSignature.AllTokens
+            .Count(currentSignature.AllTokens.Contains);
+        return sharedTokenCount >= 2;
+    }
+
+    private static SwapIngredientSignature BuildSwapIngredientSignature(MealTemplate meal)
+    {
+        var allTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var proteinTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var prioritizedIngredients = meal.Ingredients
+            .Where(ingredient => !IsMinorPantryAssumptionIngredient(ingredient.Name))
+            .OrderByDescending(ingredient => ResolveSwapIngredientPriority(ingredient))
+            .ThenByDescending(ingredient => ingredient.EstimatedCostForTwo)
+            .Take(3)
+            .ToList();
+
+        foreach (var ingredient in prioritizedIngredients)
+        {
+            foreach (var token in ExtractSwapIngredientTokens(ingredient))
+            {
+                allTokens.Add(token);
+                if (IsProteinLikeSwapIngredient(ingredient, token))
+                {
+                    proteinTokens.Add(token);
+                }
+            }
+        }
+
+        return new SwapIngredientSignature(allTokens, proteinTokens);
+    }
+
+    private static int ResolveSwapIngredientPriority(IngredientTemplate ingredient)
+    {
+        return ingredient.Department.Equals("Meat & Fish", StringComparison.OrdinalIgnoreCase)
+            ? 3
+            : ingredient.Department.Equals("Dairy & Eggs", StringComparison.OrdinalIgnoreCase)
+                ? 2
+                : 1;
+    }
+
+    private static IReadOnlyList<string> ExtractSwapIngredientTokens(IngredientTemplate ingredient)
+    {
+        var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var searchTerm in BuildIngredientSearchTerms(ingredient.Name))
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm) ||
+                GenericPantryTokensNormalized.Contains(searchTerm) ||
+                AssumedPantryBasicsNormalized.Contains(searchTerm))
+            {
+                continue;
+            }
+
+            var coreWords = ExtractCoreIngredientWords(
+                searchTerm.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            foreach (var word in coreWords)
+            {
+                if (word.Length < 4 || SwapSimilarityNoiseWords.Contains(word))
+                {
+                    continue;
+                }
+
+                tokens.Add(word);
+            }
+        }
+
+        return tokens.ToList();
+    }
+
+    private static bool IsProteinLikeSwapIngredient(IngredientTemplate ingredient, string token)
+    {
+        if (ingredient.Department.Equals("Meat & Fish", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (SwapSimilarityProteinTokens.Contains(token))
+        {
+            return true;
+        }
+
+        var normalizedIngredientName = NormalizePantryText(ingredient.Name);
+        return SwapSimilarityProteinTokens.Any(proteinToken =>
+            normalizedIngredientName.Contains(proteinToken, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed record SwapIngredientSignature(
+        HashSet<string> AllTokens,
+        HashSet<string> ProteinTokens);
 
     private static bool HasUniqueMealNames(
         IReadOnlyList<MealTemplate> meals,

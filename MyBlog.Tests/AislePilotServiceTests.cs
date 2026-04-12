@@ -57,7 +57,7 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
-    public async Task BuildPlanFromCurrentMealsAsync_ShoppingList_ConvertsFractionalBottleUnitsToTeaspoons()
+    public async Task BuildPlanFromCurrentMealsAsync_ShoppingList_ConvertsFractionalBottleUnitsToSpoonMeasures()
     {
         var request = new AislePilotRequestModel
         {
@@ -80,7 +80,7 @@ public partial class AislePilotServiceTests
             result.ShoppingItems,
             item => item.Name.Equals("Soy sauce", StringComparison.OrdinalIgnoreCase));
 
-        Assert.Equal("22 tsp", soySauce.QuantityDisplay);
+        Assert.Equal("7 1/4 tbsp", soySauce.QuantityDisplay);
         Assert.DoesNotContain("bottle", soySauce.QuantityDisplay, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -264,6 +264,39 @@ public partial class AislePilotServiceTests
         Assert.DoesNotContain(
             result.MealPlan[0].RecipeSteps,
             step => step.Contains("garlic", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_UsesRecipeSpecificMealTimesInsteadOfFlattenedFallbacks()
+    {
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 200m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 3,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+
+        var result = await _service.BuildPlanFromCurrentMealsAsync(
+            request,
+            ["Egg fried rice", "Turkey chilli with beans", "Salmon, potatoes, and broccoli"]);
+
+        Assert.Equal(3, result.MealPlan.Count);
+        Assert.Equal(
+            ["Egg fried rice", "Turkey chilli with beans", "Salmon, potatoes, and broccoli"],
+            result.MealPlan.Select(meal => meal.MealName).ToArray());
+
+        var eggFriedRice = Assert.Single(result.MealPlan, meal => meal.MealName.Equals("Egg fried rice", StringComparison.OrdinalIgnoreCase));
+        var turkeyChilli = Assert.Single(result.MealPlan, meal => meal.MealName.Equals("Turkey chilli with beans", StringComparison.OrdinalIgnoreCase));
+        var salmon = Assert.Single(result.MealPlan, meal => meal.MealName.Equals("Salmon, potatoes, and broccoli", StringComparison.OrdinalIgnoreCase));
+
+        Assert.All(result.MealPlan, meal => Assert.Equal(0, meal.EstimatedPrepMinutes % 5));
+        Assert.True(eggFriedRice.EstimatedPrepMinutes < turkeyChilli.EstimatedPrepMinutes);
+        Assert.True(eggFriedRice.EstimatedPrepMinutes < salmon.EstimatedPrepMinutes);
+        Assert.Equal(3, result.MealPlan.Select(meal => meal.EstimatedPrepMinutes).Distinct().Count());
     }
 
     [Fact]
@@ -1093,6 +1126,75 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_NormalizesIngredientDisplayCapitalizationAcrossMealAndShoppingViews()
+    {
+        ClearAiPool();
+
+        var mealOneName = $"Creamy greens pasta {Guid.NewGuid():N}";
+        var mealTwoName = $"Warm greens tray {Guid.NewGuid():N}";
+        var mealOne = CreateMealTemplateWithIngredients(
+            mealOneName,
+            [
+                ("spINNACH", "Produce", 1m, "pcs", 0.60m),
+                ("garLIC", "Produce", 2m, "pcs", 0.20m)
+            ]);
+        var mealTwo = CreateMealTemplateWithIngredients(
+            mealTwoName,
+            [
+                ("spinnach", "Produce", 2m, "pcs", 1.10m),
+                ("LEMON zest", "Produce", 1m, "pcs", 0.35m)
+            ]);
+
+        InvokeAddMealsToAiPool([mealOne, mealTwo]);
+
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 80m,
+            HouseholdSize = 2,
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+
+        try
+        {
+            var result = await _service.BuildPlanFromCurrentMealsAsync(request, [mealOneName, mealTwoName]);
+
+            var normalizedIngredientLines = result.MealPlan
+                .SelectMany(meal => meal.IngredientLines)
+                .Where(line => line.Contains("spinnach", StringComparison.OrdinalIgnoreCase) ||
+                               line.Contains("garlic", StringComparison.OrdinalIgnoreCase) ||
+                               line.Contains("lemon zest", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Assert.Contains(normalizedIngredientLines, line => line.Contains("Spinnach", StringComparison.Ordinal));
+            Assert.Contains(normalizedIngredientLines, line => line.Contains("Garlic", StringComparison.Ordinal));
+            Assert.Contains(normalizedIngredientLines, line => line.Contains("Lemon zest", StringComparison.Ordinal));
+            Assert.DoesNotContain(normalizedIngredientLines, line => line.Contains("spINNACH", StringComparison.Ordinal));
+            Assert.DoesNotContain(normalizedIngredientLines, line => line.Contains("spinnach", StringComparison.Ordinal));
+            Assert.DoesNotContain(normalizedIngredientLines, line => line.Contains("garLIC", StringComparison.Ordinal));
+            Assert.DoesNotContain(normalizedIngredientLines, line => line.Contains("LEMON zest", StringComparison.Ordinal));
+
+            var spinnachItem = Assert.Single(result.ShoppingItems, item =>
+                item.Name.Contains("spinnach", StringComparison.OrdinalIgnoreCase));
+            var garlicItem = Assert.Single(result.ShoppingItems, item =>
+                item.Name.Contains("garlic", StringComparison.OrdinalIgnoreCase));
+            var lemonItem = Assert.Single(result.ShoppingItems, item =>
+                item.Name.Contains("lemon zest", StringComparison.OrdinalIgnoreCase));
+
+            Assert.Equal("Spinnach", spinnachItem.Name);
+            Assert.Equal("Garlic", garlicItem.Name);
+            Assert.Equal("Lemon zest", lemonItem.Name);
+        }
+        finally
+        {
+            ClearAiPool();
+        }
+    }
+
+    [Fact]
     public void BuildPlan_CustomAisleOrderWithAtLeastThreeAisles_UsesCustomOrder()
     {
         var request = new AislePilotRequestModel
@@ -1141,6 +1243,68 @@ public partial class AislePilotServiceTests
         for (var i = 0; i < expectedPrefix.Length; i++)
         {
             Assert.Equal(expectedPrefix[i], result.AisleOrderUsed[i]);
+        }
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_MergesEquivalentShoppingLiquidsAcrossUnitsAndDepartments()
+    {
+        ClearAiPool();
+
+        var mealOneName = $"Olive oil pasta {Guid.NewGuid():N}";
+        var mealTwoName = $"Olive oil salad {Guid.NewGuid():N}";
+        var mealThreeName = $"Olive oil roast veg {Guid.NewGuid():N}";
+        var mealOne = CreateMealTemplateWithIngredients(
+            mealOneName,
+            [
+                ("Olive oil", "Spices & Sauces", 0.08m, "bottle", 0.55m),
+                ("Pasta", "Tins & Dry Goods", 200m, "g", 0.70m),
+                ("Garlic", "Produce", 2m, "pcs", 0.10m)
+            ]);
+        var mealTwo = CreateMealTemplateWithIngredients(
+            mealTwoName,
+            [
+                ("olive oil", "Other", 1.25m, "tsp", 0.04m),
+                ("Lettuce", "Produce", 1m, "pcs", 0.65m),
+                ("Cherry tomatoes", "Produce", 0.25m, "kg", 0.90m)
+            ]);
+        var mealThree = CreateMealTemplateWithIngredients(
+            mealThreeName,
+            [
+                ("Olive oil", "Spices & Sauces", 0.02m, "l", 0.14m),
+                ("Courgettes", "Produce", 2m, "pcs", 0.70m),
+                ("Peppers", "Produce", 2m, "pcs", 0.80m)
+            ]);
+
+        InvokeAddMealsToAiPool([mealOne, mealTwo, mealThree]);
+
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 80m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 3,
+            MealsPerDay = 1,
+            DietaryModes = ["Balanced"]
+        };
+
+        try
+        {
+            var result = await _service.BuildPlanFromCurrentMealsAsync(request, [mealOneName, mealTwoName, mealThreeName]);
+
+            var oliveOilItems = result.ShoppingItems
+                .Where(item => item.Name.Equals("Olive oil", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var oliveOil = Assert.Single(oliveOilItems);
+            Assert.Equal("Spices & Sauces", oliveOil.Department);
+            Assert.Equal("ml", oliveOil.Unit);
+            Assert.Equal(66.25m, oliveOil.Quantity);
+            Assert.Equal("4 1/2 tbsp", oliveOil.QuantityDisplay);
+        }
+        finally
+        {
+            ClearAiPool();
         }
     }
 

@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -98,7 +98,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_RendersOverviewGlanceAndDayMealSummaryRows()
+    public async Task Index_Post_RendersDayMealSummaryRowsWithoutOverviewGlanceMetrics()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -122,15 +122,102 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("class=\"aislepilot-overview-glance\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-overview-glance-item", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("class=\"aislepilot-overview-glance\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-overview-glance-item", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-meal-summary", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-card aislepilot-shop-card\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-action\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-expander", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-day-card-expander-summary", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-expander-image", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-meal-swipe-surface", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-meal-image-url=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_RendersMealDetailSectionsAsCollapsedDisclosures()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Matches(
+            new Regex(
+                @"<details[^>]*class=""[^""]*aislepilot-meal-section[^""]*""[^>]*data-meal-section=""nutrition""[\s\S]*?<summary[^>]*data-meal-section-summary[^>]*>\s*Est\. calories \+ macros\s*</summary>[\s\S]*?<div[^>]*data-meal-section-content",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<details[^>]*class=""[^""]*aislepilot-meal-section[^""]*""[^>]*data-meal-section=""ingredients""[\s\S]*?<summary[^>]*data-meal-section-summary[^>]*>\s*Ingredients\s*</summary>[\s\S]*?<div[^>]*data-meal-section-content",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Matches(
+            new Regex(
+                @"<details[^>]*class=""[^""]*aislepilot-meal-section[^""]*""[^>]*data-meal-section=""method""[\s\S]*?<summary[^>]*data-meal-section-summary[^>]*>\s*Method\s*</summary>[\s\S]*?<div[^>]*data-meal-section-content",
+                RegexOptions.IgnoreCase),
+            html);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithMultipleDayCards_RendersDayCardReorderFormAndHandles()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "90",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "3",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.LeftoverCookDayIndexesCsv"] = "0",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("data-day-reorder-form", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-reorder-handle", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-meal-names=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-ignored-flags=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-leftover-count=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Get_RendersPeopleSliderWithThumbFriendlyModifier()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Contains("aislepilot-slider-field--thumb-friendly", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("name=\"Request.HouseholdSize\"", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -155,6 +242,35 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("outline: none;", css, StringComparison.OrdinalIgnoreCase);
         var importantCount = Regex.Matches(css, "!important", RegexOptions.IgnoreCase).Count;
         Assert.True(importantCount <= 240, $"Expected CSS override count to stay under control, but found {importantCount} '!important' usages.");
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_PeopleSlider_UsesLargerThumbLatchTarget()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-input {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("height: 1.9rem !important;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-value {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("min-width: 2.1rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-input::-webkit-slider-thumb {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("width: 1.7rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("height: 1.7rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-input::-moz-range-thumb {", css, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_DoesNotRenderDayCardChevronAffordance()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.DoesNotContain(".aislepilot-day-card-expander > summary::after", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(".aislepilot-day-card-expander[open] > summary::after", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(":root[data-theme=\"dark\"] .aislepilot-day-card-expander > summary::after", css, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -210,6 +326,22 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("imageElement.replaceWith(preservedImageElement);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const preservedMealImageSources = captureRenderedMealImageSources(document);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("restoreRenderedMealImageSources(document, preservedMealImageSources);", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotScript_DayCardReorder_RebuildsPlanStateBeforeAjaxSubmit()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+
+        Assert.Contains("const syncDayReorderFormState = form => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const buildDayCardLeftoverSourceIndexesCsv = cards => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const buildDayCardIgnoredIndexesCsv = cards => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const wireDayCardReorder = scope => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("swapForm.hasAttribute(\"data-day-reorder-form\")", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("showToast(\"Meal day updated.\", \"success\");", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("form.requestSubmit();", script, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -292,6 +424,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
             ["Request.CustomAisleOrder"] = string.Empty,
             ["Request.DislikesOrAllergens"] = string.Empty,
             ["Request.PreferQuickMeals"] = "true",
+            ["Request.IncludeDessertAddOn"] = "true",
             ["Request.DietaryModes"] = "Balanced",
             ["__RequestVerificationToken"] = antiForgeryToken
         }));
@@ -335,7 +468,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("data-day-card-summary-value=", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
-                @"<section[^>]*class=""[^""]*aislepilot-day-meal-panel[^""]*""[^>]*>[\s\S]*?<h3>[^<]+</h3>[\s\S]*?<div class=""aislepilot-meal-image-shell"">",
+                @"<section[^>]*class=""[^""]*aislepilot-day-meal-panel[^""]*""[^>]*>[\s\S]*?<h3>[^<]+</h3>[\s\S]*?<summary[^>]*class=""[^""]*aislepilot-meal-image-summary[^""]*""[^>]*>[\s\S]*?<div class=""aislepilot-meal-image-shell""[^>]*data-day-meal-swipe-surface",
                 RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
@@ -407,7 +540,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_WithThreeMealsPerDay_RendersCompactActionControlsWithVisibleLabels()
+    public async Task Index_Post_WithThreeMealsPerDay_RendersCompactActionControlsWithMealDetailPreviewChips()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -423,6 +556,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
             ["Request.CustomAisleOrder"] = string.Empty,
             ["Request.DislikesOrAllergens"] = string.Empty,
             ["Request.PreferQuickMeals"] = "true",
+            ["Request.IncludeDessertAddOn"] = "true",
             ["Request.DietaryModes"] = "Balanced",
             ["__RequestVerificationToken"] = antiForgeryToken
         }));
@@ -431,12 +565,12 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Contains("class=\"aislepilot-overview-regenerate-btn\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"aislepilot-edit-setup-btn\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-overview-regenerate-btn aislepilot-edit-setup-btn\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-setup-toggle-label", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-overview-actions-menu", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-overview-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("aislepilot-overview-regenerate-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("aislepilot-edit-setup-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("aislepilot-overview-regenerate-btn aislepilot-edit-setup-btn is-icon-only", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-more-actions-trigger\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("class=\"aislepilot-more-actions-trigger is-icon-only\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aria-haspopup=\"dialog\"", html, StringComparison.OrdinalIgnoreCase);
@@ -449,9 +583,16 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("class=\"aislepilot-mobile-meal-sheet-handle\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span>Refresh plan</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span data-setup-toggle-label>Edit settings</span>", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<span class=\"sr-only\">View details</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-meal-image-hint-primary\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-meal-image-hint-chip\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">View meal details: macros, ingredients and method</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">View dessert details: ingredients and method</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<span class=\"sr-only\">Swap meal</span>", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<span>View details</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"View meal details: macros, ingredients and method\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"View dessert details: ingredients and method\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">View</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">View details<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Macros</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">View recipe<", html, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -533,7 +674,42 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
                 @"<button[^>]*class=""[^""]*aislepilot-mobile-context-jump[^""]*""(?=[^>]*data-window-tab=""aislepilot-export"")(?=[^>]*role=""tab"")(?=[^>]*aria-controls=""aislepilot-export"")(?=[^>]*aria-selected=""false"")(?=[^>]*aria-current=""false"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
-        Assert.Matches(new Regex(@"(&middot;|·)", RegexOptions.IgnoreCase), html);
+        Assert.Matches(new Regex(@"(&middot;|Â·)", RegexOptions.IgnoreCase), html);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithThreeMealsPerDay_RendersStyledBudgetStatusInWeeklyPlanSummary()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "3",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.IncludeDessertAddOn"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.Matches(
+            new Regex(
+                @"<span[^>]*class=""[^""]*aislepilot-mobile-context-budget-status[^""]*(?:is-over-budget|is-on-budget)[^""]*""[^>]*>[^<]*(?:under|over|On budget)[^<]*</span>",
+                RegexOptions.IgnoreCase),
+            html);
+        Assert.Contains(".aislepilot-mobile-context-budget-status.is-over-budget", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-mobile-context-budget-status.is-on-budget", css, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -706,7 +882,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_WithResult_RendersGenericShareShoppingListLabel()
+    public async Task Index_Post_WithResult_RendersNotesCompatibleShareShoppingListLabel()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -729,8 +905,138 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Share shopping list", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Share shopping list (works with Notes)", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("iPhone Notes", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithResult_ClarifiesShoppingEstimateIsNotCheckoutTotal()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Meal ingredient estimate", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("This estimate covers the ingredients used in these meals.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Actual checkout can be higher if shops only sell larger packs or bags.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(" - Est. ", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithResult_RendersExportActionsInRequestedOrder()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        var shareIndex = html.IndexOf("Share shopping list (works with Notes)", StringComparison.OrdinalIgnoreCase);
+        var checklistIndex = html.IndexOf("Download shopping checklist (.txt)", StringComparison.OrdinalIgnoreCase);
+        var planPackIndex = html.IndexOf("Download full plan pack (.pdf)", StringComparison.OrdinalIgnoreCase);
+        var printIndex = html.IndexOf("Print current view", StringComparison.OrdinalIgnoreCase);
+
+        Assert.True(shareIndex >= 0, "Expected share-shopping-list export action to be rendered.");
+        Assert.True(checklistIndex > shareIndex, "Expected shopping checklist download to follow the share action.");
+        Assert.True(planPackIndex > checklistIndex, "Expected full plan pack download to follow the checklist download.");
+        Assert.True(printIndex > planPackIndex, "Expected print action to be the final export option.");
+    }
+
+    [Fact]
+    public async Task Index_Post_WithResult_RendersCheckableShoppingItems()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("data-shopping-item-label", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-item-key=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-item-input", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-item-text", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithResult_RendersCustomShoppingItemsSection()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("data-custom-shopping-shell", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-custom-shopping-form", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-custom-shopping-input", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-custom-shopping-list", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Your extra items", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -829,340 +1135,4 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.DoesNotContain("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public async Task SaveWeek_ThenOpenWeek_RestoresSavedMealPlan()
-    {
-        using var client = CreateClient(allowAutoRedirect: true);
-        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-
-        var generateForm = new List<KeyValuePair<string, string>>
-        {
-            new("Request.Supermarket", "Tesco"),
-            new("Request.WeeklyBudget", "85"),
-            new("Request.HouseholdSize", "2"),
-            new("Request.PortionSize", "Medium"),
-            new("Request.PlanDays", "2"),
-            new("Request.CookDays", "2"),
-            new("Request.MealsPerDay", "1"),
-            new("Request.SelectedMealTypes", string.Empty),
-            new("Request.SelectedMealTypes", "Dinner"),
-            new("Request.CustomAisleOrder", string.Empty),
-            new("Request.DislikesOrAllergens", string.Empty),
-            new("Request.PreferQuickMeals", "true"),
-            new("Request.DietaryModes", "Balanced"),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        using var generatedResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(generateForm));
-
-        Assert.Equal(HttpStatusCode.OK, generatedResponse.StatusCode);
-        var generatedHtml = await generatedResponse.Content.ReadAsStringAsync();
-        var generatedMealNames = ExtractRenderedMealNames(generatedHtml);
-        Assert.Equal(2, generatedMealNames.Count);
-
-        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-        var saveWeekForm = new List<KeyValuePair<string, string>>
-        {
-            new("Request.Supermarket", "Tesco"),
-            new("Request.WeeklyBudget", "85"),
-            new("Request.HouseholdSize", "2"),
-            new("Request.PortionSize", "Medium"),
-            new("Request.PlanDays", "2"),
-            new("Request.CookDays", "2"),
-            new("Request.MealsPerDay", "1"),
-            new("Request.SelectedMealTypes", string.Empty),
-            new("Request.SelectedMealTypes", "Dinner"),
-            new("Request.CustomAisleOrder", string.Empty),
-            new("Request.DislikesOrAllergens", string.Empty),
-            new("Request.PreferQuickMeals", "true"),
-            new("Request.DietaryModes", "Balanced"),
-            new("weekLabel", "Family week"),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        foreach (var mealName in generatedMealNames)
-        {
-            saveWeekForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
-        }
-
-        using var savedResponse = await client.PostAsync("/projects/aisle-pilot/save-week", new FormUrlEncodedContent(saveWeekForm));
-
-        Assert.Equal(HttpStatusCode.OK, savedResponse.StatusCode);
-        var savedHtml = await savedResponse.Content.ReadAsStringAsync();
-        Assert.Contains("Saved weeks", savedHtml, StringComparison.OrdinalIgnoreCase);
-        var savedWeekId = ExtractSavedWeekId(savedHtml);
-        Assert.False(string.IsNullOrWhiteSpace(savedWeekId));
-
-        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-        var openWeekForm = new List<KeyValuePair<string, string>>
-        {
-            new("weekId", savedWeekId),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-
-        using var openedResponse = await client.PostAsync("/projects/aisle-pilot/open-week", new FormUrlEncodedContent(openWeekForm));
-
-        Assert.Equal(HttpStatusCode.OK, openedResponse.StatusCode);
-        var openedHtml = await openedResponse.Content.ReadAsStringAsync();
-        var openedMealNames = ExtractRenderedMealNames(openedHtml);
-        Assert.Equal(2, openedMealNames.Count);
-        Assert.Contains("data-head-menu", openedHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("aislepilot-head-week-list", openedHtml, StringComparison.OrdinalIgnoreCase);
-        foreach (var mealName in generatedMealNames)
-        {
-            Assert.Contains(mealName, openedMealNames, StringComparer.OrdinalIgnoreCase);
-        }
-    }
-
-    [Fact]
-    public async Task SavedWeeks_AreRenderedInsideHeaderMenu_OnIndexLoad()
-    {
-        using var client = CreateClient(allowAutoRedirect: true);
-        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-
-        var generateForm = new List<KeyValuePair<string, string>>
-        {
-            new("Request.Supermarket", "Tesco"),
-            new("Request.WeeklyBudget", "85"),
-            new("Request.HouseholdSize", "2"),
-            new("Request.PortionSize", "Medium"),
-            new("Request.PlanDays", "2"),
-            new("Request.CookDays", "2"),
-            new("Request.MealsPerDay", "1"),
-            new("Request.SelectedMealTypes", string.Empty),
-            new("Request.SelectedMealTypes", "Dinner"),
-            new("Request.CustomAisleOrder", string.Empty),
-            new("Request.DislikesOrAllergens", string.Empty),
-            new("Request.PreferQuickMeals", "true"),
-            new("Request.DietaryModes", "Balanced"),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        using var generatedResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(generateForm));
-        Assert.Equal(HttpStatusCode.OK, generatedResponse.StatusCode);
-        var generatedHtml = await generatedResponse.Content.ReadAsStringAsync();
-        var generatedMealNames = ExtractRenderedMealNames(generatedHtml);
-        Assert.Equal(2, generatedMealNames.Count);
-
-        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-        var saveWeekForm = new List<KeyValuePair<string, string>>
-        {
-            new("Request.Supermarket", "Tesco"),
-            new("Request.WeeklyBudget", "85"),
-            new("Request.HouseholdSize", "2"),
-            new("Request.PortionSize", "Medium"),
-            new("Request.PlanDays", "2"),
-            new("Request.CookDays", "2"),
-            new("Request.MealsPerDay", "1"),
-            new("Request.SelectedMealTypes", string.Empty),
-            new("Request.SelectedMealTypes", "Dinner"),
-            new("Request.CustomAisleOrder", string.Empty),
-            new("Request.DislikesOrAllergens", string.Empty),
-            new("Request.PreferQuickMeals", "true"),
-            new("Request.DietaryModes", "Balanced"),
-            new("weekLabel", "Header menu week"),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        foreach (var mealName in generatedMealNames)
-        {
-            saveWeekForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
-        }
-
-        using var savedResponse = await client.PostAsync("/projects/aisle-pilot/save-week", new FormUrlEncodedContent(saveWeekForm));
-        Assert.Equal(HttpStatusCode.OK, savedResponse.StatusCode);
-
-        var indexHtml = await client.GetStringAsync("/projects/aisle-pilot");
-        Assert.Contains("data-head-menu", indexHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("aislepilot-head-menu-section-title", indexHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(">Saved weeks<", indexHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("id=\"aislepilot-saved-weeks\"", indexHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("/projects/aisle-pilot/open-week", indexHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("/projects/aisle-pilot/delete-week", indexHtml, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task Index_Get_SupermarketPlannerSection_IsCollapsedByDefault()
-    {
-        using var client = CreateClient(allowAutoRedirect: true);
-
-        using var response = await client.GetAsync("/projects/aisle-pilot");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var html = await response.Content.ReadAsStringAsync();
-        var supermarketSectionTag = Regex.Match(
-            html,
-            @"<details[^>]*data-plan-basic-item=""supermarket""[^>]*>",
-            RegexOptions.IgnoreCase);
-        Assert.True(supermarketSectionTag.Success, "Supermarket planner section was not found.");
-        Assert.DoesNotContain("open", supermarketSectionTag.Value, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task SavedMeals_AreRenderedInsideHeaderMenu_AndCanBeRemoved()
-    {
-        using var client = CreateClient(allowAutoRedirect: true);
-        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-
-        var generateForm = new List<KeyValuePair<string, string>>
-        {
-            new("Request.Supermarket", "Tesco"),
-            new("Request.WeeklyBudget", "85"),
-            new("Request.HouseholdSize", "2"),
-            new("Request.PortionSize", "Medium"),
-            new("Request.PlanDays", "2"),
-            new("Request.CookDays", "2"),
-            new("Request.MealsPerDay", "1"),
-            new("Request.SelectedMealTypes", string.Empty),
-            new("Request.SelectedMealTypes", "Dinner"),
-            new("Request.CustomAisleOrder", string.Empty),
-            new("Request.DislikesOrAllergens", string.Empty),
-            new("Request.PreferQuickMeals", "true"),
-            new("Request.DietaryModes", "Balanced"),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        using var generatedResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(generateForm));
-        Assert.Equal(HttpStatusCode.OK, generatedResponse.StatusCode);
-        var generatedHtml = await generatedResponse.Content.ReadAsStringAsync();
-        var generatedMealNames = ExtractRenderedMealNames(generatedHtml);
-        Assert.Equal(2, generatedMealNames.Count);
-        var targetMealName = generatedMealNames[0];
-
-        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-        var saveMealForm = new List<KeyValuePair<string, string>>
-        {
-            new("Request.Supermarket", "Tesco"),
-            new("Request.WeeklyBudget", "85"),
-            new("Request.HouseholdSize", "2"),
-            new("Request.PortionSize", "Medium"),
-            new("Request.PlanDays", "2"),
-            new("Request.CookDays", "2"),
-            new("Request.MealsPerDay", "1"),
-            new("Request.SelectedMealTypes", string.Empty),
-            new("Request.SelectedMealTypes", "Dinner"),
-            new("Request.CustomAisleOrder", string.Empty),
-            new("Request.DislikesOrAllergens", string.Empty),
-            new("Request.PreferQuickMeals", "true"),
-            new("Request.DietaryModes", "Balanced"),
-            new("Request.SavedEnjoyedMealNamesState", string.Empty),
-            new("mealName", targetMealName),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        foreach (var mealName in generatedMealNames)
-        {
-            saveMealForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
-        }
-
-        using var savedMealResponse = await client.PostAsync("/projects/aisle-pilot/toggle-enjoyed-meal", new FormUrlEncodedContent(saveMealForm));
-        Assert.Equal(HttpStatusCode.OK, savedMealResponse.StatusCode);
-        var savedMealHtml = await savedMealResponse.Content.ReadAsStringAsync();
-        Assert.Contains("aislepilot-head-saved-meal-list", savedMealHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("/projects/aisle-pilot/remove-saved-meal", savedMealHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.Matches(
-            new Regex(
-                $@"<span class=""aislepilot-head-saved-meal-name"">\s*{Regex.Escape(targetMealName)}\s*</span>",
-                RegexOptions.IgnoreCase),
-            savedMealHtml);
-
-        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-        var removeSavedMealForm = new List<KeyValuePair<string, string>>
-        {
-            new("mealName", targetMealName),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        using var removedSavedMealResponse = await client.PostAsync(
-            "/projects/aisle-pilot/remove-saved-meal",
-            new FormUrlEncodedContent(removeSavedMealForm));
-
-        Assert.Equal(HttpStatusCode.OK, removedSavedMealResponse.StatusCode);
-        var removedSavedMealHtml = await removedSavedMealResponse.Content.ReadAsStringAsync();
-        Assert.Contains("No saved meals yet", removedSavedMealHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotMatch(
-            new Regex(
-                $@"<span class=""aislepilot-head-saved-meal-name"">\s*{Regex.Escape(targetMealName)}\s*</span>",
-                RegexOptions.IgnoreCase),
-            removedSavedMealHtml);
-    }
-
-    [Fact]
-    public async Task DeleteWeek_RemovesSavedWeekAndBlocksOpen()
-    {
-        using var client = CreateClient(allowAutoRedirect: true);
-        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-
-        var generateForm = new List<KeyValuePair<string, string>>
-        {
-            new("Request.Supermarket", "Tesco"),
-            new("Request.WeeklyBudget", "85"),
-            new("Request.HouseholdSize", "2"),
-            new("Request.PortionSize", "Medium"),
-            new("Request.PlanDays", "2"),
-            new("Request.CookDays", "2"),
-            new("Request.MealsPerDay", "1"),
-            new("Request.SelectedMealTypes", string.Empty),
-            new("Request.SelectedMealTypes", "Dinner"),
-            new("Request.CustomAisleOrder", string.Empty),
-            new("Request.DislikesOrAllergens", string.Empty),
-            new("Request.PreferQuickMeals", "true"),
-            new("Request.DietaryModes", "Balanced"),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        using var generatedResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(generateForm));
-
-        Assert.Equal(HttpStatusCode.OK, generatedResponse.StatusCode);
-        var generatedHtml = await generatedResponse.Content.ReadAsStringAsync();
-        var generatedMealNames = ExtractRenderedMealNames(generatedHtml);
-        Assert.Equal(2, generatedMealNames.Count);
-
-        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-        var saveWeekForm = new List<KeyValuePair<string, string>>
-        {
-            new("Request.Supermarket", "Tesco"),
-            new("Request.WeeklyBudget", "85"),
-            new("Request.HouseholdSize", "2"),
-            new("Request.PortionSize", "Medium"),
-            new("Request.PlanDays", "2"),
-            new("Request.CookDays", "2"),
-            new("Request.MealsPerDay", "1"),
-            new("Request.SelectedMealTypes", string.Empty),
-            new("Request.SelectedMealTypes", "Dinner"),
-            new("Request.CustomAisleOrder", string.Empty),
-            new("Request.DislikesOrAllergens", string.Empty),
-            new("Request.PreferQuickMeals", "true"),
-            new("Request.DietaryModes", "Balanced"),
-            new("weekLabel", "Delete me"),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        foreach (var mealName in generatedMealNames)
-        {
-            saveWeekForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
-        }
-
-        using var savedResponse = await client.PostAsync("/projects/aisle-pilot/save-week", new FormUrlEncodedContent(saveWeekForm));
-        Assert.Equal(HttpStatusCode.OK, savedResponse.StatusCode);
-        var savedHtml = await savedResponse.Content.ReadAsStringAsync();
-        var savedWeekId = ExtractSavedWeekId(savedHtml);
-        Assert.False(string.IsNullOrWhiteSpace(savedWeekId));
-
-        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-        var deleteForm = new List<KeyValuePair<string, string>>
-        {
-            new("weekId", savedWeekId),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        using var deletedResponse = await client.PostAsync("/projects/aisle-pilot/delete-week", new FormUrlEncodedContent(deleteForm));
-
-        Assert.Equal(HttpStatusCode.OK, deletedResponse.StatusCode);
-        var deletedHtml = await deletedResponse.Content.ReadAsStringAsync();
-        Assert.DoesNotContain(savedWeekId, deletedHtml, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Delete me", deletedHtml, StringComparison.OrdinalIgnoreCase);
-
-        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
-        var openDeletedWeekForm = new List<KeyValuePair<string, string>>
-        {
-            new("weekId", savedWeekId),
-            new("__RequestVerificationToken", antiForgeryToken)
-        };
-        using var openDeletedWeekResponse = await client.PostAsync("/projects/aisle-pilot/open-week", new FormUrlEncodedContent(openDeletedWeekForm));
-
-        Assert.Equal(HttpStatusCode.OK, openDeletedWeekResponse.StatusCode);
-        var openDeletedWeekHtml = await openDeletedWeekResponse.Content.ReadAsStringAsync();
-        Assert.Contains("Saved week was not found", openDeletedWeekHtml, StringComparison.OrdinalIgnoreCase);
-    }
 }

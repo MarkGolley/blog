@@ -36,6 +36,20 @@ public static class QuantityDisplayFormatter
         "milliliter",
         "milliliters"
     };
+    private static readonly HashSet<string> TeaspoonUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "tsp",
+        "tsps",
+        "teaspoon",
+        "teaspoons"
+    };
+    private static readonly HashSet<string> TablespoonUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "tbsp",
+        "tbsps",
+        "tablespoon",
+        "tablespoons"
+    };
 
     private static readonly HashSet<string> WholePurchaseUnits = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -70,6 +84,11 @@ public static class QuantityDisplayFormatter
             return FormatKg(quantity);
         }
 
+        if (TryFormatSpoonQuantity(quantity, normalizedUnit, out var spoonQuantityDisplay))
+        {
+            return spoonQuantityDisplay;
+        }
+
         if (FractionalContainerUnits.Contains(normalizedUnit))
         {
             return FormatShoppingListFractionalContainer(quantity, normalizedUnit);
@@ -79,6 +98,16 @@ public static class QuantityDisplayFormatter
         {
             var unitsToBuy = (int)Math.Ceiling(quantity);
             return $"{unitsToBuy} {ToDisplayUnit(normalizedUnit, unitsToBuy)}";
+        }
+
+        if (RecipeLitreUnits.Contains(normalizedUnit))
+        {
+            return FormatShoppingLiquidVolume(quantity * 1000m);
+        }
+
+        if (RecipeMillilitreUnits.Contains(normalizedUnit))
+        {
+            return FormatShoppingLiquidVolume(quantity);
         }
 
         var roundedQuantity = decimal.Round(quantity, 2, MidpointRounding.AwayFromZero);
@@ -99,6 +128,11 @@ public static class QuantityDisplayFormatter
         if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
         {
             return FormatKg(quantity);
+        }
+
+        if (TryFormatSpoonQuantity(quantity, normalizedUnit, out var spoonQuantityDisplay))
+        {
+            return spoonQuantityDisplay;
         }
 
         if (RecipeLitreUnits.Contains(normalizedUnit))
@@ -207,6 +241,48 @@ public static class QuantityDisplayFormatter
         return $"{roundedContainerQuantity:0.##} {ToDisplayUnit(normalizedUnit, roundedContainerQuantity)}";
     }
 
+    internal static bool TryConvertToMillilitres(decimal quantity, string? unit, out decimal totalMillilitres)
+    {
+        totalMillilitres = 0m;
+        if (quantity <= 0m)
+        {
+            return false;
+        }
+
+        var normalizedUnit = NormalizeUnit(unit);
+        if (RecipeLitreUnits.Contains(normalizedUnit))
+        {
+            totalMillilitres = quantity * 1000m;
+            return true;
+        }
+
+        if (RecipeMillilitreUnits.Contains(normalizedUnit))
+        {
+            totalMillilitres = quantity;
+            return true;
+        }
+
+        if (TeaspoonUnits.Contains(normalizedUnit))
+        {
+            totalMillilitres = quantity * 5m;
+            return true;
+        }
+
+        if (TablespoonUnits.Contains(normalizedUnit))
+        {
+            totalMillilitres = quantity * 15m;
+            return true;
+        }
+
+        if (RecipeContainerUnitMillilitres.TryGetValue(normalizedUnit, out var millilitresPerUnit))
+        {
+            totalMillilitres = quantity * millilitresPerUnit;
+            return true;
+        }
+
+        return false;
+    }
+
     private static decimal RoundUpToNearest(decimal value, decimal step)
     {
         if (step <= 0m)
@@ -215,6 +291,58 @@ public static class QuantityDisplayFormatter
         }
 
         return decimal.Ceiling(value / step) * step;
+    }
+
+    private static bool TryFormatSpoonQuantity(decimal quantity, string normalizedUnit, out string formattedQuantity)
+    {
+        formattedQuantity = string.Empty;
+
+        if (TeaspoonUnits.Contains(normalizedUnit))
+        {
+            formattedQuantity = FormatFractionalAmount(RoundToNearestQuarter(quantity), "tsp", "tsp");
+            return true;
+        }
+
+        if (!TablespoonUnits.Contains(normalizedUnit))
+        {
+            return false;
+        }
+
+        var roundedTablespoons = RoundToNearestQuarter(quantity);
+        if (roundedTablespoons < 1m)
+        {
+            var teaspoons = RoundToNearestQuarter(quantity * 3m);
+            formattedQuantity = FormatFractionalAmount(teaspoons, "tsp", "tsp");
+            return true;
+        }
+
+        formattedQuantity = FormatFractionalAmount(roundedTablespoons, "tbsp", "tbsp");
+        return true;
+    }
+
+    private static string FormatShoppingLiquidVolume(decimal totalMillilitres)
+    {
+        if (totalMillilitres <= 0m)
+        {
+            return "-";
+        }
+
+        if (totalMillilitres < 15m)
+        {
+            var teaspoons = RoundToNearestQuarter(totalMillilitres / 5m);
+            return FormatFractionalAmount(teaspoons, "tsp", "tsp");
+        }
+
+        if (totalMillilitres <= 120m)
+        {
+            var tablespoons = RoundToNearestQuarter(totalMillilitres / 15m);
+            return FormatFractionalAmount(tablespoons, "tbsp", "tbsp");
+        }
+
+        var roundedUpMillilitres = RoundUpToNearest(
+            decimal.Round(totalMillilitres, 0, MidpointRounding.AwayFromZero),
+            5m);
+        return $"{roundedUpMillilitres:0} ml";
     }
 
     private static string FormatRecipeLiquidVolume(decimal totalMillilitres)

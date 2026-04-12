@@ -17,6 +17,22 @@ namespace MyBlog.Services;
 
 public sealed partial class AislePilotService
 {
+    private static readonly string[] ColdBreakfastContradictoryCookingTerms =
+    [
+        "hob",
+        "pan",
+        "skillet",
+        "wok",
+        "oven",
+        "roast",
+        "bake",
+        "simmer",
+        "boil",
+        "fry",
+        "stock",
+        "broth"
+    ];
+
     internal static IReadOnlyList<string> BuildRecipeSteps(MealTemplate template)
     {
         var mealName = template.Name.Trim().ToLowerInvariant();
@@ -82,6 +98,83 @@ public sealed partial class AislePilotService
         var secondaryIngredient = ingredientNames.ElementAtOrDefault(1) ?? primaryIngredient;
         var thirdIngredient = ingredientNames.ElementAtOrDefault(2) ?? secondaryIngredient;
         var carbIngredient = ingredientNames.FirstOrDefault(IsLikelyCarbIngredientName);
+
+        if (IsColdBreakfastMeal(template, mealName, ingredientNames))
+        {
+            return BuildColdBreakfastRecipeSteps(ingredientNames);
+        }
+
+        if (mealName.Contains("muffin", StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "Heat oven to 190C (fan 170C) and lightly grease a muffin tin.",
+                $"Whisk {primaryIngredient} until smooth, then fold through {secondaryIngredient} and {thirdIngredient}.",
+                "Season lightly, divide the mixture between the muffin holes, and level the tops.",
+                "Bake for 18-22 minutes until puffed and just set in the centre.",
+                "Leave to cool for 5 minutes before lifting out; serve warm or chill for later."
+            ];
+        }
+
+        if (mealName.Contains("scramble", StringComparison.OrdinalIgnoreCase) ||
+            mealName.Contains("scrambled", StringComparison.OrdinalIgnoreCase) ||
+            mealName.Contains("omelette", StringComparison.OrdinalIgnoreCase) ||
+            mealName.Contains("omelet", StringComparison.OrdinalIgnoreCase))
+        {
+            var scrambleBase = ingredientNames.FirstOrDefault(name => name.Contains("egg", StringComparison.OrdinalIgnoreCase)) ??
+                               ingredientNames.FirstOrDefault(name => name.Contains("tofu", StringComparison.OrdinalIgnoreCase)) ??
+                               primaryIngredient;
+            var scrambleSupportingIngredients = ingredientNames
+                .Where(name => !name.Equals(scrambleBase, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var firstSupportingIngredient = scrambleSupportingIngredients.ElementAtOrDefault(0) ?? secondaryIngredient;
+            var secondSupportingIngredient = scrambleSupportingIngredients.ElementAtOrDefault(1) ?? thirdIngredient;
+            var finalIngredient = scrambleSupportingIngredients.ElementAtOrDefault(2);
+            var hasEggBase = scrambleBase.Contains("egg", StringComparison.OrdinalIgnoreCase);
+            var basePreparationStep = hasEggBase
+                ? $"Crack and beat {scrambleBase} until smooth, then prep {firstSupportingIngredient} and {secondSupportingIngredient}."
+                : $"Crumble {scrambleBase} into small pieces, then prep {firstSupportingIngredient} and {secondSupportingIngredient}.";
+            var finalStep = string.IsNullOrWhiteSpace(finalIngredient)
+                ? "Serve straight away while the scramble is still soft and hot."
+                : $"Fold through {finalIngredient} right at the end, then serve straight away.";
+
+            return
+            [
+                basePreparationStep,
+                "Heat a non-stick pan over medium heat for 1-2 minutes with a little oil.",
+                $"Cook {firstSupportingIngredient} and {secondSupportingIngredient} for 2-3 minutes until softened.",
+                hasEggBase
+                    ? $"Pour in {scrambleBase} and stir gently for 2-4 minutes until softly set."
+                    : $"Add {scrambleBase} and stir for 3-4 minutes until heated through and lightly golden in places.",
+                finalStep
+            ];
+        }
+
+        if (mealName.Contains("toast", StringComparison.OrdinalIgnoreCase))
+        {
+            var toastBase = ingredientNames.FirstOrDefault(name => name.Contains("bread", StringComparison.OrdinalIgnoreCase)) ??
+                            ingredientNames.FirstOrDefault(name => name.Contains("toast", StringComparison.OrdinalIgnoreCase)) ??
+                            primaryIngredient;
+            var toastTopping = ingredientNames.FirstOrDefault(name => name.Contains("egg", StringComparison.OrdinalIgnoreCase)) ??
+                               ingredientNames.FirstOrDefault(name =>
+                                   !name.Equals(toastBase, StringComparison.OrdinalIgnoreCase) &&
+                                   !name.Contains("milk", StringComparison.OrdinalIgnoreCase)) ??
+                               secondaryIngredient;
+            var toastFinishingIngredient = ingredientNames.FirstOrDefault(name =>
+                                              !name.Equals(toastBase, StringComparison.OrdinalIgnoreCase) &&
+                                              !name.Equals(toastTopping, StringComparison.OrdinalIgnoreCase) &&
+                                              !name.Contains("milk", StringComparison.OrdinalIgnoreCase)) ??
+                                          thirdIngredient;
+
+            return
+            [
+                $"Toast {toastBase} until golden and crisp, then keep it warm.",
+                $"Prep {toastTopping} and {toastFinishingIngredient} so they are ready to go as soon as the toast is done.",
+                "Heat a non-stick pan over medium-low heat with a little oil or butter.",
+                $"Cook {toastTopping} gently until ready, then pile it over {toastBase}.",
+                $"Finish with {toastFinishingIngredient} and serve immediately."
+            ];
+        }
 
         if (mealName.Contains("salad", StringComparison.OrdinalIgnoreCase))
         {
@@ -318,6 +411,14 @@ public sealed partial class AislePilotService
             return false;
         }
 
+        if (IsColdBreakfastMeal(template) &&
+            recipeSteps.Any(step =>
+                ColdBreakfastContradictoryCookingTerms.Any(term =>
+                    ContainsWholeWord(step, term))))
+        {
+            return false;
+        }
+
         var ingredientTerms = template.Ingredients
             .SelectMany(ingredient => BuildIngredientSearchTerms(ingredient.Name))
             .Where(term => !string.IsNullOrWhiteSpace(term))
@@ -345,6 +446,75 @@ public sealed partial class AislePilotService
 
         return WeakRecipeStepPhrases.Any(phrase =>
             normalized.Contains(phrase, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsColdBreakfastMeal(
+        MealTemplate template,
+        string? mealName = null,
+        IReadOnlyList<string>? ingredientNames = null)
+    {
+        var resolvedMealName = mealName ?? template.Name.Trim().ToLowerInvariant();
+        var resolvedIngredientNames = ingredientNames ??
+            template.Ingredients
+                .Select(ingredient => ClampAndNormalize(ingredient.Name, MaxAiIngredientNameLength))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        var isBreakfastMeal = ResolveSuitableMealTypes(template)
+            .Contains("Breakfast", StringComparer.OrdinalIgnoreCase) ||
+            BreakfastNameKeywords.Any(keyword =>
+                resolvedMealName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        if (!isBreakfastMeal)
+        {
+            return false;
+        }
+
+        var isExplicitlyHotBreakfast = resolvedMealName.Contains("scramble", StringComparison.OrdinalIgnoreCase) ||
+                                       resolvedMealName.Contains("scrambled", StringComparison.OrdinalIgnoreCase) ||
+                                       resolvedMealName.Contains("omelette", StringComparison.OrdinalIgnoreCase) ||
+                                       resolvedMealName.Contains("omelet", StringComparison.OrdinalIgnoreCase) ||
+                                       resolvedMealName.Contains("muffin", StringComparison.OrdinalIgnoreCase) ||
+                                       resolvedMealName.Contains("toast", StringComparison.OrdinalIgnoreCase) ||
+                                       resolvedMealName.Contains("pancake", StringComparison.OrdinalIgnoreCase) ||
+                                       resolvedMealName.Contains("porridge", StringComparison.OrdinalIgnoreCase);
+        if (isExplicitlyHotBreakfast)
+        {
+            return false;
+        }
+
+        return resolvedIngredientNames.Any(name =>
+            name.Contains("yogurt", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("yoghurt", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("oat", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("granola", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("muesli", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("chia", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("berry", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("berries", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("honey", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IReadOnlyList<string> BuildColdBreakfastRecipeSteps(IReadOnlyList<string> ingredientNames)
+    {
+        var baseIngredient = ingredientNames.ElementAtOrDefault(0) ?? "your base";
+        var mixInIngredient = ingredientNames.ElementAtOrDefault(1) ?? baseIngredient;
+        var toppingIngredient = ingredientNames.ElementAtOrDefault(2) ?? mixInIngredient;
+        var finishingIngredient = ingredientNames.ElementAtOrDefault(3) ?? toppingIngredient;
+        var usesOatsOrChia = ingredientNames.Any(name =>
+            name.Contains("oat", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("chia", StringComparison.OrdinalIgnoreCase));
+        var chillStep = usesOatsOrChia
+            ? "Cover and chill for at least 10 minutes, or overnight if you want a softer set."
+            : "Let everything sit for 5-10 minutes so the flavours settle and any frozen fruit can soften.";
+
+        return
+        [
+            $"Divide {baseIngredient} between jars or bowls.",
+            $"Stir in {mixInIngredient} until evenly combined.",
+            $"Top with {toppingIngredient} and spread it out evenly.",
+            $"Finish with {finishingIngredient} just before serving if you want the top to stay distinct.",
+            chillStep
+        ];
     }
 
     internal static MealNutritionEstimate EstimateMealNutritionPerServing(

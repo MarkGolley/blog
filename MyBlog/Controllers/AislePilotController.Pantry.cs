@@ -182,7 +182,7 @@ public partial class AislePilotController : Controller
         }
         else
         {
-            savedMealNames.Add(normalizedMealName);
+            savedMealNames.Insert(0, normalizedMealName);
         }
 
         return SerializeSavedEnjoyedMealNameState(savedMealNames);

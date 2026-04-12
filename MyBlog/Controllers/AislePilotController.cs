@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
@@ -59,6 +57,7 @@ public partial class AislePilotController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Index(
         AislePilotPageViewModel pageModel,
+        bool forceRefreshWeek,
         List<string>? currentPlanMealNames,
         CancellationToken cancellationToken)
     {
@@ -79,12 +78,29 @@ public partial class AislePilotController : Controller
         try
         {
             var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+            var shouldForceRefreshWeek =
+                forceRefreshWeek &&
+                resolvedCurrentPlanMealNames is { Count: > 0 };
+            if (shouldForceRefreshWeek)
+            {
+                request.SwapHistoryState = string.Empty;
+                request.IgnoredMealSlotIndexesCsv = string.Empty;
+                request.PantrySuggestionHistoryState = string.Empty;
+            }
             var shouldRecalculateCurrentPlan =
+                !shouldForceRefreshWeek &&
                 resolvedCurrentPlanMealNames is { Count: > 0 } &&
                 ShouldRecalculateCurrentPlan(previousRequest, request);
 
             AislePilotPlanResultViewModel result;
-            if (shouldRecalculateCurrentPlan)
+            if (shouldForceRefreshWeek)
+            {
+                result = await aislePilotService.BuildPlanAvoidingMealsAsync(
+                    request,
+                    resolvedCurrentPlanMealNames!,
+                    cancellationToken);
+            }
+            else if (shouldRecalculateCurrentPlan)
             {
                 try
                 {
@@ -125,77 +141,6 @@ public partial class AislePilotController : Controller
                 "Plan regeneration hit a temporary issue. Please retry in a few seconds.");
             return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
-    }
-
-    private static bool ShouldRecalculateCurrentPlan(
-        AislePilotRequestModel previousRequest,
-        AislePilotRequestModel nextRequest)
-    {
-        if (!HasSameMealCompatibilitySettings(previousRequest, nextRequest))
-        {
-            return false;
-        }
-
-        return previousRequest.HouseholdSize != nextRequest.HouseholdSize ||
-               previousRequest.WeeklyBudget != nextRequest.WeeklyBudget ||
-               !string.Equals(
-                   previousRequest.PortionSize,
-                   nextRequest.PortionSize,
-                   StringComparison.OrdinalIgnoreCase) ||
-               !string.Equals(
-                   previousRequest.LeftoverCookDayIndexesCsv,
-                   nextRequest.LeftoverCookDayIndexesCsv,
-                   StringComparison.OrdinalIgnoreCase) ||
-               !string.Equals(
-                   previousRequest.IgnoredMealSlotIndexesCsv,
-                   nextRequest.IgnoredMealSlotIndexesCsv,
-                   StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool HasSameMealCompatibilitySettings(
-        AislePilotRequestModel previousRequest,
-        AislePilotRequestModel nextRequest)
-    {
-        return string.Equals(previousRequest.Supermarket, nextRequest.Supermarket, StringComparison.OrdinalIgnoreCase) &&
-               previousRequest.PlanDays == nextRequest.PlanDays &&
-               previousRequest.MealsPerDay == nextRequest.MealsPerDay &&
-               AreEquivalentSelections(previousRequest.SelectedMealTypes, nextRequest.SelectedMealTypes) &&
-               AreEquivalentSelections(previousRequest.DietaryModes, nextRequest.DietaryModes) &&
-               string.Equals(
-                   previousRequest.DislikesOrAllergens,
-                   nextRequest.DislikesOrAllergens,
-                   StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(
-                   previousRequest.CustomAisleOrder,
-                   nextRequest.CustomAisleOrder,
-                   StringComparison.OrdinalIgnoreCase) &&
-               previousRequest.PreferQuickMeals == nextRequest.PreferQuickMeals &&
-               previousRequest.IncludeSpecialTreatMeal == nextRequest.IncludeSpecialTreatMeal &&
-               previousRequest.SelectedSpecialTreatCookDayIndex == nextRequest.SelectedSpecialTreatCookDayIndex &&
-               previousRequest.IncludeDessertAddOn == nextRequest.IncludeDessertAddOn &&
-               string.Equals(
-                   previousRequest.SelectedDessertAddOnName,
-                   nextRequest.SelectedDessertAddOnName,
-                   StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool AreEquivalentSelections(
-        IReadOnlyList<string>? left,
-        IReadOnlyList<string>? right)
-    {
-        var leftValues = (left ?? [])
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .Select(static value => value.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var rightValues = (right ?? [])
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .Select(static value => value.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        return leftValues.Count == rightValues.Count &&
-               leftValues.All(value => rightValues.Contains(value, StringComparer.OrdinalIgnoreCase));
     }
 
     [HttpPost("rebalance-budget")]
@@ -491,6 +436,66 @@ public partial class AislePilotController : Controller
         }
     }
 
+    [HttpPost("move-day-card")]
+    [EnableRateLimiting("aislePilotWrites")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveDayCard(
+        AislePilotPageViewModel pageModel,
+        List<string>? currentPlanMealNames,
+        CancellationToken cancellationToken)
+    {
+        var request = NormalizeRequest(pageModel.Request);
+        request.SwapHistoryState = string.Empty;
+        PersistSetupState(request);
+        var resolvedReturnUrl = ResolveReturnUrl(pageModel.ReturnUrl);
+        ValidateRequest(request);
+        var cookDays = Math.Clamp(request.CookDays, 1, Math.Clamp(request.PlanDays, 1, 7));
+        var mealSlotCount = cookDays * Math.Clamp(request.MealsPerDay, MinMealsPerDay, MaxMealsPerDay);
+
+        if (!ModelState.IsValid)
+        {
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        try
+        {
+            var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+            if (resolvedCurrentPlanMealNames is null || resolvedCurrentPlanMealNames.Count != mealSlotCount)
+            {
+                throw new InvalidOperationException("Could not move that meal card right now. Generate a fresh plan and try again.");
+            }
+
+            var result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                resolvedCurrentPlanMealNames,
+                cancellationToken);
+            SyncRequestWithResult(request, result);
+            RefreshResultModelState();
+            PersistSetupState(request);
+            PersistCurrentPlanState(result);
+            var responseModel = BuildPageModel(request, result, returnUrl: resolvedReturnUrl);
+            if (IsAjaxRequest())
+            {
+                return PartialView("_AislePilotResultSections", responseModel);
+            }
+
+            return View("Index", responseModel);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot move day card failed unexpectedly.");
+            ModelState.AddModelError(
+                string.Empty,
+                "Meal card move hit a temporary issue. Please retry.");
+            return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+    }
+
     [HttpPost("toggle-enjoyed-meal")]
     [EnableRateLimiting("aislePilotWrites")]
     [ValidateAntiForgeryToken]
@@ -761,331 +766,6 @@ public partial class AislePilotController : Controller
                 "Saved meal was removed, but the plan could not refresh right now.");
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }
-    }
-
-    [HttpGet("meal-images")]
-    [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
-    public async Task<IActionResult> MealImages([FromQuery] List<string>? mealNames, CancellationToken cancellationToken)
-    {
-        var canGenerateImages = aislePilotService.CanGenerateMealImages();
-        if (mealNames is null || mealNames.Count == 0)
-        {
-            return Ok(new { images = Array.Empty<object>(), canGenerateImages });
-        }
-
-        var normalizedMealNames = mealNames
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Select(name => name.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(24)
-            .ToList();
-        if (normalizedMealNames.Count == 0)
-        {
-            return Ok(new { images = Array.Empty<object>(), canGenerateImages });
-        }
-
-        var imageUrls = await aislePilotService.GetMealImageUrlsAsync(normalizedMealNames, cancellationToken);
-        var images = normalizedMealNames
-            .Select(name => new
-            {
-                mealName = name,
-                imageUrl = ResolveClientMealImageUrl(imageUrls.GetValueOrDefault(name, string.Empty))
-            })
-            .ToList();
-
-        return Ok(new { images, canGenerateImages });
-    }
-
-    [HttpPost("export/plan-pack")]
-    [EnableRateLimiting("aislePilotWrites")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ExportPlanPack(
-        AislePilotPageViewModel pageModel,
-        string? exportTheme,
-        List<string>? currentPlanMealNames,
-        CancellationToken cancellationToken)
-    {
-        var request = NormalizeRequest(pageModel.Request);
-        PersistSetupState(request);
-        ValidateRequest(request);
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
-
-        try
-        {
-            var result = await BuildExportResultAsync(request, currentPlanMealNames, cancellationToken);
-            var useDarkTheme = string.Equals(exportTheme, "dark", StringComparison.OrdinalIgnoreCase);
-            var bytes = aislePilotExportService.BuildPlanPackPdf(request, result, useDarkTheme);
-            var fileName = $"aislepilot-plan-pack-{DateTime.UtcNow:yyyyMMdd}.pdf";
-            Response.Headers.ContentDisposition = $"inline; filename=\"{fileName}\"";
-            return File(bytes, "application/pdf");
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Problem(title: "AislePilot AI unavailable", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "AislePilot plan-pack export failed unexpectedly.");
-            return Problem(
-                title: "Export failed",
-                detail: "Plan-pack export hit a temporary issue. Please retry.",
-                statusCode: StatusCodes.Status500InternalServerError);
-        }
-    }
-
-    [HttpPost("export/checklist")]
-    [EnableRateLimiting("aislePilotWrites")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ExportChecklist(
-        AislePilotPageViewModel pageModel,
-        List<string>? currentPlanMealNames,
-        CancellationToken cancellationToken)
-    {
-        var request = NormalizeRequest(pageModel.Request);
-        PersistSetupState(request);
-        ValidateRequest(request);
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
-
-        try
-        {
-            var result = await BuildExportResultAsync(request, currentPlanMealNames, cancellationToken);
-            var content = aislePilotExportService.BuildChecklistText(result);
-            var bytes = Encoding.UTF8.GetBytes(content);
-            var fileName = $"aislepilot-checklist-{DateTime.UtcNow:yyyyMMdd}.txt";
-            return File(bytes, "text/plain; charset=utf-8", fileName);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Problem(title: "AislePilot AI unavailable", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "AislePilot checklist export failed unexpectedly.");
-            return Problem(
-                title: "Export failed",
-                detail: "Checklist export hit a temporary issue. Please retry.",
-                statusCode: StatusCodes.Status500InternalServerError);
-        }
-    }
-
-    private async Task<AislePilotPlanResultViewModel> BuildExportResultAsync(
-        AislePilotRequestModel request,
-        IReadOnlyList<string>? currentPlanMealNames,
-        CancellationToken cancellationToken)
-    {
-        var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
-        if (resolvedCurrentPlanMealNames is not null && resolvedCurrentPlanMealNames.Count > 0)
-        {
-            return await aislePilotService.BuildPlanFromCurrentMealsAsync(request, resolvedCurrentPlanMealNames, cancellationToken);
-        }
-
-        logger.LogWarning("AislePilot export request did not include currentPlanMealNames; regenerating plan.");
-        return await aislePilotService.BuildPlanAsync(request, cancellationToken);
-    }
-
-    private AislePilotPageViewModel BuildPageModel(
-        AislePilotRequestModel request,
-        AislePilotPlanResultViewModel? result = null,
-        IReadOnlyList<AislePilotPantrySuggestionViewModel>? pantrySuggestions = null,
-        string returnUrl = "",
-        IReadOnlyList<AislePilotSavedWeekSummaryViewModel>? savedWeeks = null)
-    {
-        return new AislePilotPageViewModel
-        {
-            Request = request,
-            ReturnUrl = returnUrl,
-            Result = result,
-            SavedWeeks = savedWeeks ?? BuildSavedWeekSummaries(TryReadSavedWeekState()),
-            SavedMeals = ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
-            PantrySuggestions = pantrySuggestions ?? [],
-            SupermarketOptions = aislePilotService.GetSupportedSupermarkets(),
-            PortionSizeOptions = aislePilotService.GetSupportedPortionSizes(),
-            DietaryOptions = aislePilotService.GetSupportedDietaryModes(),
-            MealImagePollingEnabled = aislePilotService.CanGenerateMealImages()
-        };
-    }
-
-    private void ValidateRequest(AislePilotRequestModel request)
-    {
-        var supermarkets = aislePilotService.GetSupportedSupermarkets();
-        var portionSizes = aislePilotService.GetSupportedPortionSizes();
-        var dietaryModes = aislePilotService.GetSupportedDietaryModes();
-
-        if (!supermarkets.Contains(request.Supermarket, StringComparer.OrdinalIgnoreCase))
-        {
-            ModelState.AddModelError("Request.Supermarket", "Select a supported supermarket.");
-        }
-
-        if (!portionSizes.Contains(request.PortionSize, StringComparer.OrdinalIgnoreCase))
-        {
-            ModelState.AddModelError("Request.PortionSize", "Select a supported portion size.");
-        }
-
-        var unsupportedDietaryModes = request.DietaryModes
-            .Where(x => !dietaryModes.Contains(x, StringComparer.OrdinalIgnoreCase))
-            .ToList();
-
-        if (unsupportedDietaryModes.Count > 0)
-        {
-            ModelState.AddModelError("Request.DietaryModes", "One or more dietary options were not recognised.");
-        }
-
-        if (request.DietaryModes.Count == 0)
-        {
-            ModelState.AddModelError("Request.DietaryModes", "Choose at least one dietary mode.");
-        }
-
-        ValidateMealTypeSelection(request);
-        if (request.IncludeSpecialTreatMeal &&
-            !request.SelectedMealTypes.Contains("Dinner", StringComparer.OrdinalIgnoreCase))
-        {
-            ModelState.AddModelError(
-                "Request.IncludeSpecialTreatMeal",
-                "Special treat requires the Dinner meal slot.");
-        }
-
-        if (string.Equals(request.Supermarket, "Custom", StringComparison.OrdinalIgnoreCase))
-        {
-            var customAisles = ParseCustomAisles(request.CustomAisleOrder);
-            if (customAisles.Count < 3)
-            {
-                ModelState.AddModelError(
-                    "Request.CustomAisleOrder",
-                    "Add at least 3 comma-separated aisles when using Custom supermarket.");
-            }
-        }
-
-        if (ModelState.ErrorCount == 0 && !aislePilotService.HasCompatibleMeals(request))
-        {
-            ModelState.AddModelError(
-                "Request.DietaryModes",
-                "No meals match your dietary modes and dislike/allergen notes. Remove one constraint and try again.");
-        }
-    }
-
-    private void ValidateMealTypeSelection(AislePilotRequestModel request)
-    {
-        var selectedMealTypes = NormalizeSelectedMealTypes(request.SelectedMealTypes);
-        request.SelectedMealTypes = selectedMealTypes;
-        if (selectedMealTypes.Count > 0)
-        {
-            request.MealsPerDay = selectedMealTypes.Count;
-        }
-
-        if (selectedMealTypes.Count < MinMealsPerDay || selectedMealTypes.Count > MaxMealsPerDay)
-        {
-            ModelState.AddModelError(
-                "Request.SelectedMealTypes",
-                "Choose 1 to 3 meal slots (Breakfast, Lunch, Dinner).");
-        }
-    }
-
-    private void ValidateRequestForSuggestions(AislePilotRequestModel request)
-    {
-        var supermarkets = aislePilotService.GetSupportedSupermarkets();
-        var portionSizes = aislePilotService.GetSupportedPortionSizes();
-        var dietaryModes = aislePilotService.GetSupportedDietaryModes();
-
-        if (!supermarkets.Contains(request.Supermarket, StringComparer.OrdinalIgnoreCase))
-        {
-            ModelState.AddModelError("Request.Supermarket", "Select a supported supermarket.");
-        }
-
-        if (!portionSizes.Contains(request.PortionSize, StringComparer.OrdinalIgnoreCase))
-        {
-            ModelState.AddModelError("Request.PortionSize", "Select a supported portion size.");
-        }
-
-        var unsupportedDietaryModes = request.DietaryModes
-            .Where(x => !dietaryModes.Contains(x, StringComparer.OrdinalIgnoreCase))
-            .ToList();
-
-        if (unsupportedDietaryModes.Count > 0)
-        {
-            ModelState.AddModelError("Request.DietaryModes", "One or more dietary options were not recognised.");
-        }
-
-        if (request.DietaryModes.Count == 0)
-        {
-            ModelState.AddModelError("Request.DietaryModes", "Choose at least one dietary mode.");
-        }
-
-        ValidateMealTypeSelection(request);
-
-        if (string.IsNullOrWhiteSpace(request.PantryItems))
-        {
-            ModelState.AddModelError("Request.PantryItems", "Add a few pantry ingredients to get meal suggestions.");
-        }
-    }
-
-    private static IReadOnlyList<string> ParseCustomAisles(string? customAisleOrder)
-    {
-        return (customAisleOrder ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(x => x.Trim())
-            .Where(x => x.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    private static string ResolveClientMealImageUrl(string? imageUrl)
-    {
-        var normalized = imageUrl?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return $"{AislePilotImagePathPrefix}/aislepilot-icon.svg";
-        }
-
-        if (normalized.StartsWith($"{AislePilotImagePathPrefix}/", StringComparison.OrdinalIgnoreCase))
-        {
-            return normalized;
-        }
-
-        if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"{AislePilotImagePathPrefix}/{normalized["/images/".Length..]}";
-        }
-
-        normalized = normalized.Replace('\\', '/');
-        if (!normalized.StartsWith("/", StringComparison.Ordinal))
-        {
-            var trimmed = normalized.TrimStart('/');
-            if (trimmed.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"{AislePilotImagePathPrefix}/{trimmed["images/".Length..]}";
-            }
-
-            if (trimmed.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"{AislePilotImagePathPrefix}/{trimmed}";
-            }
-
-            var hasImageExtension =
-                trimmed.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
-            if (hasImageExtension)
-            {
-                return $"{AislePilotImagePathPrefix}/aislepilot-meals/{trimmed}";
-            }
-        }
-
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
-            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
-             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
-        {
-            return normalized;
-        }
-
-        return normalized;
     }
 
 }
