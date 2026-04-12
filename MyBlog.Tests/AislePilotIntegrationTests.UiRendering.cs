@@ -177,6 +177,39 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task Index_Post_WithMultipleDayCards_RendersDayCardReorderFormAndHandles()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "90",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "3",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.LeftoverCookDayIndexesCsv"] = "0",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("data-day-reorder-form", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-reorder-handle", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-meal-names=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-ignored-flags=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-leftover-count=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Get_RendersPeopleSliderWithThumbFriendlyModifier()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -293,6 +326,22 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("imageElement.replaceWith(preservedImageElement);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const preservedMealImageSources = captureRenderedMealImageSources(document);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("restoreRenderedMealImageSources(document, preservedMealImageSources);", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotScript_DayCardReorder_RebuildsPlanStateBeforeAjaxSubmit()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+
+        Assert.Contains("const syncDayReorderFormState = form => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const buildDayCardLeftoverSourceIndexesCsv = cards => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const buildDayCardIgnoredIndexesCsv = cards => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const wireDayCardReorder = scope => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("swapForm.hasAttribute(\"data-day-reorder-form\")", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("showToast(\"Meal day updated.\", \"success\");", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("form.requestSubmit();", script, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

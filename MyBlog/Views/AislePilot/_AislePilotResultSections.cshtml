@@ -37,6 +37,7 @@
             LeftoverDaysCovered = group.Max(entry => entry.meal.LeftoverDaysCovered)
         })
         .ToList();
+    var canReorderDayCards = dayMealGroups.Count > 1;
     var weekDayLookup = planWeekDayNames
         .Select((name, index) => new { name, index })
         .ToDictionary(x => x.name, x => x.index, StringComparer.OrdinalIgnoreCase);
@@ -614,6 +615,20 @@
                                      model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true, includeLeftoverCsvDataAttribute: true)" />
                         </form>
                     }
+                    @if (canReorderDayCards)
+                    {
+                        <form method="post"
+                              action="@Url.Action("MoveDayCard", "AislePilot")#aislepilot-meals"
+                              class="aislepilot-day-reorder-form"
+                              data-day-reorder-form
+                              data-ajax-swap-form
+                              data-preserve-scroll-form
+                              hidden>
+                            @Html.AntiForgeryToken()
+                            <partial name="_AislePilotHiddenRequestFields"
+                                     model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true, includeLeftoverCsvDataAttribute: true)" />
+                        </form>
+                    }
                     <div class="aislepilot-meal-grid"
                          data-meal-image-poll-root
                          data-fallback-meal-image-url="@fallbackMealImageUrl"
@@ -642,7 +657,20 @@
                             var dayWeekIndex = weekDayLookup.TryGetValue(dayGroup.Day, out var resolvedWeekDayIndex)
                                 ? resolvedWeekDayIndex
                                 : Math.Clamp(dayGroupIndex, 0, Math.Max(0, result.PlanDays - 1));
-                            <article class="@mealCardClass" data-leftover-day-card data-day-index="@firstMealIndex" data-day-meal-card>
+                            var serializedDayMealNames = JsonSerializer.Serialize(dayGroup.Entries.Select(entry => entry.meal.MealName).ToList());
+                            var serializedIgnoredFlags = JsonSerializer.Serialize(dayGroup.Entries
+                                .Select(entry => ignoredMealSlotIndexes.Contains(entry.index) || entry.meal.IsIgnored)
+                                .ToList());
+                            var dayGroupHasSpecialTreat = dayGroup.Entries.Any(entry => entry.meal.IsSpecialTreat);
+                            <article class="@mealCardClass"
+                                     data-leftover-day-card
+                                     data-day-index="@firstMealIndex"
+                                     data-day-meal-card
+                                     data-day-card-order="@dayGroupIndex"
+                                     data-day-card-leftover-count="@dayGroup.LeftoverDaysCovered"
+                                     data-day-card-meal-names="@serializedDayMealNames"
+                                     data-day-card-ignored-flags="@serializedIgnoredFlags"
+                                     data-day-card-has-special-treat="@(dayGroupHasSpecialTreat ? "true" : "false")">
                                 <details class="aislepilot-day-card-expander" data-day-card-expander @dayCardOpenAttribute>
                                     <summary class="aislepilot-day-card-expander-summary"
                                              aria-controls="@dayCardExpanderBodyId"
@@ -661,6 +689,24 @@
                                         <span class="aislepilot-day-card-expander-meta"
                                               data-day-card-expander-meta
                                               data-day-card-expander-meta-default="@daySummaryMeta">@daySummaryMeta</span>
+                                        @if (canReorderDayCards)
+                                        {
+                                            <button type="button"
+                                                    class="aislepilot-day-card-reorder-handle aislepilot-day-card-reorder-handle-summary"
+                                                    data-day-reorder-handle
+                                                    aria-label="Hold and drag to move @dayGroup.Day">
+                                                <span class="aislepilot-day-card-reorder-handle-glyph" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                        <circle cx="8" cy="7" r="1.4"></circle>
+                                                        <circle cx="8" cy="12" r="1.4"></circle>
+                                                        <circle cx="8" cy="17" r="1.4"></circle>
+                                                        <circle cx="16" cy="7" r="1.4"></circle>
+                                                        <circle cx="16" cy="12" r="1.4"></circle>
+                                                        <circle cx="16" cy="17" r="1.4"></circle>
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                        }
                                     </summary>
                                     <div id="@dayCardExpanderBodyId" class="aislepilot-day-card-expander-body">
                                 <div class="aislepilot-card-head aislepilot-day-card-head">
@@ -674,26 +720,46 @@
                                                aria-label="Selected meal cost and cook time">@daySummaryMeta</p>
                                         }
                                     </div>
-                                    @if (result.PlanDays > 1)
-                                    {
-                                        var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0
-                                            ? $"{dayGroup.Day}: cook-extra x{dayGroup.LeftoverDaysCovered}"
-                                            : $"{dayGroup.Day}: no cook-extra";
-                                        var dayAllocationControlClass = dayGroup.LeftoverDaysCovered > 0
-                                            ? "aislepilot-day-card-leftover-controls is-leftover-source is-menu-only"
-                                            : "aislepilot-day-card-leftover-controls is-menu-only";
-                                        <div class="@dayAllocationControlClass"
-                                             data-leftover-day-zone
-                                             data-day-index="@dayWeekIndex"
-                                             data-day-name="@dayGroup.Day"
-                                             data-leftover-count="@dayGroup.LeftoverDaysCovered"
-                                             aria-label="@dayAllocationAriaLabel">
-                                            @{
-                                                var dayCountHiddenAttribute = dayGroup.LeftoverDaysCovered > 1 ? null : "hidden";
-                                            }
-                                            <span class="aislepilot-leftover-day-count" data-leftover-day-count @dayCountHiddenAttribute>x@dayGroup.LeftoverDaysCovered</span>
-                                        </div>
-                                    }
+                                    <div class="aislepilot-day-card-head-side">
+                                        @if (canReorderDayCards)
+                                        {
+                                            <button type="button"
+                                                    class="aislepilot-day-card-reorder-handle"
+                                                    data-day-reorder-handle
+                                                    aria-label="Hold and drag to move @dayGroup.Day">
+                                                <span class="aislepilot-day-card-reorder-handle-glyph" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" focusable="false">
+                                                        <circle cx="8" cy="7" r="1.4"></circle>
+                                                        <circle cx="8" cy="12" r="1.4"></circle>
+                                                        <circle cx="8" cy="17" r="1.4"></circle>
+                                                        <circle cx="16" cy="7" r="1.4"></circle>
+                                                        <circle cx="16" cy="12" r="1.4"></circle>
+                                                        <circle cx="16" cy="17" r="1.4"></circle>
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                        }
+                                        @if (result.PlanDays > 1)
+                                        {
+                                            var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0
+                                                ? $"{dayGroup.Day}: cook-extra x{dayGroup.LeftoverDaysCovered}"
+                                                : $"{dayGroup.Day}: no cook-extra";
+                                            var dayAllocationControlClass = dayGroup.LeftoverDaysCovered > 0
+                                                ? "aislepilot-day-card-leftover-controls is-leftover-source is-menu-only"
+                                                : "aislepilot-day-card-leftover-controls is-menu-only";
+                                            <div class="@dayAllocationControlClass"
+                                                 data-leftover-day-zone
+                                                 data-day-index="@dayWeekIndex"
+                                                 data-day-name="@dayGroup.Day"
+                                                 data-leftover-count="@dayGroup.LeftoverDaysCovered"
+                                                 aria-label="@dayAllocationAriaLabel">
+                                                @{
+                                                    var dayCountHiddenAttribute = dayGroup.LeftoverDaysCovered > 1 ? null : "hidden";
+                                                }
+                                                <span class="aislepilot-leftover-day-count" data-leftover-day-count @dayCountHiddenAttribute>x@dayGroup.LeftoverDaysCovered</span>
+                                            </div>
+                                        }
+                                    </div>
                                 </div>
 
                                 @if (dayGroup.Entries.Count > 1)

@@ -234,6 +234,56 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task MoveDayCard_ValidRequest_ReordersCurrentPlanSequence()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var reorderedMealNames = new[]
+        {
+            "Chicken stir fry with rice",
+            "Turkey chilli with beans"
+        };
+        var formValues = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "90"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "3"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", string.Empty),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.LeftoverCookDayIndexesCsv", "1"),
+            new("Request.SwapHistoryState", "0:Turkey chilli with beans"),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in reorderedMealNames)
+        {
+            formValues.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/move-day-card", new FormUrlEncodedContent(formValues));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        var renderedMealNames = ExtractRenderedMealNames(html);
+        Assert.Equal(reorderedMealNames, renderedMealNames);
+        Assert.Contains(
+            "name=\"Request.LeftoverCookDayIndexesCsv\" value=\"1\"",
+            html,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "name=\"Request.SwapHistoryState\" value=\"\"",
+            html,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ToggleEnjoyedMeal_ValidRequest_PersistsSavedMealState()
     {
         using var client = CreateClient(allowAutoRedirect: true);

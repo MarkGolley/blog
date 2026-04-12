@@ -4794,6 +4794,358 @@
         });
     };
 
+    const parseDayCardJsonArray = (serializedValue, itemMapper) => {
+        if (typeof serializedValue !== "string" || serializedValue.trim().length === 0) {
+            return [];
+        }
+
+        try {
+            const parsed = JSON.parse(serializedValue);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            return typeof itemMapper === "function"
+                ? parsed.map(itemMapper)
+                : parsed;
+        } catch {
+            return [];
+        }
+    };
+
+    const readDayCardMealNames = card => {
+        if (!(card instanceof HTMLElement)) {
+            return [];
+        }
+
+        return parseDayCardJsonArray(card.dataset.dayCardMealNames, value =>
+            typeof value === "string" ? value.trim() : "").filter(value => value.length > 0);
+    };
+
+    const readDayCardIgnoredFlags = card => {
+        if (!(card instanceof HTMLElement)) {
+            return [];
+        }
+
+        const mealNames = readDayCardMealNames(card);
+        const parsedFlags = parseDayCardJsonArray(card.dataset.dayCardIgnoredFlags, value => value === true);
+        if (parsedFlags.length === mealNames.length) {
+            return parsedFlags;
+        }
+
+        return mealNames.map(() => false);
+    };
+
+    const getReorderableDayCards = scope => {
+        const root = scope instanceof Element ? scope : document;
+        return Array.from(root.querySelectorAll("[data-day-meal-card][data-day-card-meal-names]"))
+            .filter(card => card instanceof HTMLElement);
+    };
+
+    const buildDayCardCurrentPlanMealNames = cards => {
+        const mealNames = [];
+        cards.forEach(card => {
+            readDayCardMealNames(card).forEach(mealName => {
+                if (mealName.length > 0) {
+                    mealNames.push(mealName);
+                }
+            });
+        });
+        return mealNames;
+    };
+
+    const buildDayCardIgnoredIndexesCsv = cards => {
+        const ignoredIndexes = [];
+        let slotIndex = 0;
+        cards.forEach(card => {
+            readDayCardIgnoredFlags(card).forEach(isIgnored => {
+                if (isIgnored) {
+                    ignoredIndexes.push(slotIndex);
+                }
+
+                slotIndex += 1;
+            });
+        });
+
+        return ignoredIndexes.join(",");
+    };
+
+    const buildDayCardLeftoverSourceIndexesCsv = cards => {
+        const sourceIndexes = [];
+        let weekDayIndex = 0;
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+
+            const leftoverCount = Number.parseInt(card.dataset.dayCardLeftoverCount ?? "0", 10);
+            const safeLeftoverCount = Number.isInteger(leftoverCount)
+                ? Math.max(0, leftoverCount)
+                : 0;
+            for (let index = 0; index < safeLeftoverCount; index += 1) {
+                sourceIndexes.push(weekDayIndex);
+            }
+
+            weekDayIndex += Math.max(1, safeLeftoverCount + 1);
+        });
+
+        return sourceIndexes.join(",");
+    };
+
+    const syncDayReorderFormState = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return false;
+        }
+
+        const cards = getReorderableDayCards(form.parentElement ?? document);
+        const reorderedMealNames = buildDayCardCurrentPlanMealNames(cards);
+        if (reorderedMealNames.length <= 1) {
+            return false;
+        }
+
+        const leftoverInput = form.querySelector("input[name='Request.LeftoverCookDayIndexesCsv']");
+        if (leftoverInput instanceof HTMLInputElement) {
+            leftoverInput.value = buildDayCardLeftoverSourceIndexesCsv(cards);
+        }
+
+        const ignoredInput = form.querySelector("input[name='Request.IgnoredMealSlotIndexesCsv']");
+        if (ignoredInput instanceof HTMLInputElement) {
+            ignoredInput.value = buildDayCardIgnoredIndexesCsv(cards);
+        }
+
+        const swapHistoryInput = form.querySelector("input[name='Request.SwapHistoryState']");
+        if (swapHistoryInput instanceof HTMLInputElement) {
+            swapHistoryInput.value = "";
+        }
+
+        const specialTreatInput = form.querySelector("input[name='Request.SelectedSpecialTreatCookDayIndex']");
+        if (specialTreatInput instanceof HTMLInputElement) {
+            const specialTreatCardIndex = cards.findIndex(card =>
+                card instanceof HTMLElement && card.dataset.dayCardHasSpecialTreat === "true");
+            if (specialTreatCardIndex >= 0) {
+                specialTreatInput.value = `${specialTreatCardIndex}`;
+            }
+        }
+
+        Array.from(form.querySelectorAll("input[name='currentPlanMealNames']")).forEach(input => {
+            input.remove();
+        });
+
+        reorderedMealNames.forEach(mealName => {
+            const hiddenInput = document.createElement("input");
+            hiddenInput.type = "hidden";
+            hiddenInput.name = "currentPlanMealNames";
+            hiddenInput.value = mealName;
+            form.append(hiddenInput);
+        });
+
+        return true;
+    };
+
+    const wireDayCardReorder = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-reorder-form]"))
+            : Array.from(document.querySelectorAll("[data-day-reorder-form]"));
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement) || form.dataset.dayReorderWired === "true") {
+                return;
+            }
+
+            const root = form.parentElement;
+            if (!(root instanceof Element)) {
+                return;
+            }
+
+            const handles = Array.from(root.querySelectorAll("[data-day-reorder-handle]"));
+            if (handles.length === 0) {
+                return;
+            }
+
+            form.dataset.dayReorderWired = "true";
+            let activePointerId = null;
+            let activeHandle = null;
+            let activeCard = null;
+            let pointerStartY = 0;
+            let lastSwapY = 0;
+            let hasMoved = false;
+            let activationTimerId = null;
+            let reorderActivated = false;
+
+            const clearActivationTimer = () => {
+                if (typeof activationTimerId === "number") {
+                    window.clearTimeout(activationTimerId);
+                }
+
+                activationTimerId = null;
+            };
+
+            const activateReorder = () => {
+                if (!(activeCard instanceof HTMLElement) || !(activeHandle instanceof HTMLElement) || reorderActivated) {
+                    return;
+                }
+
+                reorderActivated = true;
+                activeCard.classList.add("is-reorder-active");
+                activeHandle.classList.add("is-reorder-active");
+            };
+
+            const cleanupReorder = shouldSubmit => {
+                clearActivationTimer();
+                if (activeCard instanceof HTMLElement) {
+                    activeCard.classList.remove("is-reorder-active");
+                }
+
+                if (activeHandle instanceof HTMLElement) {
+                    activeHandle.classList.remove("is-reorder-active");
+                }
+
+                const reorderChanged = hasMoved;
+                activePointerId = null;
+                activeHandle = null;
+                activeCard = null;
+                hasMoved = false;
+                reorderActivated = false;
+
+                if (!shouldSubmit || !reorderChanged || form.dataset.ajaxSwapSubmitting === "true") {
+                    return;
+                }
+
+                if (!syncDayReorderFormState(form)) {
+                    return;
+                }
+
+                persistSwapScrollPosition(form);
+                form.requestSubmit();
+            };
+
+            const moveCardInDirection = direction => {
+                if (!(activeCard instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const cards = getReorderableDayCards(root);
+                const currentIndex = cards.indexOf(activeCard);
+                if (currentIndex < 0) {
+                    return false;
+                }
+
+                if (direction < 0 && currentIndex > 0) {
+                    cards[currentIndex - 1].before(activeCard);
+                    return true;
+                }
+
+                if (direction > 0 && currentIndex < cards.length - 1) {
+                    cards[currentIndex + 1].after(activeCard);
+                    return true;
+                }
+
+                return false;
+            };
+
+            handles.forEach(handle => {
+                if (!(handle instanceof HTMLElement) || handle.dataset.dayReorderHandleWired === "true") {
+                    return;
+                }
+
+                handle.dataset.dayReorderHandleWired = "true";
+                handle.addEventListener("click", event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                });
+
+                handle.addEventListener("pointerdown", event => {
+                    if (form.dataset.ajaxSwapSubmitting === "true") {
+                        return;
+                    }
+
+                    if (event.pointerType === "mouse" && event.button !== 0) {
+                        return;
+                    }
+
+                    const card = handle.closest("[data-day-meal-card][data-day-card-meal-names]");
+                    if (!(card instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    activePointerId = event.pointerId;
+                    activeHandle = handle;
+                    activeCard = card;
+                    pointerStartY = event.clientY;
+                    lastSwapY = event.clientY;
+                    hasMoved = false;
+                    reorderActivated = false;
+                    clearActivationTimer();
+                    activationTimerId = window.setTimeout(() => {
+                        activateReorder();
+                    }, 140);
+                    handle.setPointerCapture(event.pointerId);
+                    event.preventDefault();
+                    event.stopPropagation();
+                });
+
+                handle.addEventListener("pointermove", event => {
+                    if (activePointerId === null || event.pointerId !== activePointerId) {
+                        return;
+                    }
+
+                    if (!reorderActivated && Math.abs(event.clientY - pointerStartY) >= 8) {
+                        activateReorder();
+                    }
+
+                    if (!reorderActivated) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    const movementThreshold = Math.max(
+                        32,
+                        activeCard instanceof HTMLElement ? Math.round(activeCard.getBoundingClientRect().height * 0.22) : 32);
+                    const deltaY = event.clientY - lastSwapY;
+                    if (Math.abs(deltaY) < movementThreshold) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    const moved = moveCardInDirection(deltaY < 0 ? -1 : 1);
+                    if (moved) {
+                        hasMoved = true;
+                        lastSwapY = event.clientY;
+                    }
+
+                    event.preventDefault();
+                });
+
+                handle.addEventListener("pointerup", event => {
+                    if (activePointerId === null || event.pointerId !== activePointerId) {
+                        return;
+                    }
+
+                    try {
+                        handle.releasePointerCapture(event.pointerId);
+                    } catch {
+                        // Pointer capture can already be released if the browser cancels the gesture.
+                    }
+                    event.preventDefault();
+                    cleanupReorder(true);
+                });
+
+                handle.addEventListener("pointercancel", event => {
+                    if (activePointerId === null || event.pointerId !== activePointerId) {
+                        return;
+                    }
+
+                    try {
+                        handle.releasePointerCapture(event.pointerId);
+                    } catch {
+                        // Pointer capture can already be released if the browser cancels the gesture.
+                    }
+                    cleanupReorder(false);
+                });
+            });
+        });
+    };
+
     const wireDayCardExpanders = scope => {
         const expanders = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-day-card-expander]"))
@@ -5562,6 +5914,7 @@
             const isIgnoreForm = swapForm.classList.contains("aislepilot-ignore-form");
             const isLeftoverRebalanceForm = swapForm.hasAttribute("data-leftover-rebalance-form");
             const isDessertSwapForm = swapForm.action.toLowerCase().includes("/swap-dessert");
+            const isDayReorderForm = swapForm.hasAttribute("data-day-reorder-form");
             const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
             const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
                 ? scrollSnapshot.anchorDayIndex
@@ -5572,6 +5925,8 @@
                 currentCard.setAttribute("aria-busy", "true");
                 currentCard.dataset.swapStatus = isLeftoverRebalanceForm
                     ? "Updating meal plan..."
+                    : isDayReorderForm
+                        ? "Moving meal card..."
                     : isIgnoreForm
                         ? "Updating meal..."
                         : isDessertSwapForm
@@ -5652,6 +6007,8 @@
 
                     if (isLeftoverRebalanceForm) {
                         // Leftover rebalancing is an inline layout tweak; avoid generic swap toast noise.
+                    } else if (isDayReorderForm) {
+                        showToast("Meal day updated.", "success");
                     } else if (isIgnoreForm) {
                         const normalizedAction = submitActionLabel.toLowerCase();
                         const ignoreMessage = normalizedAction.includes("ignore")
@@ -5719,6 +6076,7 @@
         wireCardMoreActions(scope);
         wireInlineDetailsPanels(scope);
         wireDayCardExpanders(scope);
+        wireDayCardReorder(scope);
         wireDayMealCards(scope);
         wireShoppingChecklist(scope);
         wireCustomShoppingList(scope);
