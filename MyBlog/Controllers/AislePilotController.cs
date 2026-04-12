@@ -57,6 +57,7 @@ public partial class AislePilotController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Index(
         AislePilotPageViewModel pageModel,
+        bool forceRefreshWeek,
         List<string>? currentPlanMealNames,
         CancellationToken cancellationToken)
     {
@@ -77,12 +78,29 @@ public partial class AislePilotController : Controller
         try
         {
             var resolvedCurrentPlanMealNames = ResolveCurrentPlanMealNames(currentPlanMealNames);
+            var shouldForceRefreshWeek =
+                forceRefreshWeek &&
+                resolvedCurrentPlanMealNames is { Count: > 0 };
+            if (shouldForceRefreshWeek)
+            {
+                request.SwapHistoryState = string.Empty;
+                request.IgnoredMealSlotIndexesCsv = string.Empty;
+                request.PantrySuggestionHistoryState = string.Empty;
+            }
             var shouldRecalculateCurrentPlan =
+                !shouldForceRefreshWeek &&
                 resolvedCurrentPlanMealNames is { Count: > 0 } &&
                 ShouldRecalculateCurrentPlan(previousRequest, request);
 
             AislePilotPlanResultViewModel result;
-            if (shouldRecalculateCurrentPlan)
+            if (shouldForceRefreshWeek)
+            {
+                result = await aislePilotService.BuildPlanAvoidingMealsAsync(
+                    request,
+                    resolvedCurrentPlanMealNames!,
+                    cancellationToken);
+            }
+            else if (shouldRecalculateCurrentPlan)
             {
                 try
                 {

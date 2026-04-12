@@ -129,7 +129,8 @@ Return JSON only with this schema:
         IReadOnlyList<string> mealTypeSlots,
         int totalMealCount,
         int requestedMealCount,
-        bool compactJson = false)
+        bool compactJson = false,
+        IReadOnlyList<string>? excludedMealNames = null)
     {
         var strictModes = context.DietaryModes
             .Where(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase))
@@ -152,6 +153,15 @@ Return JSON only with this schema:
             : "disabled";
         var resolvedMealTypeSlots = NormalizeMealTypeSlots(mealTypeSlots, mealsPerDay);
         var mealTypePattern = string.Join(" -> ", resolvedMealTypeSlots);
+        var normalizedExcludedMealNames = (excludedMealNames ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(24)
+            .ToArray();
+        var excludedMealsText = normalizedExcludedMealNames.Length == 0
+            ? "none"
+            : string.Join(", ", normalizedExcludedMealNames);
 
         return $$"""
 Generate a weekly meal plan for a UK grocery-planning app.
@@ -174,6 +184,7 @@ Planner inputs:
 - Pantry items already available: {{pantryText}}
 - Saved enjoyed meal names: {{savedEnjoyedMealsText}}
 - Saved meal repeat preference: {{savedMealRepeatPreference}}
+- Excluded meal names for this refresh: {{excludedMealsText}}
 
 Rules:
 - Return exactly {{requestedMealCount}} meals in `meals`.
@@ -188,6 +199,7 @@ Rules:
 - Use typical UK non-promo shelf prices (no loyalty-only offers, markdowns, or extreme bulk discounts).
 - Keep the full plan period roughly within the stated budget.
 - Avoid repeating the same meal in this plan.
+- Do not use any meal name from the excluded meal names list.
 - If saved meal repeat preference is enabled and saved meals are compatible, include some of those meals where possible.
 - Respect dietary requirements and dislikes/allergens strictly.
 - Assume standard pantry basics are available (oil, salt, pepper, dried herbs) even if not listed.

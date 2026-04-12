@@ -1126,6 +1126,75 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_NormalizesIngredientDisplayCapitalizationAcrossMealAndShoppingViews()
+    {
+        ClearAiPool();
+
+        var mealOneName = $"Creamy greens pasta {Guid.NewGuid():N}";
+        var mealTwoName = $"Warm greens tray {Guid.NewGuid():N}";
+        var mealOne = CreateMealTemplateWithIngredients(
+            mealOneName,
+            [
+                ("spINNACH", "Produce", 1m, "pcs", 0.60m),
+                ("garLIC", "Produce", 2m, "pcs", 0.20m)
+            ]);
+        var mealTwo = CreateMealTemplateWithIngredients(
+            mealTwoName,
+            [
+                ("spinnach", "Produce", 2m, "pcs", 1.10m),
+                ("LEMON zest", "Produce", 1m, "pcs", 0.35m)
+            ]);
+
+        InvokeAddMealsToAiPool([mealOne, mealTwo]);
+
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 80m,
+            HouseholdSize = 2,
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            DietaryModes = ["Balanced"]
+        };
+
+        try
+        {
+            var result = await _service.BuildPlanFromCurrentMealsAsync(request, [mealOneName, mealTwoName]);
+
+            var normalizedIngredientLines = result.MealPlan
+                .SelectMany(meal => meal.IngredientLines)
+                .Where(line => line.Contains("spinnach", StringComparison.OrdinalIgnoreCase) ||
+                               line.Contains("garlic", StringComparison.OrdinalIgnoreCase) ||
+                               line.Contains("lemon zest", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Assert.Contains(normalizedIngredientLines, line => line.Contains("Spinnach", StringComparison.Ordinal));
+            Assert.Contains(normalizedIngredientLines, line => line.Contains("Garlic", StringComparison.Ordinal));
+            Assert.Contains(normalizedIngredientLines, line => line.Contains("Lemon zest", StringComparison.Ordinal));
+            Assert.DoesNotContain(normalizedIngredientLines, line => line.Contains("spINNACH", StringComparison.Ordinal));
+            Assert.DoesNotContain(normalizedIngredientLines, line => line.Contains("spinnach", StringComparison.Ordinal));
+            Assert.DoesNotContain(normalizedIngredientLines, line => line.Contains("garLIC", StringComparison.Ordinal));
+            Assert.DoesNotContain(normalizedIngredientLines, line => line.Contains("LEMON zest", StringComparison.Ordinal));
+
+            var spinnachItem = Assert.Single(result.ShoppingItems, item =>
+                item.Name.Contains("spinnach", StringComparison.OrdinalIgnoreCase));
+            var garlicItem = Assert.Single(result.ShoppingItems, item =>
+                item.Name.Contains("garlic", StringComparison.OrdinalIgnoreCase));
+            var lemonItem = Assert.Single(result.ShoppingItems, item =>
+                item.Name.Contains("lemon zest", StringComparison.OrdinalIgnoreCase));
+
+            Assert.Equal("Spinnach", spinnachItem.Name);
+            Assert.Equal("Garlic", garlicItem.Name);
+            Assert.Equal("Lemon zest", lemonItem.Name);
+        }
+        finally
+        {
+            ClearAiPool();
+        }
+    }
+
+    [Fact]
     public void BuildPlan_CustomAisleOrderWithAtLeastThreeAisles_UsesCustomOrder()
     {
         var request = new AislePilotRequestModel

@@ -35,7 +35,7 @@ public sealed class AislePilotMealSwapPipeline : IAislePilotMealSwapPipeline
                 context,
                 cookDays,
                 totalMealCount,
-                cancellationToken);
+                cancellationToken: cancellationToken);
             selectedMeals = AislePilotService.BuildSelectedMealsFromCurrentPlanNames(
                 fallbackPlan.MealPlan.Select(meal => meal.MealName).ToList(),
                 totalMealCount);

@@ -95,7 +95,7 @@ public sealed partial class AislePilotService
                         ingredient.QuantityForTwo * householdFactor * mealPortionMultiplier,
                         2,
                         MidpointRounding.AwayFromZero);
-                    return $"{QuantityDisplayFormatter.FormatForRecipe(quantity, ingredient.Unit)} {ingredient.Name}";
+                    return $"{QuantityDisplayFormatter.FormatForRecipe(quantity, ingredient.Unit)} {NormalizeIngredientDisplayName(ingredient.Name)}";
                 })
                 .ToList();
             var recipeSteps = _nutritionRecipeFallbackEngine.BuildRecipeSteps(template);
@@ -424,8 +424,8 @@ public sealed partial class AislePilotService
 
     private static string ResolvePreferredShoppingListName(string ingredientName, string? candidateName = null)
     {
-        var currentName = ingredientName?.Trim() ?? string.Empty;
-        var incomingName = candidateName?.Trim() ?? string.Empty;
+        var currentName = NormalizeIngredientDisplayName(ingredientName);
+        var incomingName = NormalizeIngredientDisplayName(candidateName);
         if (string.IsNullOrWhiteSpace(incomingName))
         {
             return currentName;
@@ -472,8 +472,37 @@ public sealed partial class AislePilotService
                     ingredient.QuantityForTwo * scale,
                     2,
                     MidpointRounding.AwayFromZero);
-                return $"{QuantityDisplayFormatter.FormatForRecipe(scaledQuantity, ingredient.Unit)} {ingredient.Name}";
+                return $"{QuantityDisplayFormatter.FormatForRecipe(scaledQuantity, ingredient.Unit)} {NormalizeIngredientDisplayName(ingredient.Name)}";
             })
             .ToList();
+    }
+
+    private static string NormalizeIngredientDisplayName(string? ingredientName)
+    {
+        if (string.IsNullOrWhiteSpace(ingredientName))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = Regex.Replace(ingredientName.Trim(), "\\s+", " ");
+        if (trimmed.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var lowered = trimmed.ToLowerInvariant();
+        var chars = lowered.ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (!char.IsLetter(chars[i]))
+            {
+                continue;
+            }
+
+            chars[i] = char.ToUpperInvariant(chars[i]);
+            break;
+        }
+
+        return new string(chars);
     }
 }

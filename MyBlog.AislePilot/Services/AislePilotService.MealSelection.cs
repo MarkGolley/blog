@@ -30,7 +30,8 @@ public sealed partial class AislePilotService
         int? selectedSpecialTreatCookDayIndex = null,
         IReadOnlySet<string>? savedEnjoyedMealNames = null,
         bool enableSavedMealRepeats = false,
-        int savedMealRepeatRatePercent = DefaultSavedMealRepeatRatePercent)
+        int savedMealRepeatRatePercent = DefaultSavedMealRepeatRatePercent,
+        IReadOnlyList<string>? excludedMealNames = null)
     {
         return _slotSelectionEngine.SelectMeals(
             mealSource,
@@ -45,7 +46,8 @@ public sealed partial class AislePilotService
             selectedSpecialTreatCookDayIndex,
             savedEnjoyedMealNames,
             enableSavedMealRepeats,
-            savedMealRepeatRatePercent);
+            savedMealRepeatRatePercent,
+            excludedMealNames);
     }
 
     internal static bool ShouldPreferSavedMealForSlot(

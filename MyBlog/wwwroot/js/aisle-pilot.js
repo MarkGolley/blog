@@ -10,6 +10,7 @@
         )
     );
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
+    const supermarketSelectionStorageKey = "aislepilot:setup-supermarket";
     const submitLoadingDelayTimers = new WeakMap();
     const appRoot = document.querySelector(".aislepilot-app");
     const shellHeader = document.querySelector(".app-shell-header");
@@ -262,6 +263,64 @@
             form.dataset.exportThemeWired = "true";
             form.addEventListener("submit", syncThemeInput);
         });
+    };
+
+    const getExportDownloadFallbackName = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return "aislepilot-export";
+        }
+
+        const fallbackName = form.dataset.exportDownloadFallbackName?.trim();
+        return fallbackName && fallbackName.length > 0
+            ? fallbackName
+            : "aislepilot-export";
+    };
+
+    const readExportDownloadFileName = (response, form) => {
+        if (!(response instanceof Response)) {
+            return getExportDownloadFallbackName(form);
+        }
+
+        const contentDisposition = response.headers.get("content-disposition") ?? "";
+        const encodedNameMatch = contentDisposition.match(/filename\*\s*=\s*([^;]+)/i);
+        if (encodedNameMatch) {
+            const encodedName = encodedNameMatch[1].trim().replace(/^UTF-8''/i, "").replace(/^"|"$/g, "");
+            if (encodedName.length > 0) {
+                try {
+                    return decodeURIComponent(encodedName);
+                } catch {
+                    return encodedName;
+                }
+            }
+        }
+
+        const plainNameMatch = contentDisposition.match(/filename\s*=\s*"?(.*?)"?($|;)/i);
+        const plainName = plainNameMatch?.[1]?.trim();
+        if (plainName && plainName.length > 0) {
+            return plainName;
+        }
+
+        return getExportDownloadFallbackName(form);
+    };
+
+    const triggerFileDownload = (blob, fileName) => {
+        if (!(blob instanceof Blob)) {
+            return;
+        }
+
+        const anchor = document.createElement("a");
+        const objectUrl = URL.createObjectURL(blob);
+        anchor.href = objectUrl;
+        anchor.download = typeof fileName === "string" && fileName.trim().length > 0
+            ? fileName.trim()
+            : "aislepilot-export";
+        anchor.hidden = true;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => {
+            URL.revokeObjectURL(objectUrl);
+        }, 1000);
     };
 
     let toastHost = null;
@@ -1778,15 +1837,66 @@
 
     wireSharedPreferenceSummaries(document);
 
+    const getSupermarketRadioOptions = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return [];
+        }
+
+        return Array.from(form.querySelectorAll("[data-supermarket-option]"))
+            .filter(input => input instanceof HTMLInputElement);
+    };
+
+    const normalizeSupermarketValue = value => typeof value === "string" ? value.trim() : "";
+
+    const readPersistedSupermarketSelection = () => {
+        try {
+            return normalizeSupermarketValue(window.localStorage.getItem(supermarketSelectionStorageKey));
+        } catch {
+            return "";
+        }
+    };
+
+    const persistSupermarketSelection = value => {
+        const normalizedValue = normalizeSupermarketValue(value);
+        if (normalizedValue.length === 0) {
+            return;
+        }
+
+        try {
+            window.localStorage.setItem(supermarketSelectionStorageKey, normalizedValue);
+        } catch {
+            // Ignore storage failures in private modes.
+        }
+    };
+
+    const resolveSupermarketOptionValue = (options, candidateValue) => {
+        const normalizedCandidate = normalizeSupermarketValue(candidateValue).toLowerCase();
+        if (normalizedCandidate.length === 0) {
+            return "";
+        }
+
+        const matchedOption = options.find(option =>
+            normalizeSupermarketValue(option.value).toLowerCase() === normalizedCandidate);
+        return matchedOption instanceof HTMLInputElement ? matchedOption.value : "";
+    };
+
     const getSelectedSupermarket = form => {
         if (!(form instanceof HTMLFormElement)) {
             return "";
         }
 
-        const supermarketRadioOptions = Array.from(form.querySelectorAll("[data-supermarket-option]"))
-            .filter(input => input instanceof HTMLInputElement);
+        const supermarketRadioOptions = getSupermarketRadioOptions(form);
         if (supermarketRadioOptions.length > 0) {
-            const selectedOption = supermarketRadioOptions.find(input => input.checked);
+            const enabledCheckedOption = [...supermarketRadioOptions]
+                .reverse()
+                .find(input => input.checked && !input.matches(":disabled"));
+            if (enabledCheckedOption instanceof HTMLInputElement) {
+                return enabledCheckedOption.value;
+            }
+
+            const selectedOption = [...supermarketRadioOptions]
+                .reverse()
+                .find(input => input.checked);
             return selectedOption instanceof HTMLInputElement ? selectedOption.value : "";
         }
 
@@ -1797,6 +1907,101 @@
 
         return "";
     };
+
+    const syncSupermarketSelection = (form, selectedValue) => {
+        if (!(form instanceof HTMLFormElement)) {
+            return "";
+        }
+
+        const supermarketRadioOptions = getSupermarketRadioOptions(form);
+        if (supermarketRadioOptions.length === 0) {
+            const supermarketSelect = form.querySelector("[data-supermarket-select]");
+            if (supermarketSelect instanceof HTMLSelectElement || supermarketSelect instanceof HTMLInputElement) {
+                const normalizedValue = normalizeSupermarketValue(selectedValue);
+                if (normalizedValue.length > 0) {
+                    supermarketSelect.value = normalizedValue;
+                    persistSupermarketSelection(normalizedValue);
+                }
+
+                return supermarketSelect.value;
+            }
+
+            return "";
+        }
+
+        const resolvedSelectedValue =
+            resolveSupermarketOptionValue(supermarketRadioOptions, selectedValue) ||
+            resolveSupermarketOptionValue(supermarketRadioOptions, getSelectedSupermarket(form)) ||
+            supermarketRadioOptions.find(option => !option.matches(":disabled"))?.value ||
+            supermarketRadioOptions[0]?.value ||
+            "";
+
+        const selectedOption =
+            supermarketRadioOptions.find(option =>
+                !option.matches(":disabled") &&
+                normalizeSupermarketValue(option.value).toLowerCase() ===
+                normalizeSupermarketValue(resolvedSelectedValue).toLowerCase()) ||
+            supermarketRadioOptions.find(option =>
+                normalizeSupermarketValue(option.value).toLowerCase() ===
+                normalizeSupermarketValue(resolvedSelectedValue).toLowerCase()) ||
+            null;
+
+        supermarketRadioOptions.forEach(option => {
+            option.checked = option === selectedOption;
+        });
+
+        if (resolvedSelectedValue.length > 0) {
+            persistSupermarketSelection(resolvedSelectedValue);
+        }
+
+        return resolvedSelectedValue;
+    };
+
+    const wireSupermarketSelectionPersistence = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("form"))
+            : getAislePilotForms();
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const supermarketRadioOptions = getSupermarketRadioOptions(form);
+            if (supermarketRadioOptions.length === 0) {
+                return;
+            }
+
+            supermarketRadioOptions.forEach(option => {
+                if (option.dataset.supermarketPersistenceWired === "true") {
+                    return;
+                }
+
+                option.dataset.supermarketPersistenceWired = "true";
+                option.addEventListener("change", () => {
+                    syncSupermarketSelection(form, option.value);
+                });
+            });
+
+            const currentSelection = normalizeSupermarketValue(getSelectedSupermarket(form));
+            const persistedSelection = resolveSupermarketOptionValue(
+                supermarketRadioOptions,
+                readPersistedSupermarketSelection());
+            const preferredSelection = persistedSelection || currentSelection;
+            const resolvedSelection = syncSupermarketSelection(form, preferredSelection);
+            if (
+                resolvedSelection.length > 0 &&
+                resolvedSelection.localeCompare(currentSelection, undefined, { sensitivity: "accent" }) !== 0
+            ) {
+                const selectedOption = supermarketRadioOptions.find(option => option.checked);
+                if (selectedOption instanceof HTMLInputElement) {
+                    selectedOption.dispatchEvent(new Event("change", { bubbles: true }));
+                }
+            }
+        });
+    };
+
+    wireSupermarketSelectionPersistence(document);
 
     const syncCustomAisleFieldVisibility = (selectedSupermarket, customAisleField, storeLayoutSection) => {
         if (!(customAisleField instanceof HTMLElement) && !(storeLayoutSection instanceof HTMLElement)) {
@@ -2157,6 +2362,10 @@
         if (event.persisted) {
             resetSubmittingState();
         }
+
+        requestAnimationFrame(() => {
+            wireSupermarketSelectionPersistence(document);
+        });
     });
 
     document.addEventListener("visibilitychange", () => {
@@ -4644,6 +4853,41 @@
         return card instanceof HTMLElement ? card : null;
     };
 
+    const closeCardMoreActionsWithinCard = card => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const menus = Array.from(card.querySelectorAll("[data-card-more-actions]"));
+        menus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement)) {
+                return;
+            }
+
+            finishClosingCardMoreActionsMenu(menu);
+        });
+    };
+
+    const preserveReplacementCardUiState = (currentCard, replacementCard) => {
+        if (!(currentCard instanceof HTMLElement) || !(replacementCard instanceof HTMLElement)) {
+            return;
+        }
+
+        const dayKey = readCardDayKey(currentCard);
+        if (dayKey) {
+            dayMealSlotState.set(dayKey, readActiveDayMealSlotIndex(currentCard));
+        }
+
+        const currentExpander = currentCard.querySelector("[data-day-card-expander]");
+        const replacementExpander = replacementCard.querySelector("[data-day-card-expander]");
+        if (currentExpander instanceof HTMLDetailsElement && replacementExpander instanceof HTMLDetailsElement) {
+            replacementExpander.open = currentExpander.open;
+            if (!currentExpander.open) {
+                replacementExpander.removeAttribute("open");
+            }
+        }
+    };
+
     const replaceSwappedMealCard = (responseDocument, slotIndex) => {
         const currentCard = findMealCardBySlotIndex(document, slotIndex);
         const nextCard = findMealCardBySlotIndex(responseDocument, slotIndex);
@@ -4656,6 +4900,8 @@
             return false;
         }
 
+        closeCardMoreActionsWithinCard(currentCard);
+        preserveReplacementCardUiState(currentCard, replacement);
         currentCard.replaceWith(replacement);
         return true;
     };
@@ -5116,6 +5362,152 @@
         return "";
     };
 
+    const readJsonFailureMessage = responseText => {
+        if (typeof responseText !== "string" || responseText.length === 0) {
+            return "";
+        }
+
+        try {
+            const payload = JSON.parse(responseText);
+            if (!payload || typeof payload !== "object") {
+                return "";
+            }
+
+            if (typeof payload.detail === "string" && payload.detail.trim().length > 0) {
+                return payload.detail.trim();
+            }
+
+            if (typeof payload.title === "string" && payload.title.trim().length > 0) {
+                return payload.title.trim();
+            }
+
+            const errorValues = payload.errors && typeof payload.errors === "object"
+                ? Object.values(payload.errors)
+                : [];
+            for (const errorValue of errorValues) {
+                if (Array.isArray(errorValue)) {
+                    const firstMessage = errorValue.find(message => typeof message === "string" && message.trim().length > 0);
+                    if (typeof firstMessage === "string") {
+                        return firstMessage.trim();
+                    }
+                }
+            }
+        } catch {
+            return "";
+        }
+
+        return "";
+    };
+
+    const readExportFailureMessage = (responseText, contentType) => {
+        const normalizedContentType = typeof contentType === "string"
+            ? contentType.toLowerCase()
+            : "";
+        if (normalizedContentType.includes("json")) {
+            const jsonMessage = readJsonFailureMessage(responseText);
+            if (jsonMessage.length > 0) {
+                return jsonMessage;
+            }
+        }
+
+        const responseDocument = parseHtmlDocument(responseText);
+        const htmlMessage = readAjaxFailureMessage(responseDocument);
+        if (htmlMessage.length > 0) {
+            return htmlMessage;
+        }
+
+        const plainMessage = typeof responseText === "string"
+            ? responseText.replace(/\s+/g, " ").trim()
+            : "";
+        return plainMessage.length > 0
+            ? plainMessage
+            : "Could not complete that export. Try again.";
+    };
+
+    const wireExportDownloadForms = scope => {
+        const forms = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-export-download-form]"))
+            : Array.from(document.querySelectorAll("[data-export-download-form]"));
+
+        forms.forEach(form => {
+            if (!(form instanceof HTMLFormElement) || form.dataset.exportDownloadWired === "true") {
+                return;
+            }
+
+            form.dataset.exportDownloadWired = "true";
+            form.addEventListener("submit", async event => {
+                if (!(event.currentTarget instanceof HTMLFormElement) || typeof fetch !== "function") {
+                    return;
+                }
+
+                event.preventDefault();
+                const exportForm = event.currentTarget;
+                if (exportForm.dataset.exportDownloadSubmitting === "true") {
+                    return;
+                }
+
+                const submitButton = getSubmitButton(event);
+                if (!(submitButton instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                exportForm.dataset.exportDownloadSubmitting = "true";
+                clearSubmitLoadingDelay(exportForm);
+                setSubmitButtonLoadingState(submitButton);
+
+                const actionUrl = stripHashFromFormAction(exportForm);
+                if (!actionUrl) {
+                    delete exportForm.dataset.exportDownloadSubmitting;
+                    HTMLFormElement.prototype.submit.call(exportForm);
+                    return;
+                }
+
+                try {
+                    const response = await fetch(actionUrl, {
+                        method: (exportForm.method || "POST").toUpperCase(),
+                        body: new FormData(exportForm),
+                        credentials: "same-origin",
+                        headers: {
+                            "Accept": "application/pdf,text/plain,application/json,text/html,*/*",
+                            "X-Requested-With": "XMLHttpRequest"
+                        }
+                    });
+                    const contentType = response.headers.get("content-type") ?? "";
+                    const normalizedContentType = contentType.toLowerCase();
+
+                    if (normalizedContentType.includes("text/html") || normalizedContentType.includes("application/xhtml+xml")) {
+                        const responseText = await response.text();
+                        if (response.ok) {
+                            replaceDocumentWithHtml(responseText);
+                            return;
+                        }
+
+                        showToast(readExportFailureMessage(responseText, contentType), "warning");
+                        resetFormSubmittingState(exportForm);
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        const responseText = await response.text();
+                        showToast(readExportFailureMessage(responseText, contentType), "warning");
+                        resetFormSubmittingState(exportForm);
+                        return;
+                    }
+
+                    const blob = await response.blob();
+                    triggerFileDownload(blob, readExportDownloadFileName(response, exportForm));
+                    resetFormSubmittingState(exportForm);
+                } catch {
+                    delete exportForm.dataset.exportDownloadSubmitting;
+                    HTMLFormElement.prototype.submit.call(exportForm);
+                    return;
+                } finally {
+                    delete exportForm.dataset.exportDownloadSubmitting;
+                }
+            });
+        });
+    };
+
     const animateSwappedMeal = dayIndex => {
         if (!Number.isInteger(dayIndex) || dayIndex < 0) {
             return;
@@ -5336,6 +5728,7 @@
     const wireModulesAfterAjaxSwap = scope => {
         wireSubmitLoadingHandlers(scope);
         wireExportThemeForms(scope);
+        wireExportDownloadForms(scope);
         wirePlanBasicsSliders(scope);
         wireMealTypeSelectors(scope);
         wireCustomAisleFieldVisibility(scope);
@@ -5349,6 +5742,7 @@
         wireAjaxSwapHandlers(scope);
     };
 
+    wireExportDownloadForms(document);
     wireCardInteractionModules(document);
     startMealImagePolling();
 

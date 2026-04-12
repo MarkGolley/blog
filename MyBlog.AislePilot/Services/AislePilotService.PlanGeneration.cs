@@ -19,14 +19,22 @@ public sealed partial class AislePilotService
 {
     public AislePilotPlanResultViewModel BuildPlan(AislePilotRequestModel request)
     {
-        return _planGenerationOrchestrator.BuildPlanAsync(this, request).GetAwaiter().GetResult();
+        return _planGenerationOrchestrator.BuildPlanAsync(this, request, null).GetAwaiter().GetResult();
     }
 
     public Task<AislePilotPlanResultViewModel> BuildPlanAsync(
         AislePilotRequestModel request,
         CancellationToken cancellationToken = default)
     {
-        return _planGenerationOrchestrator.BuildPlanAsync(this, request, cancellationToken);
+        return _planGenerationOrchestrator.BuildPlanAsync(this, request, null, cancellationToken);
+    }
+
+    public Task<AislePilotPlanResultViewModel> BuildPlanAvoidingMealsAsync(
+        AislePilotRequestModel request,
+        IReadOnlyList<string> excludedMealNames,
+        CancellationToken cancellationToken = default)
+    {
+        return _planGenerationOrchestrator.BuildPlanAsync(this, request, excludedMealNames, cancellationToken);
     }
 
     public async Task<AislePilotPlanResultViewModel> BuildPlanFromCurrentMealsAsync(
@@ -185,9 +193,10 @@ public sealed partial class AislePilotService
         AislePilotRequestModel request,
         PlanContext context,
         int cookDays,
-        int totalMealCount)
+        int totalMealCount,
+        IReadOnlyList<string>? excludedMealNames = null)
     {
-        return BuildPlanFromTemplateCatalogAsync(request, context, cookDays, totalMealCount).GetAwaiter().GetResult();
+        return BuildPlanFromTemplateCatalogAsync(request, context, cookDays, totalMealCount, excludedMealNames).GetAwaiter().GetResult();
     }
 
     internal async Task<AislePilotPlanResultViewModel> BuildPlanFromTemplateCatalogAsync(
@@ -195,6 +204,7 @@ public sealed partial class AislePilotService
         PlanContext context,
         int cookDays,
         int totalMealCount,
+        IReadOnlyList<string>? excludedMealNames = null,
         CancellationToken cancellationToken = default)
     {
         var selectedMeals = SelectMeals(
@@ -210,7 +220,8 @@ public sealed partial class AislePilotService
             request.SelectedSpecialTreatCookDayIndex,
             savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
             enableSavedMealRepeats: request.EnableSavedMealRepeats,
-            savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+            savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+            excludedMealNames: excludedMealNames);
 
         // Keep swap behavior consistent by making fallback-selected meals available in the in-memory pool.
         AddMealsToAiPool(selectedMeals);
@@ -229,11 +240,12 @@ public sealed partial class AislePilotService
         AislePilotRequestModel request,
         PlanContext context,
         int cookDays,
-        int totalMealCount)
+        int totalMealCount,
+        IReadOnlyList<string>? excludedMealNames = null)
     {
         try
         {
-            return TryBuildPlanWithAiAsync(request, context, cookDays, totalMealCount).GetAwaiter().GetResult();
+            return TryBuildPlanWithAiAsync(request, context, cookDays, totalMealCount, excludedMealNames).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
@@ -247,6 +259,7 @@ public sealed partial class AislePilotService
         PlanContext context,
         int cookDays,
         int totalMealCount,
+        IReadOnlyList<string>? excludedMealNames = null,
         CancellationToken cancellationToken = default)
     {
         if (!_enableAiGeneration || _httpClient is null)
@@ -275,6 +288,7 @@ public sealed partial class AislePilotService
                 context,
                 cookDays,
                 totalMealCount,
+                excludedMealNames,
                 cancellationToken);
         }
 
@@ -291,6 +305,7 @@ public sealed partial class AislePilotService
             requestedMealCount,
             PrimaryAiMealPlanMaxTokens,
             compactJson: false,
+            excludedMealNames,
             generationToken);
 
         if (aiBatch is null && ShouldRetryWithCompactPayload(totalMealCount))
@@ -307,6 +322,7 @@ public sealed partial class AislePilotService
                 totalMealCount,
                 RetryAiMealPlanMaxTokens,
                 compactJson: true,
+                excludedMealNames,
                 generationToken);
         }
 
@@ -382,7 +398,8 @@ public sealed partial class AislePilotService
                 request.SelectedSpecialTreatCookDayIndex,
                 savedEnjoyedMealNames: savedEnjoyedMealNames,
                 enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                excludedMealNames: excludedMealNames);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -410,7 +427,8 @@ public sealed partial class AislePilotService
                     selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex,
                     savedEnjoyedMealNames: savedEnjoyedMealNames,
                     enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                    excludedMealNames: excludedMealNames);
             }
             catch (InvalidOperationException)
             {
@@ -429,7 +447,8 @@ public sealed partial class AislePilotService
                         includeSpecialTreatMeal: false,
                         savedEnjoyedMealNames: savedEnjoyedMealNames,
                         enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                        excludedMealNames: excludedMealNames);
                 }
                 catch (InvalidOperationException)
                 {
@@ -472,6 +491,7 @@ public sealed partial class AislePilotService
         PlanContext context,
         int cookDays,
         int totalMealCount,
+        IReadOnlyList<string>? excludedMealNames = null,
         CancellationToken cancellationToken = default)
     {
         if (!_enableAiGeneration || _httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
@@ -513,7 +533,8 @@ public sealed partial class AislePilotService
                 includeSpecialTreatMeal: false,
                 savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
                 enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                excludedMealNames: excludedMealNames);
         }
         catch (InvalidOperationException)
         {
@@ -627,6 +648,7 @@ public sealed partial class AislePilotService
         int requestedMealCount,
         int maxTokens,
         bool compactJson,
+        IReadOnlyList<string>? excludedMealNames,
         CancellationToken cancellationToken)
     {
         var planDays = NormalizePlanDays(request.PlanDays);
@@ -641,7 +663,8 @@ public sealed partial class AislePilotService
             mealTypeSlots,
             totalMealCount,
             requestedMealCount,
-            compactJson);
+            compactJson,
+            excludedMealNames);
         var requestBody = new
         {
             model = _model,
@@ -727,7 +750,8 @@ public sealed partial class AislePilotService
         AislePilotRequestModel request,
         PlanContext context,
         int cookDays,
-        int totalMealCount)
+        int totalMealCount,
+        IReadOnlyList<string>? excludedMealNames = null)
     {
         EnsureAiMealPoolHydrated();
         var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
@@ -762,7 +786,8 @@ public sealed partial class AislePilotService
                 request.SelectedSpecialTreatCookDayIndex,
                 savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
                 enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                excludedMealNames: excludedMealNames);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -790,7 +815,8 @@ public sealed partial class AislePilotService
                     selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex,
                     savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
                     enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                    excludedMealNames: excludedMealNames);
             }
             catch (InvalidOperationException)
             {
@@ -809,7 +835,8 @@ public sealed partial class AislePilotService
                         includeSpecialTreatMeal: false,
                         savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
                         enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                        excludedMealNames: excludedMealNames);
                 }
                 catch (InvalidOperationException)
                 {
@@ -840,6 +867,7 @@ public sealed partial class AislePilotService
         PlanContext context,
         int cookDays,
         int totalMealCount,
+        IReadOnlyList<string>? excludedMealNames = null,
         CancellationToken cancellationToken = default)
     {
         await EnsureAiMealPoolHydratedAsync(cancellationToken);
@@ -875,7 +903,8 @@ public sealed partial class AislePilotService
                 request.SelectedSpecialTreatCookDayIndex,
                 savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
                 enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                excludedMealNames: excludedMealNames);
         }
         catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
         {
@@ -903,7 +932,8 @@ public sealed partial class AislePilotService
                     selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex,
                     savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
                     enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                    excludedMealNames: excludedMealNames);
             }
             catch (InvalidOperationException)
             {
@@ -922,7 +952,8 @@ public sealed partial class AislePilotService
                         includeSpecialTreatMeal: false,
                         savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
                         enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent);
+                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
+                        excludedMealNames: excludedMealNames);
                 }
                 catch (InvalidOperationException)
                 {

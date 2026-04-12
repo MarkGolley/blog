@@ -15,13 +15,26 @@ public sealed class AislePilotSlotSelectionEngine
         int? selectedSpecialTreatCookDayIndex = null,
         IReadOnlySet<string>? savedEnjoyedMealNames = null,
         bool enableSavedMealRepeats = false,
-        int savedMealRepeatRatePercent = 35)
+        int savedMealRepeatRatePercent = 35,
+        IReadOnlyList<string>? excludedMealNames = null)
     {
+        var normalizedExcludedMealNames = (excludedMealNames ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var candidates = AislePilotService.FilterMeals(dietaryModes, dislikesOrAllergens, mealSource)
             .Select(meal => AislePilotService.EnsureMealTypeSuitability(meal))
+            .Where(meal => !normalizedExcludedMealNames.Contains(meal.Name))
             .ToList();
         if (candidates.Count == 0)
         {
+            if (normalizedExcludedMealNames.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "Could not find a fully refreshed week with the current settings. Try loosening filters or swapping individual meals.");
+            }
+
             throw new InvalidOperationException(
                 "No meals match the selected dietary modes and dislikes/allergens.");
         }

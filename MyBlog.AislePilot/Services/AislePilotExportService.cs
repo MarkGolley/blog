@@ -9,6 +9,8 @@ namespace MyBlog.Services;
 
 public sealed class AislePilotExportService : IAislePilotExportService
 {
+    private const string MealIngredientEstimateLabel = "Meal ingredient estimate";
+    private const string ShoppingEstimateDisclaimer = "This estimate covers the ingredients used in these meals. Actual checkout can be higher if shops only sell larger packs or bags.";
     private const string AislePilotMarkSvg = """
         <svg width="128" height="128" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
           <g fill="none" stroke="#103F65" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
@@ -102,7 +104,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
             ("Leftover days", result.LeftoverDays.ToString(ukCulture)),
             ("Dietary requirements", dietaryModesText),
             ("Weekly budget", result.WeeklyBudget.ToString("C", ukCulture)),
-            ("Estimated total", result.EstimatedTotalCost.ToString("C", ukCulture)),
+            (MealIngredientEstimateLabel, result.EstimatedTotalCost.ToString("C", ukCulture)),
             ("Budget status", budgetStatusText)
         };
 
@@ -201,7 +203,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
                                 row.RelativeItem().Border(0.7f).BorderColor(line).Background(panelSoft).Padding(8).Column(metric =>
                                 {
                                     metric.Spacing(2);
-                                    metric.Item().Text("Estimated total").FontSize(8.5f).SemiBold().FontColor(inkSoft);
+                                    metric.Item().Text(MealIngredientEstimateLabel).FontSize(8.5f).SemiBold().FontColor(inkSoft);
                                     metric.Item().Text(result.EstimatedTotalCost.ToString("C", ukCulture)).FontSize(12).SemiBold().FontColor(brandDeep);
                                 });
                                 row.RelativeItem().Border(0.7f).BorderColor(line).Background(budgetStatusBackground).Padding(8).Column(metric =>
@@ -282,6 +284,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
                         {
                             section.Spacing(7);
                             section.Item().Text("Shopping list").FontSize(13.5f).SemiBold().FontColor(brandDeep);
+                            section.Item().Text(ShoppingEstimateDisclaimer).FontSize(8.8f).FontColor(inkSoft);
 
                             section.Item().MultiColumn(columns =>
                             {
@@ -301,7 +304,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
                                             group.Item().Row(row =>
                                             {
                                                 row.RelativeItem().Text(department.Department).FontSize(10.5f).SemiBold().FontColor(brandDeep);
-                                                row.AutoItem().Text(department.Total.ToString("C", ukCulture)).FontSize(9.5f).SemiBold().FontColor(inkSoft);
+                                                row.AutoItem().Text($"Est. {department.Total.ToString("C", ukCulture)}").FontSize(9.5f).SemiBold().FontColor(inkSoft);
                                             });
 
                                             group.Item().Table(table =>
@@ -365,7 +368,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
 
                             section.Item().PaddingTop(2).AlignRight().Text(text =>
                             {
-                                text.Span("Grand total: ").SemiBold().FontColor(inkSoft);
+                                text.Span($"{MealIngredientEstimateLabel}: ").SemiBold().FontColor(inkSoft);
                                 text.Span(result.EstimatedTotalCost.ToString("C", ukCulture)).SemiBold().FontColor(brandDeep);
                             });
                         });
@@ -473,7 +476,8 @@ public sealed class AislePilotExportService : IAislePilotExportService
         builder.AppendLine("AislePilot Shopping Checklist");
         builder.AppendLine($"Supermarket: {result.Supermarket}");
         builder.AppendLine($"Portion size: {result.PortionSize}");
-        builder.AppendLine($"Estimated total: {result.EstimatedTotalCost.ToString("C", ukCulture)}");
+        builder.AppendLine($"{MealIngredientEstimateLabel}: {result.EstimatedTotalCost.ToString("C", ukCulture)}");
+        builder.AppendLine(ShoppingEstimateDisclaimer);
         builder.AppendLine();
         builder.AppendLine($"Aisle order: {string.Join(" -> ", result.AisleOrderUsed)}");
 
@@ -483,7 +487,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
             builder.AppendLine($"[{department.Key}]");
             foreach (var item in department)
             {
-                builder.AppendLine($"[ ] {item.Name} - {item.QuantityDisplay} - {item.EstimatedCost.ToString("C", ukCulture)}");
+                builder.AppendLine($"[ ] {item.Name} - {item.QuantityDisplay} - Est. {item.EstimatedCost.ToString("C", ukCulture)}");
             }
         }
 

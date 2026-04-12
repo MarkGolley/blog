@@ -230,6 +230,144 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotSwap_ClosesActionsSheetAndPreservesActiveDayAndSlot()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var targetCardIndex = await page.EvaluateAsync<int>(
+            """
+            () => {
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                return cards.findIndex((card, index) =>
+                    index > 0 &&
+                    card instanceof HTMLElement &&
+                    card.querySelectorAll("[data-day-meal-tab]").length > 1 &&
+                    card.querySelector("[data-day-card-expander]") instanceof HTMLDetailsElement);
+            }
+            """);
+
+        Assert.True(targetCardIndex > 0, $"Expected a non-default day card with multiple meal slots. Actual index={targetCardIndex}.");
+
+        var targetCard = page.Locator("[data-day-meal-card]").Nth(targetCardIndex);
+        var targetExpanderSummary = targetCard.Locator("[data-day-card-expander] > summary").First;
+        var targetExpander = targetCard.Locator("[data-day-card-expander]").First;
+        var wasTargetExpanderOpen = await targetExpander.EvaluateAsync<bool>(
+            "element => element instanceof HTMLDetailsElement && element.open");
+        if (!wasTargetExpanderOpen)
+        {
+            await targetExpanderSummary.ScrollIntoViewIfNeededAsync();
+            await targetExpanderSummary.ClickAsync();
+        }
+
+        var mealTabs = targetCard.Locator("[data-day-meal-tab]");
+        var mealTabCount = await mealTabs.CountAsync();
+        Assert.True(mealTabCount > 1, $"Expected target day card to expose multiple meal slots. Actual count={mealTabCount}.");
+
+        var targetSlotIndex = Math.Min(2, mealTabCount - 1);
+        var targetMealTab = mealTabs.Nth(targetSlotIndex);
+        await targetMealTab.ClickAsync();
+
+        var expectedDayLabel = (await targetCard.Locator(".aislepilot-day-card-expander-day").First.InnerTextAsync()).Trim();
+        var expectedSlotLabel = (await targetMealTab.InnerTextAsync()).Trim();
+        var activeMealPanel = targetCard.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        var previousMealName = (await activeMealPanel.Locator("h3").First.InnerTextAsync()).Trim();
+
+        var targetMoreActionsSummary = targetCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
+        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
+        await targetMoreActionsSummary.ScrollIntoViewIfNeededAsync();
+        await targetMoreActionsSummary.ClickAsync();
+        await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var swapResponseTask = page.WaitForResponseAsync(response =>
+            string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            response.Url.Contains("/projects/aisle-pilot/swap-meal", StringComparison.OrdinalIgnoreCase));
+
+        await targetSwapButton.ClickAsync();
+        _ = await swapResponseTask;
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        await page.WaitForFunctionAsync(
+            """
+            ([cardIndex, dayLabel, slotLabel, priorMealName]) => {
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                const card = cards[cardIndex];
+                if (!(card instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const expander = card.querySelector("[data-day-card-expander]");
+                const isOpen = !(expander instanceof HTMLDetailsElement) || expander.open;
+                const currentDayLabel = (card.querySelector(".aislepilot-day-card-expander-day")?.textContent ?? "").trim();
+                const activeTab = card.querySelector("[data-day-meal-tab].is-active");
+                const currentSlotLabel = (activeTab?.textContent ?? "").trim();
+                const currentMealName = (card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false'] h3")?.textContent ?? "").trim();
+                const openMenuCount = document.querySelectorAll("[data-card-more-actions][open]").length;
+                const visibleLoadingButtons = Array.from(document.querySelectorAll(".aislepilot-swap-btn.is-loading"))
+                    .filter(button => button instanceof HTMLElement && button.offsetParent !== null)
+                    .length;
+
+                return isOpen &&
+                    currentDayLabel === dayLabel &&
+                    currentSlotLabel === slotLabel &&
+                    currentMealName.length > 0 &&
+                    currentMealName !== priorMealName &&
+                    openMenuCount === 0 &&
+                    visibleLoadingButtons === 0;
+            }
+            """,
+            new object[] { targetCardIndex, expectedDayLabel, expectedSlotLabel, previousMealName },
+            new PageWaitForFunctionOptions
+            {
+                Timeout = 10000
+            });
+
+        var postSwapState = await page.EvaluateAsync<string>(
+            """
+            ([cardIndex, priorMealName]) => {
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                const card = cards[cardIndex];
+                if (!(card instanceof HTMLElement)) {
+                    return "missing";
+                }
+
+                const expander = card.querySelector("[data-day-card-expander]");
+                const isOpen = expander instanceof HTMLDetailsElement && expander.open ? "1" : "0";
+                const dayLabel = (card.querySelector(".aislepilot-day-card-expander-day")?.textContent ?? "").trim();
+                const slotLabel = (card.querySelector("[data-day-meal-tab].is-active")?.textContent ?? "").trim();
+                const mealName = (card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false'] h3")?.textContent ?? "").trim();
+                const sheetOpen = document.querySelector("[data-card-more-actions][open]") ? "1" : "0";
+                const loadingButtons = Array.from(document.querySelectorAll(".aislepilot-swap-btn.is-loading"))
+                    .filter(button => button instanceof HTMLElement && button.offsetParent !== null)
+                    .length;
+                const mealChanged = mealName.length > 0 && mealName !== priorMealName ? "1" : "0";
+                return `${isOpen}|${dayLabel}|${slotLabel}|${mealChanged}|${sheetOpen}|${loadingButtons}`;
+            }
+            """,
+            new object[] { targetCardIndex, previousMealName });
+
+        var stateParts = postSwapState.Split('|', StringSplitOptions.None);
+        Assert.True(stateParts.Length >= 6, $"Expected swap state payload. Actual='{postSwapState}'.");
+        Assert.Equal("1", stateParts[0]);
+        Assert.Equal(expectedDayLabel, stateParts[1]);
+        Assert.Equal(expectedSlotLabel, stateParts[2]);
+        Assert.Equal("1", stateParts[3]);
+        Assert.Equal("0", stateParts[4]);
+        Assert.Equal("0", stateParts[5]);
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotMealImagePolling_ShowsLoadingStateForFallbackImage()
     {
         if (!IsE2EEnabled())

@@ -111,6 +111,131 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Desktop_AislePilotSupermarketSelection_PersistsAcrossFreshVisit()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var didSelectAldi = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const aldiOption = Array.from(document.querySelectorAll("input[data-supermarket-option][value='Aldi']"))
+                    .find(input => input instanceof HTMLInputElement && !input.matches(":disabled"));
+                if (!(aldiOption instanceof HTMLInputElement)) {
+                    return false;
+                }
+
+                aldiOption.checked = true;
+                aldiOption.dispatchEvent(new Event("change", { bubbles: true }));
+                return true;
+            }
+            """);
+        Assert.True(didSelectAldi, "Expected an enabled Aldi supermarket option to be available.");
+
+        var selectedAfterChange = await page.EvaluateAsync<string>(
+            """
+            () => {
+                const selected = Array.from(document.querySelectorAll("input[data-supermarket-option]"))
+                    .find(input => input instanceof HTMLInputElement && input.checked && !input.matches(":disabled"));
+                return selected instanceof HTMLInputElement ? selected.value : "";
+            }
+            """);
+        Assert.Equal("Aldi", selectedAfterChange);
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/blog");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var selectedAfterReturn = await page.EvaluateAsync<string>(
+            """
+            () => {
+                const selected = Array.from(document.querySelectorAll("input[data-supermarket-option]"))
+                    .find(input => input instanceof HTMLInputElement && input.checked && !input.matches(":disabled"));
+                return selected instanceof HTMLInputElement ? selected.value : "";
+            }
+            """);
+        Assert.Equal("Aldi", selectedAfterReturn);
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotExports_UseRequestedOrder_AndResetChecklistDownloadButton()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var exportTab = page.Locator("#aislepilot-tab-export").First;
+        await exportTab.ClickAsync();
+        await page.Locator("#aislepilot-export[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 10000
+        });
+
+        var exportButtonLabels = await page.EvaluateAsync<string[]>(
+            """
+            () => Array.from(document.querySelectorAll("#aislepilot-export .aislepilot-export-btn"))
+                .map(button => button.textContent?.replace(/\s+/g, " ").trim() ?? "")
+            """);
+
+        Assert.Equal(
+            new[]
+            {
+                "Share shopping list (works with Notes)",
+                "Download shopping checklist (.txt)",
+                "Download full plan pack (.pdf)",
+                "Print current view"
+            },
+            exportButtonLabels);
+
+        var checklistButton = page.Locator("#aislepilot-export .aislepilot-export-btn").Nth(1);
+        var checklistResponseTask = page.WaitForResponseAsync(response =>
+            string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
+            response.Url.Contains("/projects/aisle-pilot/export/checklist", StringComparison.OrdinalIgnoreCase));
+
+        await checklistButton.ClickAsync();
+        _ = await checklistResponseTask;
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const button = Array.from(document.querySelectorAll("#aislepilot-export .aislepilot-export-btn"))
+                    .find(candidate => candidate.textContent?.includes("Download shopping checklist"));
+                return button instanceof HTMLButtonElement
+                    && !button.disabled
+                    && !button.classList.contains("is-loading")
+                    && button.getAttribute("aria-busy") !== "true"
+                    && button.textContent?.trim() === "Download shopping checklist (.txt)";
+            }
+            """,
+            null,
+            new PageWaitForFunctionOptions
+            {
+                Timeout = 10000
+            });
+    }
+
+    [Fact]
     public async Task Desktop_AislePilotLayout_UsesWideMainContainer()
     {
         if (!IsE2EEnabled())

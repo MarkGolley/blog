@@ -8,6 +8,7 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
     public async Task<AislePilotPlanResultViewModel> BuildPlanAsync(
         AislePilotService service,
         AislePilotRequestModel request,
+        IReadOnlyList<string>? excludedMealNames = null,
         CancellationToken cancellationToken = default)
     {
         var context = await service.BuildPlanContextAsync(request, cancellationToken);
@@ -19,7 +20,13 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
         if (service.ShouldUseTemplateFallback() && !request.IncludeSpecialTreatMeal)
         {
             service.Logger?.LogWarning("AislePilot is using local meal templates because AI generation is unavailable in this runtime.");
-            return await service.BuildPlanFromTemplateCatalogAsync(request, context, cookDays, totalMealCount, cancellationToken);
+            return await service.BuildPlanFromTemplateCatalogAsync(
+                request,
+                context,
+                cookDays,
+                totalMealCount,
+                excludedMealNames,
+                cancellationToken);
         }
 
         var pooledAiPlan = await service.TryBuildPlanFromAiPoolAsync(
@@ -27,6 +34,7 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
             context,
             cookDays,
             totalMealCount,
+            excludedMealNames,
             cancellationToken);
         if (pooledAiPlan is not null)
         {
@@ -38,6 +46,7 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
             context,
             cookDays,
             totalMealCount,
+            excludedMealNames,
             cancellationToken);
         if (aiPlan is not null)
         {
@@ -51,11 +60,17 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
             try
             {
                 // Try to satisfy special treat immediately from local/template candidates first.
-                return await service.BuildPlanFromTemplateCatalogAsync(request, context, cookDays, totalMealCount, cancellationToken);
+                return await service.BuildPlanFromTemplateCatalogAsync(
+                    request,
+                    context,
+                    cookDays,
+                    totalMealCount,
+                    excludedMealNames,
+                    cancellationToken);
             }
             catch (InvalidOperationException)
             {
-                service.QueueSpecialTreatGeneration(request, context);
+                service.QueueSpecialTreatGeneration(request, context, excludedMealNames);
 
                 var requestWithoutSpecialTreat = AislePilotService.CloneRequest(request);
                 requestWithoutSpecialTreat.IncludeSpecialTreatMeal = false;
@@ -66,12 +81,14 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
                     context,
                     cookDays,
                     totalMealCount,
+                    excludedMealNames,
                     cancellationToken);
                 nonBlockingPlan ??= await service.BuildPlanFromTemplateCatalogAsync(
                     requestWithoutSpecialTreat,
                     context,
                     cookDays,
                     totalMealCount,
+                    excludedMealNames,
                     cancellationToken);
                 nonBlockingPlan.BudgetTips = nonBlockingPlan.BudgetTips
                     .Concat(["Special treat dinner is still generating in the background."])
@@ -83,6 +100,12 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
 
         service.Logger?.LogWarning(
             "AislePilot AI generation was unavailable for this request. Serving template fallback instead.");
-        return await service.BuildPlanFromTemplateCatalogAsync(request, context, cookDays, totalMealCount, cancellationToken);
+        return await service.BuildPlanFromTemplateCatalogAsync(
+            request,
+            context,
+            cookDays,
+            totalMealCount,
+            excludedMealNames,
+            cancellationToken);
     }
 }

@@ -18,6 +18,10 @@ public interface IAislePilotService
     Task<AislePilotPlanResultViewModel> BuildPlanAsync(
         AislePilotRequestModel request,
         CancellationToken cancellationToken = default);
+    Task<AislePilotPlanResultViewModel> BuildPlanAvoidingMealsAsync(
+        AislePilotRequestModel request,
+        IReadOnlyList<string> excludedMealNames,
+        CancellationToken cancellationToken = default);
     Task<AislePilotPlanResultViewModel> BuildPlanFromCurrentMealsAsync(
         AislePilotRequestModel request,
         IReadOnlyList<string> currentPlanMealNames,

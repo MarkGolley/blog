@@ -177,6 +177,17 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task Index_Get_RendersPeopleSliderWithThumbFriendlyModifier()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Contains("aislepilot-slider-field--thumb-friendly", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("name=\"Request.HouseholdSize\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AislePilotStylesheet_UsesLargerControlHeightTokensForReadableTapTargets()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -198,6 +209,23 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("outline: none;", css, StringComparison.OrdinalIgnoreCase);
         var importantCount = Regex.Matches(css, "!important", RegexOptions.IgnoreCase).Count;
         Assert.True(importantCount <= 240, $"Expected CSS override count to stay under control, but found {importantCount} '!important' usages.");
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_PeopleSlider_UsesLargerThumbLatchTarget()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+
+        Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-input {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("height: 1.9rem !important;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-value {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("min-width: 2.1rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-input::-webkit-slider-thumb {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("width: 1.7rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("height: 1.7rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-input::-moz-range-thumb {", css, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -347,6 +375,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
             ["Request.CustomAisleOrder"] = string.Empty,
             ["Request.DislikesOrAllergens"] = string.Empty,
             ["Request.PreferQuickMeals"] = "true",
+            ["Request.IncludeDessertAddOn"] = "true",
             ["Request.DietaryModes"] = "Balanced",
             ["__RequestVerificationToken"] = antiForgeryToken
         }));
@@ -462,7 +491,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_WithThreeMealsPerDay_RendersCompactActionControlsWithVisibleLabels()
+    public async Task Index_Post_WithThreeMealsPerDay_RendersCompactActionControlsWithMealDetailPreviewChips()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -478,6 +507,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
             ["Request.CustomAisleOrder"] = string.Empty,
             ["Request.DislikesOrAllergens"] = string.Empty,
             ["Request.PreferQuickMeals"] = "true",
+            ["Request.IncludeDessertAddOn"] = "true",
             ["Request.DietaryModes"] = "Balanced",
             ["__RequestVerificationToken"] = antiForgeryToken
         }));
@@ -504,9 +534,16 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("class=\"aislepilot-mobile-meal-sheet-handle\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span>Refresh plan</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span data-setup-toggle-label>Edit settings</span>", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<span class=\"sr-only\">View details</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-meal-image-hint-primary\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-meal-image-hint-chip\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">View meal details: macros, ingredients and method</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<span class=\"sr-only\">View dessert details: ingredients and method</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<span class=\"sr-only\">Swap meal</span>", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<span>View details</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"View meal details: macros, ingredients and method\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"View dessert details: ingredients and method\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">View</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">View details<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Macros</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">View recipe<", html, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -608,6 +645,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
             ["Request.CustomAisleOrder"] = string.Empty,
             ["Request.DislikesOrAllergens"] = string.Empty,
             ["Request.PreferQuickMeals"] = "true",
+            ["Request.IncludeDessertAddOn"] = "true",
             ["Request.DietaryModes"] = "Balanced",
             ["__RequestVerificationToken"] = antiForgeryToken
         }));
@@ -795,7 +833,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_WithResult_RendersGenericShareShoppingListLabel()
+    public async Task Index_Post_WithResult_RendersNotesCompatibleShareShoppingListLabel()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -818,8 +856,75 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Share shopping list", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Share shopping list (works with Notes)", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("iPhone Notes", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithResult_ClarifiesShoppingEstimateIsNotCheckoutTotal()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("Meal ingredient estimate", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("This estimate covers the ingredients used in these meals.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Actual checkout can be higher if shops only sell larger packs or bags.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(" - Est. ", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_Post_WithResult_RendersExportActionsInRequestedOrder()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var response = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        var shareIndex = html.IndexOf("Share shopping list (works with Notes)", StringComparison.OrdinalIgnoreCase);
+        var checklistIndex = html.IndexOf("Download shopping checklist (.txt)", StringComparison.OrdinalIgnoreCase);
+        var planPackIndex = html.IndexOf("Download full plan pack (.pdf)", StringComparison.OrdinalIgnoreCase);
+        var printIndex = html.IndexOf("Print current view", StringComparison.OrdinalIgnoreCase);
+
+        Assert.True(shareIndex >= 0, "Expected share-shopping-list export action to be rendered.");
+        Assert.True(checklistIndex > shareIndex, "Expected shopping checklist download to follow the share action.");
+        Assert.True(planPackIndex > checklistIndex, "Expected full plan pack download to follow the checklist download.");
+        Assert.True(printIndex > planPackIndex, "Expected print action to be the final export option.");
     }
 
     [Fact]

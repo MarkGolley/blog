@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -6,6 +7,86 @@ using Microsoft.Playwright;
 namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
+    [Fact]
+    public async Task NarrowMobile_AislePilotPeopleSlider_UsesThumbFriendlyTouchTarget()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateNarrowMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        await page.EvaluateAsync(
+            """
+            () => {
+                const servingDetails = Array.from(document.querySelectorAll(".aislepilot-collapsible"))
+                    .find(section => section.querySelector(".aislepilot-collapsible-title")?.textContent?.trim() === "Cooking for");
+                if (servingDetails instanceof HTMLDetailsElement) {
+                    servingDetails.open = true;
+                }
+            }
+            """);
+
+        var peopleSlider = page.Locator(".aislepilot-slider-field--thumb-friendly input[name='Request.HouseholdSize']").First;
+        await peopleSlider.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var metricsText = await page.EvaluateAsync<string>(
+            """
+            () => {
+                const field = document.querySelector(".aislepilot-slider-field--thumb-friendly");
+                if (!(field instanceof HTMLElement)) {
+                    return "NaN|NaN|NaN";
+                }
+
+                const input = field.querySelector("input[name='Request.HouseholdSize']");
+                const valueBubble = field.querySelector("[data-number-slider-value]");
+                if (!(input instanceof HTMLInputElement) || !(valueBubble instanceof HTMLElement)) {
+                    return "NaN|NaN|NaN";
+                }
+
+                const inputRect = input.getBoundingClientRect();
+                const valueRect = valueBubble.getBoundingClientRect();
+                return `${inputRect.height}|${valueRect.width}|${valueRect.height}`;
+            }
+            """);
+
+        static double ParseMetric(string raw)
+        {
+            return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : double.NaN;
+        }
+
+        var metrics = (metricsText ?? "NaN|NaN|NaN").Split('|');
+        var inputHeight = metrics.Length > 0 ? ParseMetric(metrics[0]) : double.NaN;
+        var bubbleWidth = metrics.Length > 1 ? ParseMetric(metrics[1]) : double.NaN;
+        var bubbleHeight = metrics.Length > 2 ? ParseMetric(metrics[2]) : double.NaN;
+
+        Assert.True(
+            inputHeight >= 32,
+            $"Expected the people slider input to keep at least a 32px mobile hit area. Actual={inputHeight}px.");
+        Assert.True(
+            bubbleWidth >= 34,
+            $"Expected the people slider value bubble to stay wide enough for thumb dragging on mobile. Actual={bubbleWidth}px.");
+        Assert.True(
+            bubbleHeight >= 27,
+            $"Expected the people slider value bubble to stay tall enough for thumb dragging on mobile. Actual={bubbleHeight}px.");
+    }
+
     [Fact]
     public async Task NarrowMobile_AislePilotMealCardActionButtons_RemainVisibleWithinViewport()
     {
