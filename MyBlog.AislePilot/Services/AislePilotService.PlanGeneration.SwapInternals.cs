@@ -62,6 +62,9 @@ public sealed partial class AislePilotService
             return null;
         }
 
+        var currentMeal = dayIndex >= 0 && dayIndex < selectedMeals.Count
+            ? selectedMeals[dayIndex]
+            : null;
         var excludedMealNames = selectedMeals
             .Where((_, index) => index != dayIndex)
             .Select(meal => meal.Name)
@@ -133,6 +136,11 @@ public sealed partial class AislePilotService
             return null;
         }
 
+        if (currentMeal is not null && SharesKeySwapIngredients(replacement, currentMeal))
+        {
+            return null;
+        }
+
         var persistedMeals = await PersistAiMealsAsync([replacement], cancellationToken);
         if (persistedMeals.Count > 0)
         {
@@ -152,6 +160,7 @@ public sealed partial class AislePilotService
         PlanContext context,
         IReadOnlyList<MealTemplate> selectedMeals,
         int dayIndex,
+        MealTemplate? currentMeal,
         string currentMealName,
         decimal weeklyBudget,
         bool preferQuickMeals,
@@ -178,6 +187,7 @@ public sealed partial class AislePilotService
             unseenTemplates,
             selectedMeals,
             dayIndex,
+            currentMeal,
             currentMealName,
             weeklyBudget,
             context.HouseholdFactor,
