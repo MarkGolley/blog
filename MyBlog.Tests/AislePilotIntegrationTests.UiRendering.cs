@@ -98,7 +98,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_RendersDayMealSummaryRowsWithoutOverviewGlanceMetrics()
+    public async Task Index_Post_RendersDayMealSummaryRowsWithinDayCardCarousel()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -127,9 +127,14 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("data-day-meal-summary", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-card aislepilot-shop-card\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-action\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-day-card-expander", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("aislepilot-day-card-expander-summary", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-day-card-expander-image", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-carousel", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-viewport", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-track", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-slide", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-status", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-pagination", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-dot", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-day-card-expander", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-meal-swipe-surface", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-meal-image-url=", html, StringComparison.OrdinalIgnoreCase);
     }
@@ -177,7 +182,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_WithMultipleDayCards_RendersDayCardReorderFormAndHandles()
+    public async Task Index_Post_WithMultipleDayCards_RendersDayCardCarouselWithoutVisibleReorderHandles()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -202,8 +207,11 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("data-day-reorder-form", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-day-reorder-handle", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-card-carousel", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-prev", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-next", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-dot", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-day-reorder-handle", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-meal-names=", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-ignored-flags=", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-card-leftover-count=", html, StringComparison.OrdinalIgnoreCase);
@@ -262,12 +270,63 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task AislePilotStylesheet_DoesNotRenderDayCardChevronAffordance()
+    public async Task AislePilotStylesheet_UsesDayCardCarouselWithoutChevronAffordance()
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
         var css = await client.GetStringAsync("/css/aisle-pilot.css");
 
+        Assert.Contains(".aislepilot-day-carousel", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-day-carousel-track", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("scroll-snap-type: x mandatory;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-day-card-slide-width: min(100%, 31.75rem);", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-day-card-ghost-width: clamp(8rem, 17vw, 11rem);", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-day-carousel-stage-inset-inline: 1rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-day-carousel-stage-inset-block-start: 2.85rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("gap: 0.88rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-day-card::before", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-meal-grid::before", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("overflow-x: auto;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("grid-template-columns: auto minmax(0, 1fr);", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr) auto;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("width: min(100%, var(--ap-day-card-slide-width));", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("min-width: 3.6rem;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("background: rgba(244, 249, 253, 0.88);", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("rotateY(10deg)", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-day-card-slide-width: 100%;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("justify-content: flex-start;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-meal-image-hint-chips {", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("text-wrap: balance;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("max-width: min(calc(100% - 1.2rem), 8.5rem);", css, StringComparison.OrdinalIgnoreCase);
+        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+        Assert.Contains("dayCarouselPosition", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("targetScrollLeft", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("computeTargetScrollLeft", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("targetCenter - viewportCenter", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-ghost", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ensureGhostSlides", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-carousel-ghost-side", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-day-card-ghost-shell", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-day-card-ghost-band", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-day-card-ghost-panel", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("aislepilot-day-card-ghost-chip", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("scrollPaginationToActiveDot", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("activeIndex === 0 ? slides.length - 1 : activeIndex - 1", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("activeIndex === slides.length - 1 ? 0 : activeIndex + 1", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("prefers-reduced-motion: reduce", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("pendingNavigationIndex", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("scheduleNavigationSettle", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("viewport.scrollTo({", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("scrollToIndex(targetIndex, \"smooth\", \"jump\")", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("transform: none;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-day-card.is-carousel-ghost", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-day-card-ghost-shell", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-day-card-ghost-band", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".aislepilot-day-card-ghost-panel", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("@keyframes aislepilot-day-card-settle", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(".aislepilot-day-carousel-pagination::before", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("@keyframes aislepilot-day-carousel-pill-pulse", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(".aislepilot-day-card-ghost-chip", css, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(".aislepilot-day-card-expander > summary::after", css, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(".aislepilot-day-card-expander[open] > summary::after", css, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(":root[data-theme=\"dark\"] .aislepilot-day-card-expander > summary::after", css, StringComparison.OrdinalIgnoreCase);
@@ -590,7 +649,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.DoesNotContain("<span class=\"sr-only\">Swap meal</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aria-label=\"View meal details: macros, ingredients and method\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aria-label=\"View dessert details: ingredients and method\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(">View</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Recipe</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">View details<", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(">Macros</span>", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(">View recipe<", html, StringComparison.OrdinalIgnoreCase);

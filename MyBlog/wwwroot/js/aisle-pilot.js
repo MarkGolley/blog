@@ -5146,47 +5146,404 @@
         });
     };
 
-    const wireDayCardExpanders = scope => {
-        const expanders = scope instanceof Element
-            ? Array.from(scope.querySelectorAll("[data-day-card-expander]"))
-            : Array.from(document.querySelectorAll("[data-day-card-expander]"));
+    const wireDayCardCarousel = scope => {
+        const carousels = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-card-carousel]"))
+            : Array.from(document.querySelectorAll("[data-day-card-carousel]"));
 
-        const syncSummaryExpandedState = expander => {
-            if (!(expander instanceof HTMLDetailsElement)) {
+        carousels.forEach(carousel => {
+            if (!(carousel instanceof HTMLElement) || carousel.dataset.dayCardCarouselWired === "true") {
                 return;
             }
 
-            const summary = expander.querySelector(":scope > summary");
-            if (!(summary instanceof HTMLElement)) {
+            const viewport = carousel.querySelector("[data-day-carousel-viewport]");
+            const track = carousel.querySelector("[data-day-carousel-track]");
+            const status = carousel.querySelector("[data-day-carousel-status]");
+            const previousButton = carousel.querySelector("[data-day-carousel-prev]");
+            const nextButton = carousel.querySelector("[data-day-carousel-next]");
+            const pagination = carousel.querySelector("[data-day-carousel-pagination]");
+            const dots = Array.from(carousel.querySelectorAll("[data-day-carousel-dot]"));
+            if (!(viewport instanceof HTMLElement) || !(track instanceof HTMLElement)) {
                 return;
             }
 
-            summary.setAttribute("aria-expanded", expander.open ? "true" : "false");
-        };
+            carousel.dataset.dayCardCarouselWired = "true";
+            let activeIndex = 0;
+            let scrollSyncFrame = 0;
+            let motionTimer = 0;
+            const prefersReducedMotion = typeof window.matchMedia === "function"
+                && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-        expanders.forEach(expander => {
-            if (!(expander instanceof HTMLDetailsElement) || expander.dataset.dayCardExpanderWired === "true") {
-                return;
-            }
+            const getSlides = () => Array.from(track.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"))
+                .filter(slide => slide instanceof HTMLElement);
 
-            expander.dataset.dayCardExpanderWired = "true";
-            syncSummaryExpandedState(expander);
-            expander.addEventListener("toggle", () => {
-                syncSummaryExpandedState(expander);
-                const isMobileViewport = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 760px)").matches;
-                if (isMobileViewport && expander.open) {
-                    expanders.forEach(otherExpander => {
-                        if (!(otherExpander instanceof HTMLDetailsElement) || otherExpander === expander || !otherExpander.open) {
-                            return;
-                        }
+            const createGhostSlide = side => {
+                const ghost = document.createElement("article");
+                ghost.className = "aislepilot-card aislepilot-day-card is-carousel-ghost";
+                ghost.setAttribute("data-day-card-slide", "");
+                ghost.setAttribute("data-day-carousel-ghost", "true");
+                ghost.setAttribute("data-day-carousel-ghost-side", side);
+                ghost.setAttribute("data-day-carousel-position", "far");
+                ghost.setAttribute("aria-hidden", "true");
+                ghost.setAttribute("inert", "");
 
-                        otherExpander.open = false;
-                        syncSummaryExpandedState(otherExpander);
-                    });
+                const body = document.createElement("div");
+                body.className = "aislepilot-day-card-body aislepilot-day-card-body--ghost";
+                body.setAttribute("aria-hidden", "true");
+
+                const placeholder = document.createElement("div");
+                placeholder.className = "aislepilot-day-card-ghost-shell";
+                placeholder.innerHTML = `
+                    <span class="aislepilot-day-card-ghost-band is-top"></span>
+                    <span class="aislepilot-day-card-ghost-band is-mid"></span>
+                    <span class="aislepilot-day-card-ghost-panel"></span>
+                `;
+
+                body.appendChild(placeholder);
+                ghost.appendChild(body);
+                return ghost;
+            };
+
+            const ensureGhostSlides = () => {
+                Array.from(track.querySelectorAll("[data-day-carousel-ghost='true']")).forEach(ghost => {
+                    ghost.remove();
+                });
+
+                const slides = getSlides();
+                if (slides.length <= 1) {
+                    return;
                 }
 
+                const firstSlide = slides[0];
+                const lastSlide = slides[slides.length - 1];
+                if (!(firstSlide instanceof HTMLElement) || !(lastSlide instanceof HTMLElement)) {
+                    return;
+                }
+
+                const leadingGhost = createGhostSlide("leading");
+                const trailingGhost = createGhostSlide("trailing");
+                track.insertBefore(leadingGhost, firstSlide);
+                track.appendChild(trailingGhost);
+            };
+
+            const clampIndex = nextIndex => {
+                const slides = getSlides();
+                if (slides.length === 0) {
+                    return 0;
+                }
+
+                if (!Number.isInteger(nextIndex)) {
+                    return activeIndex;
+                }
+
+                return Math.max(0, Math.min(slides.length - 1, nextIndex));
+            };
+
+            const clearMotionState = () => {
+                if (motionTimer > 0) {
+                    window.clearTimeout(motionTimer);
+                    motionTimer = 0;
+                }
+
+                delete carousel.dataset.dayCarouselMotion;
+                getSlides().forEach(slide => {
+                    if (slide instanceof HTMLElement) {
+                        delete slide.dataset.dayCarouselSettling;
+                    }
+                });
+
+                dots.forEach(dot => {
+                    if (dot instanceof HTMLElement) {
+                        delete dot.dataset.dayCarouselSettling;
+                    }
+                });
+            };
+
+            const pulseActiveState = (nextIndex, motion) => {
+                clearMotionState();
+
+                const slides = getSlides();
+                const targetSlide = slides[clampIndex(nextIndex)];
+                const targetDot = dots[clampIndex(nextIndex)];
+                if (targetSlide instanceof HTMLElement) {
+                    targetSlide.dataset.dayCarouselSettling = "true";
+                }
+
+                if (targetDot instanceof HTMLElement) {
+                    targetDot.dataset.dayCarouselSettling = "true";
+                }
+
+                if (typeof motion === "string" && motion.length > 0) {
+                    carousel.dataset.dayCarouselMotion = motion;
+                }
+
+                motionTimer = window.setTimeout(() => {
+                    clearMotionState();
+                }, 320);
+            };
+
+            const computeTargetScrollLeft = targetSlide => {
+                if (!(targetSlide instanceof HTMLElement)) {
+                    return 0;
+                }
+
+                const viewportRect = viewport.getBoundingClientRect();
+                const targetRect = targetSlide.getBoundingClientRect();
+                const viewportCenter = viewportRect.left + (viewportRect.width / 2);
+                const targetCenter = targetRect.left + (targetRect.width / 2);
+                const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+                const centeredLeft = viewport.scrollLeft + (targetCenter - viewportCenter);
+                return Math.max(0, Math.min(maxScrollLeft, Math.round(centeredLeft)));
+            };
+
+            const scrollPaginationToActiveDot = behavior => {
+                if (!(pagination instanceof HTMLElement)) {
+                    return;
+                }
+
+                const activeDot = dots[activeIndex];
+                if (!(activeDot instanceof HTMLElement)) {
+                    return;
+                }
+
+                const maxScrollLeft = Math.max(0, pagination.scrollWidth - pagination.clientWidth);
+                if (maxScrollLeft <= 0) {
+                    return;
+                }
+
+                const targetLeft = activeDot.offsetLeft - ((pagination.clientWidth - activeDot.offsetWidth) / 2);
+                pagination.scrollTo({
+                    left: Math.max(0, Math.min(maxScrollLeft, Math.round(targetLeft))),
+                    behavior
+                });
+            };
+
+            const updateChrome = (nextIndex, options = {}) => {
+                const slides = getSlides();
+                if (slides.length === 0) {
+                    return;
+                }
+
+                const previousActiveIndex = activeIndex;
+                activeIndex = clampIndex(nextIndex);
+                slides.forEach((slide, index) => {
+                    if (!(slide instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const isActive = index === activeIndex;
+                    const offset = index - activeIndex;
+                    let position = "far";
+                    if (offset === 0) {
+                        position = "active";
+                    } else if (offset === -1) {
+                        position = "prev";
+                    } else if (offset === 1) {
+                        position = "next";
+                    }
+
+                    slide.setAttribute("aria-hidden", isActive ? "false" : "true");
+                    slide.dataset.dayCarouselPosition = position;
+                });
+
+                const leadingGhost = track.querySelector("[data-day-carousel-ghost-side='leading']");
+                if (leadingGhost instanceof HTMLElement) {
+                    leadingGhost.dataset.dayCarouselPosition = activeIndex === 0 ? "prev" : "far";
+                }
+
+                const trailingGhost = track.querySelector("[data-day-carousel-ghost-side='trailing']");
+                if (trailingGhost instanceof HTMLElement) {
+                    trailingGhost.dataset.dayCarouselPosition = activeIndex === slides.length - 1 ? "next" : "far";
+                }
+
+                dots.forEach(dot => {
+                    if (!(dot instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    const dotIndex = Number.parseInt(dot.dataset.dayCarouselTarget ?? "-1", 10);
+                    const isActive = dotIndex === activeIndex;
+                    dot.classList.toggle("is-active", isActive);
+                    dot.setAttribute("aria-selected", isActive ? "true" : "false");
+                    dot.setAttribute("tabindex", isActive ? "0" : "-1");
+                    dot.setAttribute("aria-current", isActive ? "true" : "false");
+                });
+
+                if (previousButton instanceof HTMLButtonElement) {
+                    previousButton.disabled = slides.length <= 1;
+                }
+
+                if (nextButton instanceof HTMLButtonElement) {
+                    nextButton.disabled = slides.length <= 1;
+                }
+
+                if (status instanceof HTMLElement) {
+                    const activeSlide = slides[activeIndex];
+                    const dayName = activeSlide instanceof HTMLElement
+                        ? (activeSlide.dataset.dayCardDayName ?? "").trim()
+                        : "";
+                    const dayPositionRaw = activeSlide instanceof HTMLElement
+                        ? Number.parseInt(activeSlide.dataset.dayCardDayPosition ?? "", 10)
+                        : Number.NaN;
+                    const totalDaysRaw = activeSlide instanceof HTMLElement
+                        ? Number.parseInt(activeSlide.dataset.dayCardTotalDays ?? "", 10)
+                        : Number.NaN;
+                    const dayPosition = Number.isInteger(dayPositionRaw) && dayPositionRaw > 0 ? dayPositionRaw : activeIndex + 1;
+                    const totalDays = Number.isInteger(totalDaysRaw) && totalDaysRaw > 0 ? totalDaysRaw : slides.length;
+                    status.textContent = dayName.length > 0
+                        ? `${dayName}, ${dayPosition} of ${totalDays}`
+                        : `Day ${dayPosition} of ${totalDays}`;
+                }
+
+                if (previousButton instanceof HTMLButtonElement) {
+                    const previousIndex = activeIndex === 0 ? slides.length - 1 : activeIndex - 1;
+                    const previousDayName = slides[previousIndex] instanceof HTMLElement
+                        ? (slides[previousIndex].dataset.dayCardDayName ?? "").trim()
+                        : "";
+                    previousButton.setAttribute("aria-label", previousDayName.length > 0
+                        ? `Show ${previousDayName}`
+                        : "Show previous day");
+                }
+
+                if (nextButton instanceof HTMLButtonElement) {
+                    const nextWrappedIndex = activeIndex === slides.length - 1 ? 0 : activeIndex + 1;
+                    const nextDayName = slides[nextWrappedIndex] instanceof HTMLElement
+                        ? (slides[nextWrappedIndex].dataset.dayCardDayName ?? "").trim()
+                        : "";
+                    nextButton.setAttribute("aria-label", nextDayName.length > 0
+                        ? `Show ${nextDayName}`
+                        : "Show next day");
+                }
+
+                if (options.forcePaginationSync === true || activeIndex !== previousActiveIndex) {
+                    scrollPaginationToActiveDot(options.paginationBehavior === "smooth" ? "smooth" : "auto");
+                }
+            };
+
+            const scrollToIndex = (nextIndex, behavior, motion = "") => {
+                const slides = getSlides();
+                if (slides.length === 0) {
+                    return;
+                }
+
+                activeIndex = clampIndex(nextIndex);
+                const resolvedBehavior = prefersReducedMotion ? "auto" : behavior;
+                updateChrome(activeIndex, {
+                    paginationBehavior: resolvedBehavior,
+                    forcePaginationSync: true
+                });
+                const targetSlide = slides[activeIndex];
+                if (!(targetSlide instanceof HTMLElement)) {
+                    return;
+                }
+
+                pulseActiveState(activeIndex, motion);
+                const targetScrollLeft = computeTargetScrollLeft(targetSlide);
+                viewport.scrollTo({
+                    left: targetScrollLeft,
+                    behavior: resolvedBehavior
+                });
+
                 updateViewportHeight(true);
+            };
+
+            const findClosestSlideIndex = () => {
+                const slides = getSlides();
+                if (slides.length === 0) {
+                    return 0;
+                }
+
+                const viewportRect = viewport.getBoundingClientRect();
+                const viewportCenter = viewportRect.left + (viewportRect.width / 2);
+                let closestIndex = activeIndex;
+                let closestDistance = Number.POSITIVE_INFINITY;
+
+                slides.forEach((slide, index) => {
+                    if (!(slide instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const slideRect = slide.getBoundingClientRect();
+                    const slideCenter = slideRect.left + (slideRect.width / 2);
+                    const distance = Math.abs(slideCenter - viewportCenter);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestIndex = index;
+                    }
+                });
+
+                return closestIndex;
+            };
+
+            const syncFromScroll = () => {
+                scrollSyncFrame = 0;
+                updateChrome(findClosestSlideIndex());
+            };
+
+            viewport.addEventListener("scroll", () => {
+                if (scrollSyncFrame > 0) {
+                    return;
+                }
+
+                scrollSyncFrame = window.requestAnimationFrame(syncFromScroll);
+            }, { passive: true });
+
+            if (previousButton instanceof HTMLButtonElement) {
+                previousButton.addEventListener("click", () => {
+                    const slides = getSlides();
+                    if (slides.length <= 1) {
+                        return;
+                    }
+
+                    const isWrapping = activeIndex === 0;
+                    const previousIndex = isWrapping ? slides.length - 1 : activeIndex - 1;
+                    scrollToIndex(previousIndex, isWrapping ? "auto" : "smooth", "prev");
+                });
+            }
+
+            if (nextButton instanceof HTMLButtonElement) {
+                nextButton.addEventListener("click", () => {
+                    const slides = getSlides();
+                    if (slides.length <= 1) {
+                        return;
+                    }
+
+                    const isWrapping = activeIndex === slides.length - 1;
+                    const nextWrappedIndex = isWrapping ? 0 : activeIndex + 1;
+                    scrollToIndex(nextWrappedIndex, isWrapping ? "auto" : "smooth", "next");
+                });
+            }
+
+            dots.forEach(dot => {
+                if (!(dot instanceof HTMLButtonElement) || dot.dataset.dayCarouselDotWired === "true") {
+                    return;
+                }
+
+                dot.dataset.dayCarouselDotWired = "true";
+                dot.addEventListener("click", () => {
+                    const targetIndex = Number.parseInt(dot.dataset.dayCarouselTarget ?? "-1", 10);
+                    if (!Number.isInteger(targetIndex) || targetIndex < 0) {
+                        return;
+                    }
+
+                    scrollToIndex(targetIndex, "smooth", "jump");
+                });
             });
+
+            ensureGhostSlides();
+            const initialSlides = getSlides();
+            const initialActiveIndex = initialSlides.findIndex(slide =>
+                slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+            updateChrome(initialActiveIndex >= 0 ? initialActiveIndex : 0, { forcePaginationSync: true });
+
+            const alignAfterLayout = () => {
+                window.requestAnimationFrame(() => {
+                    scrollToIndex(activeIndex, "auto");
+                });
+            };
+
+            alignAfterLayout();
+            window.addEventListener("resize", alignAfterLayout);
         });
     };
 
@@ -5230,14 +5587,7 @@
             dayMealSlotState.set(dayKey, readActiveDayMealSlotIndex(currentCard));
         }
 
-        const currentExpander = currentCard.querySelector("[data-day-card-expander]");
-        const replacementExpander = replacementCard.querySelector("[data-day-card-expander]");
-        if (currentExpander instanceof HTMLDetailsElement && replacementExpander instanceof HTMLDetailsElement) {
-            replacementExpander.open = currentExpander.open;
-            if (!currentExpander.open) {
-                replacementExpander.removeAttribute("open");
-            }
-        }
+        replacementCard.setAttribute("aria-hidden", currentCard.getAttribute("aria-hidden") === "false" ? "false" : "true");
     };
 
     const replaceSwappedMealCard = (responseDocument, slotIndex) => {
@@ -6075,7 +6425,7 @@
         wireLeftoverPlanner(scope);
         wireCardMoreActions(scope);
         wireInlineDetailsPanels(scope);
-        wireDayCardExpanders(scope);
+        wireDayCardCarousel(scope);
         wireDayCardReorder(scope);
         wireDayMealCards(scope);
         wireShoppingChecklist(scope);

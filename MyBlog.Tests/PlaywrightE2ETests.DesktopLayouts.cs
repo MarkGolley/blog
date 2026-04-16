@@ -111,6 +111,230 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Desktop_AislePilotDayCarousel_DayPillAndArrowAdvanceToExpectedSlides()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var saturdayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='5']").First;
+        await saturdayPill.ClickAsync();
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const viewport = document.querySelector("[data-day-carousel-viewport]");
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeSlide = slides[activeIndex];
+                const status = document.querySelector("[data-day-carousel-status]");
+                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const viewportRect = viewport.getBoundingClientRect();
+                const activeRect = activeSlide.getBoundingClientRect();
+                const centerDelta = Math.abs((activeRect.left + (activeRect.width / 2)) - (viewportRect.left + (viewportRect.width / 2)));
+                const previousSlide = slides[activeIndex - 1];
+                const nextSlide = slides[activeIndex + 1];
+                const activeTitle = activeSlide.querySelector("h3");
+                const previousTitle = previousSlide instanceof HTMLElement ? previousSlide.querySelector("h3") : null;
+                const nextTitle = nextSlide instanceof HTMLElement ? nextSlide.querySelector("h3") : null;
+                const activeTitleOpacity = activeTitle instanceof HTMLElement ? Number.parseFloat(getComputedStyle(activeTitle).opacity || "1") : 0;
+                const previousTitleOpacity = previousTitle instanceof HTMLElement ? Number.parseFloat(getComputedStyle(previousTitle).opacity || "1") : 0;
+                const nextTitleOpacity = nextTitle instanceof HTMLElement ? Number.parseFloat(getComputedStyle(nextTitle).opacity || "1") : 0;
+                return activeIndex === 5 &&
+                    /Saturday/i.test(status.textContent || "") &&
+                    centerDelta <= 12 &&
+                    activeTitleOpacity >= 0.95 &&
+                    previousTitleOpacity <= 0.4 &&
+                    nextTitleOpacity <= 0.4;
+            }
+            """);
+
+        var nextButton = page.Locator("[data-day-carousel-next]").First;
+        await nextButton.ClickAsync();
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const viewport = document.querySelector("[data-day-carousel-viewport]");
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeSlide = slides[activeIndex];
+                const status = document.querySelector("[data-day-carousel-status]");
+                const nextButton = document.querySelector("[data-day-carousel-next]");
+                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement) || !(nextButton instanceof HTMLButtonElement)) {
+                    return false;
+                }
+
+                const viewportRect = viewport.getBoundingClientRect();
+                const activeRect = activeSlide.getBoundingClientRect();
+                const centerDelta = Math.abs((activeRect.left + (activeRect.width / 2)) - (viewportRect.left + (viewportRect.width / 2)));
+                const trailingGhost = document.querySelector("[data-day-carousel-ghost-side='trailing']");
+                const ghostRect = trailingGhost instanceof HTMLElement ? trailingGhost.getBoundingClientRect() : null;
+                const ghostVisibleWidth = ghostRect
+                    ? Math.max(0, Math.min(ghostRect.right, viewportRect.right) - Math.max(ghostRect.left, viewportRect.left))
+                    : 0;
+                const ghostPlaceholder = trailingGhost instanceof HTMLElement
+                    ? trailingGhost.querySelector(".aislepilot-day-card-ghost-panel")
+                    : null;
+                const ghostTitle = trailingGhost instanceof HTMLElement ? trailingGhost.querySelector("h3") : null;
+                return activeIndex === 6 &&
+                    /Sunday/i.test(status.textContent || "") &&
+                    centerDelta <= 12 &&
+                    !nextButton.disabled &&
+                    ghostVisibleWidth >= 28 &&
+                    ghostPlaceholder instanceof HTMLElement &&
+                    !(ghostTitle instanceof HTMLElement);
+            }
+            """);
+
+        await nextButton.ClickAsync();
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const viewport = document.querySelector("[data-day-carousel-viewport]");
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeSlide = slides[activeIndex];
+                const status = document.querySelector("[data-day-carousel-status]");
+                const previousButton = document.querySelector("[data-day-carousel-prev]");
+                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement) || !(previousButton instanceof HTMLButtonElement)) {
+                    return false;
+                }
+
+                const viewportRect = viewport.getBoundingClientRect();
+                const activeRect = activeSlide.getBoundingClientRect();
+                const centerDelta = Math.abs((activeRect.left + (activeRect.width / 2)) - (viewportRect.left + (viewportRect.width / 2)));
+                const leadingGhost = document.querySelector("[data-day-carousel-ghost-side='leading']");
+                const ghostRect = leadingGhost instanceof HTMLElement ? leadingGhost.getBoundingClientRect() : null;
+                const ghostVisibleWidth = ghostRect
+                    ? Math.max(0, Math.min(ghostRect.right, viewportRect.right) - Math.max(ghostRect.left, viewportRect.left))
+                    : 0;
+                const ghostPlaceholder = leadingGhost instanceof HTMLElement
+                    ? leadingGhost.querySelector(".aislepilot-day-card-ghost-panel")
+                    : null;
+                const ghostTitle = leadingGhost instanceof HTMLElement ? leadingGhost.querySelector("h3") : null;
+                return activeIndex === 0 &&
+                    /Monday/i.test(status.textContent || "") &&
+                    centerDelta <= 12 &&
+                    !previousButton.disabled &&
+                    ghostVisibleWidth >= 28 &&
+                    ghostPlaceholder instanceof HTMLElement &&
+                    !(ghostTitle instanceof HTMLElement);
+            }
+            """);
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotDayCarousel_UsesMutedPreviewCardsAndCompactOverlayChrome()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var thursdayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='3']").First;
+        await thursdayPill.ClickAsync();
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const parseAlpha = value => {
+                    if (typeof value !== "string") {
+                        return 0;
+                    }
+
+                    const match = value.match(/rgba?\(([^)]+)\)/i);
+                    if (!match) {
+                        return 1;
+                    }
+
+                    const parts = match[1].split(",").map(part => Number.parseFloat(part.trim()));
+                    return parts.length >= 4 && Number.isFinite(parts[3]) ? parts[3] : 1;
+                };
+
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeSlide = slides[activeIndex];
+                const previousSlide = slides[activeIndex - 1];
+                const nextSlide = slides[activeIndex + 1];
+                const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
+                const inactiveDot = document.querySelector("[data-day-carousel-dot][aria-selected='false']");
+                const hint = activeSlide instanceof HTMLElement ? activeSlide.querySelector(".aislepilot-meal-image-hint") : null;
+                const hintChips = hint instanceof HTMLElement ? hint.querySelector(".aislepilot-meal-image-hint-chips") : null;
+                const primaryHint = hint instanceof HTMLElement ? hint.querySelector(".aislepilot-meal-image-hint-primary") : null;
+                const actionsTrigger = activeSlide instanceof HTMLElement
+                    ? activeSlide.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] > summary")
+                    : null;
+                const title = activeSlide instanceof HTMLElement ? activeSlide.querySelector(".aislepilot-day-meal-panel > h3") : null;
+                if (!(activeSlide instanceof HTMLElement)
+                    || !(previousSlide instanceof HTMLElement)
+                    || !(nextSlide instanceof HTMLElement)
+                    || !(activeDot instanceof HTMLElement)
+                    || !(inactiveDot instanceof HTMLElement)
+                    || !(hint instanceof HTMLElement)
+                    || !(actionsTrigger instanceof HTMLElement)
+                    || !(primaryHint instanceof HTMLElement)
+                    || !(title instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const activeRect = activeSlide.getBoundingClientRect();
+                const previousRect = previousSlide.getBoundingClientRect();
+                const nextRect = nextSlide.getBoundingClientRect();
+                const activeOpacity = Number.parseFloat(getComputedStyle(activeSlide).opacity || "0");
+                const previousOpacity = Number.parseFloat(getComputedStyle(previousSlide).opacity || "0");
+                const nextOpacity = Number.parseFloat(getComputedStyle(nextSlide).opacity || "0");
+                const activeDotOpacity = Number.parseFloat(getComputedStyle(activeDot).opacity || "0");
+                const inactiveDotOpacity = Number.parseFloat(getComputedStyle(inactiveDot).opacity || "0");
+                const hintAlpha = parseAlpha(getComputedStyle(hint).backgroundColor || "");
+                const triggerAlpha = parseAlpha(getComputedStyle(actionsTrigger).backgroundColor || "");
+                const triggerRect = actionsTrigger.getBoundingClientRect();
+                const hintRect = hint.getBoundingClientRect();
+                const hintChipsDisplay = hintChips instanceof HTMLElement ? getComputedStyle(hintChips).display : "missing";
+                const primaryText = (primaryHint.textContent || "").trim();
+                const titleSize = Number.parseFloat(getComputedStyle(title).fontSize || "0");
+                const metaBadge = activeSlide.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta");
+                const metaRadius = metaBadge instanceof HTMLElement
+                    ? Number.parseFloat(getComputedStyle(metaBadge).borderTopLeftRadius || "0")
+                    : 0;
+
+                return activeIndex === 3
+                    && activeRect.width > previousRect.width + 14
+                    && activeRect.width > nextRect.width + 14
+                    && activeOpacity >= 0.98
+                    && previousOpacity >= 0.6 && previousOpacity <= 0.8
+                    && nextOpacity >= 0.6 && nextOpacity <= 0.8
+                    && activeDotOpacity >= 0.98
+                    && inactiveDotOpacity >= 0.9
+                    && hintAlpha >= 0.3 && hintAlpha <= 0.58
+                    && hintRect.width <= 136
+                    && hintChipsDisplay === "none"
+                    && /Recipe/i.test(primaryText)
+                    && triggerAlpha >= 0.28 && triggerAlpha <= 0.56
+                    && triggerRect.width <= 34
+                    && triggerRect.height <= 34
+                    && titleSize >= 15 && titleSize <= 17
+                    && metaRadius >= 20;
+            }
+            """);
+    }
+
+    [Fact]
     public async Task Desktop_AislePilotSupermarketSelection_PersistsAcrossFreshVisit()
     {
         if (!IsE2EEnabled())

@@ -1012,7 +1012,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCard_ShowsSingleVisibleSummarySurface()
+    public async Task Mobile_AislePilotDayCarousel_ShowsSinglePrimarySlideAndHeaderSummary()
     {
         if (!IsE2EEnabled())
         {
@@ -1027,30 +1027,96 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var summaryMetrics = await page.EvaluateAsync<object[]>(
             """
             () => {
-                const card = document.querySelector("[data-day-meal-card]:has([data-day-card-summary])");
-                if (!(card instanceof HTMLElement)) {
-                    return [0, 0, "missing"];
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                const viewport = carousel?.querySelector("[data-day-carousel-viewport]");
+                const pagination = carousel?.querySelector("[data-day-carousel-pagination]");
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]"));
+                const activeSlide = slides.find(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                if (!(carousel instanceof HTMLElement) || !(viewport instanceof HTMLElement) || !(pagination instanceof HTMLElement) || !(activeSlide instanceof HTMLElement)) {
+                    return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "missing", "missing", "missing"];
                 }
 
-                const headerSummary = card.querySelector("[data-day-card-summary]");
-                const inlineSummary = card.querySelector("[data-day-meal-summary]");
+                const headerSummary = activeSlide.querySelector("[data-day-card-summary], .aislepilot-day-card-head-main .aislepilot-day-card-meta");
+                const inlineSummary = activeSlide.querySelector("[data-day-meal-summary]");
                 if (!(headerSummary instanceof HTMLElement) || !(inlineSummary instanceof HTMLElement)) {
-                    return [0, 0, "missing"];
+                    return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "missing", "missing", "missing"];
                 }
 
+                const activeCount = slides.filter(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false").length;
+                const hiddenCount = slides.filter(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "true").length;
                 const headerStyle = window.getComputedStyle(headerSummary);
                 const inlineStyle = window.getComputedStyle(inlineSummary);
                 const headerVisible = headerStyle.display !== "none" && headerSummary.getBoundingClientRect().height > 0 ? 1 : 0;
                 const inlineVisible = inlineStyle.display !== "none" && inlineSummary.getBoundingClientRect().height > 0 ? 1 : 0;
+                const hasHorizontalOverflow = viewport.scrollWidth > viewport.clientWidth + 16 ? 1 : 0;
+                const viewportRect = viewport.getBoundingClientRect();
+                const paginationRect = pagination.getBoundingClientRect();
+                const activeRect = activeSlide.getBoundingClientRect();
+                const activeWidthRatio = viewportRect.width > 0 ? activeRect.width / viewportRect.width : 0;
+                const activeCenterDelta = viewportRect.width > 0
+                    ? Math.abs((activeRect.left + (activeRect.width / 2)) - (viewportRect.left + (viewportRect.width / 2)))
+                    : Number.POSITIVE_INFINITY;
+                const nextSlide = slides.find(slide => slide instanceof HTMLElement && slide.dataset.dayCarouselPosition === "next");
+                const previousSlide = slides.find(slide => slide instanceof HTMLElement && slide.dataset.dayCarouselPosition === "prev");
+                const visibleWidthWithinViewport = slide => {
+                    if (!(slide instanceof HTMLElement)) {
+                        return 0;
+                    }
+
+                    const rect = slide.getBoundingClientRect();
+                    return Math.max(0, Math.min(rect.right, viewportRect.right) - Math.max(rect.left, viewportRect.left));
+                };
+                const nextPeekWidth = visibleWidthWithinViewport(nextSlide);
+                const previousPeekWidth = visibleWidthWithinViewport(previousSlide);
+                const activeDot = carousel.querySelector("[data-day-carousel-dot][aria-selected='true']");
+                const inactiveDot = carousel.querySelector("[data-day-carousel-dot][aria-selected='false']");
+                const activeDotWidth = activeDot instanceof HTMLElement ? activeDot.getBoundingClientRect().width : 0;
+                const inactiveDotWidth = inactiveDot instanceof HTMLElement ? inactiveDot.getBoundingClientRect().width : 0;
+                const activeDotHeight = activeDot instanceof HTMLElement ? activeDot.getBoundingClientRect().height : 0;
+                const inactiveDotHeight = inactiveDot instanceof HTMLElement ? inactiveDot.getBoundingClientRect().height : 0;
+                const selectorAboveViewport = paginationRect.bottom <= viewportRect.top + 12 ? 1 : 0;
+                const activeDotText = activeDot instanceof HTMLElement ? (activeDot.textContent || "").replace(/\s+/g, " ").trim() : "";
+                const inactiveDotText = inactiveDot instanceof HTMLElement ? (inactiveDot.textContent || "").replace(/\s+/g, " ").trim() : "";
                 const headerText = (headerSummary.textContent || "").replace(/\s+/g, " ").trim();
-                return [headerVisible, inlineVisible, headerText];
+                return [
+                    activeCount,
+                    hiddenCount,
+                    headerVisible,
+                    inlineVisible,
+                    hasHorizontalOverflow,
+                    activeWidthRatio,
+                    activeCenterDelta,
+                    nextPeekWidth,
+                    previousPeekWidth,
+                    activeDotWidth,
+                    inactiveDotWidth,
+                    activeDotHeight,
+                    inactiveDotHeight,
+                    selectorAboveViewport,
+                    activeDotText,
+                    inactiveDotText,
+                    headerText
+                ];
             }
             """);
 
-        Assert.Equal(3, summaryMetrics.Length);
+        Assert.Equal(17, summaryMetrics.Length);
         Assert.Equal(1, Convert.ToInt32(summaryMetrics[0]));
-        Assert.Equal(0, Convert.ToInt32(summaryMetrics[1]));
-        var summaryText = Convert.ToString(summaryMetrics[2]) ?? string.Empty;
+        Assert.True(Convert.ToInt32(summaryMetrics[1]) >= 1, $"Expected at least one inactive slide. Hidden={summaryMetrics[1]}.");
+        Assert.Equal(1, Convert.ToInt32(summaryMetrics[2]));
+        Assert.Equal(0, Convert.ToInt32(summaryMetrics[3]));
+        Assert.Equal(1, Convert.ToInt32(summaryMetrics[4]));
+        Assert.InRange(Convert.ToDouble(summaryMetrics[5]), 0.9d, 1.04d);
+        Assert.True(Convert.ToDouble(summaryMetrics[6]) <= 10d, $"Expected the active slide to stay centered in the viewport. Delta={summaryMetrics[6]}.");
+        Assert.True(Convert.ToDouble(summaryMetrics[7]) <= 2d, $"Expected no visible next-slide peek on mobile. Peek={summaryMetrics[7]}.");
+        Assert.True(Convert.ToDouble(summaryMetrics[8]) <= 2d, $"Expected no visible previous-slide peek on mobile. Peek={summaryMetrics[8]}.");
+        Assert.True(Math.Abs(Convert.ToDouble(summaryMetrics[9]) - Convert.ToDouble(summaryMetrics[10])) <= 20d, $"Expected active and inactive day chips to keep a stable width. Active={summaryMetrics[9]}, inactive={summaryMetrics[10]}.");
+        Assert.True(Convert.ToDouble(summaryMetrics[11]) >= 30d, $"Expected the active day chip to remain tappable. Height={summaryMetrics[11]}.");
+        Assert.True(Convert.ToDouble(summaryMetrics[12]) >= 30d, $"Expected inactive day chips to remain tappable. Height={summaryMetrics[12]}.");
+        Assert.Equal(1, Convert.ToInt32(summaryMetrics[13]));
+        Assert.True((Convert.ToString(summaryMetrics[14]) ?? string.Empty).Length >= 3, $"Expected active day chip text to stay visible. Text='{summaryMetrics[14]}'.");
+        Assert.True((Convert.ToString(summaryMetrics[15]) ?? string.Empty).Length >= 3, $"Expected inactive day chip text to stay visible. Text='{summaryMetrics[15]}'.");
+        var summaryText = Convert.ToString(summaryMetrics[16]) ?? string.Empty;
         Assert.True(
             summaryText.Contains("mins", StringComparison.OrdinalIgnoreCase) ||
             summaryText.Contains("removed", StringComparison.OrdinalIgnoreCase) ||
@@ -1059,7 +1125,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardExpander_CollapsesAndExpandsMealBody()
+    public async Task Mobile_AislePilotDayCarousel_NextButtonMovesToNextDay()
     {
         if (!IsE2EEnabled())
         {
@@ -1071,117 +1137,60 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var expanderMetrics = await page.EvaluateAsync<object[]>(
+        var initialMetrics = await page.EvaluateAsync<object[]>(
             """
             () => {
-                const expanders = Array.from(document.querySelectorAll("[data-day-card-expander]"));
-                if (expanders.length < 2) {
-                    return [0, 0];
-                }
-
-                const openCount = expanders.filter(expander => expander instanceof HTMLDetailsElement && expander.open).length;
-                const closedCount = expanders.filter(expander => expander instanceof HTMLDetailsElement && !expander.open).length;
-                return [openCount, closedCount];
+                const status = document.querySelector("[data-day-carousel-status]");
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                return [status instanceof HTMLElement ? (status.textContent || "").trim() : "", activeIndex, slides.length];
             }
             """);
-        Assert.Equal(2, expanderMetrics.Length);
-        Assert.True(Convert.ToInt32(expanderMetrics[0]) >= 1, $"Expected at least one day card expander open by default. Open={expanderMetrics[0]}.");
-        Assert.True(Convert.ToInt32(expanderMetrics[1]) >= 1, $"Expected at least one day card expander collapsed by default. Closed={expanderMetrics[1]}.");
+        Assert.Equal(3, initialMetrics.Length);
+        Assert.True(Convert.ToInt32(initialMetrics[2]) >= 2, $"Expected multiple day slides. Count={initialMetrics[2]}.");
 
-        var secondExpanderSummary = page.Locator("[data-day-card-expander] > summary").Nth(1);
-        await secondExpanderSummary.ScrollIntoViewIfNeededAsync();
-        await secondExpanderSummary.ClickAsync();
+        var nextButton = page.Locator("[data-day-carousel-next]").First;
+        await nextButton.ScrollIntoViewIfNeededAsync();
+        await nextButton.ClickAsync();
 
-        var toggleMetrics = await page.EvaluateAsync<object[]>(
+        await page.WaitForFunctionAsync(
             """
             () => {
-                const targetExpander = document.querySelectorAll("[data-day-card-expander]")[1];
-                if (!(targetExpander instanceof HTMLDetailsElement)) {
-                    return [0, 0, "missing", 0, Number.POSITIVE_INFINITY, 1, 1, 0, 1, Number.POSITIVE_INFINITY];
-                }
-
-                const summary = targetExpander.querySelector(":scope > summary");
-                const body = targetExpander.querySelector(":scope > .aislepilot-day-card-expander-body");
-                if (!(summary instanceof HTMLElement) || !(body instanceof HTMLElement)) {
-                    return [0, 0, "missing", 0, Number.POSITIVE_INFINITY, 1, 1, 0, 1, Number.POSITIVE_INFINITY];
-                }
-
-                const thumb = summary.querySelector("[data-day-card-expander-image]");
-                const day = summary.querySelector(".aislepilot-day-card-expander-day");
-                const meta = summary.querySelector(".aislepilot-day-card-expander-meta");
-                const thumbVisible =
-                    thumb instanceof HTMLImageElement &&
-                    thumb.getBoundingClientRect().width >= 24 &&
-                    thumb.getBoundingClientRect().height >= 24
-                        ? 1
-                        : 0;
-                const dayMetaTopDelta =
-                    day instanceof HTMLElement && meta instanceof HTMLElement
-                        ? Math.abs(day.getBoundingClientRect().top - meta.getBoundingClientRect().top)
-                        : Number.POSITIVE_INFINITY;
-
-                const bodyVisible = window.getComputedStyle(body).display !== "none" && body.getBoundingClientRect().height > 12 ? 1 : 0;
-                const headMain = body.querySelector(".aislepilot-day-card-head-main");
-                const activePanelTitle = body.querySelector(".aislepilot-day-meal-panel[aria-hidden='false'] > h3");
-                const duplicateHeadVisible =
-                    headMain instanceof HTMLElement &&
-                    window.getComputedStyle(headMain).display !== "none" &&
-                    headMain.getBoundingClientRect().height > 1
-                        ? 1
-                        : 0;
-                const duplicateTitleVisible =
-                    activePanelTitle instanceof HTMLElement &&
-                    window.getComputedStyle(activePanelTitle).display !== "none" &&
-                    activePanelTitle.getBoundingClientRect().height > 1
-                        ? 1
-                        : 0;
-                const tabs = body.querySelector(".aislepilot-day-meal-tabs");
-                const firstPanel = body.querySelector(".aislepilot-day-meal-slider");
-                const bodyTop = body.getBoundingClientRect().top;
-                const firstContentTop =
-                    tabs instanceof HTMLElement
-                        ? tabs.getBoundingClientRect().top
-                        : (firstPanel instanceof HTMLElement ? firstPanel.getBoundingClientRect().top : Number.POSITIVE_INFINITY);
-                const topGap = Math.max(0, firstContentTop - bodyTop);
-                const activePanel = body.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']");
-                const imageShell = activePanel instanceof HTMLElement
-                    ? activePanel.querySelector(".aislepilot-meal-image-shell")
-                    : null;
-                const menuSummary = activePanel instanceof HTMLElement
-                    ? activePanel.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] > summary")
-                    : null;
-                const menuAttachedToMealPanel = menuSummary instanceof HTMLElement ? 1 : 0;
-                const strayMenuInDayHead = body.querySelector(".aislepilot-day-card-head [data-day-card-header-actions]") instanceof HTMLElement ? 1 : 0;
-                const menuInImageBand =
-                    imageShell instanceof HTMLElement && menuSummary instanceof HTMLElement
-                        ? (
-                            menuSummary.getBoundingClientRect().top >= imageShell.getBoundingClientRect().top - 8 &&
-                            menuSummary.getBoundingClientRect().bottom <= imageShell.getBoundingClientRect().bottom + 8
-                                ? 1
-                                : 0
-                        )
-                        : 0;
-                const imageRightInset =
-                    imageShell instanceof HTMLElement && menuSummary instanceof HTMLElement
-                        ? Math.abs(imageShell.getBoundingClientRect().right - menuSummary.getBoundingClientRect().right)
-                        : Number.POSITIVE_INFINITY;
-                return [targetExpander.open ? 1 : 0, bodyVisible, summary.getAttribute("aria-expanded") || "", thumbVisible, dayMetaTopDelta, duplicateHeadVisible, duplicateTitleVisible, menuAttachedToMealPanel, menuInImageBand, imageRightInset, strayMenuInDayHead, topGap];
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const status = document.querySelector("[data-day-carousel-status]");
+                return activeIndex === 1 && status instanceof HTMLElement && /2 of/i.test(status.textContent || "");
             }
             """);
 
-        Assert.Equal(12, toggleMetrics.Length);
-        Assert.Equal(1, Convert.ToInt32(toggleMetrics[0]));
-        Assert.Equal(1, Convert.ToInt32(toggleMetrics[1]));
-        Assert.Equal("true", Convert.ToString(toggleMetrics[2]));
-        Assert.Equal(1, Convert.ToInt32(toggleMetrics[3]));
-        Assert.True(Convert.ToDouble(toggleMetrics[4]) <= 8, $"Expected day and summary meta to align on top row. Delta={toggleMetrics[4]}.");
-        Assert.Equal(0, Convert.ToInt32(toggleMetrics[5]));
-        Assert.Equal(0, Convert.ToInt32(toggleMetrics[6]));
-        Assert.Equal(1, Convert.ToInt32(toggleMetrics[7]));
-        Assert.Equal(1, Convert.ToInt32(toggleMetrics[8]));
-        Assert.True(Convert.ToDouble(toggleMetrics[9]) <= 24, $"Expected meal actions trigger to align near the image right edge. Inset={toggleMetrics[9]}.");
-        Assert.Equal(0, Convert.ToInt32(toggleMetrics[10]));
-        Assert.True(Convert.ToDouble(toggleMetrics[11]) <= 12, $"Expected expanded card body content to start near the top without a dedicated action row gap. Gap={toggleMetrics[11]}.");
+        var carouselMetrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const status = document.querySelector("[data-day-carousel-status]");
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]"));
+                const activeSlides = slides.filter(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
+                const previousButton = document.querySelector("[data-day-carousel-prev]");
+                const nextButton = document.querySelector("[data-day-carousel-next]");
+                return [
+                    status instanceof HTMLElement ? (status.textContent || "").trim() : "",
+                    activeIndex,
+                    activeSlides.length,
+                    activeDot instanceof HTMLElement ? Number.parseInt(activeDot.getAttribute("data-day-carousel-target") || "-1", 10) : -1,
+                    previousButton instanceof HTMLButtonElement && !previousButton.disabled ? 1 : 0,
+                    nextButton instanceof HTMLButtonElement && !nextButton.disabled ? 1 : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(6, carouselMetrics.Length);
+        Assert.Contains("2 of", Convert.ToString(carouselMetrics[0]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, Convert.ToInt32(carouselMetrics[1]));
+        Assert.Equal(1, Convert.ToInt32(carouselMetrics[2]));
+        Assert.Equal(1, Convert.ToInt32(carouselMetrics[3]));
+        Assert.Equal(1, Convert.ToInt32(carouselMetrics[4]));
+        Assert.Equal(1, Convert.ToInt32(carouselMetrics[5]));
     }
 
     [Fact]
