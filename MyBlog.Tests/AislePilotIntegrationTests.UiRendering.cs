@@ -101,6 +101,19 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task Index_Get_RendersAislePilotSubBrandFontLinksAndThemeColor()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Contains("rel=\"preconnect\" href=\"https://fonts.googleapis.com\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("family=Plus+Jakarta+Sans", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<meta name=\"theme-color\" content=\"#115C4E\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Post_RendersDayMealSummaryRowsWithinDayCardCarousel()
     {
         using var client = CreateClient(allowAutoRedirect: true);

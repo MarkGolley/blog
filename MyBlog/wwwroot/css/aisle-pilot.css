@@ -36,11 +36,14 @@ html {
         var(--ap-mobile-context-gap)
     );
     --ap-section-scroll-margin-top: clamp(7rem, 12vh, 9rem);
+    --ap-font-sans: "Space Grotesk", "Segoe UI", sans-serif;
+    --ap-font-display: var(--ap-font-sans);
     width: min(100%, 58rem);
     margin-inline: auto;
     display: grid;
     gap: var(--ap-space-3);
     padding-bottom: 1.5rem;
+    font-family: var(--ap-font-sans);
 }
 
 .app-shell-main.aislepilot-main.container {
@@ -5883,7 +5886,7 @@ body.aislepilot-mobile-meal-sheet-open {
         font-size: 0.78rem;
         font-weight: 700;
         line-height: 1.25;
-        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+        font-family: var(--ap-font-sans);
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: var(--ink-soft);
@@ -5905,7 +5908,7 @@ body.aislepilot-mobile-meal-sheet-open {
         font-size: 0.78rem;
         font-weight: 700;
         line-height: 1.25;
-        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+        font-family: var(--ap-font-sans);
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: var(--ink-soft);

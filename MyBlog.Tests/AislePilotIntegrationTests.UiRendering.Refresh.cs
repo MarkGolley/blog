@@ -141,6 +141,26 @@ public partial class AislePilotIntegrationTests
     }
 
     [Fact]
+    public async Task AislePilotRefreshStylesheet_DefinesSubBrandTypographyWithoutImportingFontsInline()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot-refresh.css");
+
+        Assert.DoesNotContain("@import url('https://fonts.googleapis.com", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-app\s*\{[\s\S]*--ap-font-sans:\s*""Plus Jakarta Sans"",\s*""Segoe UI"",\s*sans-serif;[\s\S]*--brand:\s*var\(--ap-refresh-primary\);[\s\S]*--brand-deep:\s*var\(--ap-refresh-accent\);[\s\S]*font-family:\s*var\(--ap-font-sans\);",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-app\s*:where\([\s\S]*\.aislepilot-app-title,[\s\S]*\.aislepilot-window-tab,[\s\S]*\.aislepilot-day-carousel-dot,[\s\S]*\.aislepilot-head-menu-item,[\s\S]*\.aislepilot-head-menu-section-title[\s\S]*\)\s*\{[\s\S]*font-family:\s*var\(--ap-font-display\);",
+                RegexOptions.IgnoreCase),
+            css);
+    }
+
+    [Fact]
     public async Task Index_Post_RendersResultSnapshotCardsWithDesktopPriorityClasses()
     {
         using var client = CreateClient(allowAutoRedirect: true);

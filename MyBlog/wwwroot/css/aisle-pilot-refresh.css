@@ -1,41 +1,73 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
 .aislepilot-app {
-    --ap-refresh-canvas: #f4f8f5;
+    --ap-font-sans: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --ap-font-display: var(--ap-font-sans);
+    --ap-refresh-canvas: #f3f8f5;
     --ap-refresh-surface: rgba(255, 255, 255, 0.96);
-    --ap-refresh-surface-strong: rgba(243, 248, 245, 0.96);
+    --ap-refresh-surface-strong: rgba(240, 247, 243, 0.98);
     --ap-refresh-border: rgba(15, 23, 42, 0.1);
-    --ap-refresh-border-strong: rgba(22, 101, 52, 0.22);
+    --ap-refresh-border-strong: rgba(17, 92, 78, 0.22);
     --ap-refresh-text: #102033;
     --ap-refresh-text-muted: #536579;
-    --ap-refresh-primary: #15803d;
-    --ap-refresh-primary-strong: #166534;
-    --ap-refresh-accent: #0f766e;
+    --ap-refresh-primary: #15724f;
+    --ap-refresh-primary-strong: #115c4e;
+    --ap-refresh-accent: #0f6b75;
     --ap-refresh-success: #16a34a;
     --ap-refresh-warning: #d97706;
+    --brand: var(--ap-refresh-primary);
+    --brand-deep: var(--ap-refresh-accent);
+    --accent: var(--ap-refresh-warning);
+    --ink: var(--ap-refresh-text);
+    --ink-soft: var(--ap-refresh-text-muted);
+    --panel: var(--ap-refresh-surface);
+    --panel-strong: var(--ap-refresh-surface-strong);
+    --line: var(--ap-refresh-border);
+    --line-strong: var(--ap-refresh-border-strong);
     --ap-refresh-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
-    font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    font-family: var(--ap-font-sans);
     color: var(--ap-refresh-text);
 }
 
 :root[data-theme="dark"] .aislepilot-app {
-    --ap-refresh-canvas: #09111d;
+    --ap-refresh-canvas: #09121b;
     --ap-refresh-surface: rgba(15, 24, 38, 0.96);
     --ap-refresh-surface-strong: rgba(20, 31, 49, 0.96);
     --ap-refresh-border: rgba(148, 163, 184, 0.16);
-    --ap-refresh-border-strong: rgba(45, 212, 191, 0.26);
+    --ap-refresh-border-strong: rgba(86, 197, 175, 0.28);
     --ap-refresh-text: #f8fbff;
     --ap-refresh-text-muted: #9cb0c5;
-    --ap-refresh-primary: #16a34a;
-    --ap-refresh-primary-strong: #0f7a37;
-    --ap-refresh-accent: #14b8a6;
+    --ap-refresh-primary: #2aa06c;
+    --ap-refresh-primary-strong: #187a5a;
+    --ap-refresh-accent: #3cbac3;
     --ap-refresh-success: #22c55e;
     --ap-refresh-warning: #f59e0b;
+    --brand: var(--ap-refresh-primary);
+    --brand-deep: var(--ap-refresh-accent);
+    --accent: var(--ap-refresh-warning);
+    --ink: var(--ap-refresh-text);
+    --ink-soft: var(--ap-refresh-text-muted);
+    --panel: var(--ap-refresh-surface);
+    --panel-strong: var(--ap-refresh-surface-strong);
+    --line: var(--ap-refresh-border);
+    --line-strong: var(--ap-refresh-border-strong);
     --ap-refresh-shadow: 0 20px 44px rgba(2, 6, 23, 0.32);
 }
 
 .aislepilot-app :where(button, input, select, textarea) {
     font-family: inherit;
+}
+
+.aislepilot-app :where(
+    .aislepilot-app-title,
+    .aislepilot-card h3,
+    .aislepilot-card-head h3,
+    .aislepilot-head-primary-action,
+    .aislepilot-window-tab,
+    .aislepilot-day-carousel-dot,
+    .aislepilot-head-menu-item,
+    .aislepilot-card-kicker,
+    .aislepilot-head-menu-section-title
+) {
+    font-family: var(--ap-font-display);
 }
 
 .aislepilot-app-head,
@@ -104,8 +136,9 @@
 .aislepilot-app-title {
     margin-top: 0.2rem;
     font-size: clamp(1.8rem, 3.8vw, 2.8rem);
-    line-height: 1.04;
-    letter-spacing: -0.04em;
+    font-weight: 800;
+    line-height: 1.06;
+    letter-spacing: -0.03em;
     max-width: 14ch;
     color: var(--ap-refresh-text);
 }
@@ -115,6 +148,7 @@
     max-width: 60ch;
     font-size: 1rem;
     color: var(--ap-refresh-text-muted);
+    line-height: 1.55;
 }
 
 .aislepilot-app-head.is-compact .aislepilot-app-title {
@@ -146,6 +180,7 @@
     color: var(--ap-refresh-text);
     font-size: 0.84rem;
     font-weight: 600;
+    letter-spacing: 0.01em;
 }
 
 .aislepilot-head-primary-action {
@@ -155,6 +190,7 @@
     background: linear-gradient(135deg, var(--ap-refresh-primary) 0%, var(--ap-refresh-primary-strong) 100%);
     box-shadow: 0 14px 28px rgba(21, 128, 61, 0.2);
     width: 100%;
+    letter-spacing: 0.01em;
 }
 
 .aislepilot-app-head-actions {
