@@ -1,0 +1,39 @@
+@model IReadOnlyList<string>
+@{
+    var alertTitle = ViewData["AlertTitle"] as string ?? "Please review your settings";
+    var alertGuidance = ViewData["AlertGuidance"] as string ?? "Review the message below, then try again.";
+    var hasResult = ViewData["HasResult"] is true;
+}
+<section aria-labelledby="aislepilot-alert-title" class="aislepilot-shell aislepilot-alert-shell" data-reveal>
+    <h2 id="aislepilot-alert-title" class="aislepilot-section-title">@alertTitle</h2>
+    <p class="aislepilot-alert-guidance">@alertGuidance</p>
+    <ul class="aislepilot-alert-list">
+        @foreach (var errorMessage in Model.Take(3))
+        {
+            <li>@errorMessage</li>
+        }
+    </ul>
+    <div class="aislepilot-alert-actions">
+        <button type="submit"
+                class="aislepilot-alert-btn"
+                form="aislepilot-setup-form"
+                data-loading-label="Generating plan..."
+                data-show-plan-skeleton>
+            Generate again
+        </button>
+        @if (hasResult)
+        {
+            <button type="button"
+                    class="aislepilot-alert-btn is-secondary"
+                    data-setup-toggle
+                    aria-controls="aislepilot-setup"
+                    aria-expanded="false">
+                Edit settings
+            </button>
+        }
+        else
+        {
+            <a href="#aislepilot-setup" class="aislepilot-alert-btn is-secondary">Review settings</a>
+        }
+    </div>
+</section>

@@ -101,6 +101,19 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task Index_Get_RendersSplitAislePilotScriptBundles()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Contains("/js/aisle-pilot/core.js", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/js/aisle-pilot/action-menus.js", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/js/aisle-pilot/shopping.js", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/js/aisle-pilot.js", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Get_RendersAislePilotSubBrandFontLinksAndThemeColor()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -298,7 +311,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+        var css = await GetCombinedAislePilotCssAsync(client);
 
         Assert.Contains("--ap-control-height: 2.5rem;", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("--ap-control-height-lg: 2.75rem;", css, StringComparison.OrdinalIgnoreCase);
@@ -322,7 +335,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+        var css = await GetCombinedAislePilotCssAsync(client);
 
         Assert.Contains(".aislepilot-slider-field--thumb-friendly .aislepilot-slider-input {", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("height: 1.9rem !important;", css, StringComparison.OrdinalIgnoreCase);
@@ -339,7 +352,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+        var css = await GetCombinedAislePilotCssAsync(client);
 
         Assert.Contains(".aislepilot-day-carousel", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(".aislepilot-day-carousel-track", css, StringComparison.OrdinalIgnoreCase);
@@ -364,7 +377,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("-webkit-line-clamp: 2;", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("height: clamp(8.8rem, 22vw, 11.6rem);", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("max-width: min(calc(100% - 1.4rem), 7rem);", css, StringComparison.OrdinalIgnoreCase);
-        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+        var script = await GetCombinedAislePilotScriptAsync(client);
         Assert.Contains("dayCarouselPosition", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("targetScrollLeft", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("computeTargetScrollLeft", script, StringComparison.OrdinalIgnoreCase);
@@ -403,7 +416,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+        var script = await GetCombinedAislePilotScriptAsync(client);
 
         Assert.Contains("if (submitButton.classList.contains(\"is-icon-only\"))", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("submitButton.setAttribute(\"aria-label\", nextAriaLabel);", script, StringComparison.OrdinalIgnoreCase);
@@ -413,7 +426,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("if (!srOnlyLabel && !(visibleLabel instanceof HTMLElement)) {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const closeOpenOverviewActionsMenus = except => {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const wireOverviewActionsMenus = scope => {", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("wireOverviewActionsMenus(scope);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("window.AislePilotActionMenus?.wireOverviewActionsMenus(scope);", script, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -421,7 +434,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+        var script = await GetCombinedAislePilotScriptAsync(client);
 
         Assert.Contains("const leftoverRebalanceForms = scope instanceof Element", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const maxExtraRaw = Number.parseInt(", script, StringComparison.OrdinalIgnoreCase);
@@ -444,7 +457,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+        var script = await GetCombinedAislePilotScriptAsync(client);
 
         Assert.Contains("const captureRenderedMealImageSources = scope => {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const restoreRenderedMealImageSources = (scope, imageSrcByMealName) => {", script, StringComparison.OrdinalIgnoreCase);
@@ -458,7 +471,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var script = await client.GetStringAsync("/js/aisle-pilot.js");
+        var script = await GetCombinedAislePilotScriptAsync(client);
 
         Assert.Contains("const syncDayReorderFormState = form => {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const buildDayCardLeftoverSourceIndexesCsv = cards => {", script, StringComparison.OrdinalIgnoreCase);
@@ -474,7 +487,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+        var css = await GetCombinedAislePilotCssAsync(client);
 
         Assert.Contains(".aislepilot-day-meal-panel > .aislepilot-meal-details-panel ol.case-list", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("list-style-position: inside;", css, StringComparison.OrdinalIgnoreCase);
@@ -488,7 +501,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+        var css = await GetCombinedAislePilotCssAsync(client);
 
         Assert.Contains(".aislepilot-card-more-actions-menu {", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("min-width: 8.8rem;", css, StringComparison.OrdinalIgnoreCase);
@@ -517,7 +530,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
-        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+        var css = await GetCombinedAislePilotCssAsync(client);
         var stepButtonBlockMatch = Regex.Match(
             css,
             @"\.aislepilot-leftover-step-btn\s*\{(?<body>[\s\S]*?)\}",
@@ -825,7 +838,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        var css = await client.GetStringAsync("/css/aisle-pilot.css");
+        var css = await GetCombinedAislePilotCssAsync(client);
 
         Assert.Matches(
             new Regex(
@@ -1274,3 +1287,4 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
 }
+

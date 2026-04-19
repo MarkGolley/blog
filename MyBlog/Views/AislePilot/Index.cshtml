@@ -202,8 +202,6 @@
     var appLayoutClass = hasDesktopResults
         ? "aislepilot-layout has-results"
         : "aislepilot-layout";
-    var hasSavedWeeks = Model.SavedWeeks.Count > 0;
-    var hasSavedMeals = Model.SavedMeals.Count > 0;
     var modelErrors = ViewData.ModelState.Values
         .SelectMany(state => state.Errors)
         .Select(error => error.ErrorMessage?.Trim())
@@ -225,15 +223,6 @@
         return ukCulture.TextInfo.ToTitleCase(trimmed.ToLower(ukCulture));
     }
 
-    AislePilotHiddenRequestFieldsViewModel BuildPantryHiddenRequestFields()
-    {
-        return new AislePilotHiddenRequestFieldsViewModel
-        {
-            ReturnUrl = Model.ReturnUrl,
-            Request = Model.Request,
-            LeftoverCookDayIndexesCsv = string.Empty
-        };
-    }
     var looksLikeSwapIssue =
         joinedErrorText.Contains("swap", StringComparison.Ordinal) ||
         joinedErrorText.Contains("selected day was out of range", StringComparison.Ordinal) ||
@@ -251,171 +240,13 @@
 }
 
 <div class="aislepilot-app@(hasDesktopResults ? " has-results" : string.Empty)">
-    <section aria-label="AislePilot header" class="@appHeadClass" data-reveal>
-        <div class="aislepilot-app-head-main">
-            <div class="aislepilot-brand-row">
-                <div class="aislepilot-brand-lockup" aria-label="AislePilot brand">
-                    <img class="aislepilot-brand-logo" src="~/images/aislepilot-logo-horizontal.svg" alt="AislePilot" />
-                    <details class="aislepilot-head-menu" data-head-menu>
-                        <summary class="aislepilot-head-menu-trigger is-icon-only"
-                                 aria-label="AislePilot menu"
-                                 aria-expanded="false"
-                                 title="AislePilot menu">
-                            <span class="aislepilot-btn-label">
-                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <line x1="4" y1="7" x2="20" y2="7"></line>
-                                        <line x1="4" y1="12" x2="20" y2="12"></line>
-                                        <line x1="4" y1="17" x2="20" y2="17"></line>
-                                    </svg>
-                                </span>
-                                <span class="sr-only">Menu</span>
-                            </span>
-                        </summary>
-                    <div class="aislepilot-head-menu-panel" role="menu" aria-label="AislePilot quick menu">
-                        <p class="aislepilot-head-menu-section-title">Saved weeks</p>
-                        @if (hasSavedWeeks)
-                        {
-                            <ul class="aislepilot-head-week-list">
-                                @foreach (var savedWeek in Model.SavedWeeks.Take(6))
-                                {
-                                    var savedAtLocal = savedWeek.SavedAtUtc.ToLocalTime();
-                                    <li class="aislepilot-head-week-row">
-                                        <span class="aislepilot-head-week-date">
-                                            Saved @savedAtLocal.ToString("d MMM yyyy", ukCulture)
-                                        </span>
-                                        <div class="aislepilot-head-week-actions">
-                                            <form method="post"
-                                                  action="@Url.Action("OpenWeek", "AislePilot")#aislepilot-overview"
-                                                  class="aislepilot-head-week-form">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="weekId" value="@savedWeek.WeekId" />
-                                                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-                                                <button type="submit"
-                                                        class="aislepilot-head-week-action-btn"
-                                                        data-loading-label="Opening week..."
-                                                        data-show-plan-skeleton
-                                                        aria-label="Open week"
-                                                        title="Open week">
-                                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                        <svg viewBox="0 0 24 24" focusable="false">
-                                                            <path d="M12 3v11"></path>
-                                                            <path d="m8 10 4 4 4-4"></path>
-                                                            <path d="M4 17v2h16v-2"></path>
-                                                        </svg>
-                                                    </span>
-                                                    <span class="sr-only">Open week</span>
-                                                </button>
-                                            </form>
-                                            <form method="post"
-                                                  action="@Url.Action("DeleteWeek", "AislePilot")"
-                                                  class="aislepilot-head-week-form">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="weekId" value="@savedWeek.WeekId" />
-                                                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-                                                <button type="submit"
-                                                        class="aislepilot-head-week-action-btn is-danger"
-                                                        data-loading-label="Deleting week..."
-                                                        aria-label="Delete week"
-                                                        title="Delete week">
-                                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                        <svg viewBox="0 0 24 24" focusable="false">
-                                                            <path d="M4 7h16"></path>
-                                                            <path d="M9 7V4h6v3"></path>
-                                                            <path d="M7 7l1 12h8l1-12"></path>
-                                                            <path d="M10 11v6"></path>
-                                                            <path d="M14 11v6"></path>
-                                                        </svg>
-                                                    </span>
-                                                    <span class="sr-only">Delete week</span>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </li>
-                                }
-                            </ul>
-                        }
-                        else
-                        {
-                            <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true">No saved weeks yet</p>
-                        }
-
-                        <div data-saved-meals-menu-section>
-                            <p class="aislepilot-head-menu-section-title">Saved meals</p>
-                            @if (hasSavedMeals)
-                            {
-                                <ul class="aislepilot-head-saved-meal-list">
-                                    @foreach (var savedMealName in Model.SavedMeals.Take(20))
-                                    {
-                                        <li class="aislepilot-head-saved-meal-row">
-                                            <span class="aislepilot-head-saved-meal-name">@savedMealName</span>
-                                            <form method="post"
-                                                  action="@Url.Action("RemoveSavedMeal", "AislePilot")"
-                                                  class="aislepilot-head-week-form">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="mealName" value="@savedMealName" />
-                                                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-                                                <button type="submit"
-                                                        class="aislepilot-head-week-action-btn is-danger"
-                                                        data-loading-label="Removing meal..."
-                                                        aria-label="Remove @savedMealName from saved meals"
-                                                        title="Remove saved meal">
-                                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                        <svg viewBox="0 0 24 24" focusable="false">
-                                                            <path d="M4 7h16"></path>
-                                                            <path d="M9 7V4h6v3"></path>
-                                                            <path d="M7 7l1 12h8l1-12"></path>
-                                                            <path d="M10 11v6"></path>
-                                                            <path d="M14 11v6"></path>
-                                                        </svg>
-                                                    </span>
-                                                    <span class="sr-only">Remove saved meal</span>
-                                                </button>
-                                            </form>
-                                        </li>
-                                    }
-                                </ul>
-                            }
-                            else
-                            {
-                                <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true">No saved meals yet</p>
-                            }
-                        </div>
-                        </div>
-                    </details>
-                </div>
-            </div>
-                <div class="aislepilot-app-head-content">
-                    <div class="aislepilot-app-head-intro@(hasResult ? " is-results-context" : string.Empty)">
-                        <div class="aislepilot-app-head-topline">
-                            <p class="aislepilot-app-badge">Meal planner</p>
-                            <p class="aislepilot-app-head-status">@(hasResult ? "Plan ready" : "Guided weekly setup")</p>
-                        </div>
-                        <h1 id="aislepilot-title" class="aislepilot-app-title">@(hasResult ? "Your weekly plan is ready." : "Build a full week of meals with less setup friction.")</h1>
-                        <p class="aislepilot-app-subtitle">@(hasResult ? "Review the plan snapshot, refine settings, and export a shopping list that is already ordered for your supermarket." : "Set your budget, household, and meal rules once, then generate a cleaner weekly plan and aisle-ordered shopping list.")</p>
-                        <ul class="aislepilot-app-highlights" aria-label="AislePilot highlights">
-                            @if (hasResult && Model.Result is not null)
-                            {
-                                <li>@($"{Model.Result.PlanDays} day plan")</li>
-                                <li>@($"{Model.Result.EstimatedTotalCost.ToString("C0", ukCulture)} estimated spend")</li>
-                                <li>@($"{FormatSupermarketLabel(Model.Result.Supermarket)} aisle order")</li>
-                            }
-                            else
-                            {
-                                <li>Budget-aware weekly planning</li>
-                                <li>Aisle-ordered shopping lists</li>
-                                <li>Fast mobile-friendly setup</li>
-                            }
-                        </ul>
-                    </div>
-                </div>
-        </div>
-        <div class="aislepilot-app-head-actions">
-            @if (hasResult) { <button type="button" class="aislepilot-head-primary-action" data-setup-toggle aria-controls="aislepilot-setup" aria-expanded="false">Adjust settings</button> }
-            else { <a href="#aislepilot-setup" class="aislepilot-head-primary-action">Start with settings</a> }
-            <p class="aislepilot-head-action-note">@(hasResult ? "Open the setup again to tighten budget, meal cadence, or store rules before you export." : "Jump straight into step 1, save your defaults, and come back next week with less setup work.")</p>
-        </div>
-    </section>
+    <partial name="_AislePilotAppHeader"
+             model="Model"
+             view-data='new ViewDataDictionary(ViewData)
+             {
+                 ["AppHeadClass"] = appHeadClass,
+                 ["HasResult"] = hasResult
+             }' />
 
     @if (hasModelErrors)
     {
@@ -434,39 +265,14 @@
                     ? "Wait 15-30 seconds, then generate again."
                     : "Review the message below, then try again.";
 
-        <section aria-labelledby="aislepilot-alert-title" class="aislepilot-shell aislepilot-alert-shell" data-reveal>
-            <h2 id="aislepilot-alert-title" class="aislepilot-section-title">@alertTitle</h2>
-            <p class="aislepilot-alert-guidance">@alertGuidance</p>
-            <ul class="aislepilot-alert-list">
-                @foreach (var errorMessage in modelErrors.Take(3))
-                {
-                    <li>@errorMessage</li>
-                }
-            </ul>
-            <div class="aislepilot-alert-actions">
-                <button type="submit"
-                        class="aislepilot-alert-btn"
-                        form="aislepilot-setup-form"
-                        data-loading-label="Generating plan..."
-                        data-show-plan-skeleton>
-                    Generate again
-                </button>
-                @if (hasResult)
-                {
-                    <button type="button"
-                            class="aislepilot-alert-btn is-secondary"
-                            data-setup-toggle
-                            aria-controls="aislepilot-setup"
-                            aria-expanded="false">
-                        Edit settings
-                    </button>
-                }
-                else
-                {
-                    <a href="#aislepilot-setup" class="aislepilot-alert-btn is-secondary">Review settings</a>
-                }
-            </div>
-        </section>
+        <partial name="_AislePilotAlert"
+                 model="modelErrors"
+                 view-data='new ViewDataDictionary(ViewData)
+                 {
+                     ["AlertTitle"] = alertTitle,
+                     ["AlertGuidance"] = alertGuidance,
+                     ["HasResult"] = hasResult
+                 }' />
     }
 
     <div class="@appLayoutClass">
@@ -1049,195 +855,13 @@
         <div class="aislepilot-results-stack">
         @if (Model.PantrySuggestions.Count > 0)
         {
-            var strictCoreModeEnabled = Model.Request.RequireCorePantryIngredients;
-            var hasTopUpSuggestions = Model.PantrySuggestions.Any(suggestion => !suggestion.CanCookNow);
-            var pantrySuggestionCountLabel = $"{Model.PantrySuggestions.Count} suggestion{(Model.PantrySuggestions.Count == 1 ? string.Empty : "s")}";
-            var currentSuggestionMealNames = Model.PantrySuggestions
-                .Select(suggestion => suggestion.MealName)
-                .Where(mealName => !string.IsNullOrWhiteSpace(mealName))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var pantryIntroText = strictCoreModeEnabled
-                ? "Strict core mode is on: each suggestion is built from your listed core ingredients plus minor basics only."
-                : hasTopUpSuggestions
-                    ? "Best matches from your ingredients. Some are cook-now dishes; some need a small top-up shop."
-                    : "These dishes can be cooked immediately from what you already have.";
-            <section aria-labelledby="aislepilot-pantry-title" class="aislepilot-shell" data-reveal>
-                <div class="aislepilot-section-head aislepilot-section-head-row">
-                    <h2 id="aislepilot-pantry-title" class="aislepilot-section-title">Meal suggestions</h2>
-                    <span class="aislepilot-section-chip">@pantrySuggestionCountLabel</span>
-                </div>
-                <p class="section-intro">@pantryIntroText</p>
-                <div class="aislepilot-meal-grid"
-                     data-meal-image-poll-root
-                     data-fallback-meal-image-url="@fallbackMealImageUrl"
-                     data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
-                     data-meal-image-poll-url="@mealImagesPollUrl">
-                    @{
-                        var pantrySuggestionIndex = 0;
-                    }
-                    @foreach (var suggestion in Model.PantrySuggestions)
-                    {
-                        var suggestionIndex = pantrySuggestionIndex++;
-                        var meal = suggestion.MealCard;
-                        var imageUrl = meal is null
-                            ? fallbackMealImageUrl
-                            : AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl);
-                        var shouldPrioritizeSuggestionImage = suggestionIndex < 2;
-                        <article class="aislepilot-card">
-                            <div class="aislepilot-meal-image-shell">
-                                <img class="aislepilot-meal-image"
-                                     src="@imageUrl"
-                                     data-meal-image
-                                     data-meal-name="@suggestion.MealName"
-                                     alt="@($"{suggestion.MealName} plated meal")"
-                                     loading="@(shouldPrioritizeSuggestionImage ? "eager" : "lazy")"
-                                     fetchpriority="@(shouldPrioritizeSuggestionImage ? "high" : "low")"
-                                     decoding="async" />
-                            </div>
-                            <div class="aislepilot-card-head aislepilot-card-head-with-title">
-                                <h3>@suggestion.MealName</h3>
-                                @if (!suggestion.CanCookNow && suggestion.MissingIngredientsEstimatedCost > 0m)
-                                {
-                                    <p class="aislepilot-cost">Top-up @suggestion.MissingIngredientsEstimatedCost.ToString("C", ukCulture)</p>
-                                }
-                            </div>
-                            <div class="aislepilot-card-compact-meta">
-                                <span class="aislepilot-card-meta-pill">
-                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24" focusable="false">
-                                            <circle cx="12" cy="12" r="7"></circle>
-                                            <path d="M12 8v4l3 2"></path>
-                                        </svg>
-                                    </span>
-                                    Prep @(meal?.EstimatedPrepMinutes ?? 25) mins
-                                </span>
-                                <span class="aislepilot-card-meta-pill">
-                                    @(suggestion.CanCookNow
-                                        ? "Cook now"
-                                        : $"Needs {suggestion.MissingCoreIngredientCount} extra item{(suggestion.MissingCoreIngredientCount == 1 ? string.Empty : "s")}")
-                                </span>
-                                <span class="aislepilot-card-meta-pill">
-                                    @($"{suggestion.MatchPercent}% pantry match")
-                                </span>
-                            </div>
-                            <div class="aislepilot-card-action-row">
-                                <details class="aislepilot-meal-details">
-                                    <summary>
-                                        <span class="aislepilot-btn-label">
-                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                <svg viewBox="0 0 24 24" focusable="false">
-                                                    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                                                    <circle cx="12" cy="12" r="2.5"></circle>
-                                                </svg>
-                                            </span>
-                                            View details
-                                        </span>
-                                    </summary>
-                                    <div class="aislepilot-meal-details-panel">
-                                        @if (meal is not null)
-                                        {
-                                            <p class="aislepilot-card-meta aislepilot-card-reason">@meal.MealReason</p>
-                                        }
-                                        <div class="aislepilot-meal-details-grid">
-                                            <div class="aislepilot-nutrition-details">
-                                                <p class="aislepilot-card-kicker">Est. calories + macros</p>
-                                                <ul class="aislepilot-nutrition-list">
-                                                    <li>@(meal?.CaloriesPerServing ?? 0) kcal per serving</li>
-                                                    <li>Protein: @((meal?.ProteinGramsPerServing ?? 0m).ToString("0.#", ukCulture)) g</li>
-                                                    <li>Carbs: @((meal?.CarbsGramsPerServing ?? 0m).ToString("0.#", ukCulture)) g</li>
-                                                    <li>Fat: @((meal?.FatGramsPerServing ?? 0m).ToString("0.#", ukCulture)) g</li>
-                                                </ul>
-                                            </div>
-                                            <div class="aislepilot-recipe-details">
-                                                <p class="aislepilot-card-kicker">Ingredients</p>
-                                                <ul class="case-list">
-                                                    @foreach (var ingredient in meal?.IngredientLines ?? Array.Empty<string>())
-                                                    {
-                                                        <li>@ingredient</li>
-                                                    }
-                                                </ul>
-                                                @if (suggestion.MissingIngredients.Count > 0)
-                                                {
-                                                    <p class="aislepilot-card-kicker">Need to buy</p>
-                                                    <ul class="case-list">
-                                                        @foreach (var item in suggestion.MissingIngredients)
-                                                        {
-                                                            <li>@item</li>
-                                                        }
-                                                    </ul>
-                                                }
-                                                <p class="aislepilot-card-kicker">Method</p>
-                                                <ol class="case-list">
-                                                    @foreach (var step in meal?.RecipeSteps ?? Array.Empty<string>())
-                                                    {
-                                                        <li>@step</li>
-                                                    }
-                                                </ol>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </details>
-                                <form method="post"
-                                      action="@Url.Action("SwapPantrySuggestion", "AislePilot")#aislepilot-pantry-title"
-                                      class="aislepilot-swap-form aislepilot-card-action-inline">
-                                    @Html.AntiForgeryToken()
-                                    <partial name="_AislePilotHiddenRequestFields" model="BuildPantryHiddenRequestFields()" />
-                                    @foreach (var mealName in currentSuggestionMealNames)
-                                    {
-                                        <input type="hidden" name="currentSuggestionMealNames" value="@mealName" />
-                                    }
-                                    <input type="hidden" name="currentMealName" value="@suggestion.MealName" />
-                                    <button type="submit" class="aislepilot-swap-btn" data-loading-label="Swapping...">
-                                        <span class="aislepilot-btn-label">
-                                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                                <svg viewBox="0 0 24 24" focusable="false">
-                                                    <path d="M16 3h5v5"></path>
-                                                    <path d="M21 3 9 15"></path>
-                                                    <path d="M8 21H3v-5"></path>
-                                                    <path d="M3 21 15 9"></path>
-                                                </svg>
-                                            </span>
-                                            Swap idea
-                                        </span>
-                                    </button>
-                                </form>
-                            </div>
-                            @if (suggestion.MissingIngredients.Count > 0 && meal is null)
-                            {
-                                <p class="aislepilot-card-kicker">Need to buy</p>
-                                <ul class="case-list">
-                                    @foreach (var item in suggestion.MissingIngredients)
-                                    {
-                                        <li>@item</li>
-                                    }
-                                </ul>
-                            }
-                        </article>
-                    }
-                    <form method="post"
-                          action="@Url.Action("SuggestFromPantry", "AislePilot")#aislepilot-pantry-title"
-                          class="aislepilot-pantry-refresh-form aislepilot-pantry-refresh-tile">
-                        @Html.AntiForgeryToken()
-                        <partial name="_AislePilotHiddenRequestFields" model="BuildPantryHiddenRequestFields()" />
-                        @foreach (var mealName in currentSuggestionMealNames)
-                        {
-                            <input type="hidden" name="excludedMealNames" value="@mealName" />
-                        }
-                        <button type="submit" class="aislepilot-swap-btn" data-loading-label="Finding 3 more...">
-                            <span class="aislepilot-btn-label">
-                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <path d="M20 12a8 8 0 1 1-2.3-5.6"></path>
-                                        <path d="M20 4v6h-6"></path>
-                                    </svg>
-                                </span>
-                                Show 3 more ideas
-                            </span>
-                        </button>
-                    </form>
-                </div>
-            </section>
+            <partial name="_AislePilotPantrySuggestions"
+                     model="Model"
+                     view-data='new ViewDataDictionary(ViewData)
+                     {
+                         ["FallbackMealImageUrl"] = fallbackMealImageUrl,
+                         ["MealImagesPollUrl"] = mealImagesPollUrl
+                     }' />
         }
 
         <partial name="_AislePilotResultSections" model="Model" />
@@ -1260,5 +884,8 @@
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/aisle-pilot/setup-mode.js" asp-append-version="true"></script>
     <script src="~/js/aisle-pilot/meal-image-polling.js" asp-append-version="true"></script>
+    <script src="~/js/aisle-pilot/core.js" asp-append-version="true"></script>
+    <script src="~/js/aisle-pilot/action-menus.js" asp-append-version="true"></script>
+    <script src="~/js/aisle-pilot/shopping.js" asp-append-version="true"></script>
     <script src="~/js/aisle-pilot.js" asp-append-version="true"></script>
 }

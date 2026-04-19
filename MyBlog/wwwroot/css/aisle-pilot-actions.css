@@ -1,0 +1,959 @@
+﻿.aislepilot-pantry-refresh-form {
+    margin-top: 0.62rem;
+    display: inline-flex;
+}
+
+.aislepilot-pantry-refresh-tile {
+    margin-top: 0;
+    display: grid;
+    border: 1px dashed rgba(16, 63, 101, 0.3);
+    border-radius: 12px;
+    background: linear-gradient(160deg, rgba(248, 252, 255, 0.92), rgba(255, 255, 255, 0.98));
+    min-height: 13.5rem;
+    align-content: center;
+    justify-items: center;
+    padding: 0.62rem;
+}
+
+.aislepilot-pantry-refresh-tile .aislepilot-swap-btn {
+    width: 100%;
+    max-width: 16rem;
+}
+
+.aislepilot-card-compact-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.24rem;
+}
+
+.aislepilot-card-primary-row {
+    display: flex;
+    align-items: center;
+    gap: 0.34rem;
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.aislepilot-card-primary-row + .aislepilot-card-compact-meta {
+    margin-top: 0.24rem;
+}
+
+.aislepilot-card-meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.24rem;
+    min-height: 1.34rem;
+    padding: 0.14rem 0.46rem;
+    border: 1px solid rgba(16, 63, 101, 0.18);
+    border-radius: 999px;
+    background: rgba(248, 251, 255, 0.96);
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.aislepilot-card-meta-pill .aislepilot-symbol-glyph {
+    width: 1rem;
+    height: 1rem;
+}
+
+.aislepilot-card-meta-pill .aislepilot-symbol-glyph svg {
+    width: 0.64rem;
+    height: 0.64rem;
+}
+
+.aislepilot-card-action-row {
+    margin-top: 0.38rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.42rem;
+}
+
+.aislepilot-meal-details {
+    margin: 0;
+    border: none;
+    padding: 0;
+    background: transparent;
+}
+
+.aislepilot-meal-details > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--ap-control-height);
+    padding: 0.34rem 0.78rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: var(--ap-radius-pill);
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: none;
+    cursor: pointer;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--brand-deep);
+    list-style: none;
+    margin-right: 0;
+}
+
+.aislepilot-meal-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-meal-details-image-toggle {
+    margin: 0;
+}
+
+.aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary {
+    display: block;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    cursor: pointer;
+    list-style: none;
+}
+
+.aislepilot-meal-details-image-toggle .aislepilot-meal-image-shell {
+    margin: 0 -0.72rem 0;
+}
+
+.aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary:hover .aislepilot-meal-image {
+    filter: saturate(1.06);
+}
+
+.aislepilot-meal-details-image-toggle[open] .aislepilot-meal-image-hint {
+    background: rgba(16, 63, 101, 0.78);
+    border-color: rgba(16, 63, 101, 0.42);
+    color: #fff;
+}
+
+.aislepilot-meal-details-image-toggle[open] .aislepilot-meal-image-hint .aislepilot-symbol-glyph {
+    border-color: transparent;
+    background: transparent;
+    color: #fff;
+}
+
+.aislepilot-meal-details-image-toggle[open] .aislepilot-meal-image-hint-chip {
+    border-color: rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+
+.aislepilot-card-action-row.is-inline-actions {
+    margin-top: 0;
+    margin-left: auto;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    align-content: center;
+    align-self: flex-start;
+    justify-content: flex-end;
+}
+
+.aislepilot-card-action-row.is-inline-actions.is-top-actions {
+    align-self: flex-start;
+    flex: 0 0 auto;
+    gap: 0.3rem;
+}
+
+.aislepilot-day-card-header-actions .aislepilot-card-action-inline {
+    margin: 0;
+}
+
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger {
+    min-height: 1.92rem;
+    min-width: 1.92rem;
+    padding: 0.12rem;
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(8, 20, 34, 0.42);
+    box-shadow: 0 8px 16px rgba(7, 17, 29, 0.14);
+    justify-content: center;
+    gap: 0;
+}
+
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger .aislepilot-symbol-glyph {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-color: transparent;
+    background: transparent;
+    color: #f5fbff;
+}
+
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger .aislepilot-swap-action-label {
+    display: none;
+}
+
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger:hover {
+    filter: none;
+}
+
+.aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger:hover .aislepilot-symbol-glyph {
+    background: transparent;
+}
+
+.aislepilot-meal-panel-image-actions {
+    position: absolute;
+    top: 0.54rem;
+    right: 0.54rem;
+    margin: 0;
+    z-index: 4;
+}
+
+.aislepilot-card-action-row.is-inline-actions .aislepilot-meal-details {
+    flex: 0 0 auto;
+}
+
+.aislepilot-card-action-row.is-inline-actions .aislepilot-card-action-inline {
+    margin-left: 0;
+}
+
+.aislepilot-meal-details > summary.is-icon-only {
+    width: 2.25rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0;
+    line-height: 1;
+}
+
+.aislepilot-meal-details > summary.is-icon-only .aislepilot-btn-label {
+    gap: 0;
+}
+
+.aislepilot-card-reason {
+    margin-top: 0.34rem;
+}
+
+.aislepilot-meal-details-panel {
+    margin-top: 0.44rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.42rem 0.56rem;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel {
+    margin-top: 0.16rem;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    display: grid;
+    gap: 0.2rem;
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel .aislepilot-card-reason {
+    margin-top: 0;
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel :is(.aislepilot-nutrition-list, .case-list) {
+    margin: 0.12rem 0 0.14rem;
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel :is(.aislepilot-nutrition-list, .case-list):last-child {
+    margin-bottom: 0;
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel ol.case-list {
+    list-style-position: inside;
+    padding-left: 0;
+}
+
+.aislepilot-meal-section {
+    border: 1px solid rgba(16, 63, 101, 0.14);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    overflow: clip;
+}
+
+.aislepilot-meal-section > summary {
+    position: relative;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding: 0.56rem 2rem 0.58rem 0.72rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--brand-deep);
+}
+
+.aislepilot-meal-section > summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-meal-section > summary::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 0.72rem;
+    width: 0.48rem;
+    height: 0.48rem;
+    border-right: 2px solid rgba(16, 63, 101, 0.58);
+    border-bottom: 2px solid rgba(16, 63, 101, 0.58);
+    transform: translateY(-65%) rotate(45deg);
+    transition: transform 0.16s ease;
+}
+
+.aislepilot-meal-section[open] > summary::after {
+    transform: translateY(-35%) rotate(225deg);
+}
+
+.aislepilot-meal-section-content {
+    padding: 0.06rem 0.72rem 0.64rem;
+    border-top: 1px solid rgba(16, 63, 101, 0.12);
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) {
+    margin: 0.16rem 0 0;
+}
+
+.aislepilot-day-meal-panel > .aislepilot-meal-details-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list):last-child {
+    margin-bottom: 0;
+}
+
+.aislepilot-meal-details-grid {
+    margin-top: 0.34rem;
+    display: grid;
+    gap: 0.48rem;
+}
+
+.aislepilot-swap-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--ap-radius-pill);
+    padding: 0.38rem 0.8rem;
+    min-height: var(--ap-control-height);
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--ap-shadow-lift);
+    transition: filter 0.14s ease, transform 0.14s ease;
+}
+
+.aislepilot-swap-btn.is-secondary {
+    background: linear-gradient(110deg, #eef3f8 0%, #dbe7f2 100%);
+    color: var(--brand-deep);
+    box-shadow: none;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+}
+
+.aislepilot-more-actions-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--ap-control-height-touch);
+    border-radius: var(--ap-radius-pill);
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    background: linear-gradient(110deg, #eef3f8 0%, #dbe7f2 100%);
+    color: var(--brand-deep);
+    box-shadow: none;
+    cursor: pointer;
+    list-style: none;
+    line-height: 1.1;
+    padding: 0.34rem 0.72rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.aislepilot-more-actions-trigger::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-swap-btn.is-secondary.is-danger {
+    background: linear-gradient(118deg, #da5b56 0%, #b0302b 100%);
+    color: #fff;
+    border-color: rgba(125, 25, 22, 0.55);
+    box-shadow: 0 8px 14px rgba(94, 22, 20, 0.22);
+}
+
+.aislepilot-swap-btn.is-secondary.is-saved-meal {
+    background: linear-gradient(118deg, #dff7e9 0%, #c8efd9 100%);
+    border-color: rgba(24, 114, 68, 0.35);
+    color: #0d5f3d;
+}
+
+.aislepilot-swap-btn.is-icon-only,
+.aislepilot-more-actions-trigger.is-icon-only {
+    width: var(--ap-control-height-touch);
+    min-width: var(--ap-control-height-touch);
+    min-height: var(--ap-control-height-touch);
+    padding: 0;
+    line-height: 1;
+}
+
+.aislepilot-swap-btn.is-compact {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 0.38rem 0.66rem;
+    min-height: 2.45rem;
+    box-shadow: none;
+    font-size: 0.84rem;
+}
+
+.aislepilot-swap-action-label {
+    white-space: nowrap;
+    line-height: 1.15;
+}
+
+.aislepilot-swap-btn.is-icon-only.is-loading {
+    width: 2.2rem;
+    min-width: 2.2rem;
+    padding: 0;
+}
+
+.aislepilot-swap-btn.is-icon-only.is-loading .aislepilot-symbol-glyph {
+    display: none;
+}
+
+.aislepilot-swap-btn.is-icon-only.is-loading::after {
+    margin-left: 0;
+    animation-duration: 0.9s;
+}
+
+.aislepilot-form button .aislepilot-symbol-glyph,
+.aislepilot-swap-btn .aislepilot-symbol-glyph {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
+.aislepilot-swap-btn.is-secondary .aislepilot-symbol-glyph {
+    border-color: rgba(16, 63, 101, 0.28);
+    background: rgba(16, 63, 101, 0.08);
+    color: var(--brand-deep);
+}
+
+.aislepilot-more-actions-trigger .aislepilot-symbol-glyph {
+    border-color: rgba(16, 63, 101, 0.28);
+    background: rgba(16, 63, 101, 0.08);
+    color: var(--brand-deep);
+}
+
+.aislepilot-swap-btn.is-secondary.is-danger .aislepilot-symbol-glyph {
+    border-color: rgba(255, 255, 255, 0.52);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
+.aislepilot-swap-btn.is-secondary.is-saved-meal .aislepilot-symbol-glyph {
+    border-color: rgba(24, 114, 68, 0.35);
+    background: rgba(24, 114, 68, 0.12);
+    color: #0d5f3d;
+}
+
+.aislepilot-swap-btn:hover {
+    filter: brightness(1.04);
+    transform: translateY(-1px);
+}
+
+.aislepilot-more-actions-trigger:hover {
+    filter: brightness(1.03);
+}
+
+.aislepilot-card-action-row :is(.aislepilot-meal-details > summary, .aislepilot-swap-btn, .aislepilot-more-actions-trigger):focus-visible {
+    box-shadow: inset 0 0 0 2px var(--ap-focus-ring-color), 0 0 0 1px rgba(11, 92, 142, 0.24) !important;
+}
+
+.aislepilot-card-action-row :is(.aislepilot-meal-details > summary, .aislepilot-swap-btn, .aislepilot-more-actions-trigger):focus {
+    outline: none;
+}
+
+.aislepilot-card-more-actions {
+    --ap-mobile-meal-sheet-duration: 420ms;
+    margin: 0;
+    position: relative;
+    z-index: 5;
+}
+
+.aislepilot-card-more-actions > summary {
+    list-style: none;
+}
+
+.aislepilot-card-more-actions > summary::-webkit-details-marker {
+    display: none;
+}
+
+.aislepilot-card-more-actions[open] > summary {
+    filter: brightness(1.03);
+}
+
+.aislepilot-card-more-actions-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.3rem);
+    bottom: auto;
+    z-index: 4;
+    min-width: 8.8rem;
+    width: max-content;
+    max-width: min(84vw, 11rem);
+    padding: 0.34rem;
+    border: 1px solid var(--ap-border-strong);
+    border-radius: var(--ap-radius-soft);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(245, 251, 255, 0.97));
+    box-shadow: 0 14px 24px rgba(11, 24, 42, 0.14);
+    display: grid;
+    gap: 0.26rem;
+    transform-origin: top right;
+}
+
+.aislepilot-mobile-meal-sheet-head {
+    display: none;
+}
+
+.aislepilot-mobile-meal-sheet-head-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.aislepilot-mobile-meal-sheet-handle {
+    display: none;
+}
+
+.aislepilot-mobile-meal-sheet-title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.25;
+}
+
+.aislepilot-mobile-meal-sheet-close {
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--brand-deep);
+    border-radius: 999px;
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.12rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.aislepilot-mobile-meal-sheet-close > span {
+    display: none;
+}
+
+.aislepilot-mobile-meal-sheet-close::before {
+    content: "\00d7";
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.aislepilot-mobile-meal-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 18, 31, 0.44);
+    z-index: 1300;
+    opacity: 0;
+    transition: opacity 280ms ease;
+}
+
+.aislepilot-mobile-meal-sheet-backdrop.is-active {
+    opacity: 1;
+}
+
+.aislepilot-mobile-meal-sheet-backdrop[hidden] {
+    display: none;
+}
+
+body.aislepilot-mobile-meal-sheet-open {
+    overflow: hidden;
+    overscroll-behavior: contain;
+}
+
+.aislepilot-card-more-actions.is-drop-up .aislepilot-card-more-actions-menu {
+    top: auto;
+    bottom: calc(100% + 0.3rem);
+}
+
+.aislepilot-card-more-actions.is-drop-down .aislepilot-card-more-actions-menu {
+    top: calc(100% + 0.3rem);
+    bottom: auto;
+}
+
+.aislepilot-card-more-actions.is-align-left .aislepilot-card-more-actions-menu {
+    left: 0;
+    right: auto;
+}
+
+.aislepilot-card-more-action-form {
+    margin: 0;
+}
+
+.aislepilot-card-more-action-control {
+    margin: 0;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact {
+    justify-content: flex-start;
+    min-height: 2.4rem;
+    padding: 0.34rem 0.52rem;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact .aislepilot-btn-label {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.36rem;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact .aislepilot-symbol-glyph {
+    width: 1.06rem;
+    height: 1.06rem;
+    border-width: 1.2px;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact .aislepilot-symbol-glyph svg {
+    width: 0.72rem;
+    height: 0.72rem;
+    stroke-width: 2.15;
+}
+
+.aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-compact {
+    background: linear-gradient(116deg, #e0efff 0%, #cce2f7 100%);
+    border-color: rgba(16, 89, 139, 0.34);
+    color: #0d4e7f;
+}
+
+.aislepilot-card-more-action-form:not(.aislepilot-favorite-form):not(.aislepilot-ignore-form) .aislepilot-swap-btn.is-secondary.is-compact .aislepilot-symbol-glyph {
+    border-color: rgba(16, 89, 139, 0.38);
+    background: rgba(16, 89, 139, 0.14);
+    color: #0d4e7f;
+}
+
+.aislepilot-leftover-more-action-btn.is-secondary.is-compact {
+    background: linear-gradient(116deg, #e8f4e6 0%, #d9edd6 100%);
+    border-color: rgba(49, 107, 60, 0.34);
+    color: #2e6537;
+}
+
+.aislepilot-leftover-more-action-btn.is-secondary.is-compact .aislepilot-symbol-glyph {
+    border-color: rgba(49, 107, 60, 0.4);
+    background: rgba(49, 107, 60, 0.14);
+    color: #2e6537;
+}
+
+.aislepilot-leftover-more-action-btn.is-secondary.is-compact[data-leftover-toggle-mode="remove"] {
+    background: linear-gradient(116deg, #f7efe2 0%, #f3e4cf 100%);
+    border-color: rgba(133, 96, 36, 0.34);
+    color: #6a4a1b;
+}
+
+.aislepilot-leftover-more-action-btn.is-secondary.is-compact[data-leftover-toggle-mode="remove"] .aislepilot-symbol-glyph {
+    border-color: rgba(133, 96, 36, 0.4);
+    background: rgba(133, 96, 36, 0.14);
+    color: #6a4a1b;
+}
+
+.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-compact:not(.is-saved-meal) {
+    background: linear-gradient(116deg, #fff2d8 0%, #ffe3b7 100%);
+    border-color: rgba(152, 95, 22, 0.34);
+    color: #7a4d14;
+}
+
+.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-compact:not(.is-saved-meal) .aislepilot-symbol-glyph {
+    border-color: rgba(152, 95, 22, 0.4);
+    background: rgba(152, 95, 22, 0.14);
+    color: #7a4d14;
+}
+
+.aislepilot-card-more-action-form.aislepilot-favorite-form .aislepilot-swap-btn.is-secondary.is-compact .aislepilot-symbol-glyph svg {
+    fill: currentColor;
+    stroke: none;
+}
+
+.aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact.is-loading {
+    width: 100%;
+    min-width: 0;
+}
+
+.aislepilot-toast-stack {
+    position: fixed;
+    right: 0.85rem;
+    bottom: 0.85rem;
+    z-index: 1100;
+    display: grid;
+    justify-items: end;
+    gap: 0.34rem;
+    pointer-events: none;
+}
+
+.aislepilot-toast-live {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.aislepilot-toast {
+    max-width: min(84vw, 22rem);
+    padding: 0.44rem 0.62rem;
+    border-radius: 11px;
+    border: 1px solid rgba(16, 63, 101, 0.26);
+    background: rgba(9, 19, 33, 0.94);
+    color: #f4fbff;
+    box-shadow: 0 14px 24px rgba(7, 17, 31, 0.28);
+    font-size: 0.84rem;
+    font-weight: 700;
+    line-height: 1.3;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.aislepilot-toast.is-success {
+    border-color: rgba(67, 182, 133, 0.36);
+    background: rgba(16, 68, 48, 0.95);
+}
+
+.aislepilot-toast.is-warning {
+    border-color: rgba(229, 171, 83, 0.45);
+    background: rgba(78, 54, 15, 0.95);
+}
+
+.aislepilot-toast.is-fading-out {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.aislepilot-nutrition-details {
+    margin-top: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.42rem 0.56rem;
+    background: rgba(248, 251, 255, 0.92);
+}
+
+.aislepilot-nutrition-list {
+    margin: 0.2rem 0 0;
+    padding-left: 1rem;
+    display: grid;
+    gap: 0.16rem;
+    color: var(--ink-soft);
+    font-size: 0.84rem;
+}
+
+.aislepilot-nutrition-note {
+    margin: 0.32rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.72rem;
+}
+
+.aislepilot-recipe-details {
+    margin-top: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.48rem 0.56rem;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.aislepilot-card-action-inline {
+    position: static;
+    margin-left: auto;
+}
+
+.aislepilot-shop-list {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.28rem;
+}
+
+.aislepilot-shop-list .aislepilot-checkbox-item {
+    width: 100%;
+    border: 1px solid rgba(16, 63, 101, 0.18);
+    border-radius: 10px;
+    padding: 0.48rem 0.54rem;
+    background: rgba(255, 255, 255, 0.96);
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+}
+
+.aislepilot-shop-list .aislepilot-checkbox-item [data-shopping-item-text] {
+    transition: color 0.16s ease, opacity 0.16s ease, text-decoration-color 0.16s ease;
+}
+
+.aislepilot-shop-list .aislepilot-checkbox-item.is-checked {
+    background: rgba(232, 238, 244, 0.96);
+    border-color: rgba(16, 63, 101, 0.12);
+}
+
+.aislepilot-shop-list .aislepilot-checkbox-item.is-checked [data-shopping-item-text] {
+    color: rgba(58, 79, 102, 0.82);
+    opacity: 0.72;
+    text-decoration: line-through;
+    text-decoration-thickness: 1.6px;
+}
+
+.aislepilot-shop-card-custom {
+    display: grid;
+    gap: 0.58rem;
+}
+
+.aislepilot-custom-shopping-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.42rem;
+    margin: 0;
+}
+
+.aislepilot-custom-shopping-input {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.56rem 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.18);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.98);
+    font: inherit;
+    color: var(--ink);
+}
+
+.aislepilot-custom-shopping-input::placeholder {
+    color: rgba(58, 79, 102, 0.72);
+}
+
+.aislepilot-custom-shopping-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.42rem;
+    align-items: stretch;
+}
+
+.aislepilot-custom-shopping-row .aislepilot-checkbox-item {
+    margin: 0;
+}
+
+.aislepilot-custom-shopping-remove {
+    min-width: 2.4rem;
+    padding: 0.48rem 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 10px;
+    background: rgba(244, 248, 252, 0.98);
+    font: inherit;
+    font-weight: 700;
+    color: var(--brand-deep);
+    cursor: pointer;
+}
+
+.aislepilot-shop-card {
+    border-color: rgba(16, 63, 101, 0.15);
+    box-shadow: 0 5px 14px rgba(10, 26, 44, 0.06);
+}
+
+.aislepilot-shop-card h3 {
+    margin-bottom: 0.42rem;
+}
+
+.aislepilot-export-panel {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.aislepilot-export-intro {
+    border: 1px solid rgba(16, 63, 101, 0.14);
+    border-radius: 16px;
+    background: rgba(251, 254, 255, 0.96);
+    padding: 0.9rem 1rem;
+}
+
+.aislepilot-export-eyebrow,
+.aislepilot-export-card-kicker {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.aislepilot-export-title,
+.aislepilot-export-card-title {
+    margin: 0;
+}
+
+.aislepilot-export-title {
+    font-size: 1.1rem;
+}
+
+.aislepilot-export-copy,
+.aislepilot-export-card-description,
+.aislepilot-export-footer-copy {
+    margin: 0;
+    line-height: 1.55;
+}
+
+.aislepilot-export-actions {
+    display: grid;
+    gap: 0.66rem;
+}
+
+.aislepilot-export-action {
+    display: grid;
+    gap: 0.78rem;
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 16px;
+    background: rgba(251, 254, 255, 0.96);
+    padding: 0.85rem;
+}
+
+.aislepilot-export-card-copy {
+    display: grid;
+    gap: 0.26rem;
+}
+
+.aislepilot-export-actions form {
+    margin: 0;
+}
+
+.aislepilot-export-btn {
+    width: 100%;
+    min-height: 2.8rem;
+    border: none;
+    border-radius: 12px;
+    padding: 0.7rem 0.85rem;
+    font: inherit;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+    cursor: pointer;
+}
+
+.aislepilot-export-footer {
+    display: grid;
+    gap: 0.55rem;
+    align-items: center;
+}
+
+.aislepilot-pantry-grid {
+    display: grid;
+    gap: 0.62rem;
+    grid-template-columns: 1fr;
+}
+

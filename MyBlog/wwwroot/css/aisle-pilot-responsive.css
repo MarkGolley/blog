@@ -1,0 +1,1206 @@
+﻿@media (prefers-reduced-motion: reduce) {
+    .aislepilot-card.is-swap-fading-out {
+        opacity: 0.74;
+        transform: none;
+    }
+
+    .aislepilot-card.is-swap-fading-out::after,
+    .aislepilot-plan-loading-line::after {
+        animation: none;
+    }
+
+    .aislepilot-meal-grid.is-swap-fading-in,
+    .aislepilot-card.is-swap-updated {
+        animation: none;
+    }
+
+    .aislepilot-setup-mode {
+        animation: none;
+    }
+
+    .aislepilot-day-meal-track {
+        transition: none;
+    }
+
+    .aislepilot-day-carousel-dot[data-day-carousel-settling="true"],
+    .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="active"][data-day-carousel-settling="true"] {
+        animation: none;
+    }
+
+    .aislepilot-toast {
+        transition: none;
+    }
+}
+
+@media (min-width: 640px) {
+    .aislepilot-app-head:not(.is-compact) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        column-gap: 0.8rem;
+        row-gap: 0.52rem;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-head-main {
+        align-self: start;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-head-intro {
+        align-self: start;
+        width: 100%;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-head-actions {
+        justify-self: end;
+        align-self: start;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-title {
+        margin-top: 0;
+    }
+
+    .aislepilot-setup-sections {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+    }
+
+    .aislepilot-budget-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-setup-section:first-child {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-export-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-export-action.is-primary {
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(0, 1.45fr) minmax(15rem, 0.95fr);
+        align-items: end;
+    }
+
+    .aislepilot-export-footer {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .aislepilot-submit-actions {
+        max-width: 24rem;
+    }
+}
+
+@media (max-width: 760px) {
+    .aislepilot-app {
+        --ap-section-scroll-margin-top: calc(var(--ap-mobile-context-top) + 7.5rem);
+        --ap-overview-button-size: 2.36rem;
+        --ap-overview-toggle-size: 1.54rem;
+    }
+
+    .aislepilot-day-carousel {
+        --ap-day-card-slide-width: 100%;
+        --ap-day-card-ghost-width: 0px;
+        gap: 0.48rem;
+    }
+
+    .aislepilot-day-carousel-header {
+        order: 1;
+    }
+
+    .aislepilot-day-carousel-status {
+        font-size: 0.7rem;
+        letter-spacing: 0.09em;
+    }
+
+    .aislepilot-mobile-context {
+        position: sticky;
+        top: var(--ap-mobile-context-top);
+        z-index: 12;
+        display: grid;
+        gap: 0.38rem;
+        padding: 0.56rem;
+        border: 1px solid rgba(16, 63, 101, 0.22);
+        border-radius: 12px;
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 255, 0.96));
+        box-shadow: 0 12px 20px rgba(10, 26, 44, 0.14);
+    }
+
+    .aislepilot-mobile-context-summary {
+        display: grid;
+        gap: 0.04rem;
+    }
+
+    .aislepilot-mobile-context-title {
+        margin: 0;
+        font-size: 0.82rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        font-weight: 700;
+    }
+
+    .aislepilot-mobile-context-meta {
+        margin: 0;
+        display: flex;
+        align-items: baseline;
+        gap: 0.42rem;
+        font-size: 0.94rem;
+        color: var(--brand-deep);
+        font-weight: 700;
+    }
+
+    .aislepilot-mobile-context-meta-values {
+        margin-left: auto;
+        text-align: right;
+    }
+
+    .aislepilot-mobile-context-budget-status {
+        color: var(--ink);
+    }
+
+    .aislepilot-mobile-context-budget-status.is-over-budget {
+        color: #92261f;
+    }
+
+    .aislepilot-mobile-context-budget-status.is-on-budget {
+        color: #166247;
+    }
+
+    .aislepilot-mobile-context-jumps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.22rem;
+    }
+
+    .aislepilot-mobile-context-jump {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
+        min-height: 2.75rem;
+        border: 1px solid rgba(16, 63, 101, 0.2);
+        border-radius: var(--ap-radius-pill);
+        background: rgba(255, 255, 255, 0.97);
+        color: var(--brand-deep);
+        font-size: 0.86rem;
+        font-weight: 700;
+        transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+    }
+
+    .aislepilot-mobile-context-jump.is-active,
+    .aislepilot-mobile-context-jump[aria-selected="true"],
+    .aislepilot-mobile-context-jump[aria-current="page"] {
+        border: none;
+        background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+        color: #fff;
+        box-shadow: var(--ap-shadow-lift);
+    }
+
+    .aislepilot-mobile-context-jump .aislepilot-symbol-glyph {
+        width: 1.2rem;
+        height: 1.2rem;
+    }
+
+    .aislepilot-mobile-context-jump .aislepilot-symbol-glyph svg {
+        width: 0.8rem;
+        height: 0.8rem;
+        stroke-width: 2.1;
+    }
+
+    .aislepilot-mobile-context-jump-text {
+        font-size: 0.8rem;
+        letter-spacing: 0.01em;
+    }
+
+    .aislepilot-mobile-context-jump.is-active .aislepilot-symbol-glyph,
+    .aislepilot-mobile-context-jump[aria-selected="true"] .aislepilot-symbol-glyph,
+    .aislepilot-mobile-context-jump[aria-current="page"] .aislepilot-symbol-glyph {
+        border-color: rgba(255, 255, 255, 0.48);
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+    }
+
+    .aislepilot-window-nav {
+        display: none;
+    }
+
+    .aislepilot-window-head {
+        align-items: center;
+    }
+
+    .aislepilot-overview-head {
+        flex-wrap: nowrap;
+        align-items: center;
+        row-gap: 0;
+    }
+
+    .aislepilot-overview-title-row {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .aislepilot-overview-actions-inline {
+        display: none;
+    }
+
+    .aislepilot-overview-actions-dropdown {
+        display: inline-block;
+    }
+
+    .aislepilot-overview-actions {
+        flex: 0 0 auto;
+        max-width: none;
+    }
+
+    .aislepilot-overview-actions-menu {
+        max-width: min(86vw, 12rem);
+    }
+
+    #aislepilot-overview.aislepilot-shell {
+        padding: 0.76rem 0.82rem;
+    }
+
+    .aislepilot-overview-glance {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-overview-glance-item:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-day-carousel {
+        --ap-day-card-slide-width: clamp(17.75rem, 82vw, 20rem);
+        --ap-day-card-ghost-width: clamp(4.25rem, 14vw, 5.5rem);
+        --ap-day-carousel-stage-inset-inline: 0.7rem;
+        --ap-day-carousel-stage-inset-block-start: 2.2rem;
+        gap: 0.46rem;
+    }
+
+    .aislepilot-day-carousel-header {
+        position: static;
+        min-height: 1.72rem;
+        align-items: center;
+    }
+
+    .aislepilot-day-carousel-status {
+        font-size: 0.68rem;
+        max-width: none;
+    }
+
+    .aislepilot-day-carousel-controls {
+        inset-inline: 0.32rem;
+        top: 58%;
+    }
+
+    .aislepilot-day-carousel-arrow {
+        width: 2rem;
+        min-width: 2rem;
+        height: 2rem;
+        background: rgba(15, 33, 55, 0.58);
+        color: #f3f8fd;
+        border-color: rgba(95, 148, 187, 0.22);
+        box-shadow: 0 10px 18px rgba(5, 14, 24, 0.18);
+        backdrop-filter: blur(10px);
+    }
+
+    .aislepilot-meal-grid {
+        order: 3;
+        overflow-x: auto;
+        padding-inline: 0;
+        padding-top: 0.18rem;
+        padding-bottom: 0.74rem;
+        scroll-padding-inline: 0;
+    }
+
+    .aislepilot-meal-grid::before {
+        inset: 0.16rem 3% 0.92rem;
+        border-radius: 28px;
+        background:
+            radial-gradient(ellipse at 50% 42%, rgba(67, 157, 203, 0.22), rgba(67, 157, 203, 0.1) 34%, rgba(8, 18, 31, 0) 72%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 32%, rgba(8, 18, 31, 0.08));
+    }
+
+    .aislepilot-meal-grid::after {
+        left: 14%;
+        right: 14%;
+        bottom: 0.08rem;
+        height: 1.45rem;
+        opacity: 0.92;
+    }
+
+    .aislepilot-day-carousel-track {
+        gap: 0;
+    }
+
+    .aislepilot-day-carousel-pagination {
+        order: 2;
+        justify-content: flex-start;
+        gap: 0.42rem;
+        padding: 0 0.12rem 0.12rem;
+        width: 100%;
+        max-width: 100%;
+        margin-inline: 0;
+        border: none;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+        backdrop-filter: none;
+    }
+
+    .aislepilot-day-carousel-dot {
+        min-width: 3.3rem;
+        min-height: 1.82rem;
+        height: auto;
+        padding: 0.22rem 0.68rem;
+        border: 1px solid rgba(95, 148, 187, 0.24);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--brand-deep);
+        font-size: 0.68rem;
+        box-shadow: none;
+        scroll-snap-align: start;
+    }
+
+    .aislepilot-day-carousel-dot-label {
+        display: inline-block;
+    }
+
+    .aislepilot-day-carousel-dot.is-active,
+    .aislepilot-day-carousel-dot[aria-selected="true"] {
+        background: linear-gradient(110deg, #4aa7cc 0%, #1f557c 100%);
+        box-shadow: 0 8px 14px rgba(10, 26, 44, 0.18);
+        color: #f6fbff;
+    }
+
+    .aislepilot-day-meal-summary {
+        display: none;
+    }
+
+    .aislepilot-day-card {
+        padding: 0.72rem;
+        border-radius: 22px;
+    }
+
+    .aislepilot-day-carousel-track > .aislepilot-day-card.is-carousel-ghost {
+        display: none;
+    }
+
+    .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] {
+        opacity: 0;
+        transform: none;
+    }
+
+    .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] {
+        opacity: 0;
+        transform: none;
+    }
+
+    .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="far"] {
+        opacity: 0;
+        transform: none;
+    }
+
+    .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="active"] {
+        transform: none;
+        box-shadow:
+            0 16px 26px rgba(8, 21, 38, 0.18),
+            0 6px 12px rgba(58, 133, 173, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    }
+
+    .aislepilot-meal-image-shell {
+        margin: -0.72rem -0.72rem 0.72rem;
+        width: calc(100% + 1.44rem);
+        height: clamp(9rem, 42vw, 10.2rem);
+        border-radius: 16px 16px 12px 12px;
+    }
+
+    .aislepilot-day-meal-title,
+    .aislepilot-day-meal-panel > h3 {
+        display: -webkit-box;
+        margin: 0.14rem 0 0.3rem;
+        padding-right: 2.35rem;
+        font-size: 0.96rem;
+        line-height: 1.08;
+        max-width: 100%;
+    }
+
+    .aislepilot-meal-panel-image-actions {
+        position: absolute;
+        top: 0.56rem;
+        right: 0.56rem;
+        margin: 0;
+        width: auto;
+        z-index: 9;
+    }
+
+    .aislepilot-meal-panel-image-actions > .aislepilot-card-more-actions {
+        width: auto;
+    }
+
+    .aislepilot-meal-panel-image-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger {
+        min-height: 1.44rem;
+        min-width: 1.44rem;
+        padding: 0;
+        border-color: rgba(255, 255, 255, 0.14);
+        background: rgba(6, 12, 20, 0.34);
+        box-shadow: 0 5px 10px rgba(5, 14, 24, 0.1);
+    }
+
+    .aislepilot-card-more-actions[open] > .aislepilot-card-more-actions-menu,
+    .aislepilot-card-more-actions.is-closing > .aislepilot-card-more-actions-menu,
+    .aislepilot-card-more-actions-menu.is-mobile-sheet {
+        position: fixed !important;
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+        top: auto !important;
+        bottom: 0 !important;
+        margin: 0 !important;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        max-height: min(78vh, 34rem);
+        overflow-y: auto;
+        border-radius: 1.2rem 1.2rem 0 0;
+        padding: 0.56rem 0.56rem calc(0.72rem + env(safe-area-inset-bottom));
+        z-index: 1320;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(243, 249, 255, 0.98));
+        box-shadow: 0 -8px 32px rgba(6, 14, 24, 0.28);
+        overscroll-behavior: contain;
+        will-change: transform, opacity;
+    }
+
+    .aislepilot-card-more-actions[open] > .aislepilot-card-more-actions-menu:not(.is-mobile-sheet) {
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .aislepilot-card-more-actions.is-closing > .aislepilot-card-more-actions-menu,
+    .aislepilot-card-more-actions-menu.is-mobile-sheet.is-closing {
+        display: grid !important;
+        pointer-events: none;
+    }
+
+    .aislepilot-card-more-actions[open] > .aislepilot-card-more-actions-menu .aislepilot-mobile-meal-sheet-head,
+    .aislepilot-card-more-actions.is-closing > .aislepilot-card-more-actions-menu .aislepilot-mobile-meal-sheet-head,
+    .aislepilot-card-more-actions-menu.is-mobile-sheet .aislepilot-mobile-meal-sheet-head {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.38rem;
+        padding: 0 0.08rem 0.48rem;
+        margin-bottom: 0.12rem;
+        border-bottom: 1px solid rgba(16, 63, 101, 0.16);
+    }
+
+    .aislepilot-card-more-actions[open] > .aislepilot-card-more-actions-menu .aislepilot-mobile-meal-sheet-handle,
+    .aislepilot-card-more-actions.is-closing > .aislepilot-card-more-actions-menu .aislepilot-mobile-meal-sheet-handle,
+    .aislepilot-card-more-actions-menu.is-mobile-sheet .aislepilot-mobile-meal-sheet-handle {
+        display: block;
+        width: 2.7rem;
+        height: 0.32rem;
+        margin: 0 auto;
+        border-radius: 999px;
+        background: rgba(16, 63, 101, 0.18);
+    }
+
+    .aislepilot-card-more-actions[open] > .aislepilot-card-more-actions-menu .aislepilot-mobile-meal-sheet-title,
+    .aislepilot-card-more-actions.is-closing > .aislepilot-card-more-actions-menu .aislepilot-mobile-meal-sheet-title,
+    .aislepilot-card-more-actions-menu.is-mobile-sheet .aislepilot-mobile-meal-sheet-title {
+        font-size: 0.98rem;
+        line-height: 1.3;
+    }
+
+    .aislepilot-card-more-actions[open] > .aislepilot-card-more-actions-menu .aislepilot-mobile-meal-sheet-close,
+    .aislepilot-card-more-actions.is-closing > .aislepilot-card-more-actions-menu .aislepilot-mobile-meal-sheet-close,
+    .aislepilot-card-more-actions-menu.is-mobile-sheet .aislepilot-mobile-meal-sheet-close {
+        min-width: 2.2rem;
+        min-height: 2.2rem;
+        background: rgba(248, 252, 255, 0.98);
+    }
+
+    .aislepilot-card-more-actions[open] > .aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact,
+    .aislepilot-card-more-actions.is-closing > .aislepilot-card-more-actions-menu .aislepilot-swap-btn.is-compact,
+    .aislepilot-card-more-actions-menu.is-mobile-sheet .aislepilot-swap-btn.is-compact {
+        min-height: 3rem;
+        padding: 0.56rem 0.68rem;
+        border-radius: 0.95rem;
+    }
+
+    .aislepilot-app-head {
+        padding: 0.78rem 0.82rem;
+        gap: 0.62rem;
+    }
+
+    .aislepilot-app-head-main {
+        gap: 0.48rem;
+    }
+
+    .aislepilot-brand-lockup {
+        width: 100%;
+        padding: 0.28rem 2.46rem 0.28rem 0.4rem;
+    }
+
+    .aislepilot-brand-logo {
+        width: clamp(152px, 55vw, 220px);
+    }
+
+    .aislepilot-app-title {
+        font-size: clamp(1.18rem, 4.9vw, 1.46rem);
+        line-height: 1.2;
+    }
+
+    .aislepilot-app-subtitle {
+        font-size: 0.9rem;
+        line-height: 1.38;
+    }
+
+    .aislepilot-app-head.is-compact,
+    .aislepilot-app-head:not(.is-compact) {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.56rem;
+    }
+
+    .aislepilot-app-head-actions {
+        width: 100%;
+    }
+
+    .aislepilot-head-primary-action {
+        width: 100%;
+        min-height: 2.8rem;
+    }
+}
+
+@media (max-width: 520px) {
+    .aislepilot-budget-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.32rem;
+    }
+
+    .aislepilot-stat-card {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.08rem;
+        padding: 0.22rem 0.42rem 0.24rem;
+    }
+
+    .aislepilot-stat-value {
+        text-align: left;
+        font-size: 0.86rem;
+    }
+
+    .aislepilot-overview-glance {
+        grid-template-columns: 1fr;
+    }
+
+    .aislepilot-overview-glance-item:last-child {
+        grid-column: auto;
+    }
+
+    .aislepilot-brand-logo {
+        width: min(100%, 240px);
+    }
+
+    .aislepilot-window-head {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .aislepilot-window-title-meta {
+        margin-left: 0.28rem;
+        font-size: 0.78rem;
+    }
+
+    .aislepilot-window-nav {
+        width: 100%;
+        justify-items: stretch;
+    }
+
+    .aislepilot-window-nav-hint {
+        max-width: none;
+        text-align: left;
+        font-size: 0.78rem;
+    }
+
+    .aislepilot-window-tabs {
+        width: 100%;
+    }
+
+    .aislepilot-window-tab {
+        min-height: 2.75rem;
+        font-size: 0.9rem;
+    }
+
+    .aislepilot-alert-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-alert-btn {
+        width: 100%;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions .aislepilot-swap-btn:not(.is-compact) {
+        width: var(--ap-control-height-touch);
+        min-width: var(--ap-control-height-touch);
+        min-height: var(--ap-control-height-touch);
+        padding: 0;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions .aislepilot-swap-btn:not(.is-compact) .aislepilot-btn-label {
+        gap: 0;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions .aislepilot-swap-btn:not(.is-compact) .aislepilot-swap-action-label {
+        display: none;
+    }
+
+    .aislepilot-card-more-actions-menu {
+        min-width: 9rem;
+        width: max-content;
+        max-width: min(86vw, 12rem);
+    }
+
+    .aislepilot-toast-stack {
+        left: 0.6rem;
+        right: 0.6rem;
+        bottom: 0.7rem;
+        justify-items: stretch;
+    }
+
+    .aislepilot-toast {
+        max-width: none;
+    }
+
+    .aislepilot-setup-mode-toggle {
+        justify-items: center;
+        text-align: center;
+        min-height: 2.4rem !important;
+    }
+
+    .aislepilot-setup-mode-toggle-note {
+        display: none;
+    }
+
+    .aislepilot-section-head:not(.aislepilot-section-head-row):not(.aislepilot-overview-head) {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .aislepilot-overview-actions {
+        width: auto;
+        margin-left: auto;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.34rem;
+    }
+
+    .aislepilot-overview-regenerate-form {
+        width: auto;
+    }
+
+    .aislepilot-overview-actions-inline .aislepilot-overview-regenerate-btn {
+        width: auto;
+        min-width: 0;
+    }
+
+    .aislepilot-overview-toggle-btn.is-icon-only {
+        width: var(--ap-overview-toggle-size) !important;
+        min-width: var(--ap-overview-toggle-size) !important;
+    }
+
+    .aislepilot-leftover-editor-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .aislepilot-supermarket-select {
+        font-size: 0.9rem !important;
+        background-size: 0.78rem;
+        padding-right: 1rem !important;
+    }
+
+    .aislepilot-meals-per-day-options {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.16rem;
+    }
+
+    .aislepilot-plan-basics .aislepilot-slider-field,
+    .aislepilot-slider-field.aislepilot-slider-field--plan-basics-frame {
+        padding: 0.22rem 0.52rem 0.2rem;
+    }
+
+    .aislepilot-slider-field--compact {
+        padding: 0.16rem 0.4rem 0.18rem;
+    }
+
+    .aislepilot-slider-track-line {
+        gap: 0.3rem;
+    }
+
+    .aislepilot-budget-precision-input {
+        width: 4.1rem !important;
+    }
+
+    .aislepilot-slider-input {
+        height: 1.62rem !important;
+        min-height: 1.62rem !important;
+    }
+
+    .aislepilot-slider-field--compact .aislepilot-slider-input {
+        width: calc(100% - 0.64rem);
+        margin-left: 0.32rem;
+        margin-right: 0.32rem;
+        height: 1.82rem !important;
+        min-height: 1.82rem !important;
+    }
+
+    .aislepilot-slider-field--thumb-friendly .aislepilot-slider-input {
+        height: 2.08rem !important;
+        min-height: 2.08rem !important;
+    }
+
+    .aislepilot-budget-slider-field .aislepilot-slider-input {
+        width: calc(100% - 1.7rem);
+        margin-left: 0.85rem;
+        margin-right: 0.85rem;
+    }
+
+    .aislepilot-slider-input::-webkit-slider-runnable-track {
+        height: 0.46rem;
+    }
+
+    .aislepilot-slider-input::-moz-range-track,
+    .aislepilot-slider-input::-moz-range-progress {
+        height: 0.46rem;
+    }
+
+    .aislepilot-slider-value {
+        min-width: 1.84rem;
+        min-height: 1.5rem;
+        font-size: 0.78rem;
+        padding: 0.16rem 0.4rem;
+        top: -0.42rem;
+    }
+
+    .aislepilot-slider-field--thumb-friendly .aislepilot-slider-value {
+        min-width: 2.24rem;
+        min-height: 1.72rem;
+        padding: 0.18rem 0.5rem;
+    }
+
+    .aislepilot-slider-input::-webkit-slider-thumb {
+        width: 1.38rem;
+        height: 1.38rem;
+        margin-top: -0.46rem;
+    }
+
+    .aislepilot-slider-field--compact .aislepilot-slider-input::-webkit-slider-thumb {
+        width: 1.3rem;
+        height: 1.3rem;
+        margin-top: -0.42rem;
+    }
+
+    .aislepilot-slider-field--thumb-friendly .aislepilot-slider-input::-webkit-slider-thumb {
+        width: 1.82rem;
+        height: 1.82rem;
+        margin-top: -0.68rem;
+    }
+
+    .aislepilot-slider-input::-moz-range-thumb {
+        width: 1.38rem;
+        height: 1.38rem;
+    }
+
+    .aislepilot-slider-field--compact .aislepilot-slider-input::-moz-range-thumb {
+        width: 1.3rem;
+        height: 1.3rem;
+    }
+
+    .aislepilot-slider-field--thumb-friendly .aislepilot-slider-input::-moz-range-thumb {
+        width: 1.82rem;
+        height: 1.82rem;
+    }
+
+    .aislepilot-day-meal-tab {
+        font-size: 0.7rem !important;
+        min-height: 2.12rem !important;
+        padding: 0.18rem 0.32rem !important;
+    }
+
+    .aislepilot-day-card-head {
+        column-gap: 0.58rem;
+        row-gap: 0.22rem;
+    }
+
+    .aislepilot-day-card-head-main {
+        column-gap: 0.52rem;
+        row-gap: 0.18rem;
+    }
+
+    .aislepilot-day-card-head-main .aislepilot-card-kicker {
+        padding-top: 0;
+    }
+
+    .aislepilot-day-card-head-main .aislepilot-day-card-meta {
+        padding: 0.18rem 0.48rem;
+        font-size: 0.7rem;
+    }
+
+    .aislepilot-day-card-leftover-controls {
+        min-width: 0;
+        padding: 0;
+        gap: 0.08rem;
+    }
+
+    .aislepilot-day-card-meta[data-day-card-summary] {
+        max-width: min(44vw, 10.8rem);
+        font-size: 0.76rem;
+    }
+
+    .aislepilot-card-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.32rem;
+    }
+
+    .aislepilot-card-primary-row {
+        flex-wrap: nowrap;
+        align-items: center;
+    }
+
+    .aislepilot-card-primary-row .aislepilot-card-meta-pill {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: calc(100% - 8rem);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions {
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions.is-top-actions {
+        gap: 0.24rem;
+    }
+
+    .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger {
+        min-height: 2.4rem;
+        padding: 0.28rem 0.56rem;
+    }
+
+    .aislepilot-meal-details:not(.aislepilot-meal-details-image-toggle) {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .aislepilot-meal-details > summary {
+        margin-right: 0;
+    }
+
+    .aislepilot-meal-image-hint {
+        left: 0.48rem;
+        bottom: 0.48rem;
+        gap: 0.1rem;
+        max-width: 6.8rem;
+        padding: 0.18rem 0.3rem;
+        font-size: 0.56rem;
+        background: rgba(6, 12, 20, 0.38);
+    }
+
+    .aislepilot-meal-image-hint-primary {
+        gap: 0.16rem;
+    }
+
+    .aislepilot-meal-image-hint-chips {
+        display: none;
+    }
+
+    .aislepilot-meal-image-hint-chip {
+        min-height: 1.02rem;
+        padding: 0.08rem 0.28rem;
+        font-size: 0.54rem;
+    }
+
+    .aislepilot-card-action-inline {
+        position: static;
+        margin-left: auto;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions .aislepilot-meal-details {
+        flex: 0 0 auto;
+    }
+
+    .aislepilot-card-action-row.is-inline-actions .aislepilot-card-action-inline {
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 680px) {
+    .app-shell-main.aislepilot-main.container {
+        width: min(84rem, 100% - 1.2rem);
+    }
+}
+
+@media (min-width: 880px) {
+    .aislepilot-day-carousel {
+        --ap-day-card-slide-width: min(72vw, 34rem);
+        --ap-day-card-ghost-width: clamp(9rem, 18vw, 12rem);
+    }
+
+    .aislepilot-shopping-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-pantry-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .aislepilot-app {
+        width: min(100%, 90rem);
+        gap: 1rem;
+    }
+
+    .aislepilot-app-head {
+        padding: 1.2rem 1.3rem;
+    }
+
+    .aislepilot-app-head:not(.is-compact),
+    .aislepilot-app-head.is-compact {
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 1rem;
+        align-items: start;
+    }
+
+    .aislepilot-app-head-main {
+        display: grid;
+        gap: 0.58rem;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-head-intro,
+    .aislepilot-app-head.is-compact .aislepilot-app-head-intro {
+        min-width: 0;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-title {
+        margin-top: 0;
+    }
+
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-title,
+    .aislepilot-app-head:not(.is-compact) .aislepilot-app-subtitle {
+        max-width: none;
+    }
+
+    .aislepilot-app-head-actions {
+        justify-self: end;
+        align-self: start;
+    }
+
+    .aislepilot-head-primary-action {
+        min-width: 11.5rem;
+    }
+
+    .aislepilot-layout {
+        gap: 0.95rem;
+    }
+
+    .aislepilot-layout.has-results {
+        grid-template-columns: minmax(21.5rem, 27rem) minmax(0, 1fr);
+        column-gap: 0.95rem;
+        align-items: start;
+    }
+
+    .aislepilot-layout.has-results > #aislepilot-setup:not([hidden]) {
+        position: sticky;
+        top: 1rem;
+        align-self: start;
+    }
+
+    .aislepilot-layout.has-results > #aislepilot-setup[hidden] + .aislepilot-results-stack {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-layout.has-results > .aislepilot-results-stack {
+        gap: 1rem;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup {
+        max-width: none;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.82rem 1rem;
+        align-items: start;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-form > [asp-validation-summary],
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-form > .text-danger,
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-form > .aislepilot-setup-mode-switch {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-shared-setup {
+        grid-column: 1;
+        margin: 0;
+        padding: 0.34rem;
+        border: 1px solid rgba(16, 63, 101, 0.18);
+        border-radius: 12px;
+        background: rgba(16, 63, 101, 0.06);
+        align-content: start;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-shared-setup::before {
+        content: "Shared settings";
+        display: block;
+        margin: 0;
+        padding: 0 0.2rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.25;
+        font-family: var(--ap-font-sans);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings:not([hidden]) {
+        grid-column: 2;
+        margin: 0;
+        padding: 0.34rem;
+        border: 1px solid rgba(16, 63, 101, 0.18);
+        border-radius: 12px;
+        background: rgba(16, 63, 101, 0.06);
+        align-content: start;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings-title {
+        margin: 0;
+        padding: 0 0.2rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.25;
+        font-family: var(--ap-font-sans);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings-title .aislepilot-symbol-label {
+        display: block;
+        gap: 0;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-planner-settings-title .aislepilot-symbol-glyph {
+        display: none;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-submit-actions {
+        max-width: none;
+        width: 100%;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-submit-actions button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .aislepilot-layout:not(.has-results) #aislepilot-setup .aislepilot-setup-mode:not([hidden]) {
+        grid-column: 1 / -1;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-shell {
+        min-width: 0;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-head {
+        align-items: flex-start;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-nav {
+        justify-items: start;
+        align-items: start;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-nav-hint {
+        display: block;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-window-tabs {
+        width: fit-content;
+        min-width: 22rem;
+    }
+
+    .aislepilot-layout.has-results .aislepilot-shell {
+        padding: 1rem;
+    }
+
+    .aislepilot-serving-context-fields .aislepilot-inline-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .aislepilot-collapsible > summary {
+        padding: 0.58rem 2rem 0.6rem 0.72rem;
+    }
+
+    .aislepilot-collapsible-title {
+        font-size: 0.9rem;
+    }
+
+    .aislepilot-collapsible-value {
+        font-size: 0.84rem;
+    }
+
+    .aislepilot-planner-settings-title {
+        font-size: 0.94rem;
+    }
+
+    .aislepilot-setup-mode-copy {
+        font-size: 0.86rem;
+    }
+
+    .aislepilot-budget-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .aislepilot-stat-card {
+        padding: 0.34rem 0.62rem 0.38rem;
+    }
+
+    .aislepilot-meal-image-shell {
+        height: clamp(7.8rem, 11vw, 10.2rem);
+    }
+}
+
+@media (min-width: 1280px) {
+    .aislepilot-app {
+        width: min(100%, 92rem);
+    }
+
+    .aislepilot-layout.has-results {
+        grid-template-columns: minmax(22rem, 28rem) minmax(0, 1fr);
+    }
+
+    .aislepilot-budget-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .aislepilot-day-carousel {
+        --ap-day-card-slide-width: min(58vw, 36rem);
+        --ap-day-card-ghost-width: clamp(10rem, 16vw, 12.5rem);
+    }
+
+    .aislepilot-shopping-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .aislepilot-pantry-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
