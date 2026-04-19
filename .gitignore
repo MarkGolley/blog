@@ -75,6 +75,7 @@ node_modules/
 
 .idea/
 
+.out/
 bin/
 obj/
 artifacts/
