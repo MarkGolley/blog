@@ -272,7 +272,7 @@ public partial class AislePilotIntegrationTests
             css);
         Assert.Matches(
             new Regex(
-                @"\.aislepilot-export-btn\.is-primary\s*\{[\s\S]*min-height:\s*3\.1rem;[\s\S]*background:\s*linear-gradient\(135deg,\s*var\(--ap-refresh-primary\)\s*0%,\s*var\(--ap-refresh-accent\)\s*100%\);",
+                @"\.aislepilot-export-intro\s*\{[\s\S]*border-color:\s*rgba\(21,\s*128,\s*61,\s*0\.16\);[\s\S]*\.aislepilot-export-btn\.is-primary\s*\{[\s\S]*min-height:\s*3\.2rem;[\s\S]*background:\s*linear-gradient\(135deg,\s*var\(--ap-refresh-primary\)\s*0%,\s*var\(--ap-refresh-accent\)\s*100%\);",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(

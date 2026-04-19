@@ -1184,33 +1184,37 @@
                 </section>
 
                 <section id="aislepilot-export" aria-label="Exports" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel aislepilot-export-panel" data-window-name="Exports">
+                    <div class="aislepilot-export-intro">
+                        <p class="aislepilot-export-eyebrow">Take this plan with you</p>
+                        <h3 class="aislepilot-export-title">Start with the shopping list on your phone.</h3>
+                        <p class="aislepilot-export-copy">Share is the quickest option for supermarket trips. Download the PDF when you want the full week, and keep the text checklist as a lightweight backup.</p>
+                    </div>
+
                     <div class="aislepilot-export-actions">
-                        <div class="aislepilot-export-action is-secondary" data-notes-export-shell>
+                        <article class="aislepilot-export-action is-primary" data-notes-export-shell>
+                            <div class="aislepilot-export-card-copy">
+                                <p class="aislepilot-export-card-kicker">Best for shopping now</p>
+                                <h4 class="aislepilot-export-card-title">Share to your phone</h4>
+                                <p class="aislepilot-export-card-description">Opens the share sheet on supported devices and can fall back to copying the list when sharing is unavailable.</p>
+                            </div>
                             <textarea hidden data-notes-export-content>@shoppingListNotesText</textarea>
                             <button type="button"
-                                    class="aislepilot-export-btn is-secondary"
+                                    class="aislepilot-export-btn is-primary"
                                     data-notes-export-trigger
-                                    data-notes-default-label="Share shopping list (works with Notes)"
+                                    data-notes-default-label="Share shopping list"
                                     data-notes-shared-label="Share sheet opened. Choose your app."
                                     data-notes-copied-label="Shopping list copied."
                                     data-notes-failed-label="Could not share. Try again.">
-                                Share shopping list (works with Notes)
+                                Share shopping list
                             </button>
-                        </div>
+                        </article>
 
-                        <div class="aislepilot-export-action is-secondary">
-                            <form method="post"
-                                  asp-action="ExportChecklist"
-                                  data-export-download-form
-                                  data-export-download-fallback-name="aislepilot-checklist.txt">
-                                @Html.AntiForgeryToken()
-                                <partial name="_AislePilotHiddenRequestFields"
-                                         model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                                <button type="submit" class="aislepilot-export-btn is-secondary" data-loading-label="Building checklist...">Download shopping checklist (.txt)</button>
-                            </form>
-                        </div>
-
-                        <div class="aislepilot-export-action is-primary">
+                        <article class="aislepilot-export-action is-secondary">
+                            <div class="aislepilot-export-card-copy">
+                                <p class="aislepilot-export-card-kicker">Full week pack</p>
+                                <h4 class="aislepilot-export-card-title">Download the full plan</h4>
+                                <p class="aislepilot-export-card-description">PDF with the meals, budget snapshot, and aisle-ordered shopping list in one file.</p>
+                            </div>
                             <form method="post"
                                   asp-action="ExportPlanPack"
                                   data-export-theme-form
@@ -1220,13 +1224,31 @@
                                 <partial name="_AislePilotHiddenRequestFields"
                                          model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                                 <input type="hidden" name="exportTheme" value="light" data-export-theme-input />
-                                <button type="submit" class="aislepilot-export-btn is-primary" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
+                                <button type="submit" class="aislepilot-export-btn is-secondary" data-loading-label="Building PDF...">Download plan pack (.pdf)</button>
                             </form>
-                        </div>
+                        </article>
 
-                        <div class="aislepilot-export-action is-tertiary">
-                            <button type="button" class="aislepilot-export-btn is-tertiary" onclick="window.print()">Print current view</button>
-                        </div>
+                        <article class="aislepilot-export-action is-secondary">
+                            <div class="aislepilot-export-card-copy">
+                                <p class="aislepilot-export-card-kicker">Plain text backup</p>
+                                <h4 class="aislepilot-export-card-title">Download a checklist</h4>
+                                <p class="aislepilot-export-card-description">Simple text version for Notes, reminders, or quick edits without the full PDF.</p>
+                            </div>
+                            <form method="post"
+                                  asp-action="ExportChecklist"
+                                  data-export-download-form
+                                  data-export-download-fallback-name="aislepilot-checklist.txt">
+                                @Html.AntiForgeryToken()
+                                <partial name="_AislePilotHiddenRequestFields"
+                                         model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                                <button type="submit" class="aislepilot-export-btn is-secondary" data-loading-label="Building checklist...">Download checklist (.txt)</button>
+                            </form>
+                        </article>
+                    </div>
+
+                    <div class="aislepilot-export-footer">
+                        <p class="aislepilot-export-footer-copy">Need a paper copy for the kitchen or a shared shop?</p>
+                        <button type="button" class="aislepilot-export-btn is-tertiary" onclick="window.print()">Print meal and shopping view</button>
                     </div>
                 </section>
             </div>

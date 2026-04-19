@@ -1129,6 +1129,83 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_MergesProduceVariantsAndRoundsShoppingQuantitiesForDisplay()
+    {
+        ClearAiPool();
+
+        var mealOneName = $"Greens lunch {Guid.NewGuid():N}";
+        var mealTwoName = $"Salad lunch {Guid.NewGuid():N}";
+        var mealThreeName = $"Soup lunch {Guid.NewGuid():N}";
+        var mealOne = CreateMealTemplateWithIngredients(
+            mealOneName,
+            [
+                ("Fresh spinach", "Produce", 150m, "g", 0.75m),
+                ("Mixed leaves", "Produce", 18.75m, "g", 0.15m),
+                ("Tomatoes", "Produce", 20m, "g", 0.14m)
+            ]);
+        var mealTwo = CreateMealTemplateWithIngredients(
+            mealTwoName,
+            [
+                ("Spinach", "Produce", 75m, "g", 0.45m),
+                ("Mixed salad leaves", "Produce", 28.13m, "g", 0.56m),
+                ("Tomatoes", "Produce", 1m, "pc", 0.25m)
+            ]);
+        var mealThree = CreateMealTemplateWithIngredients(
+            mealThreeName,
+            [
+                ("Spinach(fresh)", "Produce", 93.75m, "g", 0.75m)
+            ]);
+
+        InvokeAddMealsToAiPool([mealOne, mealTwo, mealThree]);
+
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 80m,
+            HouseholdSize = 2,
+            PlanDays = 3,
+            CookDays = 3,
+            MealsPerDay = 1,
+            DietaryModes = ["Balanced"]
+        };
+
+        try
+        {
+            var result = await _service.BuildPlanFromCurrentMealsAsync(request, [mealOneName, mealTwoName, mealThreeName]);
+
+            var spinachItems = result.ShoppingItems
+                .Where(item => item.Name.Contains("spinach", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var mixedLeafItems = result.ShoppingItems
+                .Where(item => item.Name.Contains("mixed", StringComparison.OrdinalIgnoreCase) ||
+                               item.Name.Contains("salad", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var tomatoItems = result.ShoppingItems
+                .Where(item => item.Name.Contains("tomato", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var spinach = Assert.Single(spinachItems);
+            var mixedLeaves = Assert.Single(mixedLeafItems);
+            var tomatoes = Assert.Single(tomatoItems);
+
+            Assert.Equal("Spinach", spinach.Name);
+            Assert.Equal("g", spinach.Unit);
+            Assert.Equal("320 g", spinach.QuantityDisplay);
+
+            Assert.Equal("Mixed leaves", mixedLeaves.Name);
+            Assert.Equal("g", mixedLeaves.Unit);
+            Assert.Equal("50 g", mixedLeaves.QuantityDisplay);
+
+            Assert.Equal("Tomatoes", tomatoes.Name);
+            Assert.Equal("pcs", tomatoes.Unit);
+            Assert.Equal("2 pcs", tomatoes.QuantityDisplay);
+        }
+        finally
+        {
+            ClearAiPool();
+        }
+    }
+
+    [Fact]
     public async Task BuildPlanFromCurrentMealsAsync_NormalizesIngredientDisplayCapitalizationAcrossMealAndShoppingViews()
     {
         ClearAiPool();

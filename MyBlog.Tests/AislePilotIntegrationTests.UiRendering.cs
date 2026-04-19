@@ -1015,7 +1015,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Share shopping list (works with Notes)", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Share shopping list", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("iPhone Notes", html, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1051,7 +1051,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_WithResult_RendersExportActionsInRequestedOrder()
+    public async Task Index_Post_WithResult_RendersPhoneFirstExportHierarchy()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -1075,20 +1075,25 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
 
-        var shareIndex = html.IndexOf("Share shopping list (works with Notes)", StringComparison.OrdinalIgnoreCase);
-        var checklistIndex = html.IndexOf("Download shopping checklist (.txt)", StringComparison.OrdinalIgnoreCase);
-        var planPackIndex = html.IndexOf("Download full plan pack (.pdf)", StringComparison.OrdinalIgnoreCase);
-        var printIndex = html.IndexOf("Print current view", StringComparison.OrdinalIgnoreCase);
+        var introIndex = html.IndexOf("Start with the shopping list on your phone.", StringComparison.OrdinalIgnoreCase);
+        var shareIndex = html.IndexOf("Share shopping list", StringComparison.OrdinalIgnoreCase);
+        var planPackIndex = html.IndexOf("Download plan pack (.pdf)", StringComparison.OrdinalIgnoreCase);
+        var checklistIndex = html.IndexOf("Download checklist (.txt)", StringComparison.OrdinalIgnoreCase);
+        var printIndex = html.IndexOf("Print meal and shopping view", StringComparison.OrdinalIgnoreCase);
 
+        Assert.True(introIndex >= 0, "Expected export panel to explain the phone-first export option.");
         Assert.True(shareIndex >= 0, "Expected share-shopping-list export action to be rendered.");
-        Assert.True(checklistIndex > shareIndex, "Expected shopping checklist download to follow the share action.");
-        Assert.True(planPackIndex > checklistIndex, "Expected full plan pack download to follow the checklist download.");
+        Assert.True(planPackIndex > shareIndex, "Expected full plan pack download to follow the share action.");
+        Assert.True(checklistIndex > planPackIndex, "Expected text checklist download to follow the PDF action.");
         Assert.True(printIndex > planPackIndex, "Expected print action to be the final export option.");
+        Assert.Contains("Take this plan with you", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Share to your phone", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Need a paper copy for the kitchen or a shared shop?", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-action is-primary\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-btn is-primary\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-action is-secondary\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-btn is-secondary\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("class=\"aislepilot-export-action is-tertiary\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"aislepilot-export-footer\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-btn is-tertiary\"", html, StringComparison.OrdinalIgnoreCase);
     }
 

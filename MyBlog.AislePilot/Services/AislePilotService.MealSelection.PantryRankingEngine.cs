@@ -390,6 +390,11 @@ public sealed partial class AislePilotService
 
     private static string NormalizePantryWord(string word)
     {
+        if (word.EndsWith("oes", StringComparison.Ordinal) && word.Length > 4)
+        {
+            return word[..^2];
+        }
+
         if (word.EndsWith("ies", StringComparison.Ordinal) && word.Length > 4)
         {
             return word[..^3] + "y";

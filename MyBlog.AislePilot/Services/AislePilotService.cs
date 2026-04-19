@@ -164,6 +164,16 @@ public sealed partial class AislePilotService : IAislePilotService
 
     private static readonly Dictionary<string, string[]> IngredientAliases = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["Spinach"] =
+        [
+            "fresh spinach",
+            "spinach fresh"
+        ],
+        ["Mixed leaves"] =
+        [
+            "mixed salad leaves",
+            "salad leaves"
+        ],
         ["Frozen mixed veg"] =
         [
             "mixed veg",

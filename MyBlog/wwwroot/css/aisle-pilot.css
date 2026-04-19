@@ -4792,16 +4792,60 @@ body.aislepilot-mobile-meal-sheet-open {
     margin-bottom: 0.42rem;
 }
 
+.aislepilot-export-panel {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.aislepilot-export-intro {
+    border: 1px solid rgba(16, 63, 101, 0.14);
+    border-radius: 16px;
+    background: rgba(251, 254, 255, 0.96);
+    padding: 0.9rem 1rem;
+}
+
+.aislepilot-export-eyebrow,
+.aislepilot-export-card-kicker {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.aislepilot-export-title,
+.aislepilot-export-card-title {
+    margin: 0;
+}
+
+.aislepilot-export-title {
+    font-size: 1.1rem;
+}
+
+.aislepilot-export-copy,
+.aislepilot-export-card-description,
+.aislepilot-export-footer-copy {
+    margin: 0;
+    line-height: 1.55;
+}
+
 .aislepilot-export-actions {
     display: grid;
-    gap: 0.52rem;
+    gap: 0.66rem;
 }
 
 .aislepilot-export-action {
+    display: grid;
+    gap: 0.78rem;
     border: 1px solid rgba(16, 63, 101, 0.16);
-    border-radius: 12px;
+    border-radius: 16px;
     background: rgba(251, 254, 255, 0.96);
-    padding: 0.42rem;
+    padding: 0.85rem;
+}
+
+.aislepilot-export-card-copy {
+    display: grid;
+    gap: 0.26rem;
 }
 
 .aislepilot-export-actions form {
@@ -4813,12 +4857,18 @@ body.aislepilot-mobile-meal-sheet-open {
     min-height: 2.8rem;
     border: none;
     border-radius: 12px;
-    padding: 0.62rem 0.75rem;
+    padding: 0.7rem 0.85rem;
     font: inherit;
     font-weight: 700;
     color: #fff;
     background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
     cursor: pointer;
+}
+
+.aislepilot-export-footer {
+    display: grid;
+    gap: 0.55rem;
+    align-items: center;
 }
 
 .aislepilot-pantry-grid {
@@ -4905,8 +4955,14 @@ body.aislepilot-mobile-meal-sheet-open {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .aislepilot-export-actions > .aislepilot-export-btn {
+    .aislepilot-export-action.is-primary {
         grid-column: 1 / -1;
+        grid-template-columns: minmax(0, 1.45fr) minmax(15rem, 0.95fr);
+        align-items: end;
+    }
+
+    .aislepilot-export-footer {
+        grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .aislepilot-submit-actions {

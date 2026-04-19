@@ -618,10 +618,10 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(
             new[]
             {
-                "Share shopping list (works with Notes)",
-                "Download shopping checklist (.txt)",
-                "Download full plan pack (.pdf)",
-                "Print current view"
+                "Share shopping list",
+                "Download plan pack (.pdf)",
+                "Download checklist (.txt)",
+                "Print meal and shopping view"
             },
             exportButtonLabels);
 
@@ -637,12 +637,12 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             """
             () => {
                 const button = Array.from(document.querySelectorAll("#aislepilot-export .aislepilot-export-btn"))
-                    .find(candidate => candidate.textContent?.includes("Download shopping checklist"));
+                    .find(candidate => candidate.textContent?.includes("Download checklist"));
                 return button instanceof HTMLButtonElement
                     && !button.disabled
                     && !button.classList.contains("is-loading")
                     && button.getAttribute("aria-busy") !== "true"
-                    && button.textContent?.trim() === "Download shopping checklist (.txt)";
+                    && button.textContent?.trim() === "Download checklist (.txt)";
             }
             """,
             null,
