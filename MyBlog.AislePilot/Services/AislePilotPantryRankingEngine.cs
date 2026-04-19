@@ -22,9 +22,10 @@ public sealed class AislePilotPantryRankingEngine
     internal AislePilotPantrySuggestionViewModel BuildPantrySuggestion(
         AislePilotService.MealTemplate template,
         IReadOnlyList<string> pantryTokens,
-        decimal householdFactor)
+        decimal householdFactor,
+        decimal priceFactor)
     {
-        return AislePilotService.BuildPantrySuggestion(template, pantryTokens, householdFactor);
+        return AislePilotService.BuildPantrySuggestion(template, pantryTokens, householdFactor, priceFactor);
     }
 
     internal int CountMatchedPantryTokens(

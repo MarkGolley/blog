@@ -25,6 +25,7 @@ public sealed partial class AislePilotService
         IReadOnlySet<int> ignoredMealSlotIndexes,
         IReadOnlyDictionary<string, string> mealImageUrls,
         decimal householdFactor,
+        decimal priceFactor,
         decimal portionSizeFactor,
         IReadOnlyList<string> dietaryModes,
         string dislikesOrAllergens,
@@ -52,7 +53,7 @@ public sealed partial class AislePilotService
             var estimatedCost = isIgnored
                 ? 0m
                 : decimal.Round(
-                    template.BaseCostForTwo * householdFactor * mealPortionMultiplier,
+                    template.BaseCostForTwo * householdFactor * NormalizeSupermarketPriceFactor(priceFactor) * mealPortionMultiplier,
                     2,
                     MidpointRounding.AwayFromZero);
             var reason = template.IsQuick
@@ -173,9 +174,11 @@ public sealed partial class AislePilotService
         IReadOnlyList<int> mealPortionMultipliers,
         IReadOnlySet<int> ignoredMealSlotIndexes,
         decimal householdFactor,
+        decimal priceFactor,
         IReadOnlyList<string> aisleOrder,
         DessertAddOnTemplate? dessertAddOnTemplate)
     {
+        var normalizedPriceFactor = NormalizeSupermarketPriceFactor(priceFactor);
         var aggregated = new List<MutableShoppingItem>();
         var mealCount = Math.Min(selectedMeals.Count, mealPortionMultipliers.Count);
         for (var i = 0; i < mealCount; i++)
@@ -212,13 +215,14 @@ public sealed partial class AislePilotService
                 }
 
                 existing.Quantity += canonicalQuantity;
-                existing.EstimatedCost += ingredient.EstimatedCostForTwo * householdFactor * mealPortionMultiplier;
+                existing.EstimatedCost +=
+                    ingredient.EstimatedCostForTwo * householdFactor * normalizedPriceFactor * mealPortionMultiplier;
             }
         }
 
         if (dessertAddOnTemplate is not null)
         {
-            AddDessertAddOnShoppingItems(aggregated, householdFactor, dessertAddOnTemplate);
+            AddDessertAddOnShoppingItems(aggregated, householdFactor, normalizedPriceFactor, dessertAddOnTemplate);
         }
 
         var departmentOrder = aisleOrder
@@ -454,9 +458,11 @@ public sealed partial class AislePilotService
     private static void AddDessertAddOnShoppingItems(
         IList<MutableShoppingItem> aggregated,
         decimal householdFactor,
+        decimal priceFactor,
         DessertAddOnTemplate dessertAddOnTemplate)
     {
         var scale = Math.Clamp(householdFactor, 0.5m, 4m);
+        var normalizedPriceFactor = NormalizeSupermarketPriceFactor(priceFactor);
         foreach (var ingredient in dessertAddOnTemplate.Ingredients)
         {
             var aggregatedQuantity = ingredient.QuantityForTwo * scale;
@@ -482,7 +488,7 @@ public sealed partial class AislePilotService
             }
 
             existing.Quantity += canonicalQuantity;
-            existing.EstimatedCost += ingredient.EstimatedCostForTwo * scale;
+            existing.EstimatedCost += ingredient.EstimatedCostForTwo * scale * normalizedPriceFactor;
         }
     }
 
@@ -547,10 +553,13 @@ public sealed partial class AislePilotService
 
     private static decimal CalculateDessertAddOnEstimatedCost(
         decimal householdFactor,
+        decimal priceFactor,
         DessertAddOnTemplate dessertAddOnTemplate)
     {
         var scale = Math.Clamp(householdFactor, 0.5m, 4m);
-        var estimatedCost = dessertAddOnTemplate.Ingredients.Sum(ingredient => ingredient.EstimatedCostForTwo * scale);
+        var normalizedPriceFactor = NormalizeSupermarketPriceFactor(priceFactor);
+        var estimatedCost = dessertAddOnTemplate.Ingredients.Sum(
+            ingredient => ingredient.EstimatedCostForTwo * scale * normalizedPriceFactor);
         return decimal.Round(estimatedCost, 2, MidpointRounding.AwayFromZero);
     }
 

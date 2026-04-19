@@ -950,4 +950,40 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(fontSizes[0] >= 11.5, $"Expected overview stat labels to be at least 11.5px. Actual={fontSizes[0]:F2}px.");
         Assert.True(fontSizes[1] >= 13, $"Expected day summary labels to be at least 13px. Actual={fontSizes[1]:F2}px.");
     }
+
+    [Fact]
+    public async Task Desktop_AislePilotOverview_KeepsSnapshotGridCompactBesideSupermarketCard()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var snapshotMetrics = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const supermarket = document.querySelector(".aislepilot-stat-card--supermarket");
+                const featured = document.querySelector(".aislepilot-stat-card--featured");
+                const support = document.querySelector(".aislepilot-stat-card--support");
+                if (!(supermarket instanceof HTMLElement) || !(featured instanceof HTMLElement) || !(support instanceof HTMLElement)) {
+                    return [-1, -1, -1];
+                }
+
+                const supermarketRect = supermarket.getBoundingClientRect();
+                const featuredRect = featured.getBoundingClientRect();
+                const supportRect = support.getBoundingClientRect();
+                return [supermarketRect.bottom - featuredRect.bottom, supermarketRect.bottom - supportRect.top, featuredRect.height];
+            }
+            """);
+
+        Assert.Equal(3, snapshotMetrics.Length);
+        Assert.True(snapshotMetrics[0] >= 36, $"Expected featured snapshot cards to stay shorter than the supermarket card. Delta={snapshotMetrics[0]:F1}px.");
+        Assert.True(snapshotMetrics[1] >= 28, $"Expected the support row to begin before the supermarket card finishes so the grid stays compact. Delta={snapshotMetrics[1]:F1}px.");
+        Assert.True(snapshotMetrics[2] <= 180, $"Expected featured snapshot cards to remain compact on desktop. Height={snapshotMetrics[2]:F1}px.");
+    }
 }

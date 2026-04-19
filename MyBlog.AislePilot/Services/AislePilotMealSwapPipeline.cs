@@ -91,6 +91,7 @@ public sealed class AislePilotMealSwapPipeline : IAislePilotMealSwapPipeline
                     currentName,
                     request.WeeklyBudget,
                     context.HouseholdFactor,
+                    context.PriceProfile.RelativeCostFactor,
                     request.PreferQuickMeals,
                     AislePilotService.IsHighProteinPreferred(context.DietaryModes),
                     mealType,

@@ -704,6 +704,11 @@ html.reveal-ready [data-reveal].is-visible {
     margin: 1.1rem 0 1.2rem;
 }
 
+.hero-actions-secondary {
+    margin-top: -0.45rem;
+    margin-bottom: 1.2rem;
+}
+
 .btn {
     display: flex;
     align-items: center;
@@ -1917,6 +1922,38 @@ thead th {
     letter-spacing: 0.01em;
 }
 
+.case-screenshot-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+
+.case-screenshot-card {
+    margin: 0;
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 12px;
+    background: rgba(250, 252, 255, 0.92);
+    overflow: hidden;
+    box-shadow: 0 10px 18px rgba(11, 24, 42, 0.06);
+}
+
+.case-screenshot-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    object-position: top center;
+    background: rgba(12, 24, 38, 0.08);
+}
+
+.case-screenshot-card figcaption {
+    padding: 0.55rem 0.65rem 0.62rem;
+    color: var(--ink-soft);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
 .case-list {
     margin: 0;
     padding-left: 1.1rem;
@@ -1960,6 +1997,10 @@ thead th {
     .focus-grid,
     .case-template-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .case-screenshot-grid {
+        grid-template-columns: 1fr;
     }
 
 }

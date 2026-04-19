@@ -53,7 +53,10 @@ public sealed partial class AislePilotService : IAislePilotService
     private const string MealImageChunksSubcollection = "chunks";
     private const int MaxMealImageMissCacheEntries = 2048;
     private const int MaxAiMealPoolEntries = 320;
-    private const int SupermarketLayoutCacheVersion = 2;
+    private const int SupermarketLayoutCacheVersion = 3;
+    private const int SupermarketPriceProfilesFileVersion = 1;
+    private const string DefaultSupermarketPriceProfilesFileName = "supermarket-price-profiles.v1.json";
+    private const string DefaultSupermarketPriceProfilesOutputDirectory = "AislePilotData";
     private const int SupermarketLayoutRefreshCooldownMinutes = 120;
     private const int SupermarketLayoutStaleDays = 30;
     private const decimal AiIngredientKnownUnitPriceMinFactor = 0.45m;
@@ -88,11 +91,14 @@ public sealed partial class AislePilotService : IAislePilotService
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> SupermarketLayoutLastAttemptUtc =
         new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, SupermarketPriceFileCacheEntry> SupermarketPriceFileCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImagePoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim DessertAddOnPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImageGenerationThrottle = new(1, 1);
     private static readonly SemaphoreSlim SupermarketLayoutRefreshLock = new(1, 1);
+    private static readonly SemaphoreSlim SupermarketPriceFileLoadLock = new(1, 1);
     private static readonly SemaphoreSlim AiMealWarmupLock = new(1, 1);
     private static DateTime? _lastAiMealPoolRefreshUtc;
     private static DateTime? _lastMealImagePoolRefreshUtc;
@@ -331,6 +337,11 @@ public sealed partial class AislePilotService : IAislePilotService
         "Aldi",
         "Lidl",
         "Asda",
+        "Morrisons",
+        "Waitrose",
+        "Co-op",
+        "Iceland",
+        "M&S Food",
         "Custom"
     ];
 
@@ -588,6 +599,31 @@ public sealed partial class AislePilotService : IAislePilotService
         ["Asda"] =
         [
             "Produce", "Bakery", "Meat & Fish", "Dairy & Eggs", "Frozen", "Tins & Dry Goods", "Spices & Sauces",
+            "Snacks", "Drinks", "Household", "Other"
+        ],
+        ["Morrisons"] =
+        [
+            "Produce", "Bakery", "Meat & Fish", "Dairy & Eggs", "Frozen", "Tins & Dry Goods", "Spices & Sauces",
+            "Snacks", "Drinks", "Household", "Other"
+        ],
+        ["Waitrose"] =
+        [
+            "Produce", "Bakery", "Meat & Fish", "Dairy & Eggs", "Frozen", "Tins & Dry Goods", "Spices & Sauces",
+            "Snacks", "Drinks", "Household", "Other"
+        ],
+        ["Co-op"] =
+        [
+            "Produce", "Bakery", "Dairy & Eggs", "Meat & Fish", "Frozen", "Tins & Dry Goods", "Spices & Sauces",
+            "Snacks", "Drinks", "Household", "Other"
+        ],
+        ["Iceland"] =
+        [
+            "Frozen", "Produce", "Bakery", "Dairy & Eggs", "Meat & Fish", "Tins & Dry Goods", "Spices & Sauces",
+            "Snacks", "Drinks", "Household", "Other"
+        ],
+        ["M&S Food"] =
+        [
+            "Produce", "Bakery", "Dairy & Eggs", "Meat & Fish", "Frozen", "Tins & Dry Goods", "Spices & Sauces",
             "Snacks", "Drinks", "Household", "Other"
         ]
     };
@@ -1025,6 +1061,7 @@ public sealed partial class AislePilotService : IAislePilotService
     private readonly bool _enableAiGeneration;
     private readonly bool _enableAiImageGeneration;
     private readonly bool _allowTemplateFallback;
+    private readonly string _supermarketPriceProfilesPath;
     private readonly FirestoreDb? _db;
     private readonly IWebHostEnvironment? _webHostEnvironment;
     private readonly IAislePilotPlanGenerationOrchestrator _planGenerationOrchestrator;
@@ -1067,6 +1104,7 @@ public sealed partial class AislePilotService : IAislePilotService
         _enableAiImageGeneration = !bool.TryParse(
             configuration?["AislePilot:EnableAiImageGeneration"],
             out var parsedImageGeneration) || parsedImageGeneration;
+        _supermarketPriceProfilesPath = configuration?["AislePilot:SupermarketPriceProfilesPath"] ?? string.Empty;
         _allowTemplateFallback =
             bool.TryParse(configuration?["AislePilot:AllowTemplateFallback"], out var allowTemplateFallback)
                 ? allowTemplateFallback

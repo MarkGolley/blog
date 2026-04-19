@@ -114,6 +114,20 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
+    public async Task Index_Get_UsesRecruiterFriendlyAislePilotMetaDescription()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var html = await client.GetStringAsync("/projects/aisle-pilot");
+
+        Assert.Contains(
+            "AislePilot: generate a weekly meal plan, track budget, and create a supermarket-ordered shopping list.",
+            html,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("AislePilot prototype", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Index_Post_RendersDayMealSummaryRowsWithinDayCardCarousel()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -1046,6 +1060,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Contains("Meal ingredient estimate", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("This estimate covers the ingredients used in these meals.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("It adjusts for your selected supermarket using stored public pricing data.", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Actual checkout can be higher if shops only sell larger packs or bags.", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(" - Est. ", html, StringComparison.OrdinalIgnoreCase);
     }

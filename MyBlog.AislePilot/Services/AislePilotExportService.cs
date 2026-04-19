@@ -477,6 +477,11 @@ public sealed class AislePilotExportService : IAislePilotExportService
         builder.AppendLine($"Supermarket: {result.Supermarket}");
         builder.AppendLine($"Portion size: {result.PortionSize}");
         builder.AppendLine($"{MealIngredientEstimateLabel}: {result.EstimatedTotalCost.ToString("C", ukCulture)}");
+        if (result.PriceInsight is not null && !string.IsNullOrWhiteSpace(result.PriceInsight.SourceLabel))
+        {
+            builder.AppendLine(
+                $"Store pricing: {result.PriceInsight.SourceLabel} ({AislePilotService.DescribeRelativePriceFactor(result.PriceInsight.RelativeCostFactor)})");
+        }
         builder.AppendLine(ShoppingEstimateDisclaimer);
         builder.AppendLine();
         builder.AppendLine($"Aisle order: {string.Join(" -> ", result.AisleOrderUsed)}");

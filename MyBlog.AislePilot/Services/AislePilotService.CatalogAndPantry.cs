@@ -436,6 +436,7 @@ public sealed partial class AislePilotService : IAislePilotService
         var normalizedPortionSize = NormalizePortionSize(request.PortionSize);
         var portionSizeFactor = ResolvePortionSizeFactor(normalizedPortionSize);
         var householdFactor = Math.Max(0.5m, request.HouseholdSize / 2m) * portionSizeFactor;
+        var priceFactor = ResolveSupermarketPriceProfile(request.Supermarket).RelativeCostFactor;
         var normalizedExcludedMealNames = (excludedMealNames ?? [])
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Select(name => name.Trim())
@@ -484,11 +485,13 @@ public sealed partial class AislePilotService : IAislePilotService
                 var suggestion = _pantryRankingEngine.BuildPantrySuggestion(
                     template,
                     pantryTokensWithAssumedBasics,
-                    householdFactor);
+                    householdFactor,
+                    priceFactor);
                 var userOnlySuggestion = _pantryRankingEngine.BuildPantrySuggestion(
                     template,
                     userPantryTokens,
-                    householdFactor);
+                    householdFactor,
+                    priceFactor);
                 var userMatchedTokenCount = _pantryRankingEngine.CountMatchedPantryTokens(template, userPantryTokens);
                 var specificMatchedTokenCount = _pantryRankingEngine.CountMatchedPantryTokens(template, specificPantryTokens);
                 var score = _pantryRankingEngine.ComputePantrySuggestionScore(
@@ -539,6 +542,7 @@ public sealed partial class AislePilotService : IAislePilotService
                 dietaryModes,
                 dislikesOrAllergens,
                 householdFactor,
+                priceFactor,
                 portionSizeFactor);
         }
 
@@ -614,6 +618,7 @@ public sealed partial class AislePilotService : IAislePilotService
             dietaryModes,
             dislikesOrAllergens,
             householdFactor,
+            priceFactor,
             portionSizeFactor);
     }
 
@@ -755,6 +760,7 @@ public sealed partial class AislePilotService : IAislePilotService
         IReadOnlyList<string> dietaryModes,
         string dislikesOrAllergens,
         decimal householdFactor,
+        decimal priceFactor,
         decimal portionSizeFactor)
     {
         if (suggestionsWithTemplate.Count == 0)
@@ -776,6 +782,7 @@ public sealed partial class AislePilotService : IAislePilotService
             ignoredMealSlotIndexes: new HashSet<int>(),
             mealImageUrls,
             householdFactor,
+            priceFactor,
             portionSizeFactor,
             dietaryModes,
             dislikesOrAllergens,

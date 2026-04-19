@@ -5,34 +5,61 @@
     ViewData["CanonicalPath"] = "/projects";
     var aislePilotPublicUrl = ViewData["AislePilotPublicUrl"]?.ToString() ?? string.Empty;
     var aislePilotLocalEnabled = ViewData["AislePilotLocalEnabled"] as bool? ?? true;
+    var aislePilotStatus = !string.IsNullOrWhiteSpace(aislePilotPublicUrl)
+        ? "Live beta"
+        : aislePilotLocalEnabled
+            ? "Working build"
+            : "In progress";
 }
 
 <section aria-labelledby="active-projects-title" data-reveal>
     <h2 id="active-projects-title">Active projects</h2>
-    <p class="section-intro">Current delivery and upcoming work.</p>
+    <p class="section-intro">Working products with clear proof points and near-term milestones.</p>
 
     <div class="case-template-grid">
         <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
         {
             Title = "AislePilot (Meal Planning + Shopping Flow)",
-            Status = "In progress",
+            Status = aislePilotStatus,
             OneLiner = "Turn weekly meal planning into an aisle-ordered shopping flow tailored to each supermarket.",
-            WhyItMatters = "Targets a real user pain point with a tangible mobile workflow and practical AI convenience.",
+            WhyItMatters = "Targets a real household planning problem with a tangible mobile workflow instead of an isolated AI demo.",
             TechnicalScope = new[]
             {
                 "Collect plan constraints: supermarket, budget, dietary mode, and dislikes/allergens.",
                 "Generate weekly meals with convenience-aware heuristics and budget checks.",
                 "Consolidate ingredients and sort shopping items by supermarket aisle order.",
-                "Provide a mobile-friendly shop mode checklist."
+                "Provide a mobile-friendly shop mode, saved state, and export flow."
             },
             ProofChecklist = new[]
             {
-                "End-to-end prototype page with real form submission and generated output.",
-                "Service tests for dietary filters, budget fit, and aisle ordering.",
-                "Demo recording of plan generation and in-store checklist flow.",
-                "Architecture note on AI usage, fallbacks, and scaling plan."
+                "Live end-to-end planner with generated meals, swaps, shopping, and exports.",
+                "Automated integration and Playwright coverage around key AislePilot flows.",
+                "Supermarket-specific layout and pricing metadata surfaced in the UI.",
+                "Saved week and saved meal flows that keep the product usable across sessions."
             },
-            WhatItShows = "Can build a useful AI-assisted product workflow, not just isolated model demos.",
+            BuildNotes = new[]
+            {
+                "Built as an ongoing product exercise alongside day-to-day engineering work, with the same emphasis on reliable delivery and clear scope control.",
+                "Deliberately keeps AI in a supporting role: planning flexibility improves, but deterministic fallbacks and explicit validation stay in place.",
+                "UI changes are tested at the rendered-output and browser levels so presentation polish does not depend on manual checking alone.",
+                "If usage grew materially, the next scaling step would be to keep the web tier stateless and move slower enrichment work such as image generation and metadata refresh into background workers and shared caches."
+            },
+            Screenshots = new[]
+            {
+                new CaseStudyScreenshotViewModel
+                {
+                    ImagePath = "~/images/portfolio/aislepilot-home.png",
+                    AltText = "AislePilot planner setup screen with household, plan rules, and summary sections.",
+                    Caption = "Planner setup focused on weekly constraints and a low-friction path to generation."
+                },
+                new CaseStudyScreenshotViewModel
+                {
+                    ImagePath = "~/images/portfolio/projects-overview.png",
+                    AltText = "Projects page showing the AislePilot project card in the wider site context.",
+                    Caption = "AislePilot positioned as one working product inside the broader engineering site."
+                }
+            },
+            WhatItShows = "Can turn AI assistance, business rules, and UX polish into a usable product workflow.",
             NextMilestone = "Add pricing provider integration and smarter pantry-aware substitutions.",
             CtaText = "Try AislePilot",
             CtaUrl = aislePilotPublicUrl,

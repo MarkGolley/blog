@@ -8,6 +8,8 @@ public class CaseStudyTemplateViewModel
     public string WhyItMatters { get; init; } = string.Empty;
     public IReadOnlyList<string> TechnicalScope { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> ProofChecklist { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> BuildNotes { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<CaseStudyScreenshotViewModel> Screenshots { get; init; } = Array.Empty<CaseStudyScreenshotViewModel>();
     public string WhatItShows { get; init; } = string.Empty;
     public string NextMilestone { get; init; } = string.Empty;
     public string CtaText { get; init; } = string.Empty;
@@ -15,4 +17,11 @@ public class CaseStudyTemplateViewModel
     public string CtaController { get; init; } = string.Empty;
     public string CtaAction { get; init; } = "Index";
     public string CtaIconPath { get; init; } = string.Empty;
+}
+
+public sealed class CaseStudyScreenshotViewModel
+{
+    public string ImagePath { get; init; } = string.Empty;
+    public string AltText { get; init; } = string.Empty;
+    public string Caption { get; init; } = string.Empty;
 }

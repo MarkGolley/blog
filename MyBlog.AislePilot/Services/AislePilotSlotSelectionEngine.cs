@@ -7,6 +7,7 @@ public sealed class AislePilotSlotSelectionEngine
         IReadOnlyList<string> dietaryModes,
         decimal weeklyBudget,
         decimal householdFactor,
+        decimal priceFactor,
         bool preferQuickMeals,
         string dislikesOrAllergens,
         int requestedMealCount,
@@ -46,7 +47,8 @@ public sealed class AislePilotSlotSelectionEngine
         var scoredCandidates = candidates
             .Select(template =>
             {
-                var scaledCost = template.BaseCostForTwo * householdFactor;
+                var scaledCost = template.BaseCostForTwo * householdFactor *
+                                 AislePilotService.NormalizeSupermarketPriceFactor(priceFactor);
                 var budgetDistance = Math.Abs(scaledCost - targetMealCost);
                 var quickPenalty = preferQuickMeals && !template.IsQuick ? 0.8m : 0m;
                 var highProteinPenalty =
@@ -115,6 +117,7 @@ public sealed class AislePilotSlotSelectionEngine
                 rotatedCandidates,
                 resolvedMealTypeSlots,
                 householdFactor,
+                priceFactor,
                 selectedSpecialTreatCookDayIndex);
             if (!treatApplied || !AislePilotService.HasSpecialTreatDinner(selected, resolvedMealTypeSlots))
             {

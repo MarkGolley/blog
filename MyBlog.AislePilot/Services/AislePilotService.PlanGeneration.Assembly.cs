@@ -155,13 +155,15 @@ public sealed partial class AislePilotService
         var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
         var portionSize = NormalizePortionSize(request.PortionSize);
         var portionSizeFactor = ResolvePortionSizeFactor(portionSize);
-        var aisleOrder = ResolveAisleOrder(supermarket, customAisleOrder);
+        var layout = ResolveSupermarketLayout(supermarket, customAisleOrder);
+        var priceProfile = ResolveSupermarketPriceProfile(supermarket);
         var householdFactor = Math.Max(0.5m, request.HouseholdSize / 2m) * portionSizeFactor;
 
         return new PlanContext(
             supermarket,
             dietaryModes,
-            aisleOrder,
+            layout,
+            priceProfile,
             householdFactor,
             dislikesOrAllergens,
             portionSize);
@@ -182,13 +184,15 @@ public sealed partial class AislePilotService
         var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
         var portionSize = NormalizePortionSize(request.PortionSize);
         var portionSizeFactor = ResolvePortionSizeFactor(portionSize);
-        var aisleOrder = await ResolveAisleOrderAsync(supermarket, customAisleOrder, cancellationToken);
+        var layout = await ResolveSupermarketLayoutAsync(supermarket, customAisleOrder, cancellationToken);
+        var priceProfile = ResolveSupermarketPriceProfile(supermarket);
         var householdFactor = Math.Max(0.5m, request.HouseholdSize / 2m) * portionSizeFactor;
 
         return new PlanContext(
             supermarket,
             dietaryModes,
-            aisleOrder,
+            layout,
+            priceProfile,
             householdFactor,
             dislikesOrAllergens,
             portionSize);
@@ -290,6 +294,7 @@ public sealed partial class AislePilotService
             ignoredMealSlotIndexes,
             mealImageUrls,
             context.HouseholdFactor,
+            context.PriceProfile.RelativeCostFactor,
             portionSizeFactor,
             context.DietaryModes,
             context.DislikesOrAllergens,
@@ -305,10 +310,14 @@ public sealed partial class AislePilotService
             mealPortionMultipliers,
             ignoredMealSlotIndexes,
             context.HouseholdFactor,
-            context.AisleOrder,
+            context.PriceProfile.RelativeCostFactor,
+            context.Layout.AisleOrder,
             dessertAddOnTemplate);
         var dessertAddOnCost = dessertAddOnTemplate is not null
-            ? CalculateDessertAddOnEstimatedCost(context.HouseholdFactor, dessertAddOnTemplate)
+            ? CalculateDessertAddOnEstimatedCost(
+                context.HouseholdFactor,
+                context.PriceProfile.RelativeCostFactor,
+                dessertAddOnTemplate)
             : 0m;
         var dessertAddOnName = dessertAddOnTemplate?.Name ?? string.Empty;
         var dessertAddOnIngredientLines = dessertAddOnTemplate is not null
@@ -357,7 +366,9 @@ public sealed partial class AislePilotService
             DessertAddOnEstimatedCost = dessertAddOnCost,
             DessertAddOnName = dessertAddOnName,
             DessertAddOnIngredientLines = dessertAddOnIngredientLines,
-            AisleOrderUsed = context.AisleOrder,
+            AisleOrderUsed = context.Layout.AisleOrder,
+            LayoutInsight = BuildLayoutInsightViewModel(context.Layout),
+            PriceInsight = BuildPriceInsightViewModel(context.PriceProfile),
             BudgetTips = budgetTips,
             MealPlan = dailyPlans,
             ShoppingItems = shoppingItems

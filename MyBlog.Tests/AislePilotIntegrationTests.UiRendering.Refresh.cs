@@ -201,6 +201,10 @@ public partial class AislePilotIntegrationTests
             "class=\"aislepilot-stat-card aislepilot-stat-card--meta\"",
             html,
             StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "class=\"aislepilot-stat-card aislepilot-stat-card--meta aislepilot-stat-card--supermarket\"",
+            html,
+            StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
                 @"<article class=""aislepilot-stat-card aislepilot-stat-card--status is-on-budget"">[\s\S]*?<p class=""aislepilot-stat-label"">Budget difference</p>",
@@ -223,6 +227,21 @@ public partial class AislePilotIntegrationTests
         Assert.Matches(
             new Regex(
                 @"@media\s*\(min-width:\s*68rem\)\s*\{[\s\S]*\.aislepilot-budget-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(12,\s*minmax\(0,\s*1fr\)\);",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*68rem\)\s*\{[\s\S]*\.aislepilot-budget-grid\s*\{[\s\S]*grid-auto-flow:\s*dense;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-budget-grid\s*>\s*\.aislepilot-stat-card\s*\{[\s\S]*align-self:\s*start;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-budget-grid\s*>\s*\.aislepilot-stat-card--supermarket\s*\{[\s\S]*grid-row:\s*span\s*2;",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(

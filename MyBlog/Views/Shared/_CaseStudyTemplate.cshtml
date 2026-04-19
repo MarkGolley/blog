@@ -16,6 +16,25 @@
                 <p>@Model.WhyItMatters</p>
             </div>
 
+            @if (Model.Screenshots.Count > 0)
+            {
+                <div class="case-block">
+                    <h4>Snapshots</h4>
+                    <div class="case-screenshot-grid">
+                        @foreach (var screenshot in Model.Screenshots)
+                        {
+                            <figure class="case-screenshot-card">
+                                <img src="@Url.Content(screenshot.ImagePath)" alt="@screenshot.AltText" loading="lazy" />
+                                @if (!string.IsNullOrWhiteSpace(screenshot.Caption))
+                                {
+                                    <figcaption>@screenshot.Caption</figcaption>
+                                }
+                            </figure>
+                        }
+                    </div>
+                </div>
+            }
+
             @if (Model.TechnicalScope.Count > 0)
             {
                 <div class="case-block">
@@ -35,6 +54,19 @@
                     <h4>Proof checklist</h4>
                     <ul class="case-list">
                         @foreach (var item in Model.ProofChecklist)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (Model.BuildNotes.Count > 0)
+            {
+                <div class="case-block">
+                    <h4>Build notes</h4>
+                    <ul class="case-list">
+                        @foreach (var item in Model.BuildNotes)
                         {
                             <li>@item</li>
                         }

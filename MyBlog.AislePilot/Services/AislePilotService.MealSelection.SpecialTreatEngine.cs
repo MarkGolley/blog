@@ -33,6 +33,7 @@ public sealed partial class AislePilotService
         IReadOnlyList<MealTemplate> candidateMeals,
         IReadOnlyList<string> resolvedMealTypeSlots,
         decimal householdFactor,
+        decimal priceFactor,
         int? selectedSpecialTreatCookDayIndex)
     {
         if (selectedMeals.Count == 0 || candidateMeals.Count == 0 || resolvedMealTypeSlots.Count == 0)
@@ -55,6 +56,7 @@ public sealed partial class AislePilotService
             selectedMeals,
             resolvedMealTypeSlots,
             householdFactor,
+            priceFactor,
             selectedSpecialTreatCookDayIndex);
         var currentDinnerMeal = selectedMeals[targetDinnerIndex];
         if (IsSpecialTreatMealCandidate(currentDinnerMeal))
@@ -82,7 +84,11 @@ public sealed partial class AislePilotService
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var dinnerCosts = dinnerSlotIndexes
-            .Select(index => CalculateScaledMealCost(selectedMeals[index], householdFactor, dayMultiplier: 1))
+            .Select(index => CalculateScaledMealCost(
+                selectedMeals[index],
+                householdFactor,
+                dayMultiplier: 1,
+                priceFactor: priceFactor))
             .ToList();
         var averageDinnerCost = dinnerCosts.Count == 0
             ? 0m
@@ -96,7 +102,7 @@ public sealed partial class AislePilotService
             .Select(meal => new
             {
                 Meal = meal,
-                Cost = CalculateScaledMealCost(meal, householdFactor, dayMultiplier: 1)
+                Cost = CalculateScaledMealCost(meal, householdFactor, dayMultiplier: 1, priceFactor: priceFactor)
             })
             .OrderByDescending(entry => entry.Cost)
             .ThenBy(entry => entry.Meal.IsQuick ? 1 : 0)
@@ -135,6 +141,7 @@ public sealed partial class AislePilotService
         IList<MealTemplate> selectedMeals,
         IReadOnlyList<string> resolvedMealTypeSlots,
         decimal householdFactor,
+        decimal priceFactor,
         int? selectedSpecialTreatCookDayIndex)
     {
         var preferredDinnerIndex = ResolvePreferredSpecialTreatDinnerIndex(
@@ -147,7 +154,11 @@ public sealed partial class AislePilotService
         }
 
         return dinnerSlotIndexes
-            .OrderBy(index => CalculateScaledMealCost(selectedMeals[index], householdFactor, dayMultiplier: 1))
+            .OrderBy(index => CalculateScaledMealCost(
+                selectedMeals[index],
+                householdFactor,
+                dayMultiplier: 1,
+                priceFactor: priceFactor))
             .ThenBy(index => index)
             .First();
     }
@@ -249,6 +260,7 @@ public sealed partial class AislePilotService
         MealTemplate specialTreatMeal,
         IReadOnlyList<string> mealTypeSlots,
         decimal householdFactor,
+        decimal priceFactor,
         int? selectedSpecialTreatCookDayIndex)
     {
         if (selectedMeals.Count == 0 || mealTypeSlots.Count == 0)
@@ -272,6 +284,7 @@ public sealed partial class AislePilotService
             selectedMeals,
             resolvedMealTypeSlots,
             householdFactor,
+            priceFactor,
             selectedSpecialTreatCookDayIndex);
 
         selectedMeals[targetDinnerIndex] = MarkMealAsSpecialTreat(EnsureMealTypeSuitability(specialTreatMeal));

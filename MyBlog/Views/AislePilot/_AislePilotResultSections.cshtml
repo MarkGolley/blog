@@ -1,6 +1,7 @@
 @using System.Globalization
 @using System.Text
 @using System.Text.Json
+@using MyBlog.Models
 @using MyBlog.Services
 @model AislePilotPageViewModel
 
@@ -108,12 +109,39 @@
         < 0m => $"{Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over",
         _ => "On budget"
     };
+    var layoutInsight = result.LayoutInsight ?? new AislePilotSupermarketLayoutInsightViewModel();
+    var layoutVerificationText = layoutInsight.LastVerifiedUtc.HasValue ? $"Checked {layoutInsight.LastVerifiedUtc.Value.ToLocalTime():MMM yyyy}" : "Chain default";
+    var layoutConfidenceText = string.IsNullOrWhiteSpace(layoutInsight.ConfidenceLabel) ? layoutVerificationText : $"{layoutInsight.ConfidenceLabel} confidence. {layoutVerificationText}";
+    var priceInsight = result.PriceInsight ?? new AislePilotSupermarketPriceInsightViewModel();
+    var normalizedPriceFactor = Math.Clamp(priceInsight.RelativeCostFactor, 0.75m, 1.35m);
+    var priceDeltaPercent = decimal.Round(Math.Abs((normalizedPriceFactor - 1m) * 100m), 0, MidpointRounding.AwayFromZero);
+    var priceAdjustmentText = priceDeltaPercent == 0m
+        ? "around Tesco baseline"
+        : normalizedPriceFactor > 1m
+            ? $"{priceDeltaPercent:0}% above Tesco baseline"
+            : $"{priceDeltaPercent:0}% below Tesco baseline";
+    var priceVerificationText = priceInsight.LastVerifiedUtc.HasValue ? $"Checked {priceInsight.LastVerifiedUtc.Value.ToLocalTime():MMM yyyy}" : "Standard basket";
+    var priceConfidenceText = string.IsNullOrWhiteSpace(priceInsight.ConfidenceLabel) ? priceVerificationText : $"{priceInsight.ConfidenceLabel} confidence. {priceVerificationText}";
+    var layoutSummary = string.IsNullOrWhiteSpace(layoutInsight.SourceLabel) ? null : $"{layoutInsight.SourceLabel}. {layoutConfidenceText}";
+    var layoutReviewSummary = layoutInsight.NeedsReview ? "Branch aisle order can vary. Use Custom if the order looks wrong." : null;
+    var supermarketPriceSummary = !string.IsNullOrWhiteSpace(priceInsight.SourceLabel)
+        ? $"{priceInsight.SourceLabel}. {priceAdjustmentText}. {priceConfidenceText}{(priceInsight.NeedsReview ? ". Stored public basket estimate." : string.Empty)}"
+        : priceInsight.NeedsReview
+            ? "Pricing is estimated from stored public basket data."
+            : null;
     var mealIngredientEstimateLabel = "Meal ingredient estimate";
-    var shoppingEstimateDisclaimer = "This estimate covers the ingredients used in these meals. Actual checkout can be higher if shops only sell larger packs or bags.";
+    var mealIngredientEstimateSummary = !string.IsNullOrWhiteSpace(priceInsight.RelativeCostBasis)
+        ? $"{priceAdjustmentText}. {priceInsight.RelativeCostBasis}. {priceVerificationText}."
+        : $"{priceAdjustmentText}. {priceVerificationText}.";
+    var shoppingEstimateDisclaimer = "This estimate covers the ingredients used in these meals. It adjusts for your selected supermarket using stored public pricing data. Actual checkout can be higher if shops only sell larger packs or bags.";
     var shoppingListNotesBuilder = new StringBuilder();
     shoppingListNotesBuilder.AppendLine("AislePilot Shopping List");
     shoppingListNotesBuilder.AppendLine($"Supermarket: {result.Supermarket}");
     shoppingListNotesBuilder.AppendLine($"{mealIngredientEstimateLabel}: {result.EstimatedTotalCost.ToString("C", ukCulture)}");
+    if (!string.IsNullOrWhiteSpace(priceInsight.SourceLabel))
+    {
+        shoppingListNotesBuilder.AppendLine($"Store pricing: {priceInsight.SourceLabel} ({priceAdjustmentText})");
+    }
     shoppingListNotesBuilder.AppendLine(shoppingEstimateDisclaimer);
     shoppingListNotesBuilder.AppendLine();
     foreach (var department in groupedItems)
@@ -354,9 +382,21 @@
                 </div>
             }
             <div class="aislepilot-budget-grid">
-                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta aislepilot-stat-card--supermarket">
                     <p class="aislepilot-stat-label">Supermarket</p>
                     <p class="aislepilot-stat-value">@result.Supermarket</p>
+                    @if (!string.IsNullOrWhiteSpace(layoutSummary))
+                    {
+                        <p class="aislepilot-card-meta">@layoutSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(layoutReviewSummary))
+                    {
+                        <p class="aislepilot-card-meta">@layoutReviewSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(supermarketPriceSummary))
+                    {
+                        <p class="aislepilot-card-meta">@supermarketPriceSummary</p>
+                    }
                 </article>
                 <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Portion size</p>
@@ -373,6 +413,7 @@
                 <article class="aislepilot-stat-card aislepilot-stat-card--featured">
                     <p class="aislepilot-stat-label">@mealIngredientEstimateLabel</p>
                     <p class="aislepilot-stat-value">@result.EstimatedTotalCost.ToString("C", ukCulture)</p>
+                    <p class="aislepilot-card-meta">@mealIngredientEstimateSummary</p>
                 </article>
                 <article class="aislepilot-stat-card aislepilot-stat-card--status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                     <p class="aislepilot-stat-label">Budget difference</p>

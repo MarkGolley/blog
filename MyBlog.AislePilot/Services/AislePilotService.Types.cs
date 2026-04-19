@@ -29,7 +29,8 @@ public sealed partial class AislePilotService
     internal sealed record PlanContext(
         string Supermarket,
         IReadOnlyList<string> DietaryModes,
-        IReadOnlyList<string> AisleOrder,
+        SupermarketLayoutResolution Layout,
+        SupermarketPriceResolution PriceProfile,
         decimal HouseholdFactor,
         string DislikesOrAllergens,
         string PortionSize);
@@ -152,10 +153,108 @@ public sealed partial class AislePilotService
         public List<string>? AisleOrder { get; set; }
     }
 
+    internal sealed class SupermarketLayoutResolution
+    {
+        public IReadOnlyList<string> AisleOrder { get; init; } = Array.Empty<string>();
+        public string SourceLabel { get; init; } = string.Empty;
+        public decimal ConfidenceScore { get; init; }
+        public string ConfidenceLabel { get; init; } = string.Empty;
+        public bool IsDefaultLayout { get; init; }
+        public bool NeedsReview { get; init; }
+        public DateTime? LastVerifiedUtc { get; init; }
+        public IReadOnlyList<SupermarketLayoutEvidence> Evidence { get; init; } = Array.Empty<SupermarketLayoutEvidence>();
+    }
+
+    internal sealed class SupermarketLayoutEvidence
+    {
+        public string Title { get; init; } = string.Empty;
+        public string Url { get; init; } = string.Empty;
+        public string SourceType { get; init; } = string.Empty;
+    }
+
+    internal sealed class SupermarketPriceResolution
+    {
+        public decimal RelativeCostFactor { get; init; } = 1m;
+        public string RelativeCostBasis { get; init; } = string.Empty;
+        public string SourceLabel { get; init; } = string.Empty;
+        public decimal ConfidenceScore { get; init; }
+        public string ConfidenceLabel { get; init; } = string.Empty;
+        public bool IsDirectBasketData { get; init; }
+        public bool NeedsReview { get; init; }
+        public DateTime? LastVerifiedUtc { get; init; }
+        public IReadOnlyList<SupermarketPriceEvidence> Evidence { get; init; } = Array.Empty<SupermarketPriceEvidence>();
+    }
+
+    internal sealed class SupermarketPriceEvidence
+    {
+        public string Title { get; init; } = string.Empty;
+        public string Url { get; init; } = string.Empty;
+        public string SourceType { get; init; } = string.Empty;
+    }
+
+    private sealed class SupermarketPriceProfilesFilePayload
+    {
+        public int? Version { get; set; }
+        public DateTime? ReviewedAtUtc { get; set; }
+        public string? Notes { get; set; }
+        public List<SupermarketPriceProfileFileEntry>? Profiles { get; set; }
+    }
+
+    private sealed class SupermarketPriceProfileFileEntry
+    {
+        public string? Supermarket { get; set; }
+        public decimal? RelativeCostFactor { get; set; }
+        public string? RelativeCostBasis { get; set; }
+        public string? SourceLabel { get; set; }
+        public decimal? ConfidenceScore { get; set; }
+        public string? ConfidenceLabel { get; set; }
+        public bool? IsDirectBasketData { get; set; }
+        public bool? NeedsReview { get; set; }
+        public DateTime? LastVerifiedUtc { get; set; }
+        public List<SupermarketPriceProfileFileEvidence>? Evidence { get; set; }
+    }
+
+    private sealed class SupermarketPriceProfileFileEvidence
+    {
+        public string? Title { get; set; }
+        public string? Url { get; set; }
+        public string? SourceType { get; set; }
+    }
+
+    private sealed class SupermarketPriceFileCacheEntry
+    {
+        public string Path { get; init; } = string.Empty;
+        public DateTime LastWriteUtc { get; init; }
+        public IReadOnlyDictionary<string, SupermarketPriceResolution> Profiles { get; init; } =
+            new Dictionary<string, SupermarketPriceResolution>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class SupermarketLayoutResearchPayload
+    {
+        public List<string>? AisleOrder { get; set; }
+        public decimal? ConfidenceScore { get; set; }
+        public string? ConfidenceLabel { get; set; }
+        public bool? NeedsReview { get; set; }
+        public List<SupermarketLayoutResearchSourcePayload>? Sources { get; set; }
+    }
+
+    private sealed class SupermarketLayoutResearchSourcePayload
+    {
+        public string? Title { get; set; }
+        public string? Url { get; set; }
+        public string? SourceType { get; set; }
+    }
+
     private sealed class SupermarketLayoutCacheEntry
     {
         public IReadOnlyList<string> AisleOrder { get; init; } = Array.Empty<string>();
         public DateTime UpdatedAtUtc { get; init; }
+        public string SourceLabel { get; init; } = string.Empty;
+        public decimal ConfidenceScore { get; init; }
+        public string ConfidenceLabel { get; init; } = string.Empty;
+        public bool IsDefaultLayout { get; init; }
+        public bool NeedsReview { get; init; }
+        public IReadOnlyList<SupermarketLayoutEvidence> Evidence { get; init; } = Array.Empty<SupermarketLayoutEvidence>();
     }
 
     [FirestoreData]
@@ -298,6 +397,34 @@ public sealed partial class AislePilotService
 
         [FirestoreProperty]
         public string Source { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public double ConfidenceScore { get; set; }
+
+        [FirestoreProperty]
+        public string ConfidenceLabel { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public bool NeedsReview { get; set; }
+
+        [FirestoreProperty]
+        public bool IsDefaultLayout { get; set; }
+
+        [FirestoreProperty]
+        public List<FirestoreAislePilotSupermarketLayoutEvidence> Evidence { get; set; } = [];
+    }
+
+    [FirestoreData]
+    private sealed class FirestoreAislePilotSupermarketLayoutEvidence
+    {
+        [FirestoreProperty]
+        public string Title { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public string Url { get; set; } = string.Empty;
+
+        [FirestoreProperty]
+        public string SourceType { get; set; } = string.Empty;
     }
 
     private sealed class OpenAiImageGenerationResponse

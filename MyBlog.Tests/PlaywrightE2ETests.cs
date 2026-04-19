@@ -924,12 +924,38 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             throw new InvalidOperationException("App host is not initialized.");
         }
 
-        await page.GotoAsync($"{_appHost.BaseUrl}/blog");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.GotoAsync(
+            $"{_appHost.BaseUrl}/blog",
+            new PageGotoOptions
+            {
+                WaitUntil = WaitUntilState.DOMContentLoaded
+            });
 
-        var firstPostLink = page.Locator("main a[href^='/blog/']").First;
+        var postTitleLinks = page.Locator("main .post-title-link");
+        await postTitleLinks.First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var firstPostLink = postTitleLinks.First;
+        var firstPostPath = await firstPostLink.GetAttributeAsync("href");
+        Assert.False(string.IsNullOrWhiteSpace(firstPostPath), "Expected first blog post link to have an href.");
         await firstPostLink.ClickAsync();
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.WaitForURLAsync($"**{firstPostPath}", new PageWaitForURLOptions
+        {
+            Timeout = 15000
+        });
+        await page.Locator("#post-title").WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+        await page.Locator("#add-comment-title").WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
     }
 
     private async Task GoToAislePilotAndGeneratePlanAsync(IPage page)
