@@ -427,6 +427,107 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Desktop_AislePilotDayCarousel_ExpandedMealCardDoesNotStretchPreviewSlides()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var thursdayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='3']").First;
+        await thursdayPill.ClickAsync();
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                return activeIndex === 3;
+            }
+            """);
+
+        var imageSummary = page.Locator("[data-day-card-slide][aria-hidden='false'] .aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary").First;
+        var previewTopsBeforeExpand = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const previousSlide = slides[activeIndex - 1];
+                const nextSlide = slides[activeIndex + 1];
+                if (!(previousSlide instanceof HTMLElement) || !(nextSlide instanceof HTMLElement)) {
+                    return [];
+                }
+
+                return [
+                    previousSlide.getBoundingClientRect().top,
+                    nextSlide.getBoundingClientRect().top
+                ];
+            }
+            """);
+        Assert.Equal(2, previewTopsBeforeExpand.Length);
+
+        await imageSummary.ClickAsync();
+
+        var expandedState = await page.WaitForFunctionAsync(
+            """
+            () => {
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeSlide = slides[activeIndex];
+                const previousSlide = slides[activeIndex - 1];
+                const nextSlide = slides[activeIndex + 1];
+                if (!(activeSlide instanceof HTMLElement)
+                    || !(previousSlide instanceof HTMLElement)
+                    || !(nextSlide instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const detailsToggle = activeSlide.querySelector("[data-inline-details-toggle]");
+                const detailsPanel = activeSlide.querySelector("[data-inline-details-panel]");
+                if (!(detailsToggle instanceof HTMLDetailsElement)
+                    || !(detailsPanel instanceof HTMLElement)
+                    || !detailsToggle.open
+                    || detailsPanel.hasAttribute("hidden")
+                    || detailsPanel.getAttribute("aria-hidden") !== "false") {
+                    return false;
+                }
+
+                const activeRect = activeSlide.getBoundingClientRect();
+                const previousRect = previousSlide.getBoundingClientRect();
+                const nextRect = nextSlide.getBoundingClientRect();
+
+                return {
+                    activeHeight: activeRect.height,
+                    previousHeight: previousRect.height,
+                    nextHeight: nextRect.height,
+                    previousTop: previousRect.top,
+                    nextTop: nextRect.top
+                };
+            }
+            """);
+
+        var expandedMetrics = await expandedState.JsonValueAsync<ExpandedCarouselSlideMetrics>();
+        Assert.NotNull(expandedMetrics);
+        Assert.True(expandedMetrics!.ActiveHeight > expandedMetrics.PreviousHeight + 40);
+        Assert.True(expandedMetrics.ActiveHeight > expandedMetrics.NextHeight + 40);
+        Assert.True(Math.Abs(expandedMetrics.PreviousHeight - expandedMetrics.NextHeight) < 24);
+        Assert.True(Math.Abs(expandedMetrics.PreviousTop - previewTopsBeforeExpand[0]) < 2.5);
+        Assert.True(Math.Abs(expandedMetrics.NextTop - previewTopsBeforeExpand[1]) < 2.5);
+    }
+
+    private sealed record ExpandedCarouselSlideMetrics(
+        double ActiveHeight,
+        double PreviousHeight,
+        double NextHeight,
+        double PreviousTop,
+        double NextTop);
+
+    [Fact]
     public async Task Desktop_AislePilotSupermarketSelection_PersistsAcrossFreshVisit()
     {
         if (!IsE2EEnabled())

@@ -2770,7 +2770,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-day-carousel-track {
     display: flex;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 1.1rem;
     width: max-content;
     transform-style: preserve-3d;
@@ -2940,7 +2940,7 @@ html.aislepilot-restore-pending .aislepilot-app {
         inset 0 1px 0 rgba(255, 255, 255, 0.88);
     scroll-margin-inline: 1rem;
     transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-    transform-origin: center center;
+    transform-origin: center top;
     transform-style: preserve-3d;
     backface-visibility: hidden;
     will-change: transform, opacity;
@@ -3066,14 +3066,14 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="far"] {
     opacity: 0.02;
-    transform: perspective(1500px) translate3d(0, 0.5rem, -180px) scale(0.84);
+    transform: perspective(1500px) translate3d(0, 0, -180px) scale(0.84);
     filter: saturate(0.56) brightness(0.78);
     z-index: 1;
 }
 
 .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] {
     opacity: 0.38;
-    transform: perspective(1800px) translate3d(0.38rem, 0.22rem, -88px) rotateY(8deg) scale(0.92);
+    transform: perspective(1800px) translate3d(0.38rem, 0, -88px) rotateY(8deg) scale(0.92);
     box-shadow: 0 12px 20px rgba(10, 26, 44, 0.06);
     filter: saturate(0.55) brightness(0.82);
     z-index: 2;
@@ -3087,7 +3087,7 @@ html.aislepilot-restore-pending .aislepilot-app {
 
 .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] {
     opacity: 0.38;
-    transform: perspective(1800px) translate3d(-0.38rem, 0.22rem, -88px) rotateY(-8deg) scale(0.92);
+    transform: perspective(1800px) translate3d(-0.38rem, 0, -88px) rotateY(-8deg) scale(0.92);
     box-shadow: 0 12px 20px rgba(10, 26, 44, 0.06);
     filter: saturate(0.55) brightness(0.82);
     z-index: 2;

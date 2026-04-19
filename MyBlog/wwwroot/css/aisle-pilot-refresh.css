@@ -1119,20 +1119,20 @@
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="far"] {
         opacity: 0.06;
-        transform: perspective(1500px) translate3d(0, 0.35rem, -150px) scale(0.88);
+        transform: perspective(1500px) translate3d(0, 0, -150px) scale(0.88);
         filter: saturate(0.68) brightness(0.86);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] {
         opacity: 0.62;
-        transform: perspective(1800px) translate3d(0.24rem, 0.18rem, -70px) rotateY(6deg) scale(0.95);
+        transform: perspective(1800px) translate3d(0.24rem, 0, -70px) rotateY(6deg) scale(0.95);
         box-shadow: 0 16px 28px rgba(10, 26, 44, 0.08);
         filter: saturate(0.78) brightness(0.94);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] {
         opacity: 0.62;
-        transform: perspective(1800px) translate3d(-0.24rem, 0.18rem, -70px) rotateY(-6deg) scale(0.95);
+        transform: perspective(1800px) translate3d(-0.24rem, 0, -70px) rotateY(-6deg) scale(0.95);
         box-shadow: 0 16px 28px rgba(10, 26, 44, 0.08);
         filter: saturate(0.78) brightness(0.94);
     }
