@@ -296,7 +296,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardSwipe_OnMealImageKeepsMealSlotAndDisablesHorizontalPan()
+    public async Task Mobile_AislePilotDayCardSwipe_OnMealImageAdvancesDayCarouselAndKeepsMealSlot()
     {
         if (!IsE2EEnabled())
         {
@@ -344,18 +344,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(tabCount >= 2, "Expected at least two meal tabs on the swipe target card.");
         Assert.True(activeIndexBeforeSwipe >= 0, "Expected one active meal panel before swiping.");
 
-        var touchAction = await swipeSurface.EvaluateAsync<string>(
-            """
-            swipeRoot => {
-                if (!(swipeRoot instanceof HTMLElement)) {
-                    return "";
-                }
-
-                return window.getComputedStyle(swipeRoot).touchAction || "";
-            }
-            """);
-        Assert.DoesNotContain("pan-x", touchAction, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("pan-y", touchAction, StringComparison.OrdinalIgnoreCase);
+        var carouselStatusBeforeSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
 
         var swipeDispatched = await swipeSurface.EvaluateAsync<bool>(
             """
@@ -399,7 +388,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             }
             """);
         Assert.True(swipeDispatched, "Expected to dispatch a swipe gesture on the meal image.");
-        await page.WaitForTimeoutAsync(100);
+        await page.WaitForTimeoutAsync(220);
 
         var activeIndexAfterSwipe = await card.EvaluateAsync<int>(
             """
@@ -412,8 +401,13 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 return panels.findIndex(panel => panel instanceof HTMLElement && panel.getAttribute("aria-hidden") !== "true");
             }
             """);
+        var sourceCardHiddenAfterSwipe = await card.GetAttributeAsync("aria-hidden");
 
         Assert.Equal(activeIndexBeforeSwipe, activeIndexAfterSwipe);
+        Assert.Equal("true", sourceCardHiddenAfterSwipe);
+
+        var carouselStatusAfterSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
+        Assert.NotEqual(carouselStatusBeforeSwipe, carouselStatusAfterSwipe);
     }
 
     [Fact]
@@ -509,7 +503,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(afterIndex >= 0, "Expected one active meal panel after swiping.");
         Assert.Equal(beforeIndex, afterIndex);
 
-        await page.WaitForTimeoutAsync(100);
+        await page.WaitForTimeoutAsync(220);
 
         var activePanelAfterSwipe = await page.EvaluateAsync<string>(
             """
@@ -521,7 +515,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal("aislepilot-meals", activePanelAfterSwipe);
 
         var carouselStatusAfterSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
-        Assert.Equal(carouselStatusBeforeSwipe, carouselStatusAfterSwipe);
+        Assert.NotEqual(carouselStatusBeforeSwipe, carouselStatusAfterSwipe);
     }
 
     [Fact]

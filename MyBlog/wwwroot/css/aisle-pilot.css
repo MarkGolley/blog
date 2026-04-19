@@ -2787,6 +2787,8 @@ html.aislepilot-restore-pending .aislepilot-app {
     justify-content: center;
     gap: 0.38rem;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pinch-zoom;
     padding: 0.28rem;
     margin-inline: auto;
     width: min(100%, calc(var(--ap-day-card-slide-width) - 3rem));

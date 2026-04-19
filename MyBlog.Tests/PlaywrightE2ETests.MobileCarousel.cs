@@ -5,6 +5,91 @@ namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
     [Fact]
+    public async Task Mobile_AislePilotDayCarousel_PaginationSwipeDoesNotSwitchToShoppingPanel()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var pagination = page.Locator("[data-day-carousel-pagination]").First;
+        await pagination.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var activePanelBeforeSwipe = await page.EvaluateAsync<string>(
+            """
+            () => {
+                const activePanel = document.querySelector(".aislepilot-window-panel[aria-hidden='false']");
+                return activePanel instanceof HTMLElement ? (activePanel.id || "") : "";
+            }
+            """);
+        Assert.Equal("aislepilot-meals", activePanelBeforeSwipe);
+
+        var carouselStatusBeforeSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
+
+        var swipeState = await pagination.EvaluateAsync<object[]>(
+            """
+            paginationRoot => {
+                if (!(paginationRoot instanceof HTMLElement)) {
+                    return [0, ""];
+                }
+
+                const overflowWidth = paginationRoot.scrollWidth - paginationRoot.clientWidth;
+                const rect = paginationRoot.getBoundingClientRect();
+                if (overflowWidth <= 8 || rect.width < 100 || rect.height < 20) {
+                    return [overflowWidth, window.getComputedStyle(paginationRoot).touchAction || ""];
+                }
+
+                const edgeInset = Math.min(36, rect.width * 0.18);
+                const startX = rect.right - edgeInset;
+                const endX = rect.left + edgeInset;
+                const y = rect.top + (rect.height / 2);
+
+                const createTouchEvent = (type, x, touchY) => {
+                    const event = new Event(type, { bubbles: true, cancelable: true });
+                    Object.defineProperty(event, "changedTouches", {
+                        configurable: true,
+                        value: [{ clientX: x, clientY: touchY }]
+                    });
+                    return event;
+                };
+
+                paginationRoot.dispatchEvent(createTouchEvent("touchstart", startX, y));
+                paginationRoot.dispatchEvent(createTouchEvent("touchmove", ((startX + endX) / 2), y));
+                paginationRoot.dispatchEvent(createTouchEvent("touchend", endX, y));
+
+                return [overflowWidth, window.getComputedStyle(paginationRoot).touchAction || ""];
+            }
+            """);
+
+        Assert.Equal(2, swipeState.Length);
+        Assert.True(Convert.ToDouble(swipeState[0]) > 8d, $"Expected the day pill strip to overflow on mobile. Overflow={swipeState[0]}.");
+        Assert.Contains("pan-x", Convert.ToString(swipeState[1]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        await page.WaitForTimeoutAsync(150);
+
+        var activePanelAfterSwipe = await page.EvaluateAsync<string>(
+            """
+            () => {
+                const activePanel = document.querySelector(".aislepilot-window-panel[aria-hidden='false']");
+                return activePanel instanceof HTMLElement ? (activePanel.id || "") : "";
+            }
+            """);
+        Assert.Equal("aislepilot-meals", activePanelAfterSwipe);
+
+        var carouselStatusAfterSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
+        Assert.Equal(carouselStatusBeforeSwipe, carouselStatusAfterSwipe);
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotDayCarousel_DayPillJumpsToRequestedDayAndKeepsSlideCentered()
     {
         if (!IsE2EEnabled())

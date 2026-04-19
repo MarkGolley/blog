@@ -2678,7 +2678,7 @@
     let currentIndex = 0;
     let touchStartX = 0;
     let touchStartY = 0;
-    let viewportSwipeStartedInsideDayMealCard = false;
+    let viewportSwipeStartedInsideProtectedRegion = false;
     let activePanelResizeObserver = null;
 
     const hideTabHint = () => {
@@ -2938,13 +2938,13 @@
         });
     };
 
-    const isEventWithinDayMealCard = event => {
-        if (!(event instanceof Event)) {
+    const isEventWithinSelector = (event, selector) => {
+        if (!(event instanceof Event) || typeof selector !== "string" || selector.length === 0) {
             return false;
         }
 
         const target = event.target;
-        if (target instanceof Element && target.closest("[data-day-meal-card]")) {
+        if (target instanceof Element && target.closest(selector)) {
             return true;
         }
 
@@ -2953,8 +2953,11 @@
         }
 
         const eventPath = event.composedPath();
-        return eventPath.some(node => node instanceof Element && node.hasAttribute("data-day-meal-card"));
+        return eventPath.some(node => node instanceof Element && (node.matches(selector) || node.closest(selector)));
     };
+
+    const isEventWithinDayMealCard = event => isEventWithinSelector(event, "[data-day-meal-card]");
+    const isEventWithinDayCarouselPagination = event => isEventWithinSelector(event, "[data-day-carousel-pagination]");
 
     const scrollInstantly = (x, y) => {
         const rootElement = document.documentElement;
@@ -5485,6 +5488,93 @@
                 updateViewportHeight(true);
             };
 
+            const navigateBySwipeDelta = deltaX => {
+                const slides = getSlides();
+                if (slides.length <= 1 || Math.abs(deltaX) < 48) {
+                    return false;
+                }
+
+                if (deltaX < 0) {
+                    const isWrapping = activeIndex === slides.length - 1;
+                    const nextWrappedIndex = isWrapping ? 0 : activeIndex + 1;
+                    scrollToIndex(nextWrappedIndex, isWrapping ? "auto" : "smooth", "next");
+                    return true;
+                }
+
+                const isWrapping = activeIndex === 0;
+                const previousIndex = isWrapping ? slides.length - 1 : activeIndex - 1;
+                scrollToIndex(previousIndex, isWrapping ? "auto" : "smooth", "prev");
+                return true;
+            };
+
+            const wireMealImageSwipeSurface = swipeSurface => {
+                if (!(swipeSurface instanceof HTMLElement) || swipeSurface.dataset.dayMealSwipeSurfaceWired === "true") {
+                    return;
+                }
+
+                swipeSurface.dataset.dayMealSwipeSurfaceWired = "true";
+                let touchStartX = 0;
+                let touchStartY = 0;
+                let suppressClickUntil = 0;
+
+                swipeSurface.addEventListener("touchstart", event => {
+                    const touch = event.changedTouches[0];
+                    if (!touch) {
+                        return;
+                    }
+
+                    touchStartX = touch.clientX;
+                    touchStartY = touch.clientY;
+                }, { passive: true });
+
+                swipeSurface.addEventListener("touchmove", event => {
+                    const touch = event.changedTouches[0];
+                    if (!touch) {
+                        return;
+                    }
+
+                    const deltaX = touch.clientX - touchStartX;
+                    const deltaY = touch.clientY - touchStartY;
+                    if (Math.abs(deltaX) >= 12 && Math.abs(deltaX) > Math.abs(deltaY)) {
+                        event.preventDefault();
+                    }
+                }, { passive: false });
+
+                swipeSurface.addEventListener("touchend", event => {
+                    const touch = event.changedTouches[0];
+                    if (!touch) {
+                        return;
+                    }
+
+                    const deltaX = touch.clientX - touchStartX;
+                    const deltaY = touch.clientY - touchStartY;
+                    if (Math.abs(deltaX) <= Math.abs(deltaY)) {
+                        return;
+                    }
+
+                    const didNavigate = navigateBySwipeDelta(deltaX);
+                    if (!didNavigate) {
+                        return;
+                    }
+
+                    suppressClickUntil = Date.now() + 400;
+                    event.preventDefault();
+                    event.stopPropagation();
+                }, { passive: false });
+
+                swipeSurface.addEventListener("touchcancel", () => {
+                    touchStartX = 0;
+                    touchStartY = 0;
+                }, { passive: true });
+
+                swipeSurface.addEventListener("click", event => {
+                    if (Date.now() <= suppressClickUntil) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                });
+            };
+
             const findClosestSlideIndex = () => {
                 const slides = getSlides();
                 if (slides.length === 0) {
@@ -5578,6 +5668,8 @@
                     scrollToIndex(targetIndex, "smooth", "jump");
                 });
             });
+
+            Array.from(carousel.querySelectorAll("[data-day-meal-swipe-surface]")).forEach(wireMealImageSwipeSurface);
 
             ensureGhostSlides();
             const initialSlides = getSlides();
@@ -6504,7 +6596,9 @@
     startMealImagePolling();
 
     viewport.addEventListener("touchstart", event => {
-        viewportSwipeStartedInsideDayMealCard = isEventWithinDayMealCard(event);
+        viewportSwipeStartedInsideProtectedRegion =
+            isEventWithinDayMealCard(event) ||
+            isEventWithinDayCarouselPagination(event);
         const touch = event.changedTouches[0];
         if (!touch) {
             return;
@@ -6515,12 +6609,12 @@
     }, { passive: true });
 
     viewport.addEventListener("touchend", event => {
-        if (viewportSwipeStartedInsideDayMealCard) {
-            viewportSwipeStartedInsideDayMealCard = false;
+        if (viewportSwipeStartedInsideProtectedRegion) {
+            viewportSwipeStartedInsideProtectedRegion = false;
             return;
         }
 
-        viewportSwipeStartedInsideDayMealCard = false;
+        viewportSwipeStartedInsideProtectedRegion = false;
         const touch = event.changedTouches[0];
         if (!touch) {
             return;
@@ -6543,7 +6637,7 @@
     }, { passive: true });
 
     viewport.addEventListener("touchcancel", () => {
-        viewportSwipeStartedInsideDayMealCard = false;
+        viewportSwipeStartedInsideProtectedRegion = false;
     }, { passive: true });
 
     window.addEventListener("resize", () => {
