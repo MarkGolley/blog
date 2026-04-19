@@ -146,6 +146,11 @@ public sealed partial class AislePilotService
     {
         var supermarket = NormalizeSupermarket(request.Supermarket);
         var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
+        if (!TryValidateNormalizedDietaryModes(dietaryModes, out var dietaryValidationMessage))
+        {
+            throw new InvalidOperationException(dietaryValidationMessage);
+        }
+
         var customAisleOrder = request.CustomAisleOrder ?? string.Empty;
         var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
         var portionSize = NormalizePortionSize(request.PortionSize);
@@ -168,6 +173,11 @@ public sealed partial class AislePilotService
     {
         var supermarket = NormalizeSupermarket(request.Supermarket);
         var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
+        if (!TryValidateNormalizedDietaryModes(dietaryModes, out var dietaryValidationMessage))
+        {
+            throw new InvalidOperationException(dietaryValidationMessage);
+        }
+
         var customAisleOrder = request.CustomAisleOrder ?? string.Empty;
         var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
         var portionSize = NormalizePortionSize(request.PortionSize);

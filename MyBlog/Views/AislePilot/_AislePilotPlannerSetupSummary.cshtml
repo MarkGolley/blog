@@ -1,0 +1,35 @@
+@model AislePilotPlannerSetupSummaryViewModel
+<p class="aislepilot-setup-summary-kicker">Plan snapshot</p>
+<h3 id="aislepilot-setup-summary-title" class="aislepilot-setup-summary-title">Ready to generate</h3>
+<p class="aislepilot-setup-summary-copy">This summary updates as you change the setup, so you can see the shape of the week before generating it.</p>
+<dl class="aislepilot-setup-summary-list">
+    <div class="aislepilot-setup-summary-item">
+        <dt>Cooking for</dt>
+        <dd>@Model.ServingSummaryText</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Dietary</dt>
+        <dd>@Model.DietarySummaryText</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Store</dt>
+        <dd>@Model.SelectedSupermarketLabel</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Meal slots</dt>
+        <dd>@Model.MealTypesSummaryText</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Plan length</dt>
+        <dd>@Model.PlanLengthText</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Budget</dt>
+        <dd>@Model.BudgetText</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Extras</dt>
+        <dd>@Model.SpecialOptionsSummaryText</dd>
+    </div>
+</dl>
+<p class="aislepilot-setup-summary-note">Generate the plan when the budget, meal cadence, and extras look right.</p>

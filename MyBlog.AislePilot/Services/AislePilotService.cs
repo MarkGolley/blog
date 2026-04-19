@@ -340,6 +340,28 @@ public sealed partial class AislePilotService : IAislePilotService
         "Pescatarian",
         "Gluten-Free"
     ];
+    private static readonly string[] SupportedDietaryCoreModes =
+    [
+        "Balanced",
+        "Vegetarian",
+        "Vegan",
+        "Pescatarian"
+    ];
+    private static readonly string[] SupportedDietaryOverlayModes =
+    [
+        "High-Protein",
+        "Gluten-Free"
+    ];
+    private static readonly AislePilotDietarySelectionRules DietarySelectionRules = new()
+    {
+        MaxSelections = 2,
+        HelperText =
+            "Choose up to 2. Balanced, Vegetarian, Vegan, and Pescatarian replace each other. High-Protein and Gluten-Free can pair with one other option.",
+        MaxSelectionsMessage =
+            "Choose up to 2 dietary options. Balanced, Vegetarian, Vegan, and Pescatarian replace each other.",
+        CoreModes = SupportedDietaryCoreModes,
+        OverlayModes = SupportedDietaryOverlayModes
+    };
     private static readonly string[] SupportedAiMealTags =
     [
         .. SupportedDietaryModes,

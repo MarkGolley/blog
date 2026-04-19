@@ -71,7 +71,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task ExportChecklist_NoCompatibleMeals_ReturnsBadRequestValidationProblem()
+    public async Task ExportChecklist_WithConflictingCoreDietaryModes_ReturnsBadRequestValidationProblem()
     {
         using var client = CreateClient(allowAutoRedirect: false);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -93,7 +93,34 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("No meals match your dietary modes", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("can't be combined", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExportChecklist_WithMoreThanTwoDietaryModes_ReturnsBadRequestValidationProblem()
+    {
+        using var client = CreateClient(allowAutoRedirect: false);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        var formValues = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "High-Protein"),
+            new("Request.DietaryModes", "Pescatarian"),
+            new("Request.DietaryModes", "Gluten-Free"),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/export/checklist", new FormUrlEncodedContent(formValues));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Choose up to 2 dietary options", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -811,9 +838,8 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("2 day(s)", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-mobile-context-meta-values\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Matches(
-            "data-overview-content(?:\\s+[^>]*)?\\s+hidden|hidden(?:\\s+[^>]*)?\\s+data-overview-content",
-            html);
+        Assert.Contains("Plan snapshot", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-overview-content hidden", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

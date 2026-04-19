@@ -32,6 +32,16 @@ public sealed partial class AislePilotService : IAislePilotService
         return SupportedDietaryModes;
     }
 
+    public AislePilotDietarySelectionRules GetDietarySelectionRules()
+    {
+        return DietarySelectionRules;
+    }
+
+    public bool TryValidateDietaryModes(IReadOnlyList<string>? dietaryModes, out string errorMessage)
+    {
+        return TryValidateNormalizedDietaryModes(NormalizeDietaryModes(dietaryModes), out errorMessage);
+    }
+
     public bool CanGenerateMealImages()
     {
         return _enableAiGeneration &&
@@ -356,6 +366,11 @@ public sealed partial class AislePilotService : IAislePilotService
     public bool HasCompatibleMeals(AislePilotRequestModel request)
     {
         var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
+        if (!TryValidateNormalizedDietaryModes(dietaryModes, out _))
+        {
+            return false;
+        }
+
         var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
         var mealTypeSlots = BuildMealTypeSlots(request);
         var templateCandidates = FilterMeals(dietaryModes, dislikesOrAllergens)
@@ -412,6 +427,11 @@ public sealed partial class AislePilotService : IAislePilotService
         string? generationNonce = null)
     {
         var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
+        if (!TryValidateNormalizedDietaryModes(dietaryModes, out var dietaryValidationMessage))
+        {
+            throw new InvalidOperationException(dietaryValidationMessage);
+        }
+
         var dislikesOrAllergens = request.DislikesOrAllergens ?? string.Empty;
         var normalizedPortionSize = NormalizePortionSize(request.PortionSize);
         var portionSizeFactor = ResolvePortionSizeFactor(normalizedPortionSize);
@@ -789,6 +809,35 @@ public sealed partial class AislePilotService : IAislePilotService
     {
         var selected = SupportedPortionSizes.FirstOrDefault(x => x.Equals(value, StringComparison.OrdinalIgnoreCase));
         return selected ?? "Medium";
+    }
+
+    private static bool TryValidateNormalizedDietaryModes(
+        IReadOnlyList<string> dietaryModes,
+        out string errorMessage)
+    {
+        if (dietaryModes.Count > DietarySelectionRules.MaxSelections)
+        {
+            errorMessage = DietarySelectionRules.MaxSelectionsMessage;
+            return false;
+        }
+
+        var selectedCoreModes = dietaryModes
+            .Where(IsCoreDietaryMode)
+            .ToList();
+        if (selectedCoreModes.Count > 1)
+        {
+            errorMessage =
+                $"{selectedCoreModes[0]} can't be combined with {selectedCoreModes[1]}. Pick one core style, then optionally add High-Protein or Gluten-Free.";
+            return false;
+        }
+
+        errorMessage = string.Empty;
+        return true;
+    }
+
+    private static bool IsCoreDietaryMode(string mode)
+    {
+        return SupportedDietaryCoreModes.Contains(mode, StringComparer.OrdinalIgnoreCase);
     }
 
     private static decimal ResolvePortionSizeFactor(string portionSize)

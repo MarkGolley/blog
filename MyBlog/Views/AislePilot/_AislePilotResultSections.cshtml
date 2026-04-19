@@ -215,24 +215,10 @@
     <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-reveal>
         <div class="aislepilot-section-head aislepilot-overview-head">
             <div class="aislepilot-overview-title-row">
-                <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Overview</h2>
-                <button
-                    type="button"
-                    class="aislepilot-overview-toggle-btn is-icon-only"
-                    data-overview-toggle
-                    aria-controls="aislepilot-overview-content"
-                    aria-expanded="false"
-                    aria-label="Expand overview"
-                    title="Expand overview">
-                    <span class="aislepilot-btn-label">
-                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" focusable="false">
-                                <path d="m6 9 6 6 6-6"></path>
-                            </svg>
-                        </span>
-                        <span class="sr-only">Expand overview</span>
-                    </span>
-                </button>
+                <div>
+                    <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Plan snapshot</h2>
+                    <p class="aislepilot-overview-caption">Budget, spend, and weekly structure at a glance.</p>
+                </div>
             </div>
             <div class="aislepilot-overview-actions">
                 <div class="aislepilot-overview-actions-inline">
@@ -242,7 +228,7 @@
                                  model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                         <input type="hidden" name="forceRefreshWeek" value="true" />
                         <button type="submit"
-                                class="aislepilot-overview-regenerate-btn"
+                                class="aislepilot-overview-regenerate-btn is-secondary"
                                 data-loading-label="Refreshing plan..."
                                 data-show-plan-skeleton
                                 aria-label="Refresh plan"
@@ -263,7 +249,7 @@
                         <partial name="_AislePilotHiddenRequestFields"
                                  model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                         <button type="submit"
-                                class="aislepilot-overview-regenerate-btn"
+                                class="aislepilot-overview-regenerate-btn is-secondary"
                                 data-loading-label="Saving week...">
                             <span class="aislepilot-btn-label">
                                 <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -277,28 +263,6 @@
                             </span>
                         </button>
                     </form>
-                    <button
-                        type="button"
-                        class="aislepilot-overview-regenerate-btn aislepilot-edit-setup-btn"
-                        data-setup-toggle
-                        aria-controls="aislepilot-setup"
-                        aria-expanded="false"
-                        aria-label="Edit settings"
-                        title="Edit settings">
-                        <span class="aislepilot-btn-label">
-                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" focusable="false">
-                                    <line x1="4" y1="6" x2="20" y2="6"></line>
-                                    <line x1="4" y1="12" x2="20" y2="12"></line>
-                                    <line x1="4" y1="18" x2="20" y2="18"></line>
-                                    <circle cx="9" cy="6" r="2"></circle>
-                                    <circle cx="15" cy="12" r="2"></circle>
-                                    <circle cx="11" cy="18" r="2"></circle>
-                                </svg>
-                            </span>
-                            <span data-setup-toggle-label>Edit settings</span>
-                        </span>
-                    </button>
                 </div>
                 <details class="aislepilot-overview-actions-dropdown" data-overview-actions-menu>
                     <summary class="aislepilot-overview-actions-trigger is-icon-only"
@@ -323,7 +287,7 @@
                                      model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                             <input type="hidden" name="forceRefreshWeek" value="true" />
                             <button type="submit"
-                                    class="aislepilot-overview-regenerate-btn"
+                                    class="aislepilot-overview-regenerate-btn is-secondary"
                                     data-loading-label="Refreshing plan..."
                                     data-show-plan-skeleton
                                     aria-label="Refresh plan"
@@ -344,7 +308,7 @@
                             <partial name="_AislePilotHiddenRequestFields"
                                      model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                             <button type="submit"
-                                    class="aislepilot-overview-regenerate-btn"
+                                    class="aislepilot-overview-regenerate-btn is-secondary"
                                     data-loading-label="Saving week...">
                                 <span class="aislepilot-btn-label">
                                     <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -358,33 +322,11 @@
                                 </span>
                             </button>
                         </form>
-                        <button
-                            type="button"
-                            class="aislepilot-overview-regenerate-btn aislepilot-edit-setup-btn"
-                            data-setup-toggle
-                            aria-controls="aislepilot-setup"
-                            aria-expanded="false"
-                            aria-label="Edit settings"
-                            title="Edit settings">
-                            <span class="aislepilot-btn-label">
-                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <line x1="4" y1="6" x2="20" y2="6"></line>
-                                        <line x1="4" y1="12" x2="20" y2="12"></line>
-                                        <line x1="4" y1="18" x2="20" y2="18"></line>
-                                        <circle cx="9" cy="6" r="2"></circle>
-                                        <circle cx="15" cy="12" r="2"></circle>
-                                        <circle cx="11" cy="18" r="2"></circle>
-                                    </svg>
-                                </span>
-                                <span data-setup-toggle-label>Edit settings</span>
-                            </span>
-                        </button>
                     </div>
                 </details>
             </div>
         </div>
-        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content hidden>
+        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content>
             @if (result.IsOverBudget)
             {
                 <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
@@ -412,47 +354,47 @@
                 </div>
             }
             <div class="aislepilot-budget-grid">
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Supermarket</p>
                     <p class="aislepilot-stat-value">@result.Supermarket</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Portion size</p>
                     <p class="aislepilot-stat-value">@result.PortionSize</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Cooking for</p>
                     <p class="aislepilot-stat-value">@safeHouseholdSize @householdLabel</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--featured">
                     <p class="aislepilot-stat-label">Budget</p>
                     <p class="aislepilot-stat-value">@result.WeeklyBudget.ToString("C", ukCulture)</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--featured">
                     <p class="aislepilot-stat-label">@mealIngredientEstimateLabel</p>
                     <p class="aislepilot-stat-value">@result.EstimatedTotalCost.ToString("C", ukCulture)</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                     <p class="aislepilot-stat-label">Budget difference</p>
                     <p class="aislepilot-stat-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                         @result.BudgetDelta.ToString("C", ukCulture)
                     </p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--support">
                     <p class="aislepilot-stat-label">Plan length</p>
                     <p class="aislepilot-stat-value">@result.PlanDays day(s)</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Cook days</p>
                     <p class="aislepilot-stat-value">@result.CookDays</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Meals per day</p>
                     <p class="aislepilot-stat-value">@result.MealsPerDay</p>
                 </article>
                 @if (result.LeftoverDays > 0)
                 {
-                    <article class="aislepilot-stat-card">
+                    <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                         <p class="aislepilot-stat-label">Leftovers</p>
                         <p class="aislepilot-stat-value">@result.LeftoverDays day(s)</p>
                     </article>
@@ -813,7 +755,7 @@
                                                 {
                                                     <span class="aislepilot-meal-removed-watermark" aria-hidden="true">Removed</span>
                                                 }
-                                                <h3>@meal.MealName</h3>
+                                                <h3 class="aislepilot-day-meal-title">@meal.MealName</h3>
                                                 <div class="aislepilot-day-meal-summary" data-day-meal-summary>
                                                     @if (isIgnored)
                                                     {
@@ -1195,7 +1137,10 @@
                         @foreach (var department in groupedItems)
                         {
                             <article class="aislepilot-card aislepilot-shop-card">
-                                <h3>@department.Key</h3>
+                                <div class="aislepilot-shop-card-head">
+                                    <h3>@department.Key</h3>
+                                    <span class="aislepilot-shop-card-count">@department.Count() item(s)</span>
+                                </div>
                                 <ul class="aislepilot-shop-list">
                                     @foreach (var item in department)
                                     {
@@ -1240,10 +1185,10 @@
 
                 <section id="aislepilot-export" aria-label="Exports" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel aislepilot-export-panel" data-window-name="Exports">
                     <div class="aislepilot-export-actions">
-                        <div class="aislepilot-export-action" data-notes-export-shell>
+                        <div class="aislepilot-export-action is-secondary" data-notes-export-shell>
                             <textarea hidden data-notes-export-content>@shoppingListNotesText</textarea>
                             <button type="button"
-                                    class="aislepilot-export-btn"
+                                    class="aislepilot-export-btn is-secondary"
                                     data-notes-export-trigger
                                     data-notes-default-label="Share shopping list (works with Notes)"
                                     data-notes-shared-label="Share sheet opened. Choose your app."
@@ -1253,7 +1198,7 @@
                             </button>
                         </div>
 
-                        <div class="aislepilot-export-action">
+                        <div class="aislepilot-export-action is-secondary">
                             <form method="post"
                                   asp-action="ExportChecklist"
                                   data-export-download-form
@@ -1261,11 +1206,11 @@
                                 @Html.AntiForgeryToken()
                                 <partial name="_AislePilotHiddenRequestFields"
                                          model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                                <button type="submit" class="aislepilot-export-btn" data-loading-label="Building checklist...">Download shopping checklist (.txt)</button>
+                                <button type="submit" class="aislepilot-export-btn is-secondary" data-loading-label="Building checklist...">Download shopping checklist (.txt)</button>
                             </form>
                         </div>
 
-                        <div class="aislepilot-export-action">
+                        <div class="aislepilot-export-action is-primary">
                             <form method="post"
                                   asp-action="ExportPlanPack"
                                   data-export-theme-form
@@ -1275,12 +1220,12 @@
                                 <partial name="_AislePilotHiddenRequestFields"
                                          model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                                 <input type="hidden" name="exportTheme" value="light" data-export-theme-input />
-                                <button type="submit" class="aislepilot-export-btn" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
+                                <button type="submit" class="aislepilot-export-btn is-primary" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
                             </form>
                         </div>
 
-                        <div class="aislepilot-export-action">
-                            <button type="button" class="aislepilot-export-btn" onclick="window.print()">Print current view</button>
+                        <div class="aislepilot-export-action is-tertiary">
+                            <button type="button" class="aislepilot-export-btn is-tertiary" onclick="window.print()">Print current view</button>
                         </div>
                     </div>
                 </section>

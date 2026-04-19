@@ -214,16 +214,6 @@
     var joinedErrorText = string.Join(" ", modelErrors).ToLowerInvariant();
     var fallbackMealImageUrl = AislePilotMealImageUrlResolver.ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
     var mealImagesPollUrl = Url.Action("MealImages", "AislePilot") ?? "/projects/aisle-pilot/meal-images";
-    string FormatSetupOptionLabel(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return value;
-        }
-
-        return value.Trim().ToUpperInvariant();
-    }
-
     string FormatSupermarketLabel(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -395,18 +385,35 @@
                     </details>
                 </div>
             </div>
-            <div class="aislepilot-app-head-intro@(hasResult ? " is-results-context" : string.Empty)">
-                <div class="aislepilot-app-head-topline">
-                    <p class="aislepilot-app-badge">Meal planner</p>
-                    <p class="aislepilot-app-head-status">@(hasResult ? "Plan ready" : "Mobile-first workflow")</p>
+                <div class="aislepilot-app-head-content">
+                    <div class="aislepilot-app-head-intro@(hasResult ? " is-results-context" : string.Empty)">
+                        <div class="aislepilot-app-head-topline">
+                            <p class="aislepilot-app-badge">Meal planner</p>
+                            <p class="aislepilot-app-head-status">@(hasResult ? "Plan ready" : "Guided weekly setup")</p>
+                        </div>
+                        <h1 id="aislepilot-title" class="aislepilot-app-title">@(hasResult ? "Your weekly plan is ready." : "Build a full week of meals with less setup friction.")</h1>
+                        <p class="aislepilot-app-subtitle">@(hasResult ? "Review the plan snapshot, refine settings, and export a shopping list that is already ordered for your supermarket." : "Set your budget, household, and meal rules once, then generate a cleaner weekly plan and aisle-ordered shopping list.")</p>
+                        <ul class="aislepilot-app-highlights" aria-label="AislePilot highlights">
+                            @if (hasResult && Model.Result is not null)
+                            {
+                                <li>@($"{Model.Result.PlanDays} day plan")</li>
+                                <li>@($"{Model.Result.EstimatedTotalCost.ToString("C0", ukCulture)} estimated spend")</li>
+                                <li>@($"{FormatSupermarketLabel(Model.Result.Supermarket)} aisle order")</li>
+                            }
+                            else
+                            {
+                                <li>Budget-aware weekly planning</li>
+                                <li>Aisle-ordered shopping lists</li>
+                                <li>Fast mobile-friendly setup</li>
+                            }
+                        </ul>
+                    </div>
                 </div>
-                <h1 id="aislepilot-title" class="aislepilot-app-title">@(hasResult ? "Your weekly plan is ready." : "Plan a full week of meals in minutes.")</h1>
-                <p class="aislepilot-app-subtitle">@(hasResult ? "Refine meals, adjust settings, and export your shopping list." : "Set your budget and preferences, then generate an aisle-ordered meal and shopping plan.")</p>
-            </div>
         </div>
         <div class="aislepilot-app-head-actions">
-            @if (hasResult) { <button type="button" class="aislepilot-head-primary-action" data-setup-toggle aria-controls="aislepilot-setup" aria-expanded="false">Edit settings</button> }
+            @if (hasResult) { <button type="button" class="aislepilot-head-primary-action" data-setup-toggle aria-controls="aislepilot-setup" aria-expanded="false">Adjust settings</button> }
             else { <a href="#aislepilot-setup" class="aislepilot-head-primary-action">Start with settings</a> }
+            <p class="aislepilot-head-action-note">@(hasResult ? "Open the setup again to tighten budget, meal cadence, or store rules before you export." : "Jump straight into step 1, save your defaults, and come back next week with less setup work.")</p>
         </div>
     </section>
 
@@ -465,7 +472,24 @@
     <div class="@appLayoutClass">
     <section id="aislepilot-setup" aria-labelledby="aislepilot-form-title" class="aislepilot-shell" data-reveal data-setup-panel @setupHiddenAttribute>
         <div class="aislepilot-section-head aislepilot-section-head-row">
-            <h2 id="aislepilot-form-title" class="aislepilot-section-title">Settings</h2>
+            <div class="aislepilot-section-head-copy">
+                <h2 id="aislepilot-form-title" class="aislepilot-section-title">Settings</h2>
+                <p class="aislepilot-setup-intro">Move through the setup in three steps, then generate a plan shaped around your budget, household, and supermarket.</p>
+                <ol class="aislepilot-setup-track" aria-label="Setup steps">
+                    <li class="aislepilot-setup-track-item">
+                        <span class="aislepilot-setup-track-number">1</span>
+                        <span class="aislepilot-setup-track-label">Household</span>
+                    </li>
+                    <li class="aislepilot-setup-track-item">
+                        <span class="aislepilot-setup-track-number">2</span>
+                        <span class="aislepilot-setup-track-label">Plan rules</span>
+                    </li>
+                    <li class="aislepilot-setup-track-item">
+                        <span class="aislepilot-setup-track-number">3</span>
+                        <span class="aislepilot-setup-track-label">Generate</span>
+                    </li>
+                </ol>
+            </div>
         </div>
 
         <form method="post" asp-action="Index" id="aislepilot-setup-form" class="contact-form aislepilot-form">
@@ -489,171 +513,61 @@
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             }
 
-            <div class="aislepilot-setup-mode-switch"
-                 role="tablist"
-                 aria-label="Settings mode"
-                 data-setup-mode-switch
-                 data-setup-mode-default="@defaultSetupMode"
-                 data-setup-mode-force-default="@forceDefaultSetupMode">
-                <button type="button"
-                        class="@plannerToggleClass"
-                        role="tab"
-                        aria-controls="aislepilot-planner-mode"
-                        aria-selected="@(shouldShowGeneratorMode ? "false" : "true")"
-                        data-setup-mode-toggle="planner">
-                    <span class="aislepilot-setup-mode-toggle-title">Meal planner</span>
-                    <span class="aislepilot-setup-mode-toggle-note">Multi-day output</span>
-                </button>
-                <button type="button"
-                        class="@generatorToggleClass"
-                        role="tab"
-                        aria-controls="aislepilot-generator-mode"
-                        aria-selected="@(shouldShowGeneratorMode ? "true" : "false")"
-                        data-setup-mode-toggle="generator">
-                    <span class="aislepilot-setup-mode-toggle-title">Meal ideas</span>
-                    <span class="aislepilot-setup-mode-toggle-note">Single meal output</span>
-                </button>
-            </div>
+            <partial name="_AislePilotSetupModeSwitch"
+                     model="Model"
+                     view-data='new ViewDataDictionary(ViewData)
+                     {
+                         ["PlannerToggleClass"] = plannerToggleClass,
+                         ["GeneratorToggleClass"] = generatorToggleClass,
+                         ["DefaultSetupMode"] = defaultSetupMode,
+                         ["ForceDefaultSetupMode"] = forceDefaultSetupMode,
+                         ["PlannerSelected"] = shouldShowGeneratorMode ? "false" : "true",
+                         ["GeneratorSelected"] = shouldShowGeneratorMode ? "true" : "false"
+                     }' />
 
-            <div class="aislepilot-shared-setup">
-                <details class="aislepilot-collapsible" @servingDetailsOpenAttribute>
-                    <summary>
-                        <span class="aislepilot-collapsible-title">Cooking for</span>
-                        <span class="aislepilot-collapsible-value" data-serving-summary>@servingSummaryText</span>
-                    </summary>
-                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics aislepilot-serving-context-fields">
-                        <div class="aislepilot-inline-fields">
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-slider-field--thumb-friendly">
-                                <label asp-for="Request.HouseholdSize">People</label>
-                                <div class="aislepilot-slider-track-line">
-                                    <span class="aislepilot-slider-boundary">1</span>
-                                    <input asp-for="Request.HouseholdSize"
-                                           type="range"
-                                           min="1"
-                                           max="8"
-                                           step="1"
-                                           class="aislepilot-slider-input"
-                                           aria-label="People"
-                                           data-number-slider-range
-                                           data-number-slider-decimals="0" />
-                                    <span class="aislepilot-slider-boundary">8</span>
-                                </div>
-                                <div class="aislepilot-slider-meta">
-                                    <span class="aislepilot-slider-value" data-number-slider-value>@Model.Request.HouseholdSize</span>
-                                </div>
-                                <span asp-validation-for="Request.HouseholdSize" class="text-danger"></span>
-                            </div>
-
-                            <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact" data-option-slider>
-                                <label asp-for="Request.PortionSize">Portion size</label>
-                                <input asp-for="Request.PortionSize" type="hidden" data-option-slider-hidden />
-                                <div class="aislepilot-slider-track-line">
-                                    <span class="aislepilot-slider-boundary">@portionSizeOptions.First()</span>
-                                    <input type="range"
-                                           min="0"
-                                           max="@Math.Max(0, portionSizeOptions.Length - 1)"
-                                           step="1"
-                                           value="@selectedPortionSizeIndex"
-                                           class="aislepilot-slider-input"
-                                           aria-label="Portion size"
-                                           data-option-slider-range
-                                           data-option-slider-values="@portionSizeSliderValues" />
-                                    <span class="aislepilot-slider-boundary">@portionSizeOptions.Last()</span>
-                                </div>
-                                <div class="aislepilot-slider-meta">
-                                    <span class="aislepilot-slider-value" data-option-slider-value>@selectedPortionSize</span>
-                                </div>
-                                <span asp-validation-for="Request.PortionSize" class="text-danger"></span>
-                            </div>
+            <div class="aislepilot-setup-workspace">
+                <div class="aislepilot-setup-primary">
+                    <section class="aislepilot-setup-step">
+                        <div class="aislepilot-setup-step-head">
+                            <p class="aislepilot-setup-step-kicker">Step 1</p>
+                            <h3 class="aislepilot-setup-step-title">Household and preferences</h3>
+                            <p class="aislepilot-setup-step-copy">Set who the plan is for, what to avoid, and how much repetition is acceptable.</p>
                         </div>
-                    </fieldset>
-                </details>
 
-                <details class="aislepilot-collapsible" @dietaryDetailsOpenAttribute>
-                    <summary>
-                        <span class="aislepilot-collapsible-title">Dietary requirements</span>
-                        <span class="aislepilot-collapsible-value" data-dietary-summary>@dietarySummaryText</span>
-                    </summary>
-                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-dietary-grid">
-                        @foreach (var mode in Model.DietaryOptions)
-                        {
-                            var isChecked = selectedDietary.Contains(mode);
-                            <label class="aislepilot-mode-option">
-                                @if (isChecked)
-                                {
-                                    <input type="checkbox" name="Request.DietaryModes" value="@mode" checked />
-                                }
-                                else
-                                {
-                                    <input type="checkbox" name="Request.DietaryModes" value="@mode" />
-                                }
-                                <span>@FormatSetupOptionLabel(mode)</span>
-                            </label>
-                        }
-                        <span asp-validation-for="Request.DietaryModes" class="text-danger"></span>
-                    </fieldset>
-                </details>
+            <partial name="_AislePilotSharedSetup"
+                     model='new AislePilotSharedSetupViewModel
+                     {
+                         ServingDetailsOpen = hasServingValidationErrors,
+                         ServingSummaryText = servingSummaryText,
+                         HouseholdSize = Model.Request.HouseholdSize,
+                         PortionSizeOptions = portionSizeOptions,
+                         SelectedPortionSizeIndex = selectedPortionSizeIndex,
+                         PortionSizeSliderValues = portionSizeSliderValues,
+                         SelectedPortionSize = selectedPortionSize,
+                         DietaryDetailsOpen = hasDietaryValidationErrors,
+                         DietarySummaryText = dietarySummaryText,
+                         DietaryOptions = Model.DietaryOptions.ToArray(),
+                         DietarySelectionRules = Model.DietarySelectionRules,
+                         SelectedDietaryModes = Model.Request.DietaryModes.ToArray(),
+                         CookingSummaryText = cookingSummaryText,
+                         PreferQuickMeals = Model.Request.PreferQuickMeals,
+                         EnableSavedMealRepeats = savedMealRepeatsEnabled,
+                         SavedMealRepeatRatePercent = savedMealRepeatRatePercent,
+                         ExclusionsDetailsOpen = hasExclusionsValidationErrors,
+                         ExclusionsSummaryText = exclusionsSummaryText,
+                         DislikesOrAllergens = Model.Request.DislikesOrAllergens ?? string.Empty
+                     }' />
+                    </section>
 
-                <details class="aislepilot-collapsible">
-                    <summary>
-                        <span class="aislepilot-collapsible-title">Cooking preferences</span>
-                        <span class="aislepilot-collapsible-value" data-cooking-summary>@cookingSummaryText</span>
-                    </summary>
-                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                        <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
-                            <input asp-for="Request.PreferQuickMeals" type="checkbox" />
-                            <span>Prioritise quick meals</span>
-                        </label>
-                        <label class="aislepilot-checkbox-item aislepilot-toggle-chip">
-                            <input asp-for="Request.EnableSavedMealRepeats" type="checkbox" />
-                            <span>Repeat saved meals sometimes</span>
-                        </label>
-                        <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-slider-field--plan-basics-frame"
-                             data-saved-repeat-rate-field
-                             hidden="@(!savedMealRepeatsEnabled)">
-                            <label asp-for="Request.SavedMealRepeatRatePercent">Repeat strength</label>
-                            <div class="aislepilot-slider-track-line">
-                                <span class="aislepilot-slider-boundary">10%</span>
-                                <input asp-for="Request.SavedMealRepeatRatePercent"
-                                       type="range"
-                                       min="10"
-                                       max="100"
-                                       step="5"
-                                       class="aislepilot-slider-input"
-                                       aria-label="Saved meal repeat strength"
-                                       data-number-slider-range
-                                       data-number-slider-suffix="%"
-                                       data-number-slider-decimals="0" />
-                                <span class="aislepilot-slider-boundary">100%</span>
-                            </div>
-                            <div class="aislepilot-slider-meta">
-                                <span class="aislepilot-slider-value" data-number-slider-value>@savedMealRepeatRatePercent%</span>
-                            </div>
-                            <span asp-validation-for="Request.SavedMealRepeatRatePercent" class="text-danger"></span>
+                    <section class="aislepilot-setup-step"
+                             data-planner-only-preference
+                             @plannerOnlyPreferenceHiddenAttribute>
+                        <div class="aislepilot-setup-step-head">
+                            <p class="aislepilot-setup-step-kicker">Step 2</p>
+                            <h3 class="aislepilot-setup-step-title">Plan rules</h3>
+                            <p class="aislepilot-setup-step-copy">Choose the store, meal cadence, budget, and any extras that should shape the week.</p>
                         </div>
-                    </fieldset>
-                </details>
-
-                <details class="aislepilot-collapsible" @exclusionsDetailsOpenAttribute>
-                    <summary>
-                        <span class="aislepilot-collapsible-title">Foods to avoid</span>
-                        <span class="aislepilot-collapsible-value"
-                              data-exclusion-summary
-                              title="@exclusionsSummaryText">@exclusionsSummaryText</span>
-                    </summary>
-                    <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
-                        <div class="aislepilot-field aislepilot-field-optional">
-                            <label asp-for="Request.DislikesOrAllergens">Dislikes/allergens</label>
-                            <input asp-for="Request.DislikesOrAllergens" placeholder="Example: peanuts, mushrooms, shellfish" />
-                            <span asp-validation-for="Request.DislikesOrAllergens" class="text-danger"></span>
-                        </div>
-                    </fieldset>
-                </details>
-            </div>
-
-            <section class="aislepilot-planner-settings"
-                     data-planner-only-preference
-                     @plannerOnlyPreferenceHiddenAttribute>
+            <div class="aislepilot-planner-settings">
                 <h2 class="aislepilot-planner-settings-title">
                     <span class="aislepilot-symbol-label">
                         <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -866,11 +780,18 @@
                         </fieldset>
                     </details>
                 </div>
-            </section>
+            </div>
+                    </section>
 
-            <section class="aislepilot-planner-settings"
-                     data-generator-only-preference
-                     @generatorOnlyPreferenceHiddenAttribute>
+                    <section class="aislepilot-setup-step"
+                             data-generator-only-preference
+                             @generatorOnlyPreferenceHiddenAttribute>
+                        <div class="aislepilot-setup-step-head">
+                            <p class="aislepilot-setup-step-kicker">Step 2</p>
+                            <h3 class="aislepilot-setup-step-title">Pantry rules</h3>
+                            <p class="aislepilot-setup-step-copy">List what you have on hand and decide whether ideas should stay strict to those ingredients.</p>
+                        </div>
+            <div class="aislepilot-planner-settings">
                 <h2 class="aislepilot-planner-settings-title">
                     <span class="aislepilot-symbol-label">
                         <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -914,14 +835,20 @@
                         </fieldset>
                     </details>
                 </div>
-            </section>
+            </div>
+                    </section>
 
             <section id="aislepilot-planner-mode"
-                     class="aislepilot-setup-mode"
+                     class="aislepilot-setup-mode aislepilot-setup-step"
                      aria-label="Meal planner"
                      role="tabpanel"
                      data-setup-mode-panel="planner"
                      @plannerModeHiddenAttribute>
+                <div class="aislepilot-setup-step-head">
+                    <p class="aislepilot-setup-step-kicker">Step 3</p>
+                    <h3 class="aislepilot-setup-step-title">Generate the week</h3>
+                    <p class="aislepilot-setup-step-copy">Review the snapshot, then build a meal plan, recipes, and a supermarket-ordered shopping list.</p>
+                </div>
                 <div class="aislepilot-setup-mode-head">
                     <p class="aislepilot-setup-mode-copy">Build your weekly plan, recipes, and supermarket-ordered shopping list.</p>
                 </div>
@@ -1051,11 +978,16 @@
             </section>
 
             <section id="aislepilot-generator-mode"
-                     class="aislepilot-setup-mode is-secondary"
+                     class="aislepilot-setup-mode is-secondary aislepilot-setup-step"
                      aria-label="Meal generator"
                      role="tabpanel"
                      data-setup-mode-panel="generator"
                      @generatorModeHiddenAttribute>
+                <div class="aislepilot-setup-step-head">
+                    <p class="aislepilot-setup-step-kicker">Step 3</p>
+                    <h3 class="aislepilot-setup-step-title">Generate meal ideas</h3>
+                    <p class="aislepilot-setup-step-copy">Create three quick ideas based on the foods already in your kitchen.</p>
+                </div>
                 <div class="aislepilot-setup-mode-head">
                     <p class="aislepilot-setup-mode-copy">Use your on-hand foods to generate 3 quick meal ideas.</p>
                 </div>
@@ -1076,6 +1008,39 @@
                     </button>
                 </div>
             </section>
+                </div>
+
+                <aside class="aislepilot-setup-summary"
+                       aria-labelledby="aislepilot-setup-summary-title"
+                       data-planner-only-preference
+                       @plannerOnlyPreferenceHiddenAttribute>
+                    <partial name="_AislePilotPlannerSetupSummary"
+                             model='new AislePilotPlannerSetupSummaryViewModel
+                             {
+                                 ServingSummaryText = servingSummaryText,
+                                 DietarySummaryText = dietarySummaryText,
+                                 SelectedSupermarketLabel = FormatSupermarketLabel(selectedSupermarket),
+                                 MealTypesSummaryText = selectedMealTypesSummaryText,
+                                 PlanLengthText = $"{selectedPlanDays} day{(selectedPlanDays == 1 ? string.Empty : "s")}",
+                                 BudgetText = Model.Request.WeeklyBudget.ToString("C0", ukCulture),
+                                 SpecialOptionsSummaryText = specialOptionsSummaryText
+                             }' />
+                </aside>
+
+                <aside class="aislepilot-setup-summary is-generator"
+                       aria-labelledby="aislepilot-generator-summary-title"
+                       data-generator-only-preference
+                       @generatorOnlyPreferenceHiddenAttribute>
+                    <partial name="_AislePilotGeneratorSetupSummary"
+                             model='new AislePilotGeneratorSetupSummaryViewModel
+                             {
+                                 PantrySummaryText = pantrySummaryText,
+                                 DietarySummaryText = dietarySummaryText,
+                                 GeneratorCoreSummaryText = generatorCoreSummaryText,
+                                 PreferQuickMeals = Model.Request.PreferQuickMeals
+                             }' />
+                </aside>
+            </div>
         </form>
     </section>
 

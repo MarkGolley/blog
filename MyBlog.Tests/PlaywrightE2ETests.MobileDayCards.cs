@@ -296,7 +296,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardSwipe_OnMealImageChangesMealSlot()
+    public async Task Mobile_AislePilotDayCardSwipe_OnMealImageKeepsMealSlotAndDisablesHorizontalPan()
     {
         if (!IsE2EEnabled())
         {
@@ -344,6 +344,19 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(tabCount >= 2, "Expected at least two meal tabs on the swipe target card.");
         Assert.True(activeIndexBeforeSwipe >= 0, "Expected one active meal panel before swiping.");
 
+        var touchAction = await swipeSurface.EvaluateAsync<string>(
+            """
+            swipeRoot => {
+                if (!(swipeRoot instanceof HTMLElement)) {
+                    return "";
+                }
+
+                return window.getComputedStyle(swipeRoot).touchAction || "";
+            }
+            """);
+        Assert.DoesNotContain("pan-x", touchAction, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("pan-y", touchAction, StringComparison.OrdinalIgnoreCase);
+
         var swipeDispatched = await swipeSurface.EvaluateAsync<bool>(
             """
             swipeRoot => {
@@ -372,7 +385,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const y = rect.top + Math.max(30, Math.min(rect.height * 0.6, rect.height - 30));
 
                 const createTouchEvent = (type, x, y) => {
-                    const event = new Event(type, { bubbles: false, cancelable: true });
+                    const event = new Event(type, { bubbles: true, cancelable: true });
                     Object.defineProperty(event, "changedTouches", {
                         configurable: true,
                         value: [{ clientX: x, clientY: y }]
@@ -400,12 +413,11 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             }
             """);
 
-        var expectedIndexAfterSwipe = (activeIndexBeforeSwipe + 1) % tabCount;
-        Assert.Equal(expectedIndexAfterSwipe, activeIndexAfterSwipe);
+        Assert.Equal(activeIndexBeforeSwipe, activeIndexAfterSwipe);
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardSwipe_DoesNotSwitchMainWindowPanel()
+    public async Task Mobile_AislePilotDayCardSwipe_OnMealImageDoesNotSwitchMainWindowPanelOrMealSlot()
     {
         if (!IsE2EEnabled())
         {
@@ -439,6 +451,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             State = WaitForSelectorState.Visible,
             Timeout = 15000
         });
+
+        var carouselStatusBeforeSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
 
         var swipeState = await swipeSurface.EvaluateAsync<int[]>(
             """
@@ -493,7 +507,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(tabCount >= 2, "Expected at least two meal tabs on the swipe target card.");
         Assert.True(beforeIndex >= 0, "Expected one active meal panel before swiping.");
         Assert.True(afterIndex >= 0, "Expected one active meal panel after swiping.");
-        Assert.Equal((beforeIndex + 1) % tabCount, afterIndex);
+        Assert.Equal(beforeIndex, afterIndex);
 
         await page.WaitForTimeoutAsync(100);
 
@@ -505,6 +519,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             }
             """);
         Assert.Equal("aislepilot-meals", activePanelAfterSwipe);
+
+        var carouselStatusAfterSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
+        Assert.Equal(carouselStatusBeforeSwipe, carouselStatusAfterSwipe);
     }
 
     [Fact]

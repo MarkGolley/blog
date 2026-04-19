@@ -1411,6 +1411,20 @@
             const householdInput = form.querySelector("input[name='Request.HouseholdSize']");
             const portionInput = form.querySelector("input[name='Request.PortionSize']");
             const dietaryInputs = Array.from(form.querySelectorAll("input[name='Request.DietaryModes']"));
+            const dietarySelector = form.querySelector("[data-dietary-selector]");
+            const dietaryGuidance = form.querySelector("[data-dietary-guidance]");
+            const defaultDietaryGuidance = dietaryGuidance instanceof HTMLElement
+                ? (dietaryGuidance.dataset.defaultGuidance ?? dietaryGuidance.textContent ?? "").trim()
+                : "";
+            const dietaryMaxMessage = dietarySelector instanceof HTMLElement
+                ? (dietarySelector.dataset.dietaryMaxMessage ?? defaultDietaryGuidance)
+                : defaultDietaryGuidance;
+            const parsedDietaryMaxSelections = Number.parseInt(
+                dietarySelector instanceof HTMLElement ? (dietarySelector.dataset.dietaryMaxSelections ?? "2") : "2",
+                10);
+            const dietaryMaxSelections = Number.isInteger(parsedDietaryMaxSelections)
+                ? Math.max(1, parsedDietaryMaxSelections)
+                : 2;
             const quickMealsInput = form.querySelector("input[type='checkbox'][name='Request.PreferQuickMeals']");
             const savedMealRepeatsInput = form.querySelector("input[type='checkbox'][name='Request.EnableSavedMealRepeats']");
             const savedMealRepeatRateInput = form.querySelector("input[name='Request.SavedMealRepeatRatePercent']");
@@ -1509,6 +1523,27 @@
                 servingSummary.textContent = `${safePeople} ${peopleLabel} - ${portionValue} portions`;
             };
 
+            const getSelectedDietaryInputs = () => dietaryInputs.filter(input =>
+                input instanceof HTMLInputElement && input.checked);
+
+            const resetDietaryGuidance = () => {
+                if (!(dietaryGuidance instanceof HTMLElement)) {
+                    return;
+                }
+
+                dietaryGuidance.textContent = defaultDietaryGuidance;
+                dietaryGuidance.dataset.state = "default";
+            };
+
+            const setDietaryGuidanceMessage = message => {
+                if (!(dietaryGuidance instanceof HTMLElement)) {
+                    return;
+                }
+
+                dietaryGuidance.textContent = message;
+                dietaryGuidance.dataset.state = "warning";
+            };
+
             const updateDietarySummary = () => {
                 if (!(dietarySummary instanceof HTMLElement)) {
                     return;
@@ -1521,6 +1556,34 @@
                 dietarySummary.textContent = selectedModes.length > 0
                     ? selectedModes.join(", ")
                     : "No dietary filters";
+            };
+
+            const handleDietaryModeChange = targetInput => {
+                if (!(targetInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                if (targetInput.checked && targetInput.dataset.dietaryGroup === "core") {
+                    dietaryInputs.forEach(input => {
+                        if (!(input instanceof HTMLInputElement) ||
+                            input === targetInput ||
+                            !input.checked ||
+                            input.dataset.dietaryGroup !== "core") {
+                            return;
+                        }
+
+                        input.checked = false;
+                    });
+                }
+
+                if (getSelectedDietaryInputs().length > dietaryMaxSelections) {
+                    targetInput.checked = false;
+                    setDietaryGuidanceMessage(dietaryMaxMessage);
+                } else {
+                    resetDietaryGuidance();
+                }
+
+                updateDietarySummary();
             };
 
             const updateCookingSummary = () => {
@@ -1632,7 +1695,9 @@
 
                 dietaryInputs.forEach(input => {
                     if (input instanceof HTMLInputElement) {
-                        input.addEventListener("change", updateDietarySummary);
+                        input.addEventListener("change", event => {
+                            handleDietaryModeChange(event.currentTarget);
+                        });
                     }
                 });
 
@@ -1699,6 +1764,7 @@
             syncSpecialTreatCookDayOptions();
             syncSpecialTreatCookDayVisibility();
             syncSavedMealRepeatControls();
+            resetDietaryGuidance();
             updateServingSummary();
             updateDietarySummary();
             updateCookingSummary();
@@ -4566,20 +4632,12 @@
             const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
             const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
             const track = card.querySelector("[data-day-meal-track]");
-            const swipeSurfaces = Array.from(card.querySelectorAll("[data-day-meal-swipe-surface]"));
             if (!(track instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
                 return;
             }
 
             card.dataset.dayMealCardWired = "true";
             let currentSlotIndex = 0;
-            let touchStartX = Number.NaN;
-            let touchStartY = Number.NaN;
-
-            const clearTouchTracking = () => {
-                touchStartX = Number.NaN;
-                touchStartY = Number.NaN;
-            };
 
             const syncSlot = nextIndex => {
                 const slotCount = Math.min(tabs.length, panels.length);
@@ -4741,53 +4799,6 @@
                         }
                     }
                 });
-            });
-
-            swipeSurfaces.forEach(surface => {
-                if (!(surface instanceof HTMLElement)) {
-                    return;
-                }
-
-                surface.addEventListener("touchstart", event => {
-                    const touch = event.changedTouches[0];
-                    if (!touch) {
-                        clearTouchTracking();
-                        return;
-                    }
-
-                    touchStartX = touch.clientX;
-                    touchStartY = touch.clientY;
-                }, { passive: true });
-
-                surface.addEventListener("touchend", event => {
-                    if (!Number.isFinite(touchStartX) || !Number.isFinite(touchStartY)) {
-                        return;
-                    }
-
-                    const touch = event.changedTouches[0];
-                    const startX = touchStartX;
-                    const startY = touchStartY;
-                    clearTouchTracking();
-                    if (!touch) {
-                        return;
-                    }
-
-                    const deltaX = touch.clientX - startX;
-                    const deltaY = touch.clientY - startY;
-                    if (Math.abs(deltaX) < 32 || Math.abs(deltaX) <= Math.abs(deltaY)) {
-                        return;
-                    }
-
-                    if (deltaX < 0) {
-                        syncSlot(currentSlotIndex + 1);
-                    } else {
-                        syncSlot(currentSlotIndex - 1);
-                    }
-                }, { passive: true });
-
-                surface.addEventListener("touchcancel", () => {
-                    clearTouchTracking();
-                }, { passive: true });
             });
 
             syncSlot(readRememberedDayMealSlot(card));
@@ -5171,6 +5182,8 @@
             let activeIndex = 0;
             let scrollSyncFrame = 0;
             let motionTimer = 0;
+            let scrollSettleTimer = 0;
+            let suppressScrollChromeSync = false;
             const prefersReducedMotion = typeof window.matchMedia === "function"
                 && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -5280,6 +5293,13 @@
                 motionTimer = window.setTimeout(() => {
                     clearMotionState();
                 }, 320);
+            };
+
+            const clearScrollSettleTimer = () => {
+                if (scrollSettleTimer > 0) {
+                    window.clearTimeout(scrollSettleTimer);
+                    scrollSettleTimer = 0;
+                }
             };
 
             const computeTargetScrollLeft = targetSlide => {
@@ -5428,6 +5448,15 @@
 
                 activeIndex = clampIndex(nextIndex);
                 const resolvedBehavior = prefersReducedMotion ? "auto" : behavior;
+                if (scrollSyncFrame > 0) {
+                    window.cancelAnimationFrame(scrollSyncFrame);
+                    scrollSyncFrame = 0;
+                }
+
+                // Keep the status label and day pills locked to the requested day
+                // while smooth scrolling passes over intermediate slides.
+                suppressScrollChromeSync = resolvedBehavior === "smooth" && slides.length > 1;
+                clearScrollSettleTimer();
                 updateChrome(activeIndex, {
                     paginationBehavior: resolvedBehavior,
                     forcePaginationSync: true
@@ -5443,6 +5472,15 @@
                     left: targetScrollLeft,
                     behavior: resolvedBehavior
                 });
+
+                if (suppressScrollChromeSync) {
+                    scrollSettleTimer = window.setTimeout(() => {
+                        suppressScrollChromeSync = false;
+                        clearScrollSettleTimer();
+                        updateChrome(findClosestSlideIndex(), { forcePaginationSync: true });
+                        updateViewportHeight(true);
+                    }, 180);
+                }
 
                 updateViewportHeight(true);
             };
@@ -5481,6 +5519,17 @@
             };
 
             viewport.addEventListener("scroll", () => {
+                if (suppressScrollChromeSync) {
+                    clearScrollSettleTimer();
+                    scrollSettleTimer = window.setTimeout(() => {
+                        suppressScrollChromeSync = false;
+                        clearScrollSettleTimer();
+                        updateChrome(findClosestSlideIndex(), { forcePaginationSync: true });
+                        updateViewportHeight(true);
+                    }, 180);
+                    return;
+                }
+
                 if (scrollSyncFrame > 0) {
                     return;
                 }

@@ -1,0 +1,23 @@
+@model AislePilotGeneratorSetupSummaryViewModel
+<p class="aislepilot-setup-summary-kicker">Generator snapshot</p>
+<h3 id="aislepilot-generator-summary-title" class="aislepilot-setup-summary-title">Use what is on hand</h3>
+<p class="aislepilot-setup-summary-copy">Pantry mode focuses on quick inspiration and can stay strict to your listed core ingredients.</p>
+<dl class="aislepilot-setup-summary-list">
+    <div class="aislepilot-setup-summary-item">
+        <dt>Pantry status</dt>
+        <dd>@Model.PantrySummaryText</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Dietary</dt>
+        <dd>@Model.DietarySummaryText</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Generator mode</dt>
+        <dd>@Model.GeneratorCoreSummaryText</dd>
+    </div>
+    <div class="aislepilot-setup-summary-item">
+        <dt>Speed bias</dt>
+        <dd>@(Model.PreferQuickMeals ? "Quick meals on" : "Quick meals off")</dd>
+    </div>
+</dl>
+<p class="aislepilot-setup-summary-note">Generate ideas when the pantry list reflects what you actually want to cook from.</p>

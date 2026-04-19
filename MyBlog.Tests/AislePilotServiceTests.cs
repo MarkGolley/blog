@@ -132,6 +132,19 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public void GetDietarySelectionRules_CapsSelectionsAndSeparatesCoreStylesFromOverlays()
+    {
+        var rules = _service.GetDietarySelectionRules();
+
+        Assert.Equal(2, rules.MaxSelections);
+        Assert.Contains("Balanced", rules.CoreModes, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Vegan", rules.CoreModes, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("High-Protein", rules.OverlayModes, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("Gluten-Free", rules.OverlayModes, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("High-Protein", rules.CoreModes, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void BuildPlan_WithStrictDietaryModes_OnlyUsesMatchingMeals()
     {
         var request = new AislePilotRequestModel
@@ -754,18 +767,8 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
-    public void HasCompatibleMeals_WithBreakfastOnlyAndAiAvailable_AllowsAiAttemptWhenTemplatesDontMatch()
+    public void HasCompatibleMeals_WithMoreThanTwoDietaryModes_ReturnsFalse()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["OPENAI_API_KEY"] = "test-key",
-                ["AislePilot:EnableAiGeneration"] = "true"
-            })
-            .Build();
-        using var handler = new StaticResponseHandler(HttpStatusCode.OK, "{}");
-        using var httpClient = new HttpClient(handler);
-        var aiCapableService = new AislePilotService(httpClient, configuration);
         var request = new AislePilotRequestModel
         {
             DietaryModes = ["High-Protein", "Pescatarian", "Gluten-Free"],
@@ -773,9 +776,9 @@ public partial class AislePilotServiceTests
             SelectedMealTypes = ["Breakfast"]
         };
 
-        var hasCompatibleMeals = aiCapableService.HasCompatibleMeals(request);
+        var hasCompatibleMeals = _service.HasCompatibleMeals(request);
 
-        Assert.True(hasCompatibleMeals);
+        Assert.False(hasCompatibleMeals);
     }
 
     [Fact]

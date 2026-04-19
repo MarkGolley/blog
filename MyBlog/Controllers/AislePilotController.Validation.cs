@@ -22,6 +22,7 @@ public partial class AislePilotController
             SupermarketOptions = aislePilotService.GetSupportedSupermarkets(),
             PortionSizeOptions = aislePilotService.GetSupportedPortionSizes(),
             DietaryOptions = aislePilotService.GetSupportedDietaryModes(),
+            DietarySelectionRules = aislePilotService.GetDietarySelectionRules(),
             MealImagePollingEnabled = aislePilotService.CanGenerateMealImages()
         };
     }
@@ -94,6 +95,11 @@ public partial class AislePilotController
         if (request.DietaryModes.Count == 0)
         {
             ModelState.AddModelError("Request.DietaryModes", "Choose at least one dietary mode.");
+        }
+        else if (unsupportedDietaryModes.Count == 0 &&
+                 !aislePilotService.TryValidateDietaryModes(request.DietaryModes, out var dietaryValidationMessage))
+        {
+            ModelState.AddModelError("Request.DietaryModes", dietaryValidationMessage);
         }
 
         ValidateMealTypeSelection(request);

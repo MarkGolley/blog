@@ -235,6 +235,98 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Desktop_AislePilotDayCarousel_DoesNotFlashIntermediateStatusDuringSmoothNavigation()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        await page.EvaluateAsync(
+            """
+            () => {
+                const status = document.querySelector("[data-day-carousel-status]");
+                if (!(status instanceof HTMLElement)) {
+                    return;
+                }
+
+                window.__aislePilotStatusObserver?.disconnect?.();
+                window.__aislePilotStatusHistory = [];
+                const record = () => {
+                    window.__aislePilotStatusHistory.push((status.textContent || "").trim());
+                };
+
+                const observer = new MutationObserver(record);
+                observer.observe(status, { childList: true, characterData: true, subtree: true });
+                window.__aislePilotStatusObserver = observer;
+            }
+            """);
+
+        var fridayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='4']").First;
+        await page.EvaluateAsync("() => { window.__aislePilotStatusHistory = []; }");
+        await fridayPill.ClickAsync();
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const status = document.querySelector("[data-day-carousel-status]");
+                const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
+                return status instanceof HTMLElement
+                    && /Friday, 5 of 7/i.test(status.textContent || "")
+                    && activeDot instanceof HTMLElement
+                    && activeDot.getAttribute("data-day-carousel-target") === "4";
+            }
+            """);
+
+        var fridayHistory = await page.EvaluateAsync<string[]>(
+            """
+            () => Array.isArray(window.__aislePilotStatusHistory)
+                ? window.__aislePilotStatusHistory.filter(value => typeof value === "string" && value.trim().length > 0)
+                : []
+            """);
+
+        Assert.NotEmpty(fridayHistory);
+        Assert.Equal(
+            ["Friday, 5 of 7"],
+            fridayHistory
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray());
+
+        var nextButton = page.Locator("[data-day-carousel-next]").First;
+        await page.EvaluateAsync("() => { window.__aislePilotStatusHistory = []; }");
+        await nextButton.ClickAsync();
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const status = document.querySelector("[data-day-carousel-status]");
+                const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
+                return status instanceof HTMLElement
+                    && /Saturday, 6 of 7/i.test(status.textContent || "")
+                    && activeDot instanceof HTMLElement
+                    && activeDot.getAttribute("data-day-carousel-target") === "5";
+            }
+            """);
+
+        var saturdayHistory = await page.EvaluateAsync<string[]>(
+            """
+            () => Array.isArray(window.__aislePilotStatusHistory)
+                ? window.__aislePilotStatusHistory.filter(value => typeof value === "string" && value.trim().length > 0)
+                : []
+            """);
+
+        Assert.NotEmpty(saturdayHistory);
+        Assert.Equal(
+            ["Saturday, 6 of 7"],
+            saturdayHistory
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray());
+    }
+
+    [Fact]
     public async Task Desktop_AislePilotDayCarousel_UsesMutedPreviewCardsAndCompactOverlayChrome()
     {
         if (!IsE2EEnabled())
