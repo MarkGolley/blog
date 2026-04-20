@@ -1166,6 +1166,7 @@
     }
 
     .aislepilot-budget-grid {
+        grid-auto-flow: dense;
         grid-template-columns: repeat(12, minmax(0, 1fr));
         gap: 0.8rem;
     }
@@ -1195,6 +1196,7 @@
     }
 
     .aislepilot-budget-grid > .aislepilot-stat-card--supermarket {
+        grid-row: span 2;
         min-height: 5.35rem;
     }
 
@@ -1308,14 +1310,14 @@
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] {
         opacity: 0.44;
-        transform: translateX(0.36rem) scale(0.92);
+        transform: translateX(0.36rem) rotateY(8deg) scale(0.92);
         box-shadow: 0 14px 24px rgba(10, 26, 44, 0.07);
         filter: saturate(0.64) brightness(0.84);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] {
         opacity: 0.44;
-        transform: translateX(-0.36rem) scale(0.92);
+        transform: translateX(-0.36rem) rotateY(-8deg) scale(0.92);
         box-shadow: 0 14px 24px rgba(10, 26, 44, 0.07);
         filter: saturate(0.64) brightness(0.84);
     }

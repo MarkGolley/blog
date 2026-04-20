@@ -125,7 +125,7 @@
     var layoutSummary = string.IsNullOrWhiteSpace(layoutInsight.SourceLabel) ? null : $"{layoutInsight.SourceLabel}. {layoutConfidenceText}";
     var layoutReviewSummary = layoutInsight.NeedsReview ? "Branch aisle order can vary. Use Custom if the order looks wrong." : null;
     var supermarketPriceSummary = !string.IsNullOrWhiteSpace(priceInsight.SourceLabel)
-        ? $"{priceInsight.SourceLabel}. {priceAdjustmentText}. {priceConfidenceText}{(priceInsight.NeedsReview ? ". Stored public basket estimate." : string.Empty)}"
+        ? $"{priceInsight.SourceLabel}. {priceAdjustmentText}.{(string.IsNullOrWhiteSpace(priceInsight.RelativeCostBasis) ? string.Empty : $" {priceInsight.RelativeCostBasis}.")} {priceConfidenceText}{(priceInsight.NeedsReview ? ". Stored public basket estimate." : string.Empty)}"
         : priceInsight.NeedsReview
             ? "Pricing is estimated from stored public basket data."
             : null;
