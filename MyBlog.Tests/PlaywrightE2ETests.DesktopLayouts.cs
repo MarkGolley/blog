@@ -1224,4 +1224,5 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(snapshotMetrics[7] >= 0.92, $"Expected the summary row to use most of the snapshot width. Coverage={snapshotMetrics[7]:F2}.");
         Assert.Equal(0, snapshotMetrics[8]);
     }
+
 }

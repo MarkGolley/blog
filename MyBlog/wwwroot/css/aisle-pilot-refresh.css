@@ -1116,6 +1116,15 @@
         top: 1rem;
     }
 
+    .aislepilot-layout.has-results.has-visible-setup #aislepilot-setup .aislepilot-setup-workspace {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .aislepilot-layout.has-results.has-visible-setup #aislepilot-setup .aislepilot-setup-summary {
+        position: static;
+        top: auto;
+    }
+
     #aislepilot-overview.aislepilot-shell {
         padding: 1rem 1.05rem;
         background:

@@ -130,6 +130,9 @@
     }
 
     const setupPanel = document.querySelector("[data-setup-panel]");
+    const setupLayout = setupPanel instanceof HTMLElement
+        ? setupPanel.closest(".aislepilot-layout")
+        : null;
     const savedWeeksPanel = document.querySelector("[data-saved-weeks-panel]");
     const getOverviewContent = () => document.querySelector("[data-overview-content]");
 
@@ -499,6 +502,10 @@
         }
 
         const isHidden = setupPanel.hasAttribute("hidden");
+        if (setupLayout instanceof HTMLElement) {
+            setupLayout.classList.toggle("has-visible-setup", !isHidden);
+        }
+
         setupToggleButtons.forEach(button => {
             const srOnlyLabel = button.querySelector(".sr-only");
             const visibleLabel = button.querySelector("[data-setup-toggle-label]");
