@@ -27,40 +27,21 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
-    public async Task BlogIndex_ShowsPinnedPostsOrderedByLikeCount()
+    public async Task BlogIndex_ShowsConfiguredFeaturedPostsAndUpdatedCopy()
     {
-        var posts = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().Take(3).ToList();
-        Assert.True(posts.Count >= 3, "Expected at least three blog posts for pinned-post ordering test.");
+        using var client = _factory.CreateClient();
 
-        var topPostId = posts[0].Id;
-        var middlePostId = posts[1].Id;
-        var lowPostId = posts[2].Id;
+        var html = await client.GetStringAsync("/blog");
+        var featuredPosts = _factory.Services.GetRequiredService<BlogService>().GetFeaturedPosts();
 
-        using var visitorOne = CreateClient("10.0.0.1");
-        using var visitorTwo = CreateClient("10.0.0.2");
-        using var visitorThree = CreateClient("10.0.0.3");
+        Assert.Contains("<h1 id=\"blogs-title\">Articles</h1>", html, StringComparison.Ordinal);
+        Assert.Contains("Featured articles", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Pinned posts", html, StringComparison.OrdinalIgnoreCase);
 
-        await LikePostAsync(visitorOne, topPostId);
-        await LikePostAsync(visitorOne, middlePostId);
-        await LikePostAsync(visitorOne, lowPostId);
-
-        await LikePostAsync(visitorTwo, topPostId);
-        await LikePostAsync(visitorTwo, middlePostId);
-
-        await LikePostAsync(visitorThree, topPostId);
-
-        var html = await visitorOne.GetStringAsync("/blog");
-
-        var topIndex = html.IndexOf($"id=\"pinned-post-{topPostId}\"", StringComparison.Ordinal);
-        var middleIndex = html.IndexOf($"id=\"pinned-post-{middlePostId}\"", StringComparison.Ordinal);
-        var lowIndex = html.IndexOf($"id=\"pinned-post-{lowPostId}\"", StringComparison.Ordinal);
-
-        Assert.True(topIndex >= 0, "Top-liked post was not found in the pinned section.");
-        Assert.True(middleIndex >= 0, "Second-liked post was not found in the pinned section.");
-        Assert.True(lowIndex >= 0, "Third-liked post was not found in the pinned section.");
-
-        Assert.True(topIndex < middleIndex, "Pinned posts are not sorted by like count (top before middle).");
-        Assert.True(middleIndex < lowIndex, "Pinned posts are not sorted by like count (middle before low).");
+        foreach (var post in featuredPosts)
+        {
+            Assert.Contains($"id=\"featured-post-{post.Id}\"", html, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -547,6 +528,44 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("Today in code", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-daily-capsule-countdown=\"true\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-next-reset-utc=", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task HomeIndex_RendersRecruiterFacingNavigationAndFeaturedWriting()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("<title>Mark Golley | C#/.NET Engineer</title>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("asp-controller=\"Learning\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("View selected work", html, StringComparison.Ordinal);
+        Assert.Contains("Read featured writing", html, StringComparison.Ordinal);
+        Assert.Contains("Featured writing", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProjectsIndex_RendersSelectedWorkWithoutPlaceholderCards()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/projects");
+
+        Assert.Contains("Selected work", html, StringComparison.Ordinal);
+        Assert.Contains("Portfolio &#x2B; Publishing Platform", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("TBC", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AboutIndex_RendersRecruiterFocusedSummary()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/about");
+
+        Assert.Contains("focused on reliable delivery", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("View selected work", html, StringComparison.Ordinal);
+        Assert.Contains("Working style", html, StringComparison.Ordinal);
     }
 
     [Fact]

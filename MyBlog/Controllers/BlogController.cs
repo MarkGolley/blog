@@ -21,7 +21,7 @@ public class BlogController : Controller
         "Your comment was not published because it did not meet our moderation standards.";
     private const string CommentSubmissionBlockedBannerMessage =
         "Your comment could not be submitted. Please try again and make sure auto-fill is off for hidden fields.";
-    private const int MaxPinnedPosts = 3;
+    private const int MaxFeaturedPosts = 3;
     private const int MaxRelatedPosts = 3;
     private static readonly Regex RelatedTokenRegex = new(@"[A-Za-z0-9#\+\.]+", RegexOptions.Compiled);
 
@@ -70,21 +70,22 @@ public class BlogController : Controller
             };
         }).ToList();
 
-        var pinnedPosts = postItems
-            .Where(x => x.LikeCount > 0)
-            .OrderByDescending(x => x.LikeCount)
-            .ThenByDescending(x => x.Post.DatePosted)
-            .Take(MaxPinnedPosts)
+        var featuredOrder = _blogService.GetFeaturedPosts(MaxFeaturedPosts)
+            .Select(post => post.Id)
             .ToList();
-
-        var pinnedIds = pinnedPosts
+        var postItemsById = postItems.ToDictionary(item => item.Post.Id, StringComparer.OrdinalIgnoreCase);
+        var featuredPosts = featuredOrder
+            .Where(postItemsById.ContainsKey)
+            .Select(postId => postItemsById[postId])
+            .ToList();
+        var featuredIds = featuredPosts
             .Select(x => x.Post.Id)
-            .ToHashSet(StringComparer.Ordinal);
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var vm = new BlogIndexViewModel
         {
-            PinnedPosts = pinnedPosts,
-            Posts = postItems.Where(x => !pinnedIds.Contains(x.Post.Id)).ToList(),
+            FeaturedPosts = featuredPosts,
+            Posts = postItems.Where(x => !featuredIds.Contains(x.Post.Id)).ToList(),
             AvailableTags = allPosts
                 .SelectMany(post => post.Tags)
                 .Distinct(StringComparer.OrdinalIgnoreCase)

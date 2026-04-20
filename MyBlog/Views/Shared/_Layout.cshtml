@@ -6,12 +6,12 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     @{
-        var siteName = "MyBlog";
+        var siteName = "Mark Golley";
         var pageTitle = ViewData["Title"]?.ToString();
         var metaTitle = ViewData["MetaTitle"]?.ToString()
                         ?? (string.IsNullOrWhiteSpace(pageTitle) ? siteName : $"{pageTitle} - {siteName}");
         var metaDescription = ViewData["MetaDescription"]?.ToString()
-                              ?? "Engineering posts on C#, .NET, Python, testing, and software design.";
+                              ?? "C#/.NET engineering portfolio and writing focused on ASP.NET Core, testing, and practical delivery.";
         var metaRobots = ViewData["MetaRobots"]?.ToString() ?? "index,follow";
         var ogType = ViewData["OgType"]?.ToString() ?? "website";
         var twitterCard = ViewData["TwitterCard"]?.ToString() ?? "summary_large_image";
@@ -79,7 +79,7 @@
     <meta name="description" content="@metaDescription"/>
     <meta name="robots" content="@metaRobots"/>
     <link rel="canonical" href="@canonicalUrl"/>
-    <link rel="alternate" type="application/rss+xml" title="MyBlog RSS" href="@($"{baseUrl}/rss.xml")"/>
+    <link rel="alternate" type="application/rss+xml" title="Mark Golley RSS" href="@($"{baseUrl}/rss.xml")"/>
     <meta property="og:type" content="@ogType"/>
     <meta property="og:site_name" content="@siteName"/>
     <meta property="og:title" content="@metaTitle"/>
@@ -154,7 +154,7 @@
     <div class="container nav-shell">
         <a class="nav-brand" asp-controller="Home" asp-action="Index">
             <span class="brand-wordmark">Mark Golley</span>
-            <span class="brand-subtitle">Software Engineering</span>
+            <span class="brand-subtitle">C#/.NET Engineer</span>
         </a>
 
         @if (navCapsule is not null)
@@ -251,11 +251,10 @@
 
         <nav id="primary-nav" class="nav-links" aria-label="Primary" data-nav-menu>
             <a class="nav-link @(IsActive("Home") ? "is-active" : string.Empty)" asp-controller="Home" asp-action="Index">Home</a>
-            <a class="nav-link @(IsController("Blog") ? "is-active" : string.Empty)" asp-controller="Blog" asp-action="Index">Blog</a>
             <a class="nav-link @(IsController("Projects") ? "is-active" : string.Empty)" asp-controller="Projects" asp-action="Index">Projects</a>
-            <a class="nav-link @(IsActive("Learning") ? "is-active" : string.Empty)" asp-controller="Learning" asp-action="Index">Learning</a>
-            <a class="nav-link @(IsActive("Contact") ? "is-active" : string.Empty)" asp-controller="Contact" asp-action="Index">Contact</a>
+            <a class="nav-link @(IsController("Blog") ? "is-active" : string.Empty)" asp-controller="Blog" asp-action="Index">Articles</a>
             <a class="nav-link @(IsActive("About") ? "is-active" : string.Empty)" asp-controller="About" asp-action="Index">About</a>
+            <a class="nav-link @(IsActive("Contact") ? "is-active" : string.Empty)" asp-controller="Contact" asp-action="Index">Contact</a>
         </nav>
     </div>
 </header>
@@ -267,7 +266,7 @@
 <footer class="site-footer">
     <div class="container footer-shell">
         <p>&copy; @DateTime.UtcNow.Year Mark Golley</p>
-        <p>Built with ASP.NET Core, clean architecture, and obsessive pragmatism.</p>
+        <p>ASP.NET Core portfolio, engineering writing, and product experiments focused on reliable delivery.</p>
     </div>
 </footer>
 

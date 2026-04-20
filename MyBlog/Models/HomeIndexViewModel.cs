@@ -2,5 +2,6 @@ namespace MyBlog.Models;
 
 public sealed class HomeIndexViewModel
 {
-    public DailyCodingCapsuleViewModel DailyCapsule { get; init; } = new();
+    public int PublishedPostCount { get; init; }
+    public IReadOnlyList<BlogPost> FeaturedPosts { get; init; } = Array.Empty<BlogPost>();
 }

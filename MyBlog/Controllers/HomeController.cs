@@ -1,10 +1,11 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using MyBlog.Models;
+using MyBlog.Services;
 
 namespace MyBlog.Controllers;
 
-public class HomeController(IConfiguration configuration) : Controller
+public class HomeController(IConfiguration configuration, BlogService blogService) : Controller
 {
     public IActionResult Index()
     {
@@ -32,7 +33,13 @@ public class HomeController(IConfiguration configuration) : Controller
         SetExternalProfileUrl("GitHubUrl", "PROFILE_GITHUB_URL", "Profile:GitHubUrl");
         SetExternalProfileUrl("LinkedInUrl", "PROFILE_LINKEDIN_URL", "Profile:LinkedInUrl");
 
-        return View();
+        var viewModel = new HomeIndexViewModel
+        {
+            PublishedPostCount = blogService.GetAllPosts().Count(),
+            FeaturedPosts = blogService.GetFeaturedPosts()
+        };
+
+        return View(viewModel);
     }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

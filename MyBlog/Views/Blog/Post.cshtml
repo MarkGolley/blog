@@ -18,7 +18,7 @@
     }
 
     ViewData["Title"] = Model.Post.Title;
-    ViewData["MetaDescription"] = $"Read \"{Model.Post.Title}\" on MyBlog.";
+    ViewData["MetaDescription"] = $"Read \"{Model.Post.Title}\" by Mark Golley.";
     ViewData["CanonicalPath"] = $"/blog/{Uri.EscapeDataString(Model.Post.Id)}";
     ViewData["OgType"] = "article";
 }
