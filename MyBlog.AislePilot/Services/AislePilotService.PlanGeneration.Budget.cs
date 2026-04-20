@@ -110,7 +110,11 @@ public sealed partial class AislePilotService
             planDays);
         var mealMultipliers = BuildPerMealPortionMultipliers(dayMultipliers, mealsPerDay);
 
-        var currentTotal = CalculatePlanCost(selectedMeals, context.HouseholdFactor, mealMultipliers);
+        var currentTotal = CalculatePlanCost(
+            selectedMeals,
+            context.HouseholdFactor,
+            mealMultipliers,
+            context.PriceProfile.RelativeCostFactor);
         var maxIterations = Math.Max(4, totalMealCount * 2);
         var hasChanges = false;
 
@@ -120,7 +124,8 @@ public sealed partial class AislePilotService
                 .OrderByDescending(index => CalculateScaledMealCost(
                     selectedMeals[index],
                     context.HouseholdFactor,
-                    mealMultipliers[index]))
+                    mealMultipliers[index],
+                    context.PriceProfile.RelativeCostFactor))
                 .ToList();
 
             var swappedThisIteration = false;
@@ -131,6 +136,7 @@ public sealed partial class AislePilotService
                     selectedMeals,
                     dayIndex,
                     context.HouseholdFactor,
+                    context.PriceProfile.RelativeCostFactor,
                     mealMultipliers[dayIndex],
                     request.PreferQuickMeals,
                     IsHighProteinPreferred(context.DietaryModes),
@@ -143,11 +149,13 @@ public sealed partial class AislePilotService
                 var currentMealCost = CalculateScaledMealCost(
                     selectedMeals[dayIndex],
                     context.HouseholdFactor,
-                    mealMultipliers[dayIndex]);
+                    mealMultipliers[dayIndex],
+                    context.PriceProfile.RelativeCostFactor);
                 var replacementMealCost = CalculateScaledMealCost(
                     replacement,
                     context.HouseholdFactor,
-                    mealMultipliers[dayIndex]);
+                    mealMultipliers[dayIndex],
+                    context.PriceProfile.RelativeCostFactor);
 
                 if (replacementMealCost >= currentMealCost)
                 {
@@ -233,7 +241,11 @@ public sealed partial class AislePilotService
             planDays);
         var mealMultipliers = BuildPerMealPortionMultipliers(dayMultipliers, mealsPerDay);
 
-        var currentTotal = CalculatePlanCost(selectedMeals, context.HouseholdFactor, mealMultipliers);
+        var currentTotal = CalculatePlanCost(
+            selectedMeals,
+            context.HouseholdFactor,
+            mealMultipliers,
+            context.PriceProfile.RelativeCostFactor);
         var maxIterations = Math.Max(4, totalMealCount * 2);
         var hasChanges = false;
 
@@ -243,7 +255,8 @@ public sealed partial class AislePilotService
                 .OrderByDescending(index => CalculateScaledMealCost(
                     selectedMeals[index],
                     context.HouseholdFactor,
-                    mealMultipliers[index]))
+                    mealMultipliers[index],
+                    context.PriceProfile.RelativeCostFactor))
                 .ToList();
 
             var swappedThisIteration = false;
@@ -254,6 +267,7 @@ public sealed partial class AislePilotService
                     selectedMeals,
                     dayIndex,
                     context.HouseholdFactor,
+                    context.PriceProfile.RelativeCostFactor,
                     mealMultipliers[dayIndex],
                     request.PreferQuickMeals,
                     IsHighProteinPreferred(context.DietaryModes),
@@ -266,11 +280,13 @@ public sealed partial class AislePilotService
                 var currentMealCost = CalculateScaledMealCost(
                     selectedMeals[dayIndex],
                     context.HouseholdFactor,
-                    mealMultipliers[dayIndex]);
+                    mealMultipliers[dayIndex],
+                    context.PriceProfile.RelativeCostFactor);
                 var replacementMealCost = CalculateScaledMealCost(
                     replacement,
                     context.HouseholdFactor,
-                    mealMultipliers[dayIndex]);
+                    mealMultipliers[dayIndex],
+                    context.PriceProfile.RelativeCostFactor);
 
                 if (replacementMealCost >= currentMealCost)
                 {
@@ -319,6 +335,7 @@ public sealed partial class AislePilotService
         IReadOnlyList<MealTemplate> selectedMeals,
         int dayIndex,
         decimal householdFactor,
+        decimal priceFactor,
         int dayMultiplier,
         bool preferQuickMeals,
         bool preferHighProtein,
@@ -330,7 +347,7 @@ public sealed partial class AislePilotService
         }
 
         var currentMeal = selectedMeals[dayIndex];
-        var currentMealCost = CalculateScaledMealCost(currentMeal, householdFactor, dayMultiplier);
+        var currentMealCost = CalculateScaledMealCost(currentMeal, householdFactor, dayMultiplier, priceFactor);
         var usedNames = selectedMeals
             .Where((_, index) => index != dayIndex)
             .Select(meal => meal.Name)
@@ -354,7 +371,7 @@ public sealed partial class AislePilotService
             .Select(meal => new
             {
                 Meal = meal,
-                Cost = CalculateScaledMealCost(meal, householdFactor, dayMultiplier)
+                Cost = CalculateScaledMealCost(meal, householdFactor, dayMultiplier, priceFactor)
             })
             .Where(x => x.Cost < currentMealCost)
             .OrderBy(x => x.Cost)
@@ -372,7 +389,8 @@ public sealed partial class AislePilotService
     private static decimal CalculatePlanCost(
         IReadOnlyList<MealTemplate> meals,
         decimal householdFactor,
-        IReadOnlyList<int> dayMultipliers)
+        IReadOnlyList<int> dayMultipliers,
+        decimal priceFactor = 1m)
     {
         if (meals.Count == 0)
         {
@@ -383,7 +401,7 @@ public sealed partial class AislePilotService
         var total = 0m;
         for (var i = 0; i < normalizedCount; i++)
         {
-            total += CalculateScaledMealCost(meals[i], householdFactor, dayMultipliers[i]);
+            total += CalculateScaledMealCost(meals[i], householdFactor, dayMultipliers[i], priceFactor);
         }
 
         return decimal.Round(total, 2, MidpointRounding.AwayFromZero);
@@ -392,11 +410,12 @@ public sealed partial class AislePilotService
     private static decimal CalculateScaledMealCost(
         MealTemplate meal,
         decimal householdFactor,
-        int dayMultiplier)
+        int dayMultiplier,
+        decimal priceFactor = 1m)
     {
         var normalizedMultiplier = Math.Max(1, dayMultiplier);
         return decimal.Round(
-            meal.BaseCostForTwo * householdFactor * normalizedMultiplier,
+            meal.BaseCostForTwo * householdFactor * NormalizeSupermarketPriceFactor(priceFactor) * normalizedMultiplier,
             4,
             MidpointRounding.AwayFromZero);
     }

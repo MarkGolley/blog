@@ -7,6 +7,8 @@ public interface IAislePilotService
     IReadOnlyList<string> GetSupportedSupermarkets();
     IReadOnlyList<string> GetSupportedPortionSizes();
     IReadOnlyList<string> GetSupportedDietaryModes();
+    AislePilotDietarySelectionRules GetDietarySelectionRules();
+    bool TryValidateDietaryModes(IReadOnlyList<string>? dietaryModes, out string errorMessage);
     bool CanGenerateMealImages();
     bool HasCompatibleMeals(AislePilotRequestModel request);
     IReadOnlyList<AislePilotPantrySuggestionViewModel> SuggestMealsFromPantry(

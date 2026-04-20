@@ -50,6 +50,13 @@ public static class QuantityDisplayFormatter
         "tablespoon",
         "tablespoons"
     };
+    private static readonly Dictionary<string, (string Singular, string Plural)> RecipeQualitativeUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["pinch"] = ("pinch", "pinches"),
+        ["pinches"] = ("pinch", "pinches"),
+        ["dash"] = ("dash", "dashes"),
+        ["dashes"] = ("dash", "dashes")
+    };
 
     private static readonly HashSet<string> WholePurchaseUnits = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -82,6 +89,11 @@ public static class QuantityDisplayFormatter
         if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
         {
             return FormatKg(quantity);
+        }
+
+        if (string.Equals(normalizedUnit, "g", StringComparison.OrdinalIgnoreCase))
+        {
+            return FormatShoppingWeight(quantity);
         }
 
         if (TryFormatSpoonQuantity(quantity, normalizedUnit, out var spoonQuantityDisplay))
@@ -135,6 +147,11 @@ public static class QuantityDisplayFormatter
             return spoonQuantityDisplay;
         }
 
+        if (TryFormatRecipeQualitativeQuantity(quantity, normalizedUnit, out var qualitativeQuantityDisplay))
+        {
+            return qualitativeQuantityDisplay;
+        }
+
         if (RecipeLitreUnits.Contains(normalizedUnit))
         {
             var totalMillilitres = quantity * 1000m;
@@ -174,7 +191,17 @@ public static class QuantityDisplayFormatter
 
     private static string NormalizeUnit(string? unit)
     {
-        return (unit ?? string.Empty).Trim().ToLowerInvariant();
+        var normalized = (unit ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "gram" or "grams" => "g",
+            "kilogram" or "kilograms" or "kgs" => "kg",
+            "milliliter" or "milliliters" or "millilitre" or "millilitres" => "ml",
+            "liter" or "liters" or "litre" or "litres" => "l",
+            "teaspoon" or "teaspoons" or "tsps" => "tsp",
+            "tablespoon" or "tablespoons" or "tbsps" => "tbsp",
+            _ => normalized
+        };
     }
 
     private static string FormatKg(decimal quantity)
@@ -187,6 +214,24 @@ public static class QuantityDisplayFormatter
 
         var grams = decimal.Round(quantity * 1000m, 0, MidpointRounding.AwayFromZero);
         return $"{grams:0} g";
+    }
+
+    private static string FormatShoppingWeight(decimal quantityInGrams)
+    {
+        if (quantityInGrams <= 0m)
+        {
+            return "-";
+        }
+
+        if (quantityInGrams >= 1000m)
+        {
+            return FormatKg(quantityInGrams / 1000m);
+        }
+
+        var roundedUpGrams = RoundUpToNearest(
+            decimal.Round(quantityInGrams, 0, MidpointRounding.AwayFromZero),
+            5m);
+        return $"{roundedUpGrams:0} g";
     }
 
     private static string ToDisplayUnit(string normalizedUnit, decimal quantity)
@@ -388,6 +433,26 @@ public static class QuantityDisplayFormatter
             roundedToQuarter,
             ToDisplayUnit(normalizedUnit, 1),
             ToDisplayUnit(normalizedUnit, roundedToQuarter));
+    }
+
+    private static bool TryFormatRecipeQualitativeQuantity(decimal quantity, string normalizedUnit, out string formattedQuantity)
+    {
+        formattedQuantity = string.Empty;
+
+        if (!RecipeQualitativeUnits.TryGetValue(normalizedUnit, out var unitForms))
+        {
+            return false;
+        }
+
+        var roundedPinches = Math.Max(1m, decimal.Round(quantity, 0, MidpointRounding.AwayFromZero));
+        if (roundedPinches == 1m)
+        {
+            formattedQuantity = $"a {unitForms.Singular} of";
+            return true;
+        }
+
+        formattedQuantity = $"{roundedPinches:0} {unitForms.Plural} of";
+        return true;
     }
 
     private static string FormatFractionalAmount(decimal quantity, string? singularUnit, string? pluralUnit)

@@ -8,29 +8,46 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace MyBlog.Services;
 
 public sealed partial class AislePilotService
 {
+    private static readonly HashSet<string> VariableLayoutSupermarkets = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Aldi",
+        "Lidl",
+        "Co-op",
+        "Iceland",
+        "M&S Food"
+    };
+
     private IReadOnlyList<string> ResolveAisleOrder(string supermarket, string customAisleOrder)
+    {
+        return ResolveSupermarketLayout(supermarket, customAisleOrder).AisleOrder;
+    }
+
+    private async Task<IReadOnlyList<string>> ResolveAisleOrderAsync(
+        string supermarket,
+        string customAisleOrder,
+        CancellationToken cancellationToken = default)
+    {
+        var resolution = await ResolveSupermarketLayoutAsync(supermarket, customAisleOrder, cancellationToken);
+        return resolution.AisleOrder;
+    }
+
+    private SupermarketLayoutResolution ResolveSupermarketLayout(string supermarket, string customAisleOrder)
     {
         if (supermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase))
         {
-            var custom = customAisleOrder
-                .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => x.Trim())
-                .Where(x => x.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (custom.Count >= 3)
+            var customResolution = TryBuildCustomSupermarketLayoutResolution(customAisleOrder);
+            if (customResolution is not null)
             {
-                return NormalizeResolvedAisleOrder(custom);
+                return customResolution;
             }
         }
 
@@ -40,52 +57,40 @@ public sealed partial class AislePilotService
         {
             if (!IsSupermarketLayoutStale(cachedLayout.UpdatedAtUtc))
             {
-                return cachedLayout.AisleOrder;
+                return BuildCachedSupermarketLayoutResolution(cachedLayout);
             }
 
-            var refreshedStaleOrder = TryRefreshSupermarketLayoutSynchronously(supermarket);
-            if (refreshedStaleOrder is not null)
+            var refreshedStaleLayout = TryRefreshSupermarketLayoutSynchronously(supermarket);
+            if (refreshedStaleLayout is not null)
             {
-                return refreshedStaleOrder;
+                return refreshedStaleLayout;
             }
 
             QueueSupermarketLayoutRefresh(supermarket);
-            return cachedLayout.AisleOrder;
+            return BuildCachedSupermarketLayoutResolution(cachedLayout);
         }
 
-        var discoveredOrder = TryRefreshSupermarketLayoutSynchronously(supermarket);
-        if (discoveredOrder is not null)
+        var discoveredLayout = TryRefreshSupermarketLayoutSynchronously(supermarket);
+        if (discoveredLayout is not null)
         {
-            return discoveredOrder;
+            return discoveredLayout;
         }
 
         QueueSupermarketLayoutRefresh(supermarket);
-
-        if (SupermarketAisleOrders.TryGetValue(supermarket, out var predefined))
-        {
-            return NormalizeResolvedAisleOrder(predefined);
-        }
-
-        return NormalizeResolvedAisleOrder(DefaultAisleOrder);
+        return BuildFallbackSupermarketLayoutResolution(supermarket);
     }
 
-    private async Task<IReadOnlyList<string>> ResolveAisleOrderAsync(
+    private async Task<SupermarketLayoutResolution> ResolveSupermarketLayoutAsync(
         string supermarket,
         string customAisleOrder,
         CancellationToken cancellationToken = default)
     {
         if (supermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase))
         {
-            var custom = customAisleOrder
-                .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => x.Trim())
-                .Where(x => x.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (custom.Count >= 3)
+            var customResolution = TryBuildCustomSupermarketLayoutResolution(customAisleOrder);
+            if (customResolution is not null)
             {
-                return NormalizeResolvedAisleOrder(custom);
+                return customResolution;
             }
         }
 
@@ -95,33 +100,138 @@ public sealed partial class AislePilotService
         {
             if (!IsSupermarketLayoutStale(cachedLayout.UpdatedAtUtc))
             {
-                return cachedLayout.AisleOrder;
+                return BuildCachedSupermarketLayoutResolution(cachedLayout);
             }
 
-            var refreshedStaleOrder = await TryRefreshSupermarketLayoutWithTimeoutAsync(supermarket, cancellationToken);
-            if (refreshedStaleOrder is not null)
+            var refreshedStaleLayout = await TryRefreshSupermarketLayoutWithTimeoutAsync(supermarket, cancellationToken);
+            if (refreshedStaleLayout is not null)
             {
-                return refreshedStaleOrder;
+                return refreshedStaleLayout;
             }
 
             QueueSupermarketLayoutRefresh(supermarket);
-            return cachedLayout.AisleOrder;
+            return BuildCachedSupermarketLayoutResolution(cachedLayout);
         }
 
-        var discoveredOrder = await TryRefreshSupermarketLayoutWithTimeoutAsync(supermarket, cancellationToken);
-        if (discoveredOrder is not null)
+        var discoveredLayout = await TryRefreshSupermarketLayoutWithTimeoutAsync(supermarket, cancellationToken);
+        if (discoveredLayout is not null)
         {
-            return discoveredOrder;
+            return discoveredLayout;
         }
 
         QueueSupermarketLayoutRefresh(supermarket);
+        return BuildFallbackSupermarketLayoutResolution(supermarket);
+    }
 
-        if (SupermarketAisleOrders.TryGetValue(supermarket, out var predefined))
+    private static SupermarketLayoutResolution? TryBuildCustomSupermarketLayoutResolution(string customAisleOrder)
+    {
+        var custom = customAisleOrder
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .Where(x => x.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (custom.Count < 3)
         {
-            return NormalizeResolvedAisleOrder(predefined);
+            return null;
         }
 
-        return NormalizeResolvedAisleOrder(DefaultAisleOrder);
+        return new SupermarketLayoutResolution
+        {
+            AisleOrder = NormalizeResolvedAisleOrder(custom),
+            SourceLabel = "User set custom layout",
+            ConfidenceScore = 1m,
+            ConfidenceLabel = "User set",
+            IsDefaultLayout = false,
+            NeedsReview = false,
+            LastVerifiedUtc = null
+        };
+    }
+
+    private static SupermarketLayoutResolution BuildFallbackSupermarketLayoutResolution(string supermarket)
+    {
+        if (SupermarketAisleOrders.TryGetValue(supermarket, out var predefined))
+        {
+            return BuildCuratedSupermarketLayoutResolution(supermarket, predefined);
+        }
+
+        return BuildCuratedSupermarketLayoutResolution(supermarket, DefaultAisleOrder);
+    }
+
+    private static SupermarketLayoutResolution BuildCuratedSupermarketLayoutResolution(
+        string supermarket,
+        IEnumerable<string> aisleOrder)
+    {
+        var normalizedSupermarket = NormalizeSupermarket(supermarket);
+        var needsReview = VariableLayoutSupermarkets.Contains(normalizedSupermarket);
+        var confidenceScore = needsReview ? 0.55m : 0.68m;
+
+        return new SupermarketLayoutResolution
+        {
+            AisleOrder = NormalizeResolvedAisleOrder(aisleOrder),
+            SourceLabel = "Curated chain default",
+            ConfidenceScore = confidenceScore,
+            ConfidenceLabel = ResolveConfidenceLabel(confidenceScore),
+            IsDefaultLayout = true,
+            NeedsReview = needsReview,
+            LastVerifiedUtc = null
+        };
+    }
+
+    private static SupermarketLayoutResolution BuildCachedSupermarketLayoutResolution(
+        SupermarketLayoutCacheEntry cachedLayout)
+    {
+        return new SupermarketLayoutResolution
+        {
+            AisleOrder = cachedLayout.AisleOrder,
+            SourceLabel = cachedLayout.SourceLabel,
+            ConfidenceScore = cachedLayout.ConfidenceScore,
+            ConfidenceLabel = cachedLayout.ConfidenceLabel,
+            IsDefaultLayout = cachedLayout.IsDefaultLayout,
+            NeedsReview = cachedLayout.NeedsReview,
+            LastVerifiedUtc = cachedLayout.UpdatedAtUtc == default ? null : cachedLayout.UpdatedAtUtc,
+            Evidence = cachedLayout.Evidence
+        };
+    }
+
+    internal static AislePilotSupermarketLayoutInsightViewModel BuildLayoutInsightViewModel(
+        SupermarketLayoutResolution resolution)
+    {
+        return new AislePilotSupermarketLayoutInsightViewModel
+        {
+            SourceLabel = resolution.SourceLabel,
+            ConfidenceScore = resolution.ConfidenceScore,
+            ConfidenceLabel = resolution.ConfidenceLabel,
+            IsDefaultLayout = resolution.IsDefaultLayout,
+            NeedsReview = resolution.NeedsReview,
+            LastVerifiedUtc = resolution.LastVerifiedUtc,
+            Evidence = resolution.Evidence
+                .Select(source => new AislePilotSupermarketLayoutEvidenceViewModel
+                {
+                    Title = source.Title,
+                    Url = source.Url,
+                    SourceType = source.SourceType
+                })
+                .ToList()
+        };
+    }
+
+    private static SupermarketLayoutCacheEntry BuildCacheEntry(
+        SupermarketLayoutResolution resolution,
+        DateTime updatedAtUtc)
+    {
+        return new SupermarketLayoutCacheEntry
+        {
+            AisleOrder = resolution.AisleOrder,
+            UpdatedAtUtc = updatedAtUtc,
+            SourceLabel = resolution.SourceLabel,
+            ConfidenceScore = resolution.ConfidenceScore,
+            ConfidenceLabel = resolution.ConfidenceLabel,
+            IsDefaultLayout = resolution.IsDefaultLayout,
+            NeedsReview = resolution.NeedsReview,
+            Evidence = resolution.Evidence
+        };
     }
 
     private void EnsureSupermarketLayoutCacheHydrated()
@@ -200,13 +310,30 @@ public sealed partial class AislePilotService
                     continue;
                 }
 
+                var evidence = NormalizeSupermarketLayoutEvidence(mapped.Evidence?
+                    .Select(source => new SupermarketLayoutEvidence
+                    {
+                        Title = source.Title,
+                        Url = source.Url,
+                        SourceType = source.SourceType
+                    }) ?? []);
+                var confidenceScore = Math.Clamp((decimal)mapped.ConfidenceScore, 0m, 1m);
                 var updatedAtUtc = mapped.UpdatedAtUtc == default
                     ? DateTime.UtcNow.AddDays(-SupermarketLayoutStaleDays - 1)
                     : mapped.UpdatedAtUtc;
+
                 SupermarketLayoutCache[mapped.Supermarket.Trim()] = new SupermarketLayoutCacheEntry
                 {
                     AisleOrder = normalizedOrder,
-                    UpdatedAtUtc = updatedAtUtc
+                    UpdatedAtUtc = updatedAtUtc,
+                    SourceLabel = string.IsNullOrWhiteSpace(mapped.Source)
+                        ? "AI web research"
+                        : mapped.Source.Trim(),
+                    ConfidenceScore = confidenceScore,
+                    ConfidenceLabel = ResolveConfidenceLabel(confidenceScore, mapped.ConfidenceLabel),
+                    IsDefaultLayout = mapped.IsDefaultLayout,
+                    NeedsReview = mapped.NeedsReview,
+                    Evidence = evidence
                 };
             }
 
@@ -220,13 +347,12 @@ public sealed partial class AislePilotService
 
     private bool CanUseOnlineLayoutDiscovery()
     {
-        return _db is not null &&
-               _enableAiGeneration &&
+        return _enableAiGeneration &&
                _httpClient is not null &&
                !string.IsNullOrWhiteSpace(_apiKey);
     }
 
-    private async Task<IReadOnlyList<string>?> TryRefreshSupermarketLayoutWithTimeoutAsync(
+    private async Task<SupermarketLayoutResolution?> TryRefreshSupermarketLayoutWithTimeoutAsync(
         string supermarket,
         CancellationToken cancellationToken)
     {
@@ -248,14 +374,14 @@ public sealed partial class AislePilotService
         }
     }
 
-    private IReadOnlyList<string>? TryRefreshSupermarketLayoutSynchronously(string supermarket)
+    private SupermarketLayoutResolution? TryRefreshSupermarketLayoutSynchronously(string supermarket)
     {
         return TryRefreshSupermarketLayoutWithTimeoutAsync(supermarket, CancellationToken.None)
             .GetAwaiter()
             .GetResult();
     }
 
-    private async Task<IReadOnlyList<string>?> TryRefreshSupermarketLayoutAsync(
+    private async Task<SupermarketLayoutResolution?> TryRefreshSupermarketLayoutAsync(
         string supermarket,
         bool force,
         CancellationToken cancellationToken)
@@ -271,40 +397,35 @@ public sealed partial class AislePilotService
             DateTime.UtcNow - lastAttemptUtc < TimeSpan.FromMinutes(SupermarketLayoutRefreshCooldownMinutes))
         {
             return SupermarketLayoutCache.TryGetValue(normalizedSupermarket, out var recentCached)
-                ? recentCached.AisleOrder
+                ? BuildCachedSupermarketLayoutResolution(recentCached)
                 : null;
         }
 
         if (!SupermarketLayoutRefreshInFlight.TryAdd(normalizedSupermarket, 1))
         {
             return SupermarketLayoutCache.TryGetValue(normalizedSupermarket, out var existingCached)
-                ? existingCached.AisleOrder
+                ? BuildCachedSupermarketLayoutResolution(existingCached)
                 : null;
         }
 
         SupermarketLayoutLastAttemptUtc[normalizedSupermarket] = DateTime.UtcNow;
         try
         {
-            var discoveredOrder = await TryDiscoverSupermarketLayoutWithAiAsync(
+            var discoveredLayout = await TryDiscoverSupermarketLayoutWithAiAsync(
                 normalizedSupermarket,
                 cancellationToken);
-            if (discoveredOrder is null || discoveredOrder.Count < 3)
+            if (discoveredLayout is null || discoveredLayout.AisleOrder.Count < 3)
             {
                 return null;
             }
 
-            var normalizedOrder = NormalizeResolvedAisleOrder(discoveredOrder);
-            SupermarketLayoutCache[normalizedSupermarket] = new SupermarketLayoutCacheEntry
-            {
-                AisleOrder = normalizedOrder,
-                UpdatedAtUtc = DateTime.UtcNow
-            };
+            var cacheEntry = BuildCacheEntry(discoveredLayout, DateTime.UtcNow);
+            SupermarketLayoutCache[normalizedSupermarket] = cacheEntry;
             await PersistSupermarketLayoutAsync(
                 normalizedSupermarket,
-                normalizedOrder,
-                "openai-web-search",
+                discoveredLayout,
                 cancellationToken);
-            return normalizedOrder;
+            return discoveredLayout;
         }
         finally
         {
@@ -341,7 +462,7 @@ public sealed partial class AislePilotService
         });
     }
 
-    private async Task<IReadOnlyList<string>?> TryDiscoverSupermarketLayoutWithAiAsync(
+    private async Task<SupermarketLayoutResolution?> TryDiscoverSupermarketLayoutWithAiAsync(
         string supermarket,
         CancellationToken cancellationToken)
     {
@@ -352,13 +473,16 @@ public sealed partial class AislePilotService
 
         var aisleLabels = string.Join(", ", DefaultAisleOrder);
         var inputPrompt =
-            "Find current online information for typical in-store aisle flow in a UK " + supermarket + " supermarket.\n" +
+            "Research the current in-store shopping flow for a UK " + supermarket + " supermarket.\n" +
             "Return JSON only with this exact schema:\n" +
-            "{\"aisleOrder\":[\"Produce\",\"Bakery\",\"Meat & Fish\",\"Dairy & Eggs\",\"Frozen\",\"Tins & Dry Goods\",\"Spices & Sauces\",\"Snacks\",\"Drinks\",\"Household\",\"Other\"]}\n\n" +
+            "{\"aisleOrder\":[\"Produce\",\"Bakery\",\"Meat & Fish\",\"Dairy & Eggs\",\"Frozen\",\"Tins & Dry Goods\",\"Spices & Sauces\",\"Snacks\",\"Drinks\",\"Household\",\"Other\"],\"confidenceScore\":0.0,\"confidenceLabel\":\"low|medium|high\",\"needsReview\":true,\"sources\":[{\"title\":\"\",\"url\":\"https://...\",\"sourceType\":\"official|store-map|article|video|forum\"}]}\n\n" +
             "Rules:\n" +
             "- Use only these aisle labels: " + aisleLabels + ".\n" +
-            "- Order should reflect likely customer walking sequence in a typical UK branch.\n" +
-            "- If online sources disagree, choose the most common sequence and still return all labels.";
+            "- Prefer official UK retailer sources and recent UK-specific store walkthrough evidence.\n" +
+            "- Ignore non-UK stores and convenience-store formats unless the chain is mainly convenience-led.\n" +
+            "- If you cannot find at least 3 useful sources with URLs, set needsReview=true and confidenceScore to 0.55 or lower.\n" +
+            "- If layouts vary a lot by branch or format, set needsReview=true.\n" +
+            "- Never guess. If evidence is weak or mixed, still return the best normalized order but mark it for review.";
 
         var requestBody = new
         {
@@ -398,7 +522,7 @@ public sealed partial class AislePilotService
                 return null;
             }
 
-            return ParseSupermarketAisleOrderFromAiResponse(responseContent);
+            return ParseSupermarketLayoutResearchResponse(responseContent, supermarket);
         }
         catch (Exception ex)
         {
@@ -407,7 +531,9 @@ public sealed partial class AislePilotService
         }
     }
 
-    private static IReadOnlyList<string>? ParseSupermarketAisleOrderFromAiResponse(string responseContent)
+    private static SupermarketLayoutResolution? ParseSupermarketLayoutResearchResponse(
+        string responseContent,
+        string supermarket)
     {
         if (string.IsNullOrWhiteSpace(responseContent))
         {
@@ -418,7 +544,7 @@ public sealed partial class AislePilotService
         if (doc.RootElement.TryGetProperty("output_text", out var outputTextElement) &&
             outputTextElement.ValueKind == JsonValueKind.String)
         {
-            var parsedFromOutputText = ParseSupermarketAisleOrderPayload(outputTextElement.GetString());
+            var parsedFromOutputText = ParseSupermarketLayoutResearchPayload(outputTextElement.GetString(), supermarket);
             if (parsedFromOutputText is not null)
             {
                 return parsedFromOutputText;
@@ -427,29 +553,30 @@ public sealed partial class AislePilotService
 
         foreach (var textCandidate in EnumerateJsonStringValues(doc.RootElement))
         {
-            var parsed = ParseSupermarketAisleOrderPayload(textCandidate);
+            var parsed = ParseSupermarketLayoutResearchPayload(textCandidate, supermarket);
             if (parsed is not null)
             {
                 return parsed;
             }
         }
 
-        if (doc.RootElement.TryGetProperty("aisleOrder", out var directOrderElement) &&
-            directOrderElement.ValueKind == JsonValueKind.Array)
+        if (doc.RootElement.ValueKind == JsonValueKind.Object)
         {
-            var directOrder = directOrderElement
-                .EnumerateArray()
-                .Where(item => item.ValueKind == JsonValueKind.String)
-                .Select(item => item.GetString() ?? string.Empty)
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .ToList();
-            return directOrder.Count >= 3 ? NormalizeResolvedAisleOrder(directOrder) : null;
+            var parsed = TryBuildAiResearchLayoutResolution(
+                JsonSerializer.Deserialize<SupermarketLayoutResearchPayload>(doc.RootElement.GetRawText(), JsonOptions),
+                supermarket);
+            if (parsed is not null)
+            {
+                return parsed;
+            }
         }
 
         return null;
     }
 
-    private static IReadOnlyList<string>? ParseSupermarketAisleOrderPayload(string? rawPayload)
+    private static SupermarketLayoutResolution? ParseSupermarketLayoutResearchPayload(
+        string? rawPayload,
+        string supermarket)
     {
         if (string.IsNullOrWhiteSpace(rawPayload))
         {
@@ -464,16 +591,142 @@ public sealed partial class AislePilotService
 
         try
         {
-            var payload = JsonSerializer.Deserialize<SupermarketAisleOrderPayload>(normalized, JsonOptions);
-            var order = payload?.AisleOrder?
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .ToList();
-            return order is { Count: >= 3 } ? NormalizeResolvedAisleOrder(order) : null;
+            var payload = JsonSerializer.Deserialize<SupermarketLayoutResearchPayload>(normalized, JsonOptions);
+            return TryBuildAiResearchLayoutResolution(payload, supermarket);
         }
         catch
         {
             return null;
         }
+    }
+
+    private static SupermarketLayoutResolution? TryBuildAiResearchLayoutResolution(
+        SupermarketLayoutResearchPayload? payload,
+        string supermarket)
+    {
+        if (payload?.AisleOrder is null)
+        {
+            return null;
+        }
+
+        var rawDistinctOrder = payload.AisleOrder
+            .Select(ClampAndNormalizeDepartmentName)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (rawDistinctOrder.Count < 5)
+        {
+            return null;
+        }
+
+        var confidenceScore = Math.Clamp(payload.ConfidenceScore ?? 0m, 0m, 1m);
+        var evidence = NormalizeSupermarketLayoutEvidence(payload.Sources?
+            .Select(source => new SupermarketLayoutEvidence
+            {
+                Title = source.Title?.Trim() ?? string.Empty,
+                Url = source.Url?.Trim() ?? string.Empty,
+                SourceType = source.SourceType?.Trim() ?? string.Empty
+            }) ?? []);
+        var needsReview = payload.NeedsReview ?? true;
+
+        if (!IsAcceptableAiResearchResolution(confidenceScore, needsReview, evidence))
+        {
+            return null;
+        }
+
+        return new SupermarketLayoutResolution
+        {
+            AisleOrder = NormalizeResolvedAisleOrder(rawDistinctOrder),
+            SourceLabel = "AI web research",
+            ConfidenceScore = confidenceScore,
+            ConfidenceLabel = ResolveConfidenceLabel(confidenceScore, payload.ConfidenceLabel),
+            IsDefaultLayout = false,
+            NeedsReview = false,
+            LastVerifiedUtc = DateTime.UtcNow,
+            Evidence = evidence
+        };
+    }
+
+    private static bool IsAcceptableAiResearchResolution(
+        decimal confidenceScore,
+        bool needsReview,
+        IReadOnlyList<SupermarketLayoutEvidence> evidence)
+    {
+        if (needsReview || confidenceScore < 0.72m || evidence.Count < 3)
+        {
+            return false;
+        }
+
+        var distinctDomains = evidence
+            .Select(GetEvidenceDomain)
+            .Where(domain => !string.IsNullOrWhiteSpace(domain))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        if (distinctDomains < 2)
+        {
+            return false;
+        }
+
+        return evidence.Any(source =>
+            source.SourceType.Equals("official", StringComparison.OrdinalIgnoreCase) ||
+            source.SourceType.Equals("store-map", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IReadOnlyList<SupermarketLayoutEvidence> NormalizeSupermarketLayoutEvidence(
+        IEnumerable<SupermarketLayoutEvidence> evidence)
+    {
+        return evidence
+            .Where(source => !string.IsNullOrWhiteSpace(source.Url))
+            .Select(source =>
+            {
+                var normalizedUrl = NormalizeEvidenceUrl(source.Url);
+                return string.IsNullOrWhiteSpace(normalizedUrl)
+                    ? null
+                    : new SupermarketLayoutEvidence
+                    {
+                        Title = string.IsNullOrWhiteSpace(source.Title) ? normalizedUrl : source.Title.Trim(),
+                        Url = normalizedUrl,
+                        SourceType = NormalizeEvidenceSourceType(source.SourceType)
+                    };
+            })
+            .Where(source => source is not null)
+            .Select(source => source!)
+            .DistinctBy(source => source.Url, StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .ToList();
+    }
+
+    private static string NormalizeEvidenceUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) ||
+            !Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return string.Empty;
+        }
+
+        return uri.ToString();
+    }
+
+    private static string NormalizeEvidenceSourceType(string? sourceType)
+    {
+        var normalized = (sourceType ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "official" => "official",
+            "store-map" => "store-map",
+            "article" => "article",
+            "video" => "video",
+            "forum" => "forum",
+            _ => "article"
+        };
+    }
+
+    private static string? GetEvidenceDomain(SupermarketLayoutEvidence source)
+    {
+        return Uri.TryCreate(source.Url, UriKind.Absolute, out var uri)
+            ? uri.Host
+            : null;
     }
 
     private static IEnumerable<string> EnumerateJsonStringValues(JsonElement element)
@@ -515,11 +768,10 @@ public sealed partial class AislePilotService
 
     private async Task PersistSupermarketLayoutAsync(
         string supermarket,
-        IReadOnlyList<string> aisleOrder,
-        string source,
+        SupermarketLayoutResolution resolution,
         CancellationToken cancellationToken)
     {
-        if (_db is null || string.IsNullOrWhiteSpace(supermarket) || aisleOrder.Count < 3)
+        if (_db is null || string.IsNullOrWhiteSpace(supermarket) || resolution.AisleOrder.Count < 3)
         {
             return;
         }
@@ -531,10 +783,22 @@ public sealed partial class AislePilotService
                 new FirestoreAislePilotSupermarketLayout
                 {
                     Supermarket = supermarket,
-                    AisleOrder = aisleOrder.ToList(),
+                    AisleOrder = resolution.AisleOrder.ToList(),
                     Version = SupermarketLayoutCacheVersion,
                     UpdatedAtUtc = DateTime.UtcNow,
-                    Source = source
+                    Source = resolution.SourceLabel,
+                    ConfidenceScore = (double)resolution.ConfidenceScore,
+                    ConfidenceLabel = resolution.ConfidenceLabel,
+                    NeedsReview = resolution.NeedsReview,
+                    IsDefaultLayout = resolution.IsDefaultLayout,
+                    Evidence = resolution.Evidence
+                        .Select(source => new FirestoreAislePilotSupermarketLayoutEvidence
+                        {
+                            Title = source.Title,
+                            Url = source.Url,
+                            SourceType = source.SourceType
+                        })
+                        .ToList()
                 },
                 cancellationToken: cancellationToken);
         }
@@ -552,6 +816,29 @@ public sealed partial class AislePilotService
         }
 
         return DateTime.UtcNow - updatedAtUtc > TimeSpan.FromDays(SupermarketLayoutStaleDays);
+    }
+
+    private static string ResolveConfidenceLabel(decimal confidenceScore, string? preferredLabel = null)
+    {
+        var normalizedPreferred = (preferredLabel ?? string.Empty).Trim();
+        if (normalizedPreferred.Equals("user set", StringComparison.OrdinalIgnoreCase))
+        {
+            return "User set";
+        }
+
+        if (normalizedPreferred.Equals("high", StringComparison.OrdinalIgnoreCase) ||
+            normalizedPreferred.Equals("medium", StringComparison.OrdinalIgnoreCase) ||
+            normalizedPreferred.Equals("low", StringComparison.OrdinalIgnoreCase))
+        {
+            return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(normalizedPreferred.ToLowerInvariant());
+        }
+
+        return confidenceScore switch
+        {
+            >= 0.8m => "High",
+            >= 0.6m => "Medium",
+            _ => "Low"
+        };
     }
 
     private static IReadOnlyList<string> NormalizeResolvedAisleOrder(IEnumerable<string> source)
@@ -572,5 +859,4 @@ public sealed partial class AislePilotService
 
         return normalized;
     }
-
 }

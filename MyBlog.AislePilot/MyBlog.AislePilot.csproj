@@ -16,4 +16,10 @@
     <None Remove="artifacts\**" />
     <Content Remove="artifacts\**" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Data\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>AislePilotData\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+    </Content>
+  </ItemGroup>
 </Project>

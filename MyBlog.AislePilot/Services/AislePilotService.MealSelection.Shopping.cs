@@ -25,6 +25,7 @@ public sealed partial class AislePilotService
         IReadOnlySet<int> ignoredMealSlotIndexes,
         IReadOnlyDictionary<string, string> mealImageUrls,
         decimal householdFactor,
+        decimal priceFactor,
         decimal portionSizeFactor,
         IReadOnlyList<string> dietaryModes,
         string dislikesOrAllergens,
@@ -52,7 +53,7 @@ public sealed partial class AislePilotService
             var estimatedCost = isIgnored
                 ? 0m
                 : decimal.Round(
-                    template.BaseCostForTwo * householdFactor * mealPortionMultiplier,
+                    template.BaseCostForTwo * householdFactor * NormalizeSupermarketPriceFactor(priceFactor) * mealPortionMultiplier,
                     2,
                     MidpointRounding.AwayFromZero);
             var reason = template.IsQuick
@@ -173,9 +174,11 @@ public sealed partial class AislePilotService
         IReadOnlyList<int> mealPortionMultipliers,
         IReadOnlySet<int> ignoredMealSlotIndexes,
         decimal householdFactor,
+        decimal priceFactor,
         IReadOnlyList<string> aisleOrder,
         DessertAddOnTemplate? dessertAddOnTemplate)
     {
+        var normalizedPriceFactor = NormalizeSupermarketPriceFactor(priceFactor);
         var aggregated = new List<MutableShoppingItem>();
         var mealCount = Math.Min(selectedMeals.Count, mealPortionMultipliers.Count);
         for (var i = 0; i < mealCount; i++)
@@ -190,7 +193,10 @@ public sealed partial class AislePilotService
             foreach (var ingredient in meal.Ingredients)
             {
                 var aggregatedQuantity = ingredient.QuantityForTwo * householdFactor * mealPortionMultiplier;
-                var (canonicalQuantity, canonicalUnit) = NormalizeShoppingListQuantityAndUnit(aggregatedQuantity, ingredient.Unit);
+                var (canonicalQuantity, canonicalUnit) = NormalizeShoppingListQuantityAndUnit(
+                    ingredient.Name,
+                    aggregatedQuantity,
+                    ingredient.Unit);
                 var existing = FindMatchingShoppingItem(aggregated, ingredient.Name, canonicalUnit);
                 if (existing is null)
                 {
@@ -209,13 +215,14 @@ public sealed partial class AislePilotService
                 }
 
                 existing.Quantity += canonicalQuantity;
-                existing.EstimatedCost += ingredient.EstimatedCostForTwo * householdFactor * mealPortionMultiplier;
+                existing.EstimatedCost +=
+                    ingredient.EstimatedCostForTwo * householdFactor * normalizedPriceFactor * mealPortionMultiplier;
             }
         }
 
         if (dessertAddOnTemplate is not null)
         {
-            AddDessertAddOnShoppingItems(aggregated, householdFactor, dessertAddOnTemplate);
+            AddDessertAddOnShoppingItems(aggregated, householdFactor, normalizedPriceFactor, dessertAddOnTemplate);
         }
 
         var departmentOrder = aisleOrder
@@ -242,7 +249,22 @@ public sealed partial class AislePilotService
         "canned",
         "tin",
         "tinned",
-        "drained"
+        "drained",
+        "fresh",
+        "salad"
+    };
+
+    private static readonly Dictionary<string, string> PreferredShoppingListDisplayNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["spinach"] = "Spinach",
+        ["mixed leave"] = "Mixed leaves",
+        ["tomato"] = "Tomatoes",
+        ["olive oil"] = "Olive oil"
+    };
+
+    private static readonly Dictionary<string, decimal> ShoppingPieceWeightByIngredient = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["tomato"] = 100m
     };
 
     private static MutableShoppingItem? FindMatchingShoppingItem(
@@ -310,15 +332,76 @@ public sealed partial class AislePilotService
         return normalized;
     }
 
-    private static (decimal Quantity, string Unit) NormalizeShoppingListQuantityAndUnit(decimal quantity, string? unit)
+    private static (decimal Quantity, string Unit) NormalizeShoppingListQuantityAndUnit(
+        string? ingredientName,
+        decimal quantity,
+        string? unit)
     {
+        if (quantity <= 0m)
+        {
+            return (0m, NormalizeShoppingListUnit(unit));
+        }
+
+        var normalizedIngredientName = NormalizeShoppingListIngredientName(ingredientName);
         var normalizedUnit = NormalizeShoppingListUnit(unit);
+        if (TryNormalizeShoppingListPieceWeightQuantity(normalizedIngredientName, quantity, normalizedUnit, out var pieceWeightQuantity))
+        {
+            return pieceWeightQuantity;
+        }
+
+        if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
+        {
+            return (quantity * 1000m, "g");
+        }
+
+        if (string.Equals(normalizedUnit, "g", StringComparison.OrdinalIgnoreCase))
+        {
+            return (quantity, "g");
+        }
+
         if (QuantityDisplayFormatter.TryConvertToMillilitres(quantity, normalizedUnit, out var totalMillilitres))
         {
             return (totalMillilitres, "ml");
         }
 
         return (quantity, normalizedUnit);
+    }
+
+    private static bool TryNormalizeShoppingListPieceWeightQuantity(
+        string normalizedIngredientName,
+        decimal quantity,
+        string normalizedUnit,
+        out (decimal Quantity, string Unit) normalizedQuantity)
+    {
+        normalizedQuantity = default;
+        if (!ShoppingPieceWeightByIngredient.TryGetValue(normalizedIngredientName, out var gramsPerPiece) ||
+            gramsPerPiece <= 0m)
+        {
+            return false;
+        }
+
+        if (string.Equals(normalizedUnit, "pcs", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedQuantity = (quantity, "pcs");
+            return true;
+        }
+
+        decimal quantityInPieces;
+        if (string.Equals(normalizedUnit, "g", StringComparison.OrdinalIgnoreCase))
+        {
+            quantityInPieces = quantity / gramsPerPiece;
+        }
+        else if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
+        {
+            quantityInPieces = (quantity * 1000m) / gramsPerPiece;
+        }
+        else
+        {
+            return false;
+        }
+
+        normalizedQuantity = (quantityInPieces, "pcs");
+        return true;
     }
 
     private static string NormalizeShoppingListUnit(string? unit)
@@ -375,13 +458,18 @@ public sealed partial class AislePilotService
     private static void AddDessertAddOnShoppingItems(
         IList<MutableShoppingItem> aggregated,
         decimal householdFactor,
+        decimal priceFactor,
         DessertAddOnTemplate dessertAddOnTemplate)
     {
         var scale = Math.Clamp(householdFactor, 0.5m, 4m);
+        var normalizedPriceFactor = NormalizeSupermarketPriceFactor(priceFactor);
         foreach (var ingredient in dessertAddOnTemplate.Ingredients)
         {
             var aggregatedQuantity = ingredient.QuantityForTwo * scale;
-            var (canonicalQuantity, canonicalUnit) = NormalizeShoppingListQuantityAndUnit(aggregatedQuantity, ingredient.Unit);
+            var (canonicalQuantity, canonicalUnit) = NormalizeShoppingListQuantityAndUnit(
+                ingredient.Name,
+                aggregatedQuantity,
+                ingredient.Unit);
             var existing = FindMatchingShoppingItem(aggregated, ingredient.Name, canonicalUnit);
             if (existing is null)
             {
@@ -400,7 +488,7 @@ public sealed partial class AislePilotService
             }
 
             existing.Quantity += canonicalQuantity;
-            existing.EstimatedCost += ingredient.EstimatedCostForTwo * scale;
+            existing.EstimatedCost += ingredient.EstimatedCostForTwo * scale * normalizedPriceFactor;
         }
     }
 
@@ -438,25 +526,40 @@ public sealed partial class AislePilotService
             return currentName;
         }
 
-        if (currentNormalized.Equals("olive oil", StringComparison.OrdinalIgnoreCase))
+        if (PreferredShoppingListDisplayNames.TryGetValue(currentNormalized, out var preferredDisplayName))
         {
-            return "Olive oil";
+            return preferredDisplayName;
         }
 
-        if (currentName.Length >= incomingName.Length)
+        var cleanedCurrentName = StripShoppingListDisplayQualifiers(currentName);
+        var cleanedIncomingName = StripShoppingListDisplayQualifiers(incomingName);
+        if (cleanedCurrentName.Length == 0 && cleanedIncomingName.Length > 0)
         {
-            return currentName;
+            return cleanedIncomingName;
         }
 
-        return incomingName;
+        if (cleanedIncomingName.Length == 0 && cleanedCurrentName.Length > 0)
+        {
+            return cleanedCurrentName;
+        }
+
+        if (cleanedCurrentName.Length <= cleanedIncomingName.Length)
+        {
+            return cleanedCurrentName;
+        }
+
+        return cleanedIncomingName;
     }
 
     private static decimal CalculateDessertAddOnEstimatedCost(
         decimal householdFactor,
+        decimal priceFactor,
         DessertAddOnTemplate dessertAddOnTemplate)
     {
         var scale = Math.Clamp(householdFactor, 0.5m, 4m);
-        var estimatedCost = dessertAddOnTemplate.Ingredients.Sum(ingredient => ingredient.EstimatedCostForTwo * scale);
+        var normalizedPriceFactor = NormalizeSupermarketPriceFactor(priceFactor);
+        var estimatedCost = dessertAddOnTemplate.Ingredients.Sum(
+            ingredient => ingredient.EstimatedCostForTwo * scale * normalizedPriceFactor);
         return decimal.Round(estimatedCost, 2, MidpointRounding.AwayFromZero);
     }
 
@@ -504,5 +607,24 @@ public sealed partial class AislePilotService
         }
 
         return new string(chars);
+    }
+
+    private static string StripShoppingListDisplayQualifiers(string ingredientName)
+    {
+        if (string.IsNullOrWhiteSpace(ingredientName))
+        {
+            return string.Empty;
+        }
+
+        var words = Regex.Replace(ingredientName.Trim(), "\\s+", " ")
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => !ShoppingIngredientVariantQualifiers.Contains(word))
+            .ToList();
+        if (words.Count == 0)
+        {
+            return NormalizeIngredientDisplayName(ingredientName);
+        }
+
+        return NormalizeIngredientDisplayName(string.Join(' ', words));
     }
 }

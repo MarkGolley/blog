@@ -44,6 +44,7 @@ public sealed partial class AislePilotService
         var selectedMeals = SelectLowestCostMeals(
             combinedSource,
             context.HouseholdFactor,
+            context.PriceProfile.RelativeCostFactor,
             request.PreferQuickMeals,
             IsHighProteinPreferred(context.DietaryModes),
             totalMealCount,
@@ -91,6 +92,7 @@ public sealed partial class AislePilotService
         var selectedMeals = SelectLowestCostMeals(
             combinedSource,
             context.HouseholdFactor,
+            context.PriceProfile.RelativeCostFactor,
             request.PreferQuickMeals,
             IsHighProteinPreferred(context.DietaryModes),
             totalMealCount,
@@ -114,6 +116,7 @@ public sealed partial class AislePilotService
     private static IReadOnlyList<MealTemplate> SelectLowestCostMeals(
         IReadOnlyList<MealTemplate> mealSource,
         decimal householdFactor,
+        decimal priceFactor,
         bool preferQuickMeals,
         bool preferHighProtein,
         int requestedMealCount,
@@ -133,7 +136,7 @@ public sealed partial class AislePilotService
         var normalizedMealCount = NormalizeRequestedMealCount(requestedMealCount);
         var orderedCandidates = mealSource
             .Select(meal => EnsureMealTypeSuitability(meal))
-            .OrderBy(meal => decimal.Round(meal.BaseCostForTwo * householdFactor, 4, MidpointRounding.AwayFromZero))
+            .OrderBy(meal => CalculateScaledMealCost(meal, householdFactor, dayMultiplier: 1, priceFactor: priceFactor))
             .ThenBy(meal =>
                 preferHighProtein &&
                 !meal.Tags.Contains("High-Protein", StringComparer.OrdinalIgnoreCase)
@@ -188,6 +191,7 @@ public sealed partial class AislePilotService
                 orderedCandidates,
                 resolvedMealTypeSlots,
                 householdFactor,
+                priceFactor,
                 selectedSpecialTreatCookDayIndex);
             if (!treatApplied || !HasSpecialTreatDinner(selected, resolvedMealTypeSlots))
             {

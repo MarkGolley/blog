@@ -34,3 +34,7 @@
 - Do not scan or read generated directories unless the task explicitly requires them: `.git/`, `.idea/`, `.vs/`, `bin/`, `obj/`, `.playwright/`, `playwright-report/`, `TestResults/`, `coverage/`, `node_modules/`, `wwwroot/lib/`.
 - Prefer source paths over generated outputs when searching, diffing, or reviewing.
 - If generated build or Playwright artifacts accumulate and are not relevant to the task, clean them before doing broad searches so agent mode keeps a smaller working set.
+
+## UI/UX Skill Rule
+
+- Use the `ui-ux-pro-max` skill for UI, UX, design system, styling, accessibility, and frontend review tasks.

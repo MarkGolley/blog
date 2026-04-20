@@ -99,6 +99,7 @@ public sealed partial class AislePilotService
         string currentMealName,
         decimal weeklyBudget,
         decimal householdFactor,
+        decimal priceFactor,
         bool preferQuickMeals,
         bool preferHighProtein,
         string mealType,
@@ -152,6 +153,7 @@ public sealed partial class AislePilotService
                     template,
                     targetMealCost,
                     householdFactor,
+                    priceFactor,
                     preferQuickMeals,
                     preferHighProtein,
                     normalizedDayMultiplier,
@@ -346,6 +348,7 @@ public sealed partial class AislePilotService
         MealTemplate template,
         decimal targetMealCost,
         decimal householdFactor,
+        decimal priceFactor,
         bool preferQuickMeals,
         bool preferHighProtein,
         int dayMultiplier = 1,
@@ -353,7 +356,7 @@ public sealed partial class AislePilotService
         string? nextName = null)
     {
         var normalizedDayMultiplier = Math.Max(1, dayMultiplier);
-        var scaledCost = template.BaseCostForTwo * householdFactor * normalizedDayMultiplier;
+        var scaledCost = template.BaseCostForTwo * householdFactor * NormalizeSupermarketPriceFactor(priceFactor) * normalizedDayMultiplier;
         var budgetDistance = Math.Abs(scaledCost - targetMealCost);
         var quickPenalty = preferQuickMeals && !template.IsQuick ? 0.8m : 0m;
         var highProteinPenalty =

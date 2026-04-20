@@ -191,6 +191,7 @@ public sealed partial class AislePilotService
             currentMealName,
             weeklyBudget,
             context.HouseholdFactor,
+            context.PriceProfile.RelativeCostFactor,
             preferQuickMeals,
             IsHighProteinPreferred(context.DietaryModes),
             mealType,

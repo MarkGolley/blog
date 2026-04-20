@@ -15,6 +15,7 @@ public sealed class AislePilotPageViewModel
     public IReadOnlyList<string> SupermarketOptions { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> PortionSizeOptions { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> DietaryOptions { get; set; } = Array.Empty<string>();
+    public AislePilotDietarySelectionRules DietarySelectionRules { get; set; } = new();
     public bool MealImagePollingEnabled { get; set; }
     public bool HasResult => Result is not null;
 }
@@ -27,6 +28,46 @@ public sealed class AislePilotSavedWeekSummaryViewModel
     public int PlanDays { get; set; }
     public int MealCount { get; set; }
     public string Supermarket { get; set; } = string.Empty;
+}
+
+public sealed class AislePilotSupermarketLayoutInsightViewModel
+{
+    public string SourceLabel { get; set; } = string.Empty;
+    public string ConfidenceLabel { get; set; } = string.Empty;
+    public decimal ConfidenceScore { get; set; }
+    public bool IsDefaultLayout { get; set; }
+    public bool NeedsReview { get; set; }
+    public DateTime? LastVerifiedUtc { get; set; }
+    public IReadOnlyList<AislePilotSupermarketLayoutEvidenceViewModel> Evidence { get; set; } =
+        Array.Empty<AislePilotSupermarketLayoutEvidenceViewModel>();
+}
+
+public sealed class AislePilotSupermarketLayoutEvidenceViewModel
+{
+    public string Title { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
+    public string SourceType { get; set; } = string.Empty;
+}
+
+public sealed class AislePilotSupermarketPriceInsightViewModel
+{
+    public string SourceLabel { get; set; } = string.Empty;
+    public string ConfidenceLabel { get; set; } = string.Empty;
+    public decimal ConfidenceScore { get; set; }
+    public decimal RelativeCostFactor { get; set; } = 1m;
+    public string RelativeCostBasis { get; set; } = string.Empty;
+    public bool IsDirectBasketData { get; set; }
+    public bool NeedsReview { get; set; }
+    public DateTime? LastVerifiedUtc { get; set; }
+    public IReadOnlyList<AislePilotSupermarketPriceEvidenceViewModel> Evidence { get; set; } =
+        Array.Empty<AislePilotSupermarketPriceEvidenceViewModel>();
+}
+
+public sealed class AislePilotSupermarketPriceEvidenceViewModel
+{
+    public string Title { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
+    public string SourceType { get; set; } = string.Empty;
 }
 
 public sealed class AislePilotPlanResultViewModel
@@ -53,6 +94,8 @@ public sealed class AislePilotPlanResultViewModel
     public string DessertAddOnName { get; set; } = string.Empty;
     public IReadOnlyList<string> DessertAddOnIngredientLines { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> AisleOrderUsed { get; set; } = Array.Empty<string>();
+    public AislePilotSupermarketLayoutInsightViewModel LayoutInsight { get; set; } = new();
+    public AislePilotSupermarketPriceInsightViewModel PriceInsight { get; set; } = new();
     public IReadOnlyList<string> BudgetTips { get; set; } = Array.Empty<string>();
     public IReadOnlyList<AislePilotMealDayViewModel> MealPlan { get; set; } = Array.Empty<AislePilotMealDayViewModel>();
     public IReadOnlyList<AislePilotShoppingItemViewModel> ShoppingItems { get; set; } =

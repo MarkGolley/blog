@@ -1,0 +1,190 @@
+@using System.Globalization
+@model AislePilotPageViewModel
+@{
+    var ukCulture = CultureInfo.GetCultureInfo("en-GB");
+    var hasResult = ViewData["HasResult"] is true;
+    var appHeadClass = ViewData["AppHeadClass"] as string ?? "aislepilot-app-head";
+    var hasSavedWeeks = Model.SavedWeeks.Count > 0;
+    var hasSavedMeals = Model.SavedMeals.Count > 0;
+    string FormatSupermarketLabel(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        var trimmed = value.Trim();
+        return ukCulture.TextInfo.ToTitleCase(trimmed.ToLower(ukCulture));
+    }
+}
+<section aria-label="AislePilot header" class="@appHeadClass" data-reveal>
+    <div class="aislepilot-app-head-main">
+        <div class="aislepilot-brand-row">
+            <div class="aislepilot-brand-lockup" aria-label="AislePilot brand">
+                <img class="aislepilot-brand-logo" src="~/images/aislepilot-logo-horizontal.svg" alt="AislePilot" />
+                <details class="aislepilot-head-menu" data-head-menu>
+                    <summary class="aislepilot-head-menu-trigger is-icon-only"
+                             aria-label="AislePilot menu"
+                             aria-expanded="false"
+                             title="AislePilot menu">
+                        <span class="aislepilot-btn-label">
+                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <line x1="4" y1="7" x2="20" y2="7"></line>
+                                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                                    <line x1="4" y1="17" x2="20" y2="17"></line>
+                                </svg>
+                            </span>
+                            <span class="sr-only">Menu</span>
+                        </span>
+                    </summary>
+                    <div class="aislepilot-head-menu-panel" role="menu" aria-label="AislePilot quick menu">
+                        <p class="aislepilot-head-menu-section-title">Saved weeks</p>
+                        @if (hasSavedWeeks)
+                        {
+                            <ul class="aislepilot-head-week-list">
+                                @foreach (var savedWeek in Model.SavedWeeks.Take(6))
+                                {
+                                    var savedAtLocal = savedWeek.SavedAtUtc.ToLocalTime();
+                                    <li class="aislepilot-head-week-row">
+                                        <span class="aislepilot-head-week-date">
+                                            Saved @savedAtLocal.ToString("d MMM yyyy", ukCulture)
+                                        </span>
+                                        <div class="aislepilot-head-week-actions">
+                                            <form method="post"
+                                                  action="@Url.Action("OpenWeek", "AislePilot")#aislepilot-overview"
+                                                  class="aislepilot-head-week-form">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="weekId" value="@savedWeek.WeekId" />
+                                                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                                                <button type="submit"
+                                                        class="aislepilot-head-week-action-btn"
+                                                        data-loading-label="Opening week..."
+                                                        data-show-plan-skeleton
+                                                        aria-label="Open week"
+                                                        title="Open week">
+                                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                        <svg viewBox="0 0 24 24" focusable="false">
+                                                            <path d="M12 3v11"></path>
+                                                            <path d="m8 10 4 4 4-4"></path>
+                                                            <path d="M4 17v2h16v-2"></path>
+                                                        </svg>
+                                                    </span>
+                                                    <span class="sr-only">Open week</span>
+                                                </button>
+                                            </form>
+                                            <form method="post"
+                                                  action="@Url.Action("DeleteWeek", "AislePilot")"
+                                                  class="aislepilot-head-week-form">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="weekId" value="@savedWeek.WeekId" />
+                                                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                                                <button type="submit"
+                                                        class="aislepilot-head-week-action-btn is-danger"
+                                                        data-loading-label="Deleting week..."
+                                                        aria-label="Delete week"
+                                                        title="Delete week">
+                                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                        <svg viewBox="0 0 24 24" focusable="false">
+                                                            <path d="M4 7h16"></path>
+                                                            <path d="M9 7V4h6v3"></path>
+                                                            <path d="M7 7l1 12h8l1-12"></path>
+                                                            <path d="M10 11v6"></path>
+                                                            <path d="M14 11v6"></path>
+                                                        </svg>
+                                                    </span>
+                                                    <span class="sr-only">Delete week</span>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true">No saved weeks yet</p>
+                        }
+
+                        <div data-saved-meals-menu-section>
+                            <p class="aislepilot-head-menu-section-title">Saved meals</p>
+                            @if (hasSavedMeals)
+                            {
+                                <ul class="aislepilot-head-saved-meal-list">
+                                    @foreach (var savedMealName in Model.SavedMeals.Take(20))
+                                    {
+                                        <li class="aislepilot-head-saved-meal-row">
+                                            <span class="aislepilot-head-saved-meal-name">@savedMealName</span>
+                                            <form method="post"
+                                                  action="@Url.Action("RemoveSavedMeal", "AislePilot")"
+                                                  class="aislepilot-head-week-form">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="mealName" value="@savedMealName" />
+                                                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                                                <button type="submit"
+                                                        class="aislepilot-head-week-action-btn is-danger"
+                                                        data-loading-label="Removing meal..."
+                                                        aria-label="Remove @savedMealName from saved meals"
+                                                        title="Remove saved meal">
+                                                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
+                                                        <svg viewBox="0 0 24 24" focusable="false">
+                                                            <path d="M4 7h16"></path>
+                                                            <path d="M9 7V4h6v3"></path>
+                                                            <path d="M7 7l1 12h8l1-12"></path>
+                                                            <path d="M10 11v6"></path>
+                                                            <path d="M14 11v6"></path>
+                                                        </svg>
+                                                    </span>
+                                                    <span class="sr-only">Remove saved meal</span>
+                                                </button>
+                                            </form>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true">No saved meals yet</p>
+                            }
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </div>
+        <div class="aislepilot-app-head-content">
+            <div class="aislepilot-app-head-intro@(hasResult ? " is-results-context" : string.Empty)">
+                <div class="aislepilot-app-head-topline">
+                    <p class="aislepilot-app-badge">Meal planner</p>
+                    <p class="aislepilot-app-head-status">@(hasResult ? "Plan ready" : "Guided weekly setup")</p>
+                </div>
+                <h1 id="aislepilot-title" class="aislepilot-app-title">@(hasResult ? "Your weekly plan is ready." : "Build a full week of meals with less setup friction.")</h1>
+                <p class="aislepilot-app-subtitle">@(hasResult ? "Review the plan snapshot, refine settings, and export a shopping list that is already ordered for your supermarket." : "Set your budget, household, and meal rules once, then generate a cleaner weekly plan and aisle-ordered shopping list.")</p>
+                <ul class="aislepilot-app-highlights" aria-label="AislePilot highlights">
+                    @if (hasResult && Model.Result is not null)
+                    {
+                        <li>@($"{Model.Result.PlanDays} day plan")</li>
+                        <li>@($"{Model.Result.EstimatedTotalCost.ToString("C0", ukCulture)} estimated spend")</li>
+                        <li>@($"{FormatSupermarketLabel(Model.Result.Supermarket)} aisle order")</li>
+                    }
+                    else
+                    {
+                        <li>Budget-aware weekly planning</li>
+                        <li>Aisle-ordered shopping lists</li>
+                        <li>Fast mobile-friendly setup</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="aislepilot-app-head-actions">
+        @if (hasResult)
+        {
+            <button type="button" class="aislepilot-head-primary-action" data-setup-toggle aria-controls="aislepilot-setup" aria-expanded="false">Adjust settings</button>
+        }
+        else
+        {
+            <a href="#aislepilot-setup" class="aislepilot-head-primary-action">Start with settings</a>
+        }
+        <p class="aislepilot-head-action-note">@(hasResult ? "Open the setup again to tighten budget, meal cadence, or store rules before you export." : "Jump straight into step 1, save your defaults, and come back next week with less setup work.")</p>
+    </div>
+</section>

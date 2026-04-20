@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -549,6 +550,68 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task HomeIndex_RendersRecruiterActions_WhenProfileLinksAreConfigured()
+    {
+        var factory = CreateFactoryWithConfiguration(new Dictionary<string, string?>
+        {
+            ["Profile:ResumeUrl"] = "https://example.com/resume.pdf",
+            ["Profile:GitHubUrl"] = "https://github.com/example",
+            ["Profile:LinkedInUrl"] = "https://www.linkedin.com/in/example/",
+            ["AislePilot:PublicBaseUrl"] = "https://aislepilot.example.com"
+        });
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("Try AislePilot", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-recruiter-link=\"aislepilot\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://aislepilot.example.com/projects/aisle-pilot", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-recruiter-link=\"resume\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://example.com/resume.pdf", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-recruiter-link=\"github\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://github.com/example", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-recruiter-link=\"linkedin\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://www.linkedin.com/in/example/", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProjectsIndex_RendersAislePilotAsLiveBetaWithoutPrototypeLanguage()
+    {
+        var factory = CreateFactoryWithConfiguration(new Dictionary<string, string?>
+        {
+            ["AislePilot:PublicBaseUrl"] = "https://aislepilot.example.com"
+        });
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/projects");
+
+        Assert.Contains("Live beta", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Live end-to-end planner with generated meals, swaps, shopping, and exports.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("In progress", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("End-to-end prototype page", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProjectsIndex_RendersAislePilotBuildNotesAndSnapshots()
+    {
+        var factory = CreateFactoryWithConfiguration(new Dictionary<string, string?>
+        {
+            ["AislePilot:PublicBaseUrl"] = "https://aislepilot.example.com"
+        });
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/projects");
+
+        Assert.Contains("Build notes", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Built as an ongoing product exercise alongside day-to-day engineering work", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("the next scaling step would be to keep the web tier stateless", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("case-screenshot-grid", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/images/portfolio/aislepilot-home.png", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/images/portfolio/projects-overview.png", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Planner setup focused on weekly constraints and a low-friction path to generation.", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task HomeIndex_NavCapsule_DoesNotShowYesterdayArrow_WhenNoStoredHistory()
     {
         var factory = CreateFactoryWithCapsuleProvider(new FakeDailyCodingCapsuleProvider(includeStoredYesterday: false));
@@ -661,6 +724,17 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
             {
                 services.RemoveAll<IDailyCodingCapsuleProvider>();
                 services.AddSingleton(provider);
+            });
+        });
+    }
+
+    private WebApplicationFactory<Program> CreateFactoryWithConfiguration(IReadOnlyDictionary<string, string?> configurationValues)
+    {
+        return _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configBuilder) =>
+            {
+                configBuilder.AddInMemoryCollection(configurationValues);
             });
         });
     }

@@ -74,6 +74,7 @@ public sealed partial class AislePilotService
                 context.DietaryModes,
                 request.WeeklyBudget,
                 context.HouseholdFactor,
+                context.PriceProfile.RelativeCostFactor,
                 request.PreferQuickMeals,
                 context.DislikesOrAllergens,
                 totalMealCount,
@@ -97,6 +98,7 @@ public sealed partial class AislePilotService
                     context.DietaryModes,
                     request.WeeklyBudget,
                     context.HouseholdFactor,
+                    context.PriceProfile.RelativeCostFactor,
                     request.PreferQuickMeals,
                     context.DislikesOrAllergens,
                     totalMealCount,
@@ -212,6 +214,7 @@ public sealed partial class AislePilotService
             context.DietaryModes,
             request.WeeklyBudget,
             context.HouseholdFactor,
+            context.PriceProfile.RelativeCostFactor,
             request.PreferQuickMeals,
             context.DislikesOrAllergens,
             totalMealCount,
@@ -390,6 +393,7 @@ public sealed partial class AislePilotService
                 context.DietaryModes,
                 request.WeeklyBudget,
                 context.HouseholdFactor,
+                context.PriceProfile.RelativeCostFactor,
                 request.PreferQuickMeals,
                 context.DislikesOrAllergens,
                 totalMealCount,
@@ -419,6 +423,7 @@ public sealed partial class AislePilotService
                     context.DietaryModes,
                     request.WeeklyBudget,
                     context.HouseholdFactor,
+                    context.PriceProfile.RelativeCostFactor,
                     request.PreferQuickMeals,
                     context.DislikesOrAllergens,
                     totalMealCount,
@@ -440,6 +445,7 @@ public sealed partial class AislePilotService
                         context.DietaryModes,
                         request.WeeklyBudget,
                         context.HouseholdFactor,
+                        context.PriceProfile.RelativeCostFactor,
                         request.PreferQuickMeals,
                         context.DislikesOrAllergens,
                         totalMealCount,
@@ -526,6 +532,7 @@ public sealed partial class AislePilotService
                 context.DietaryModes,
                 request.WeeklyBudget,
                 context.HouseholdFactor,
+                context.PriceProfile.RelativeCostFactor,
                 request.PreferQuickMeals,
                 context.DislikesOrAllergens,
                 totalMealCount,
@@ -558,6 +565,7 @@ public sealed partial class AislePilotService
                 combinedCandidates,
                 mealTypeSlots,
                 context.HouseholdFactor,
+                context.PriceProfile.RelativeCostFactor,
                 request.SelectedSpecialTreatCookDayIndex);
             if (localTreatApplied && HasSpecialTreatDinner(fallbackPatchedMeals, mealTypeSlots))
             {
@@ -588,6 +596,7 @@ public sealed partial class AislePilotService
             dedicatedSpecialTreatMeal,
             mealTypeSlots,
             context.HouseholdFactor,
+            context.PriceProfile.RelativeCostFactor,
             request.SelectedSpecialTreatCookDayIndex);
         if (!applied || !HasSpecialTreatDinner(patchedMeals, mealTypeSlots))
         {
@@ -596,6 +605,7 @@ public sealed partial class AislePilotService
                 combinedCandidates,
                 mealTypeSlots,
                 context.HouseholdFactor,
+                context.PriceProfile.RelativeCostFactor,
                 request.SelectedSpecialTreatCookDayIndex);
             if (localTreatApplied && HasSpecialTreatDinner(patchedMeals, mealTypeSlots))
             {
@@ -778,6 +788,7 @@ public sealed partial class AislePilotService
                 context.DietaryModes,
                 request.WeeklyBudget,
                 context.HouseholdFactor,
+                context.PriceProfile.RelativeCostFactor,
                 request.PreferQuickMeals,
                 context.DislikesOrAllergens,
                 totalMealCount,
@@ -807,6 +818,7 @@ public sealed partial class AislePilotService
                     context.DietaryModes,
                     request.WeeklyBudget,
                     context.HouseholdFactor,
+                    context.PriceProfile.RelativeCostFactor,
                     request.PreferQuickMeals,
                     context.DislikesOrAllergens,
                     totalMealCount,
@@ -828,6 +840,7 @@ public sealed partial class AislePilotService
                         context.DietaryModes,
                         request.WeeklyBudget,
                         context.HouseholdFactor,
+                        context.PriceProfile.RelativeCostFactor,
                         request.PreferQuickMeals,
                         context.DislikesOrAllergens,
                         totalMealCount,
@@ -895,6 +908,7 @@ public sealed partial class AislePilotService
                 context.DietaryModes,
                 request.WeeklyBudget,
                 context.HouseholdFactor,
+                context.PriceProfile.RelativeCostFactor,
                 request.PreferQuickMeals,
                 context.DislikesOrAllergens,
                 totalMealCount,
@@ -924,6 +938,7 @@ public sealed partial class AislePilotService
                     context.DietaryModes,
                     request.WeeklyBudget,
                     context.HouseholdFactor,
+                    context.PriceProfile.RelativeCostFactor,
                     request.PreferQuickMeals,
                     context.DislikesOrAllergens,
                     totalMealCount,
@@ -945,6 +960,7 @@ public sealed partial class AislePilotService
                         context.DietaryModes,
                         request.WeeklyBudget,
                         context.HouseholdFactor,
+                        context.PriceProfile.RelativeCostFactor,
                         request.PreferQuickMeals,
                         context.DislikesOrAllergens,
                         totalMealCount,

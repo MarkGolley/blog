@@ -31,7 +31,8 @@ public sealed partial class AislePilotService
     internal static AislePilotPantrySuggestionViewModel BuildPantrySuggestion(
         MealTemplate template,
         IReadOnlyList<string> pantryTokens,
-        decimal householdFactor)
+        decimal householdFactor,
+        decimal priceFactor)
     {
         var ingredientNames = template.Ingredients
             .Select(ingredient => ingredient.Name)
@@ -48,10 +49,11 @@ public sealed partial class AislePilotService
         var total = Math.Max(1, ingredientNames.Count);
         var matchPercent = (int)Math.Round((matched.Count / (double)total) * 100.0, MidpointRounding.AwayFromZero);
         var missingCoreIngredientCount = missing.Count(ingredient => !IsMinorPantryAssumptionIngredient(ingredient));
+        var normalizedPriceFactor = NormalizeSupermarketPriceFactor(priceFactor);
         var missingIngredientsEstimatedCost = decimal.Round(
             template.Ingredients
                 .Where(ingredient => missing.Contains(ingredient.Name, StringComparer.OrdinalIgnoreCase))
-                .Sum(ingredient => ingredient.EstimatedCostForTwo * householdFactor),
+                .Sum(ingredient => ingredient.EstimatedCostForTwo * householdFactor * normalizedPriceFactor),
             2,
             MidpointRounding.AwayFromZero);
 
@@ -390,6 +392,11 @@ public sealed partial class AislePilotService
 
     private static string NormalizePantryWord(string word)
     {
+        if (word.EndsWith("oes", StringComparison.Ordinal) && word.Length > 4)
+        {
+            return word[..^2];
+        }
+
         if (word.EndsWith("ies", StringComparison.Ordinal) && word.Length > 4)
         {
             return word[..^3] + "y";

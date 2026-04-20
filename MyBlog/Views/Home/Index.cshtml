@@ -2,6 +2,11 @@
     ViewData["Title"] = "Home";
     ViewData["MetaDescription"] = "Mark Golley builds reliable software in C#/.NET and Python, with a focus on clean architecture and testing.";
     ViewData["CanonicalPath"] = "/";
+    var resumeUrl = ViewData["ResumeUrl"]?.ToString() ?? string.Empty;
+    var gitHubUrl = ViewData["GitHubUrl"]?.ToString() ?? string.Empty;
+    var linkedInUrl = ViewData["LinkedInUrl"]?.ToString() ?? string.Empty;
+    var aislePilotPublicUrl = ViewData["AislePilotPublicUrl"]?.ToString() ?? string.Empty;
+    var aislePilotLocalEnabled = ViewData["AislePilotLocalEnabled"] as bool? ?? true;
 }
 
 <section id="hero" class="home-hero" data-reveal>
@@ -14,9 +19,30 @@
                 and practical lessons from real projects.
             </p>
             <div class="hero-actions">
-                <a class="btn btn-primary" asp-controller="Contact" asp-action="Index">Start a conversation</a>
-                <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">Read latest posts</a>
+                @if (!string.IsNullOrWhiteSpace(aislePilotPublicUrl))
+                {
+                    <a class="btn btn-primary" href="@aislePilotPublicUrl" data-recruiter-link="aislepilot">Try AislePilot</a>
+                }
+                else if (aislePilotLocalEnabled)
+                {
+                    <a class="btn btn-primary" asp-controller="AislePilot" asp-action="Index" asp-route-returnUrl="/" data-recruiter-link="aislepilot">Try AislePilot</a>
+                }
                 <a class="btn btn-secondary" asp-controller="Projects" asp-action="Index">See my projects</a>
+                <a class="btn btn-secondary" asp-controller="Contact" asp-action="Index">Start a conversation</a>
+            </div>
+            <div class="hero-actions hero-actions-secondary">
+                @if (!string.IsNullOrWhiteSpace(resumeUrl))
+                {
+                    <a class="btn btn-secondary" href="@resumeUrl" target="_blank" rel="noreferrer" data-recruiter-link="resume">Resume</a>
+                }
+                @if (!string.IsNullOrWhiteSpace(gitHubUrl))
+                {
+                    <a class="btn btn-secondary" href="@gitHubUrl" target="_blank" rel="noreferrer" data-recruiter-link="github">GitHub</a>
+                }
+                @if (!string.IsNullOrWhiteSpace(linkedInUrl))
+                {
+                    <a class="btn btn-secondary" href="@linkedInUrl" target="_blank" rel="noreferrer" data-recruiter-link="linkedin">LinkedIn</a>
+                }
             </div>
             <div class="hero-metrics">
                 <article class="metric-card">

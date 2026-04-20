@@ -1,6 +1,7 @@
 @using System.Globalization
 @using System.Text
 @using System.Text.Json
+@using MyBlog.Models
 @using MyBlog.Services
 @model AislePilotPageViewModel
 
@@ -78,6 +79,12 @@
         }
     }
     var savedEnjoyedMealNames = ParseSavedEnjoyedMealNames(Model.Request.SavedEnjoyedMealNamesState);
+    string GetShortDayLabel(string? dayName)
+    {
+        var normalized = dayName?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized)) return "Day";
+        return normalized switch { "Monday" => "Mon", "Tuesday" => "Tue", "Wednesday" => "Wed", "Thursday" => "Thu", "Friday" => "Fri", "Saturday" => "Sat", "Sunday" => "Sun", _ => normalized.Length <= 3 ? normalized : normalized[..3] };
+    }
     var mealCount = result.MealPlan.Count;
     HashSet<int> ParseIgnoredMealSlotIndexes(string? ignoredMealSlotIndexesCsv, int maxMealSlotIndex)
     {
@@ -102,12 +109,43 @@
         < 0m => $"{Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over",
         _ => "On budget"
     };
+    var layoutInsight = result.LayoutInsight ?? new AislePilotSupermarketLayoutInsightViewModel();
+    var layoutVerificationText = layoutInsight.LastVerifiedUtc.HasValue ? $"Checked {layoutInsight.LastVerifiedUtc.Value.ToLocalTime():MMM yyyy}" : "Chain default";
+    var layoutConfidenceText = string.IsNullOrWhiteSpace(layoutInsight.ConfidenceLabel) ? layoutVerificationText : $"{layoutInsight.ConfidenceLabel} confidence. {layoutVerificationText}";
+    var priceInsight = result.PriceInsight ?? new AislePilotSupermarketPriceInsightViewModel();
+    var normalizedPriceFactor = Math.Clamp(priceInsight.RelativeCostFactor, 0.75m, 1.35m);
+    var priceDeltaPercent = decimal.Round(Math.Abs((normalizedPriceFactor - 1m) * 100m), 0, MidpointRounding.AwayFromZero);
+    var priceAdjustmentText = priceDeltaPercent == 0m
+        ? "around Tesco baseline"
+        : normalizedPriceFactor > 1m
+            ? $"{priceDeltaPercent:0}% above Tesco baseline"
+            : $"{priceDeltaPercent:0}% below Tesco baseline";
+    var priceVerificationText = priceInsight.LastVerifiedUtc.HasValue ? $"Checked {priceInsight.LastVerifiedUtc.Value.ToLocalTime():MMM yyyy}" : "Standard basket";
+    var priceConfidenceText = string.IsNullOrWhiteSpace(priceInsight.ConfidenceLabel) ? priceVerificationText : $"{priceInsight.ConfidenceLabel} confidence. {priceVerificationText}";
+    var layoutSummary = string.IsNullOrWhiteSpace(layoutInsight.SourceLabel) ? null : $"{layoutInsight.SourceLabel}. {layoutConfidenceText}";
+    var layoutReviewSummary = layoutInsight.NeedsReview ? "Branch aisle order can vary. Use Custom if the order looks wrong." : null;
+    var supermarketPriceSummary = !string.IsNullOrWhiteSpace(priceInsight.SourceLabel)
+        ? $"{priceInsight.SourceLabel}. {priceAdjustmentText}.{(string.IsNullOrWhiteSpace(priceInsight.RelativeCostBasis) ? string.Empty : $" {priceInsight.RelativeCostBasis}.")} {priceConfidenceText}{(priceInsight.NeedsReview ? ". Stored public basket estimate." : string.Empty)}"
+        : priceInsight.NeedsReview
+            ? "Pricing is estimated from stored public basket data."
+            : null;
+    var supermarketInsights = AislePilotSupermarketInsightStripViewModel.Create(
+        layoutInsight,
+        priceInsight,
+        priceAdjustmentText,
+        layoutSummary,
+        supermarketPriceSummary,
+        layoutReviewSummary);
     var mealIngredientEstimateLabel = "Meal ingredient estimate";
-    var shoppingEstimateDisclaimer = "This estimate covers the ingredients used in these meals. Actual checkout can be higher if shops only sell larger packs or bags.";
+    var shoppingEstimateDisclaimer = "This estimate covers the ingredients used in these meals. It adjusts for your selected supermarket using stored public pricing data. Actual checkout can be higher if shops only sell larger packs or bags.";
     var shoppingListNotesBuilder = new StringBuilder();
     shoppingListNotesBuilder.AppendLine("AislePilot Shopping List");
     shoppingListNotesBuilder.AppendLine($"Supermarket: {result.Supermarket}");
     shoppingListNotesBuilder.AppendLine($"{mealIngredientEstimateLabel}: {result.EstimatedTotalCost.ToString("C", ukCulture)}");
+    if (!string.IsNullOrWhiteSpace(priceInsight.SourceLabel))
+    {
+        shoppingListNotesBuilder.AppendLine($"Store pricing: {priceInsight.SourceLabel} ({priceAdjustmentText})");
+    }
     shoppingListNotesBuilder.AppendLine(shoppingEstimateDisclaimer);
     shoppingListNotesBuilder.AppendLine();
     foreach (var department in groupedItems)
@@ -121,6 +159,10 @@
         shoppingListNotesBuilder.AppendLine();
     }
     var shoppingListNotesText = shoppingListNotesBuilder.ToString().TrimEnd();
+    var supportGridClasses = result.LeftoverDays > 0
+        ? "aislepilot-budget-grid aislepilot-budget-grid--support has-leftovers"
+        : "aislepilot-budget-grid aislepilot-budget-grid--support";
+    var summaryCardClasses = "aislepilot-stat-card aislepilot-stat-card--support";
     AislePilotHiddenRequestFieldsViewModel BuildHiddenRequestFields(
         bool includeCurrentPlanMealNames = false,
         bool includeLeftoverCsvDataAttribute = false)
@@ -152,7 +194,7 @@
                         <circle cx="12" cy="12" r="2.5"></circle>
                     </svg>
                 </span>
-                <span>View</span>
+                <span>Recipe</span>
             </span>
             <span class="aislepilot-meal-image-hint-chips">
                 @if (includeMacros)
@@ -209,24 +251,10 @@
     <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-reveal>
         <div class="aislepilot-section-head aislepilot-overview-head">
             <div class="aislepilot-overview-title-row">
-                <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Overview</h2>
-                <button
-                    type="button"
-                    class="aislepilot-overview-toggle-btn is-icon-only"
-                    data-overview-toggle
-                    aria-controls="aislepilot-overview-content"
-                    aria-expanded="false"
-                    aria-label="Expand overview"
-                    title="Expand overview">
-                    <span class="aislepilot-btn-label">
-                        <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" focusable="false">
-                                <path d="m6 9 6 6 6-6"></path>
-                            </svg>
-                        </span>
-                        <span class="sr-only">Expand overview</span>
-                    </span>
-                </button>
+                <div>
+                    <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Plan snapshot</h2>
+                    <p class="aislepilot-overview-caption">Budget, spend, and weekly structure at a glance.</p>
+                </div>
             </div>
             <div class="aislepilot-overview-actions">
                 <div class="aislepilot-overview-actions-inline">
@@ -236,7 +264,7 @@
                                  model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                         <input type="hidden" name="forceRefreshWeek" value="true" />
                         <button type="submit"
-                                class="aislepilot-overview-regenerate-btn"
+                                class="aislepilot-overview-regenerate-btn is-secondary"
                                 data-loading-label="Refreshing plan..."
                                 data-show-plan-skeleton
                                 aria-label="Refresh plan"
@@ -257,7 +285,7 @@
                         <partial name="_AislePilotHiddenRequestFields"
                                  model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                         <button type="submit"
-                                class="aislepilot-overview-regenerate-btn"
+                                class="aislepilot-overview-regenerate-btn is-secondary"
                                 data-loading-label="Saving week...">
                             <span class="aislepilot-btn-label">
                                 <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -271,28 +299,6 @@
                             </span>
                         </button>
                     </form>
-                    <button
-                        type="button"
-                        class="aislepilot-overview-regenerate-btn aislepilot-edit-setup-btn"
-                        data-setup-toggle
-                        aria-controls="aislepilot-setup"
-                        aria-expanded="false"
-                        aria-label="Edit settings"
-                        title="Edit settings">
-                        <span class="aislepilot-btn-label">
-                            <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" focusable="false">
-                                    <line x1="4" y1="6" x2="20" y2="6"></line>
-                                    <line x1="4" y1="12" x2="20" y2="12"></line>
-                                    <line x1="4" y1="18" x2="20" y2="18"></line>
-                                    <circle cx="9" cy="6" r="2"></circle>
-                                    <circle cx="15" cy="12" r="2"></circle>
-                                    <circle cx="11" cy="18" r="2"></circle>
-                                </svg>
-                            </span>
-                            <span data-setup-toggle-label>Edit settings</span>
-                        </span>
-                    </button>
                 </div>
                 <details class="aislepilot-overview-actions-dropdown" data-overview-actions-menu>
                     <summary class="aislepilot-overview-actions-trigger is-icon-only"
@@ -317,7 +323,7 @@
                                      model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                             <input type="hidden" name="forceRefreshWeek" value="true" />
                             <button type="submit"
-                                    class="aislepilot-overview-regenerate-btn"
+                                    class="aislepilot-overview-regenerate-btn is-secondary"
                                     data-loading-label="Refreshing plan..."
                                     data-show-plan-skeleton
                                     aria-label="Refresh plan"
@@ -338,7 +344,7 @@
                             <partial name="_AislePilotHiddenRequestFields"
                                      model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                             <button type="submit"
-                                    class="aislepilot-overview-regenerate-btn"
+                                    class="aislepilot-overview-regenerate-btn is-secondary"
                                     data-loading-label="Saving week...">
                                 <span class="aislepilot-btn-label">
                                     <span class="aislepilot-symbol-glyph" aria-hidden="true">
@@ -352,33 +358,11 @@
                                 </span>
                             </button>
                         </form>
-                        <button
-                            type="button"
-                            class="aislepilot-overview-regenerate-btn aislepilot-edit-setup-btn"
-                            data-setup-toggle
-                            aria-controls="aislepilot-setup"
-                            aria-expanded="false"
-                            aria-label="Edit settings"
-                            title="Edit settings">
-                            <span class="aislepilot-btn-label">
-                                <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <line x1="4" y1="6" x2="20" y2="6"></line>
-                                        <line x1="4" y1="12" x2="20" y2="12"></line>
-                                        <line x1="4" y1="18" x2="20" y2="18"></line>
-                                        <circle cx="9" cy="6" r="2"></circle>
-                                        <circle cx="15" cy="12" r="2"></circle>
-                                        <circle cx="11" cy="18" r="2"></circle>
-                                    </svg>
-                                </span>
-                                <span data-setup-toggle-label>Edit settings</span>
-                            </span>
-                        </button>
                     </div>
                 </details>
             </div>
         </div>
-        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content hidden>
+        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content>
             @if (result.IsOverBudget)
             {
                 <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
@@ -405,53 +389,59 @@
                     </form>
                 </div>
             }
-            <div class="aislepilot-budget-grid">
-                <article class="aislepilot-stat-card">
+            <div class="aislepilot-budget-grid aislepilot-budget-grid--primary"
+                 data-overview-primary-grid>
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta aislepilot-stat-card--supermarket"
+                         data-supermarket-card>
                     <p class="aislepilot-stat-label">Supermarket</p>
                     <p class="aislepilot-stat-value">@result.Supermarket</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Portion size</p>
                     <p class="aislepilot-stat-value">@result.PortionSize</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Cooking for</p>
                     <p class="aislepilot-stat-value">@safeHouseholdSize @householdLabel</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--featured">
                     <p class="aislepilot-stat-label">Budget</p>
                     <p class="aislepilot-stat-value">@result.WeeklyBudget.ToString("C", ukCulture)</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--featured">
                     <p class="aislepilot-stat-label">@mealIngredientEstimateLabel</p>
                     <p class="aislepilot-stat-value">@result.EstimatedTotalCost.ToString("C", ukCulture)</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="aislepilot-stat-card aislepilot-stat-card--status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                     <p class="aislepilot-stat-label">Budget difference</p>
                     <p class="aislepilot-stat-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                         @result.BudgetDelta.ToString("C", ukCulture)
                     </p>
                 </article>
-                <article class="aislepilot-stat-card">
+            </div>
+            <div class="@supportGridClasses"
+                 data-overview-support-grid>
+                <article class="@summaryCardClasses">
                     <p class="aislepilot-stat-label">Plan length</p>
                     <p class="aislepilot-stat-value">@result.PlanDays day(s)</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="@summaryCardClasses">
                     <p class="aislepilot-stat-label">Cook days</p>
                     <p class="aislepilot-stat-value">@result.CookDays</p>
                 </article>
-                <article class="aislepilot-stat-card">
+                <article class="@summaryCardClasses">
                     <p class="aislepilot-stat-label">Meals per day</p>
                     <p class="aislepilot-stat-value">@result.MealsPerDay</p>
                 </article>
                 @if (result.LeftoverDays > 0)
                 {
-                    <article class="aislepilot-stat-card">
+                    <article class="@summaryCardClasses">
                         <p class="aislepilot-stat-label">Leftovers</p>
                         <p class="aislepilot-stat-value">@result.LeftoverDays day(s)</p>
                     </article>
                 }
             </div>
+            <partial name="_AislePilotOverviewSupermarketInsights" model="supermarketInsights" />
         </div>
     </section>
 
@@ -629,89 +619,91 @@
                                      model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true, includeLeftoverCsvDataAttribute: true)" />
                         </form>
                     }
-                    <div class="aislepilot-meal-grid"
-                         data-meal-image-poll-root
-                         data-fallback-meal-image-url="@fallbackMealImageUrl"
-                         data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
-                         data-meal-image-poll-url="@mealImagesPollUrl">
-                        @{
-                            var dayGroupRenderIndex = 0;
-                        }
-                        @foreach (var dayGroup in dayMealGroups)
-                        {
-                            var dayGroupIndex = dayGroupRenderIndex++;
-                            var firstMealIndex = dayGroup.Entries[0].index;
-                            var firstSlotEntry = dayGroup.Entries[0];
-                            var firstSlotMeal = firstSlotEntry.meal;
-                            var firstSlotIsIgnored = ignoredMealSlotIndexes.Contains(firstSlotEntry.index) || firstSlotMeal.IsIgnored;
-                            var firstSlotMealImageUrl = AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(firstSlotMeal.MealImageUrl);
-                            var daySummaryMeta = firstSlotIsIgnored
-                                ? "Removed"
-                                : $"{firstSlotMeal.EstimatedCost.ToString("C", ukCulture)} \u00A0\u00A0\u00B7\u00A0\u00A0 {Math.Max(0, firstSlotMeal.EstimatedPrepMinutes)} mins";
-                            var mealCardClass = dayGroup.LeftoverDaysCovered > 0
-                                ? "aislepilot-card aislepilot-day-card is-leftover-source"
-                                : "aislepilot-card aislepilot-day-card";
-                            var tabPrefix = $"meal-slot-{firstMealIndex}";
-                            var dayCardExpanderBodyId = $"day-card-body-{firstMealIndex}";
-                            var dayCardOpenAttribute = dayGroupIndex == 0 ? "open" : null;
-                            var dayWeekIndex = weekDayLookup.TryGetValue(dayGroup.Day, out var resolvedWeekDayIndex)
-                                ? resolvedWeekDayIndex
-                                : Math.Clamp(dayGroupIndex, 0, Math.Max(0, result.PlanDays - 1));
-                            var serializedDayMealNames = JsonSerializer.Serialize(dayGroup.Entries.Select(entry => entry.meal.MealName).ToList());
-                            var serializedIgnoredFlags = JsonSerializer.Serialize(dayGroup.Entries
-                                .Select(entry => ignoredMealSlotIndexes.Contains(entry.index) || entry.meal.IsIgnored)
-                                .ToList());
-                            var dayGroupHasSpecialTreat = dayGroup.Entries.Any(entry => entry.meal.IsSpecialTreat);
-                            <article class="@mealCardClass"
-                                     data-leftover-day-card
-                                     data-day-index="@firstMealIndex"
-                                     data-day-meal-card
-                                     data-day-card-order="@dayGroupIndex"
-                                     data-day-card-leftover-count="@dayGroup.LeftoverDaysCovered"
-                                     data-day-card-meal-names="@serializedDayMealNames"
-                                     data-day-card-ignored-flags="@serializedIgnoredFlags"
-                                     data-day-card-has-special-treat="@(dayGroupHasSpecialTreat ? "true" : "false")">
-                                <details class="aislepilot-day-card-expander" data-day-card-expander @dayCardOpenAttribute>
-                                    <summary class="aislepilot-day-card-expander-summary"
-                                             aria-controls="@dayCardExpanderBodyId"
-                                             aria-expanded="@(dayGroupIndex == 0 ? "true" : "false")">
-                                        <span class="aislepilot-day-card-expander-thumb" aria-hidden="true">
-                                            <img class="aislepilot-day-card-expander-thumb-image"
-                                                 src="@firstSlotMealImageUrl"
-                                                 data-day-card-expander-image
-                                                 data-day-card-expander-image-default="@firstSlotMealImageUrl"
-                                                 alt="" />
-                                        </span>
-                                        <span class="aislepilot-day-card-expander-day">@dayGroup.Day</span>
-                                        <span class="aislepilot-day-card-expander-meal"
-                                              data-day-card-expander-meal
-                                              data-day-card-expander-meal-default="@firstSlotMeal.MealName">@firstSlotMeal.MealName</span>
-                                        <span class="aislepilot-day-card-expander-meta"
-                                              data-day-card-expander-meta
-                                              data-day-card-expander-meta-default="@daySummaryMeta">@daySummaryMeta</span>
-                                        @if (canReorderDayCards)
-                                        {
-                                            <button type="button"
-                                                    class="aislepilot-day-card-reorder-handle aislepilot-day-card-reorder-handle-summary"
-                                                    data-day-reorder-handle
-                                                    aria-label="Hold and drag to move @dayGroup.Day">
-                                                <span class="aislepilot-day-card-reorder-handle-glyph" aria-hidden="true">
-                                                    <svg viewBox="0 0 24 24" focusable="false">
-                                                        <circle cx="8" cy="7" r="1.4"></circle>
-                                                        <circle cx="8" cy="12" r="1.4"></circle>
-                                                        <circle cx="8" cy="17" r="1.4"></circle>
-                                                        <circle cx="16" cy="7" r="1.4"></circle>
-                                                        <circle cx="16" cy="12" r="1.4"></circle>
-                                                        <circle cx="16" cy="17" r="1.4"></circle>
-                                                    </svg>
-                                                </span>
-                                            </button>
-                                        }
-                                    </summary>
-                                    <div id="@dayCardExpanderBodyId" class="aislepilot-day-card-expander-body">
+                    <section class="aislepilot-day-carousel"
+                             data-day-card-carousel
+                             aria-label="Meal plan day cards"
+                             data-day-card-count="@dayMealGroups.Count">
+                        <div class="aislepilot-day-carousel-header">
+                            <div class="aislepilot-day-carousel-status"
+                                 aria-live="polite"
+                                 aria-atomic="true"
+                                 data-day-carousel-status>
+                                Day 1 of @dayMealGroups.Count
+                            </div>
+                            @if (dayMealGroups.Count > 1)
+                            {
+                                <div class="aislepilot-day-carousel-controls">
+                                    <button type="button"
+                                            class="aislepilot-day-carousel-arrow"
+                                            data-day-carousel-prev
+                                            aria-label="Show previous day"
+                                            disabled>
+                                        <span aria-hidden="true">&#8249;</span>
+                                    </button>
+                                    <button type="button"
+                                            class="aislepilot-day-carousel-arrow"
+                                            data-day-carousel-next
+                                            aria-label="Show next day">
+                                        <span aria-hidden="true">&#8250;</span>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                        <div class="aislepilot-meal-grid"
+                             data-day-carousel-viewport
+                             data-meal-image-poll-root
+                             data-fallback-meal-image-url="@fallbackMealImageUrl"
+                             data-meal-image-poll-enabled="@(Model.MealImagePollingEnabled ? "true" : "false")"
+                             data-meal-image-poll-url="@mealImagesPollUrl">
+                            <div class="aislepilot-day-carousel-track" data-day-carousel-track>
+                                @{
+                                    var dayGroupRenderIndex = 0;
+                                }
+                                @foreach (var dayGroup in dayMealGroups)
+                                {
+                                    var dayGroupIndex = dayGroupRenderIndex++;
+                                    var firstMealIndex = dayGroup.Entries[0].index;
+                                    var firstSlotEntry = dayGroup.Entries[0];
+                                    var firstSlotMeal = firstSlotEntry.meal;
+                                    var firstSlotIsIgnored = ignoredMealSlotIndexes.Contains(firstSlotEntry.index) || firstSlotMeal.IsIgnored;
+                                    var daySummaryMeta = firstSlotIsIgnored
+                                        ? "Removed"
+                                        : $"{firstSlotMeal.EstimatedCost.ToString("C", ukCulture)} \u00A0\u00A0\u00B7\u00A0\u00A0 {Math.Max(0, firstSlotMeal.EstimatedPrepMinutes)} mins";
+                                    var mealCardClass = dayGroup.LeftoverDaysCovered > 0
+                                        ? "aislepilot-card aislepilot-day-card is-leftover-source"
+                                        : "aislepilot-card aislepilot-day-card";
+                                    var tabPrefix = $"meal-slot-{firstMealIndex}";
+                                    var dayWeekIndex = weekDayLookup.TryGetValue(dayGroup.Day, out var resolvedWeekDayIndex)
+                                        ? resolvedWeekDayIndex
+                                        : Math.Clamp(dayGroupIndex, 0, Math.Max(0, result.PlanDays - 1));
+                                    var serializedDayMealNames = JsonSerializer.Serialize(dayGroup.Entries.Select(entry => entry.meal.MealName).ToList());
+                                    var serializedIgnoredFlags = JsonSerializer.Serialize(dayGroup.Entries
+                                        .Select(entry => ignoredMealSlotIndexes.Contains(entry.index) || entry.meal.IsIgnored)
+                                        .ToList());
+                                    var dayGroupHasSpecialTreat = dayGroup.Entries.Any(entry => entry.meal.IsSpecialTreat);
+                                    var dayCardHeadingId = $"day-card-heading-{firstMealIndex}";
+                                    <article class="@mealCardClass"
+                                             id="@($"day-card-{firstMealIndex}")"
+                                             data-leftover-day-card
+                                             data-day-index="@firstMealIndex"
+                                             data-day-meal-card
+                                             data-day-card-order="@dayGroupIndex"
+                                             data-day-card-leftover-count="@dayGroup.LeftoverDaysCovered"
+                                             data-day-card-meal-names="@serializedDayMealNames"
+                                             data-day-card-ignored-flags="@serializedIgnoredFlags"
+                                             data-day-card-day-name="@dayGroup.Day"
+                                             data-day-card-day-position="@(dayGroupIndex + 1)"
+                                             data-day-card-total-days="@dayMealGroups.Count"
+                                             data-day-card-has-special-treat="@(dayGroupHasSpecialTreat ? "true" : "false")"
+                                             data-day-card-slide
+                                             aria-labelledby="@dayCardHeadingId"
+                                             aria-roledescription="slide"
+                                             aria-label="@($"{dayGroup.Day}, day {dayGroupIndex + 1} of {dayMealGroups.Count}")"
+                                             aria-hidden="@(dayGroupIndex == 0 ? "false" : "true")">
+                                        <div class="aislepilot-day-card-body">
                                 <div class="aislepilot-card-head aislepilot-day-card-head">
                                     <div class="aislepilot-day-card-head-main">
-                                        <p class="aislepilot-card-kicker">@dayGroup.Day</p>
+                                        <p class="aislepilot-card-kicker" id="@dayCardHeadingId">@dayGroup.Day</p>
                                         @if (dayGroup.Entries.Count > 1)
                                         {
                                             <p class="aislepilot-day-card-meta"
@@ -719,26 +711,12 @@
                                                data-day-card-summary-default="@daySummaryMeta"
                                                aria-label="Selected meal cost and cook time">@daySummaryMeta</p>
                                         }
+                                        else
+                                        {
+                                            <p class="aislepilot-day-card-meta">@daySummaryMeta</p>
+                                        }
                                     </div>
                                     <div class="aislepilot-day-card-head-side">
-                                        @if (canReorderDayCards)
-                                        {
-                                            <button type="button"
-                                                    class="aislepilot-day-card-reorder-handle"
-                                                    data-day-reorder-handle
-                                                    aria-label="Hold and drag to move @dayGroup.Day">
-                                                <span class="aislepilot-day-card-reorder-handle-glyph" aria-hidden="true">
-                                                    <svg viewBox="0 0 24 24" focusable="false">
-                                                        <circle cx="8" cy="7" r="1.4"></circle>
-                                                        <circle cx="8" cy="12" r="1.4"></circle>
-                                                        <circle cx="8" cy="17" r="1.4"></circle>
-                                                        <circle cx="16" cy="7" r="1.4"></circle>
-                                                        <circle cx="16" cy="12" r="1.4"></circle>
-                                                        <circle cx="16" cy="17" r="1.4"></circle>
-                                                    </svg>
-                                                </span>
-                                            </button>
-                                        }
                                         @if (result.PlanDays > 1)
                                         {
                                             var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0
@@ -819,7 +797,7 @@
                                                 {
                                                     <span class="aislepilot-meal-removed-watermark" aria-hidden="true">Removed</span>
                                                 }
-                                                <h3>@meal.MealName</h3>
+                                                <h3 class="aislepilot-day-meal-title">@meal.MealName</h3>
                                                 <div class="aislepilot-day-meal-summary" data-day-meal-summary>
                                                     @if (isIgnored)
                                                     {
@@ -993,9 +971,9 @@
                                                                     </span>
                                                                 </button>
                                                             </form>
-                                                        </div>
-                                                    </details>
                                                 </div>
+                                            </details>
+                                        </div>
                                                 @if (isIgnored)
                                                 {
                                                     <div class="aislepilot-card-head">
@@ -1048,10 +1026,34 @@
                                         }
                                     </div>
                                 </div>
-                                    </div>
-                                </details>
-                            </article>
+                                        </div>
+                                    </article>
+                                }
+                            </div>
+                        </div>
+                        @if (dayMealGroups.Count > 1)
+                        {
+                            <div class="aislepilot-day-carousel-pagination" data-day-carousel-pagination role="tablist" aria-label="Choose a day card">
+                                @{ var dayDotIndex = 0; }
+                                @foreach (var dayGroup in dayMealGroups)
+                                {
+                                    var dotIsActive = dayDotIndex == 0; var dayCardId = $"day-card-{dayGroup.Entries[0].index}"; var dayShortLabel = GetShortDayLabel(dayGroup.Day);
+                                    <button type="button"
+                                            class="aislepilot-day-carousel-dot@(dotIsActive ? " is-active" : string.Empty)"
+                                            data-day-carousel-dot
+                                            data-day-carousel-target="@dayDotIndex"
+                                            role="tab"
+                                            aria-controls="@dayCardId"
+                                            aria-selected="@(dotIsActive ? "true" : "false")"
+                                            aria-current="@(dotIsActive ? "true" : "false")" tabindex="@(dotIsActive ? "0" : "-1")"
+                                            title="@($"Show {dayGroup.Day}")" aria-label="@($"Show {dayGroup.Day}")">
+                                        <span class="aislepilot-day-carousel-dot-label">@dayShortLabel</span>
+                                    </button>
+                                    dayDotIndex++;
+                                }
+                            </div>
                         }
+                    </section>
                         @if (result.IncludeDessertAddOn)
                         {
                             var dessertDetailsTriggerLabel = "View dessert details: ingredients and method";
@@ -1161,7 +1163,6 @@
                                 </div>
                             </article>
                         }
-                    </div>
                 </section>
 
                 <section id="aislepilot-shop" aria-label="Shopping" role="tabpanel" aria-labelledby="aislepilot-tab-shop" class="aislepilot-window-panel aislepilot-shop-panel" data-window-name="Shopping">
@@ -1178,7 +1179,10 @@
                         @foreach (var department in groupedItems)
                         {
                             <article class="aislepilot-card aislepilot-shop-card">
-                                <h3>@department.Key</h3>
+                                <div class="aislepilot-shop-card-head">
+                                    <h3>@department.Key</h3>
+                                    <span class="aislepilot-shop-card-count">@department.Count() item(s)</span>
+                                </div>
                                 <ul class="aislepilot-shop-list">
                                     @foreach (var item in department)
                                     {
@@ -1222,33 +1226,37 @@
                 </section>
 
                 <section id="aislepilot-export" aria-label="Exports" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel aislepilot-export-panel" data-window-name="Exports">
+                    <div class="aislepilot-export-intro">
+                        <p class="aislepilot-export-eyebrow">Take this plan with you</p>
+                        <h3 class="aislepilot-export-title">Start with the shopping list on your phone.</h3>
+                        <p class="aislepilot-export-copy">Share is the quickest option for supermarket trips. Download the PDF when you want the full week, and keep the text checklist as a lightweight backup.</p>
+                    </div>
+
                     <div class="aislepilot-export-actions">
-                        <div class="aislepilot-export-action" data-notes-export-shell>
+                        <article class="aislepilot-export-action is-primary" data-notes-export-shell>
+                            <div class="aislepilot-export-card-copy">
+                                <p class="aislepilot-export-card-kicker">Best for shopping now</p>
+                                <h4 class="aislepilot-export-card-title">Share to your phone</h4>
+                                <p class="aislepilot-export-card-description">Opens the share sheet on supported devices and can fall back to copying the list when sharing is unavailable.</p>
+                            </div>
                             <textarea hidden data-notes-export-content>@shoppingListNotesText</textarea>
                             <button type="button"
-                                    class="aislepilot-export-btn"
+                                    class="aislepilot-export-btn is-primary"
                                     data-notes-export-trigger
-                                    data-notes-default-label="Share shopping list (works with Notes)"
+                                    data-notes-default-label="Share shopping list"
                                     data-notes-shared-label="Share sheet opened. Choose your app."
                                     data-notes-copied-label="Shopping list copied."
                                     data-notes-failed-label="Could not share. Try again.">
-                                Share shopping list (works with Notes)
+                                Share shopping list
                             </button>
-                        </div>
+                        </article>
 
-                        <div class="aislepilot-export-action">
-                            <form method="post"
-                                  asp-action="ExportChecklist"
-                                  data-export-download-form
-                                  data-export-download-fallback-name="aislepilot-checklist.txt">
-                                @Html.AntiForgeryToken()
-                                <partial name="_AislePilotHiddenRequestFields"
-                                         model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                                <button type="submit" class="aislepilot-export-btn" data-loading-label="Building checklist...">Download shopping checklist (.txt)</button>
-                            </form>
-                        </div>
-
-                        <div class="aislepilot-export-action">
+                        <article class="aislepilot-export-action is-secondary">
+                            <div class="aislepilot-export-card-copy">
+                                <p class="aislepilot-export-card-kicker">Full week pack</p>
+                                <h4 class="aislepilot-export-card-title">Download the full plan</h4>
+                                <p class="aislepilot-export-card-description">PDF with the meals, budget snapshot, and aisle-ordered shopping list in one file.</p>
+                            </div>
                             <form method="post"
                                   asp-action="ExportPlanPack"
                                   data-export-theme-form
@@ -1258,13 +1266,31 @@
                                 <partial name="_AislePilotHiddenRequestFields"
                                          model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                                 <input type="hidden" name="exportTheme" value="light" data-export-theme-input />
-                                <button type="submit" class="aislepilot-export-btn" data-loading-label="Building PDF...">Download full plan pack (.pdf)</button>
+                                <button type="submit" class="aislepilot-export-btn is-secondary" data-loading-label="Building PDF...">Download plan pack (.pdf)</button>
                             </form>
-                        </div>
+                        </article>
 
-                        <div class="aislepilot-export-action">
-                            <button type="button" class="aislepilot-export-btn" onclick="window.print()">Print current view</button>
-                        </div>
+                        <article class="aislepilot-export-action is-secondary">
+                            <div class="aislepilot-export-card-copy">
+                                <p class="aislepilot-export-card-kicker">Plain text backup</p>
+                                <h4 class="aislepilot-export-card-title">Download a checklist</h4>
+                                <p class="aislepilot-export-card-description">Simple text version for Notes, reminders, or quick edits without the full PDF.</p>
+                            </div>
+                            <form method="post"
+                                  asp-action="ExportChecklist"
+                                  data-export-download-form
+                                  data-export-download-fallback-name="aislepilot-checklist.txt">
+                                @Html.AntiForgeryToken()
+                                <partial name="_AislePilotHiddenRequestFields"
+                                         model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                                <button type="submit" class="aislepilot-export-btn is-secondary" data-loading-label="Building checklist...">Download checklist (.txt)</button>
+                            </form>
+                        </article>
+                    </div>
+
+                    <div class="aislepilot-export-footer">
+                        <p class="aislepilot-export-footer-copy">Need a paper copy for the kitchen or a shared shop?</p>
+                        <button type="button" class="aislepilot-export-btn is-tertiary" onclick="window.print()">Print meal and shopping view</button>
                     </div>
                 </section>
             </div>
