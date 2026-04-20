@@ -567,26 +567,109 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             """);
 
         var imageSummary = page.Locator("[data-day-card-slide][aria-hidden='false'] .aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary").First;
+        await imageSummary.ScrollIntoViewIfNeededAsync();
         var previewTopsBeforeExpand = await page.EvaluateAsync<double[]>(
             """
             () => {
                 const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeSlide = slides[activeIndex];
                 const previousSlide = slides[activeIndex - 1];
                 const nextSlide = slides[activeIndex + 1];
-                if (!(previousSlide instanceof HTMLElement) || !(nextSlide instanceof HTMLElement)) {
+                const viewport = activeSlide instanceof HTMLElement
+                    ? activeSlide.closest("[data-day-carousel-viewport]")
+                    : null;
+                if (!(previousSlide instanceof HTMLElement)
+                    || !(nextSlide instanceof HTMLElement)
+                    || !(viewport instanceof HTMLElement)) {
                     return [];
                 }
 
+                const viewportTop = viewport.getBoundingClientRect().top;
                 return [
-                    previousSlide.getBoundingClientRect().top,
-                    nextSlide.getBoundingClientRect().top
+                    previousSlide.getBoundingClientRect().top - viewportTop,
+                    nextSlide.getBoundingClientRect().top - viewportTop
                 ];
             }
             """);
         Assert.Equal(2, previewTopsBeforeExpand.Length);
 
-        await imageSummary.ClickAsync();
+        var pagePositionBeforeExpand = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const viewport = document.querySelector("[data-day-carousel-viewport]");
+                if (!(viewport instanceof HTMLElement)) {
+                    return [];
+                }
+
+                return [
+                    viewport.getBoundingClientRect().top,
+                    window.scrollY
+                ];
+            }
+            """);
+        Assert.Equal(2, pagePositionBeforeExpand.Length);
+
+        var imageSummaryBox = await imageSummary.BoundingBoxAsync();
+        Assert.NotNull(imageSummaryBox);
+        await page.Mouse.ClickAsync(
+            imageSummaryBox!.X + (imageSummaryBox.Width / 2),
+            imageSummaryBox.Y + (imageSummaryBox.Height / 2));
+
+        var driftMetrics = await page.EvaluateAsync<double[]>(
+            """
+            async ({ baselinePreviousTop, baselineNextTop, baselineViewportTop, baselineScrollY }) => {
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeSlide = slides[activeIndex];
+                const previousSlide = slides[activeIndex - 1];
+                const nextSlide = slides[activeIndex + 1];
+                const viewport = activeSlide instanceof HTMLElement
+                    ? activeSlide.closest("[data-day-carousel-viewport]")
+                    : null;
+                if (!(previousSlide instanceof HTMLElement)
+                    || !(nextSlide instanceof HTMLElement)
+                    || !(viewport instanceof HTMLElement)) {
+                    return [];
+                }
+
+                let maxPreviousDrift = 0;
+                let maxNextDrift = 0;
+                let maxViewportDrift = 0;
+                let maxScrollDrift = 0;
+                const sample = () => {
+                    const viewportTop = viewport.getBoundingClientRect().top;
+                    maxPreviousDrift = Math.max(
+                        maxPreviousDrift,
+                        Math.abs((previousSlide.getBoundingClientRect().top - viewportTop) - baselinePreviousTop));
+                    maxNextDrift = Math.max(
+                        maxNextDrift,
+                        Math.abs((nextSlide.getBoundingClientRect().top - viewportTop) - baselineNextTop));
+                    maxViewportDrift = Math.max(
+                        maxViewportDrift,
+                        Math.abs(viewportTop - baselineViewportTop));
+                    maxScrollDrift = Math.max(
+                        maxScrollDrift,
+                        Math.abs(window.scrollY - baselineScrollY));
+                };
+
+                const start = performance.now();
+                sample();
+                while (performance.now() - start < 360) {
+                    await new Promise(resolve => window.setTimeout(resolve, 32));
+                    sample();
+                }
+
+                return [maxPreviousDrift, maxNextDrift, maxViewportDrift, maxScrollDrift];
+            }
+            """,
+            new
+            {
+                baselinePreviousTop = previewTopsBeforeExpand[0],
+                baselineNextTop = previewTopsBeforeExpand[1],
+                baselineViewportTop = pagePositionBeforeExpand[0],
+                baselineScrollY = pagePositionBeforeExpand[1]
+            });
 
         var expandedState = await page.WaitForFunctionAsync(
             """
@@ -596,9 +679,15 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeSlide = slides[activeIndex];
                 const previousSlide = slides[activeIndex - 1];
                 const nextSlide = slides[activeIndex + 1];
+                const viewport = activeSlide instanceof HTMLElement
+                    ? activeSlide.closest("[data-day-carousel-viewport]")
+                    : null;
                 if (!(activeSlide instanceof HTMLElement)
                     || !(previousSlide instanceof HTMLElement)
                     || !(nextSlide instanceof HTMLElement)) {
+                    return false;
+                }
+                if (!(viewport instanceof HTMLElement)) {
                     return false;
                 }
 
@@ -615,32 +704,32 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeRect = activeSlide.getBoundingClientRect();
                 const previousRect = previousSlide.getBoundingClientRect();
                 const nextRect = nextSlide.getBoundingClientRect();
+                const viewportTop = viewport.getBoundingClientRect().top;
 
-                return {
-                    activeHeight: activeRect.height,
-                    previousHeight: previousRect.height,
-                    nextHeight: nextRect.height,
-                    previousTop: previousRect.top,
-                    nextTop: nextRect.top
-                };
+                return [
+                    activeRect.height,
+                    previousRect.height,
+                    nextRect.height,
+                    previousRect.top - viewportTop,
+                    nextRect.top - viewportTop
+                ];
             }
             """);
 
-        var expandedMetrics = await expandedState.JsonValueAsync<ExpandedCarouselSlideMetrics>();
+        var expandedMetrics = await expandedState.JsonValueAsync<double[]>();
         Assert.NotNull(expandedMetrics);
-        Assert.True(expandedMetrics!.ActiveHeight > expandedMetrics.PreviousHeight + 40);
-        Assert.True(expandedMetrics.ActiveHeight > expandedMetrics.NextHeight + 40);
-        Assert.True(Math.Abs(expandedMetrics.PreviousHeight - expandedMetrics.NextHeight) < 24);
-        Assert.True(Math.Abs(expandedMetrics.PreviousTop - previewTopsBeforeExpand[0]) < 2.5);
-        Assert.True(Math.Abs(expandedMetrics.NextTop - previewTopsBeforeExpand[1]) < 2.5);
+        Assert.Equal(5, expandedMetrics!.Length);
+        Assert.Equal(4, driftMetrics.Length);
+        Assert.True(driftMetrics[0] < 2.5, $"Expected previous preview slide to stay vertically stable. Drift={driftMetrics[0]}px.");
+        Assert.True(driftMetrics[1] < 2.5, $"Expected next preview slide to stay vertically stable. Drift={driftMetrics[1]}px.");
+        Assert.True(driftMetrics[2] < 2.5, $"Expected carousel viewport to stay vertically stable while opening details. Drift={driftMetrics[2]}px.");
+        Assert.True(driftMetrics[3] < 2.5, $"Expected page scroll to stay stable while opening details. Drift={driftMetrics[3]}px.");
+        Assert.True(expandedMetrics[0] > expandedMetrics[1] + 40);
+        Assert.True(expandedMetrics[0] > expandedMetrics[2] + 40);
+        Assert.True(Math.Abs(expandedMetrics[1] - expandedMetrics[2]) < 24);
+        Assert.True(Math.Abs(expandedMetrics[3] - previewTopsBeforeExpand[0]) < 2.5);
+        Assert.True(Math.Abs(expandedMetrics[4] - previewTopsBeforeExpand[1]) < 2.5);
     }
-
-    private sealed record ExpandedCarouselSlideMetrics(
-        double ActiveHeight,
-        double PreviousHeight,
-        double NextHeight,
-        double PreviousTop,
-        double NextTop);
 
     [Fact]
     public async Task Desktop_AislePilotSupermarketSelection_PersistsAcrossFreshVisit()

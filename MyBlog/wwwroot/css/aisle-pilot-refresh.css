@@ -1293,20 +1293,20 @@
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="far"] {
         opacity: 0.04;
-        transform: perspective(1600px) translate3d(0, 0, -170px) scale(0.85);
+        transform: scale(0.85);
         filter: saturate(0.58) brightness(0.8);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] {
         opacity: 0.44;
-        transform: perspective(1800px) translate3d(0.36rem, 0, -86px) rotateY(8deg) scale(0.92);
+        transform: translateX(0.36rem) scale(0.92);
         box-shadow: 0 14px 24px rgba(10, 26, 44, 0.07);
         filter: saturate(0.64) brightness(0.84);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] {
         opacity: 0.44;
-        transform: perspective(1800px) translate3d(-0.36rem, 0, -86px) rotateY(-8deg) scale(0.92);
+        transform: translateX(-0.36rem) scale(0.92);
         box-shadow: 0 14px 24px rgba(10, 26, 44, 0.07);
         filter: saturate(0.64) brightness(0.84);
     }
@@ -1416,6 +1416,17 @@
     :root[data-theme="dark"] .aislepilot-stat-card--support {
         background: rgba(15, 24, 38, 0.92);
         box-shadow: 0 12px 22px rgba(2, 6, 23, 0.2);
+    }
+}
+
+@media (min-width: 981px) {
+    [data-aislepilot-window] .aislepilot-window-viewport {
+        transition: none;
+        overflow-anchor: none;
+    }
+
+    [data-aislepilot-window] .aislepilot-meal-grid {
+        overflow-anchor: none;
     }
 }
 
