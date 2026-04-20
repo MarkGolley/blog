@@ -1,6 +1,9 @@
+@model HomeIndexViewModel
+
 @{
     ViewData["Title"] = "Home";
-    ViewData["MetaDescription"] = "Mark Golley builds reliable software in C#/.NET and Python, with a focus on clean architecture and testing.";
+    ViewData["MetaTitle"] = "Mark Golley | C#/.NET Engineer";
+    ViewData["MetaDescription"] = "Mark Golley is a C#/.NET engineer building reliable ASP.NET Core and Python software with testing, clear architecture, and practical delivery.";
     ViewData["CanonicalPath"] = "/";
     var resumeUrl = ViewData["ResumeUrl"]?.ToString() ?? string.Empty;
     var gitHubUrl = ViewData["GitHubUrl"]?.ToString() ?? string.Empty;
@@ -12,25 +15,26 @@
 <section id="hero" class="home-hero" data-reveal>
     <div class="home-hero-grid">
         <div class="hero-copy">
-            <p class="hero-kicker">C#/.NET + Python Engineer</p>
-            <h1 class="hero-title">Building reliable software with clear architecture and practical delivery.</h1>
+            <p class="hero-kicker">Mark Golley · C#/.NET Engineer · Burley in Wharfedale, UK</p>
+            <h1 class="hero-title">I build reliable ASP.NET Core and Python software with clear architecture, testing, and practical delivery.</h1>
             <p class="hero-lead">
-                I write pragmatic, test-driven software and share what works: architecture decisions, delivery tradeoffs,
-                and practical lessons from real projects.
+                This site is both portfolio and working product: case studies, engineering writing, and the platform
+                features behind them. It is designed to show how I think, how I build, and what I ship.
             </p>
             <div class="hero-actions">
+                <a class="btn btn-primary" asp-controller="Projects" asp-action="Index">View selected work</a>
+                <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">Read featured writing</a>
+                <a class="btn btn-secondary" asp-controller="Contact" asp-action="Index">Get in touch</a>
+            </div>
+            <div class="hero-actions hero-actions-secondary">
                 @if (!string.IsNullOrWhiteSpace(aislePilotPublicUrl))
                 {
-                    <a class="btn btn-primary" href="@aislePilotPublicUrl" data-recruiter-link="aislepilot">Try AislePilot</a>
+                    <a class="btn btn-secondary" href="@aislePilotPublicUrl" data-recruiter-link="aislepilot">Try AislePilot</a>
                 }
                 else if (aislePilotLocalEnabled)
                 {
-                    <a class="btn btn-primary" asp-controller="AislePilot" asp-action="Index" asp-route-returnUrl="/" data-recruiter-link="aislepilot">Try AislePilot</a>
+                    <a class="btn btn-secondary" asp-controller="AislePilot" asp-action="Index" asp-route-returnUrl="/" data-recruiter-link="aislepilot">Try AislePilot</a>
                 }
-                <a class="btn btn-secondary" asp-controller="Projects" asp-action="Index">See my projects</a>
-                <a class="btn btn-secondary" asp-controller="Contact" asp-action="Index">Start a conversation</a>
-            </div>
-            <div class="hero-actions hero-actions-secondary">
                 @if (!string.IsNullOrWhiteSpace(resumeUrl))
                 {
                     <a class="btn btn-secondary" href="@resumeUrl" target="_blank" rel="noreferrer" data-recruiter-link="resume">Resume</a>
@@ -46,16 +50,16 @@
             </div>
             <div class="hero-metrics">
                 <article class="metric-card">
-                    <p class="metric-value">4 Years</p>
-                    <p class="metric-label">Hands-on software development</p>
+                    <p class="metric-value">@Model.PublishedPostCount</p>
+                    <p class="metric-label">Published articles and technical write-ups</p>
                 </article>
                 <article class="metric-card">
-                    <p class="metric-value">.NET + Python</p>
-                    <p class="metric-label">Core stack for delivery and automation</p>
+                    <p class="metric-value">ASP.NET Core + Python</p>
+                    <p class="metric-label">Primary stack for delivery, automation, and product work</p>
                 </article>
                 <article class="metric-card">
-                    <p class="metric-value">Testing First</p>
-                    <p class="metric-label">Quality engineered into the build cycle</p>
+                    <p class="metric-value">Tests + Guardrails</p>
+                    <p class="metric-label">Moderation, subscriptions, and release checks built into the workflow</p>
                 </article>
             </div>
         </div>
@@ -63,59 +67,59 @@
             <div class="hero-portrait-frame">
                 <img src="~/images/me.jpg" alt="Portrait of Mark" />
             </div>
-            <section class="hero-spotlight" aria-label="Focus timeline" data-focus-carousel>
+            <section class="hero-spotlight" aria-label="Delivery highlights" data-focus-carousel>
                 <div class="hero-spotlight-head">
                     <div>
-                        <p class="spotlight-eyebrow">What I'm focused on</p>
-                        <p class="spotlight-title" data-focus-label>Current focus</p>
+                        <p class="spotlight-eyebrow">Delivery highlights</p>
+                        <p class="spotlight-title" data-focus-label>Current emphasis</p>
                     </div>
                     <div class="hero-spotlight-controls" aria-label="Focus navigation">
-                        <button type="button" class="hero-spotlight-nav" data-focus-prev aria-label="Show previous focus">&#8249;</button>
-                        <button type="button" class="hero-spotlight-nav" data-focus-next aria-label="Show next focus">&#8250;</button>
+                        <button type="button" class="hero-spotlight-nav" data-focus-prev aria-label="Show previous highlight">&#8249;</button>
+                        <button type="button" class="hero-spotlight-nav" data-focus-next aria-label="Show next highlight">&#8250;</button>
                     </div>
                 </div>
 
                 <div class="hero-focus-card" data-focus-panel>
                     <p class="hero-focus-period" data-focus-period>Now</p>
-                    <p class="hero-focus-heading" data-focus-heading>Architecture, testing, and more deliberate project delivery.</p>
+                    <p class="hero-focus-heading" data-focus-heading>Recruiter-ready portfolio proof and stronger case studies.</p>
                     <p class="hero-focus-copy" data-focus-copy>
-                        Right now I am concentrating on cleaner boundaries in my .NET work, stronger automated test coverage,
-                        and turning ideas on this site into projects with clearer proof of delivery.
+                        The current emphasis is turning this site into stronger proof of delivery: clearer project framing,
+                        tighter recruiter paths, and sharper evidence of how I build.
                     </p>
                 </div>
 
                 <div class="hero-focus-progress" role="tablist" aria-label="Focus timeline">
-                    <button type="button" class="hero-focus-dot is-active" data-focus-dot="0" aria-label="Show current focus" aria-selected="true"></button>
-                    <button type="button" class="hero-focus-dot" data-focus-dot="1" aria-label="Show cloud and deployment focus" aria-selected="false"></button>
-                    <button type="button" class="hero-focus-dot" data-focus-dot="2" aria-label="Show testing focus" aria-selected="false"></button>
-                    <button type="button" class="hero-focus-dot" data-focus-dot="3" aria-label="Show C# foundations focus" aria-selected="false"></button>
+                    <button type="button" class="hero-focus-dot is-active" data-focus-dot="0" aria-label="Show current emphasis" aria-selected="true"></button>
+                    <button type="button" class="hero-focus-dot" data-focus-dot="1" aria-label="Show applied AI highlight" aria-selected="false"></button>
+                    <button type="button" class="hero-focus-dot" data-focus-dot="2" aria-label="Show cloud and deployment highlight" aria-selected="false"></button>
+                    <button type="button" class="hero-focus-dot" data-focus-dot="3" aria-label="Show testing highlight" aria-selected="false"></button>
                 </div>
 
                 <script type="application/json" data-focus-items>
                     [
                       {
-                        "label": "Current focus",
+                        "label": "Current emphasis",
                         "period": "Now",
-                        "heading": "Architecture, testing, and more deliberate project delivery.",
-                        "copy": "Right now I am concentrating on cleaner boundaries in my .NET work, stronger automated test coverage, and turning ideas on this site into projects with clearer proof of delivery."
+                        "heading": "Recruiter-ready portfolio proof and stronger case studies.",
+                        "copy": "The current emphasis is turning this site into stronger proof of delivery: clearer project framing, tighter recruiter paths, and sharper evidence of how I build."
                       },
                       {
-                        "label": "Previous focus",
+                        "label": "Recent highlight",
+                        "period": "Applied AI with guardrails",
+                        "heading": "Turning AI features into deterministic product behavior.",
+                        "copy": "The moderation workflow focused on safe defaults, reasoned fallback behavior, and test coverage rather than shipping AI as a black box."
+                      },
+                      {
+                        "label": "Recent highlight",
                         "period": "Cloud and deployment",
-                        "heading": "Getting software live reliably, not just built locally.",
-                        "copy": "A big recent focus was deployment and operational confidence: hosting the site, working through cloud setup, and making releases feel repeatable instead of fragile."
+                        "heading": "Getting software live reliably, not just working locally.",
+                        "copy": "Release scripts, health checks, and deployment cleanup became a real focus so shipping felt repeatable instead of fragile."
                       },
                       {
-                        "label": "Previous focus",
+                        "label": "Recent highlight",
                         "period": "Testing and quality",
-                        "heading": "Building the habit of proving behaviour with tests first.",
-                        "copy": "A strong stretch of work went into xUnit, Moq, moderation checks, and comment workflows so the site could grow without guessing whether changes were safe."
-                      },
-                      {
-                        "label": "Previous focus",
-                        "period": "C# foundations",
-                        "heading": "Sharpening design patterns, SOLID, and code organisation.",
-                        "copy": "Earlier work centred on the fundamentals in my learning plan: class structure, object-oriented design, and the practical patterns that make code easier to extend."
+                        "heading": "Using tests to make iteration safer.",
+                        "copy": "Integration coverage, moderation checks, and anti-forgery handling all came from the same goal: move quickly without guessing whether changes are safe."
                       }
                     ]
                 </script>
@@ -125,45 +129,80 @@
 </section>
 
 <section aria-labelledby="quick-bits-title" class="showcase-section" data-reveal>
-    <h2 id="quick-bits-title">Quick bits</h2>
+    <h2 id="quick-bits-title">How I work</h2>
     <div class="credentials-grid">
         <div class="credential-card">
-            <div class="credential-title">Stack</div>
-            <div class="credential-value">C#, .NET, xUnit, Python, GCP</div>
-            <p class="credential-copy">I focus on maintainable code, strong tests, and clean delivery.</p>
+            <div class="credential-title">Architecture</div>
+            <div class="credential-value">Readable boundaries over cleverness</div>
+            <p class="credential-copy">I care about code that can be extended safely by the next person who touches it.</p>
         </div>
         <div class="credential-card">
-            <div class="credential-title">Learning style</div>
-            <div class="credential-value">Short focused sprints</div>
-            <p class="credential-copy">Consistent, intentional learning beats marathon sessions.</p>
+            <div class="credential-title">Testing</div>
+            <div class="credential-value">Regression coverage for risky paths</div>
+            <p class="credential-copy">Comments, moderation, likes, subscriptions, and admin flows are all backed by automated checks.</p>
         </div>
         <div class="credential-card">
-            <div class="credential-title">Outside work</div>
-            <div class="credential-value">Climbing and long walks</div>
-            <p class="credential-copy">Usually with Ellie, my cocker spaniel.</p>
+            <div class="credential-title">Delivery</div>
+            <div class="credential-value">Pragmatic scope with proof</div>
+            <p class="credential-copy">I try to ship useful slices with visible outcomes rather than leave everything as intent.</p>
         </div>
     </div>
 </section>
 
 <section aria-labelledby="focus-areas-title" class="showcase-section" data-reveal>
-    <h2 id="focus-areas-title">Focus areas</h2>
-    <p class="section-intro">A mix of production projects and practical writeups from shipping software.</p>
+    <h2 id="focus-areas-title">Where to start</h2>
+    <p class="section-intro">If you are reviewing the site quickly, these are the best entry points.</p>
     <div class="focus-grid">
         <a class="focus-card" asp-controller="Projects" asp-action="Index">
-            <p class="focus-title">Projects</p>
-            <p>Production-focused builds with architecture tradeoffs, testing evidence, and measurable outcomes.</p>
+            <p class="focus-title">Selected work</p>
+            <p>Project summaries with delivery scope, proof points, and what each build demonstrates.</p>
         </a>
-        <a class="focus-card" asp-controller="Blog" asp-action="Index" asp-route-tag="C#">
-            <p class="focus-title">C# and .NET</p>
-            <p>Clean architecture, practical patterns, and maintainable backend workflows.</p>
+        <a class="focus-card" asp-controller="Blog" asp-action="Index">
+            <p class="focus-title">Articles</p>
+            <p>Technical writing on ASP.NET Core, testing, cloud delivery, and engineering tradeoffs.</p>
         </a>
-        <a class="focus-card" asp-controller="Blog" asp-action="Index" asp-route-tag="Testing">
-            <p class="focus-title">Testing and quality</p>
-            <p>xUnit, test strategy, and reliability habits that reduce production risk.</p>
+        <a class="focus-card" asp-controller="About" asp-action="Index">
+            <p class="focus-title">About me</p>
+            <p>The quick version of how I work, what I use day to day, and what I care about in software delivery.</p>
         </a>
-        <a class="focus-card" asp-controller="Blog" asp-action="Index" asp-route-tag="Cloud">
-            <p class="focus-title">Cloud and deployment</p>
-            <p>Lessons from hosting, infrastructure decisions, and real operational concerns.</p>
+        <a class="focus-card" asp-controller="Contact" asp-action="Index">
+            <p class="focus-title">Get in touch</p>
+            <p>Email, LinkedIn, and GitHub links for roles, collaborations, or technical conversations.</p>
         </a>
     </div>
+</section>
+
+<section aria-labelledby="featured-writing-title" class="showcase-section" data-reveal>
+    <h2 id="featured-writing-title">Featured writing</h2>
+    <p class="section-intro">A few articles that best show how I think about testing, reliability, and practical engineering decisions.</p>
+
+    @if (Model.FeaturedPosts.Any())
+    {
+        <div class="focus-grid">
+            @foreach (var post in Model.FeaturedPosts)
+            {
+                <a class="focus-card" asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">
+                    <p class="focus-title">@post.Title</p>
+                    <div class="post-meta">
+                        @post.DatePosted.ToString("dd MMMM yyyy")
+                        <span class="meta-dot">•</span>
+                        @post.ReadingTimeMinutes min read
+                    </div>
+                    @if (post.Tags.Any())
+                    {
+                        <div class="tag-list">
+                            @foreach (var tag in post.Tags.Take(3))
+                            {
+                                <span class="tag-chip">@tag</span>
+                            }
+                        </div>
+                    }
+                </a>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="section-intro">Featured articles will appear here as the writing library grows.</p>
+    }
 </section>

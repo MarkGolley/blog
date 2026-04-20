@@ -1,7 +1,7 @@
 @{
-    ViewData["Title"] = "Projects";
+    ViewData["Title"] = "Selected Work";
     ViewData["MetaDescription"] =
-        "Focused engineering roadmap from Mark Golley with active builds and clear delivery milestones.";
+        "Selected software engineering work from Mark Golley, covering product flows, platform features, and reliability improvements.";
     ViewData["CanonicalPath"] = "/projects";
     var aislePilotPublicUrl = ViewData["AislePilotPublicUrl"]?.ToString() ?? string.Empty;
     var aislePilotLocalEnabled = ViewData["AislePilotLocalEnabled"] as bool? ?? true;
@@ -12,9 +12,9 @@
             : "In progress";
 }
 
-<section aria-labelledby="active-projects-title" data-reveal>
-    <h2 id="active-projects-title">Active projects</h2>
-    <p class="section-intro">Working products with clear proof points and near-term milestones.</p>
+<section aria-labelledby="selected-work-title" data-reveal>
+    <h1 id="selected-work-title">Selected work</h1>
+    <p class="section-intro">The projects and platform features that best show how I approach delivery, reliability, and product thinking.</p>
 
     <div class="case-template-grid">
         <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
@@ -70,19 +70,6 @@
             CtaIconPath = "~/images/aislepilot-icon.svg"
         }' />
 
-        <article class="case-template case-template-placeholder" aria-label="Future project slot">
-            <span class="case-template-placeholder-label">TBC</span>
-        </article>
-        <article class="case-template case-template-placeholder" aria-label="Future project slot">
-            <span class="case-template-placeholder-label">TBC</span>
-        </article>
-    </div>
-</section>
-
-<section aria-labelledby="completed-projects-title" data-reveal>
-    <h2 id="completed-projects-title">Completed</h2>
-
-    <div class="case-template-grid">
         <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
         {
             Title = "AI Moderation v2 for Blog Comments",
@@ -105,6 +92,33 @@
             },
             WhatItShows = "Can turn applied AI into deterministic product behavior with guardrails.",
             NextMilestone = string.Empty
+        }' />
+
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
+            Title = "Portfolio + Publishing Platform",
+            Status = "Shipped",
+            OneLiner = "Built and iterated the recruiter-facing ASP.NET Core site you are looking at now, including publishing, moderation, subscriptions, and operational checks.",
+            WhyItMatters = "Turns the portfolio itself into working proof of delivery rather than a static brochure site.",
+            TechnicalScope = new[]
+            {
+                "Server-rendered ASP.NET Core MVC and Razor pages with responsive theming and dark mode.",
+                "Blog ingestion with tag search, reading-time metadata, and article pages.",
+                "Comment threads, moderation hooks, likes, anti-forgery refresh, and honeypot protection.",
+                "Subscriber confirmation flow, admin actions, and health-check endpoints."
+            },
+            ProofChecklist = new[]
+            {
+                "Integration tests covering comments, likes, subscriptions, health, and admin flows.",
+                "Production-ready deployment scripts and warmup checks in the repository.",
+                "Published engineering content across testing, cloud, architecture, and delivery topics.",
+                "Live recruiter-facing UX built on the same codebase as the supporting workflows."
+            },
+            WhatItShows = "Can own product UX, backend behaviour, and operational details inside one maintainable codebase.",
+            NextMilestone = string.Empty,
+            CtaText = "Read articles",
+            CtaController = "Blog",
+            CtaAction = "Index"
         }' />
     </div>
 </section>

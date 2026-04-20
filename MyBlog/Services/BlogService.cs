@@ -8,6 +8,12 @@ public class BlogService
     private static readonly Regex HtmlTagRegex = new("<[^>]*>", RegexOptions.Compiled);
     private static readonly Regex WordRegex = new(@"[A-Za-z0-9#\+]+", RegexOptions.Compiled);
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
+    private static readonly string[] FeaturedPostIds =
+    [
+        "the_16_hour_ai_moderation_build",
+        "Using_xUnit_For_Testing",
+        "Migrating_To_GCP"
+    ];
 
     private static readonly (string Keyword, string Tag)[] TagKeywords =
     {
@@ -46,6 +52,53 @@ public class BlogService
     public IEnumerable<BlogPost> GetAllPosts()
     {
         return GetOrBuildSnapshot().Posts;
+    }
+
+    public IReadOnlyList<BlogPost> GetFeaturedPosts(int maxCount = 3)
+    {
+        if (maxCount <= 0)
+        {
+            return Array.Empty<BlogPost>();
+        }
+
+        var snapshot = GetOrBuildSnapshot();
+        if (snapshot.Posts.Count == 0)
+        {
+            return Array.Empty<BlogPost>();
+        }
+
+        var featuredPosts = new List<BlogPost>(Math.Min(maxCount, snapshot.Posts.Count));
+        var featuredIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var postId in FeaturedPostIds)
+        {
+            if (!snapshot.PostBySlug.TryGetValue(postId, out var post) || !featuredIds.Add(post.Id))
+            {
+                continue;
+            }
+
+            featuredPosts.Add(post);
+            if (featuredPosts.Count == maxCount)
+            {
+                return featuredPosts;
+            }
+        }
+
+        foreach (var post in snapshot.Posts)
+        {
+            if (!featuredIds.Add(post.Id))
+            {
+                continue;
+            }
+
+            featuredPosts.Add(post);
+            if (featuredPosts.Count == maxCount)
+            {
+                break;
+            }
+        }
+
+        return featuredPosts;
     }
 
     public BlogPost? GetPostBySlug(string? slug)

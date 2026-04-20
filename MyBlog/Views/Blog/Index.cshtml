@@ -1,16 +1,16 @@
 ﻿@model MyBlog.Models.BlogIndexViewModel
 
 @{
-    ViewData["Title"] = "My Blogs";
-    ViewData["MetaDescription"] = "Browse blog posts on C#, .NET, design patterns, cloud, testing, and practical engineering lessons.";
+    ViewData["Title"] = "Articles";
+    ViewData["MetaDescription"] = "Browse engineering articles from Mark Golley on ASP.NET Core, testing, cloud delivery, and practical software lessons.";
     ViewData["CanonicalPath"] = "/blog";
 }
 
 <section id="blogs" class="blog-page" aria-labelledby="blogs-title">
     <header class="blog-hero" data-reveal>
-        <p class="hero-kicker">Engineering Journal</p>
-        <h1 id="blogs-title">My Blogs</h1>
-        <p class="section-intro">Browse by topic, search by keyword, and surface the articles readers are pinning most.</p>
+        <p class="hero-kicker">Engineering Writing</p>
+        <h1 id="blogs-title">Articles</h1>
+        <p class="section-intro">Practical writing on ASP.NET Core, testing, cloud delivery, and the engineering tradeoffs behind this site.</p>
         <p class="blog-stat-inline" aria-label="Post summary">
             @Model.TotalPostCount posts
             <span aria-hidden="true">•</span>
@@ -25,7 +25,7 @@
             </article>
             <article class="metric-card">
                 <p class="metric-value">@Model.FilteredPostCount</p>
-                <p class="metric-label">Visible in current filter</p>
+                <p class="metric-label">Matching current filter</p>
             </article>
             <article class="metric-card">
                 <p class="metric-value">@Model.AvailableTags.Count</p>
@@ -71,13 +71,13 @@
     </p>
 
     <div class="pinned-posts-block" data-reveal>
-        <h3 class="blog-subtitle">Pinned posts</h3>
-        @if (Model.PinnedPosts.Any())
+        <h3 class="blog-subtitle">Featured articles</h3>
+        @if (Model.FeaturedPosts.Any())
         {
             <div class="blog-list pinned-blog-list">
-                @foreach (var item in Model.PinnedPosts)
+                @foreach (var item in Model.FeaturedPosts)
                 {
-                    <article class="blog-post pinned-blog-post" id="pinned-post-@item.Post.Id" data-reveal>
+                    <article class="blog-post pinned-blog-post" id="featured-post-@item.Post.Id" data-reveal>
                         <div class="blog-post-row">
                             <div class="blog-post-main">
                                 <h3>
@@ -86,7 +86,7 @@
                                     </a>
                                 </h3>
                                 <div class="post-meta">
-                                    <span class="pinned-badge">Pinned</span>
+                                    <span class="pinned-badge">Featured</span>
                                     @item.Post.DatePosted.ToString("dd MMMM yyyy")
                                     <span class="meta-dot">•</span>
                                     @item.Post.ReadingTimeMinutes min read
@@ -104,7 +104,7 @@
                             <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
                                 <input type="hidden" name="postId" value="@item.Post.Id" />
                                 <input type="hidden" name="returnTo" value="index" />
-                                <input type="hidden" name="returnAnchor" value="pinned-post-@item.Post.Id" />
+                                <input type="hidden" name="returnAnchor" value="featured-post-@item.Post.Id" />
                                 <button
                                     type="submit"
                                     class="like-btn icon-like-btn like-btn-sm @(item.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
@@ -120,11 +120,11 @@
         }
         else
         {
-            <p class="section-intro">Pinned posts will appear here once posts start getting likes.</p>
+            <p class="section-intro">No featured articles match the current filter.</p>
         }
     </div>
 
-    <h3 class="blog-subtitle" data-reveal>All posts</h3>
+    <h3 class="blog-subtitle" data-reveal>All articles</h3>
 
     <div class="blog-list">
         @if (Model.Posts.Any())
