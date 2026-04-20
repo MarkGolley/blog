@@ -1163,29 +1163,29 @@
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="far"] {
-        opacity: 0.06;
-        transform: perspective(1500px) translate3d(0, 0, -150px) scale(0.88);
-        filter: saturate(0.68) brightness(0.86);
+        opacity: 0.04;
+        transform: perspective(1600px) translate3d(0, 0, -170px) scale(0.85);
+        filter: saturate(0.58) brightness(0.8);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] {
-        opacity: 0.62;
-        transform: perspective(1800px) translate3d(0.24rem, 0, -70px) rotateY(6deg) scale(0.95);
-        box-shadow: 0 16px 28px rgba(10, 26, 44, 0.08);
-        filter: saturate(0.78) brightness(0.94);
+        opacity: 0.44;
+        transform: perspective(1800px) translate3d(0.36rem, 0, -86px) rotateY(8deg) scale(0.92);
+        box-shadow: 0 14px 24px rgba(10, 26, 44, 0.07);
+        filter: saturate(0.64) brightness(0.84);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] {
-        opacity: 0.62;
-        transform: perspective(1800px) translate3d(-0.24rem, 0, -70px) rotateY(-6deg) scale(0.95);
-        box-shadow: 0 16px 28px rgba(10, 26, 44, 0.08);
-        filter: saturate(0.78) brightness(0.94);
+        opacity: 0.44;
+        transform: perspective(1800px) translate3d(-0.36rem, 0, -86px) rotateY(-8deg) scale(0.92);
+        box-shadow: 0 14px 24px rgba(10, 26, 44, 0.07);
+        filter: saturate(0.64) brightness(0.84);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card.is-carousel-ghost[data-day-carousel-position="prev"],
     .aislepilot-day-carousel-track > .aislepilot-day-card.is-carousel-ghost[data-day-carousel-position="next"] {
-        opacity: 0.24;
-        filter: saturate(0.6) brightness(0.9);
+        opacity: 0.14;
+        filter: saturate(0.48) brightness(0.82);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] .aislepilot-day-card-head,
@@ -1198,17 +1198,17 @@
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] .aislepilot-meal-panel-image-actions,
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] .aislepilot-day-meal-tabs,
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] .aislepilot-day-meal-tabs {
-        opacity: 0.42;
+        opacity: 0.18;
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] .aislepilot-meal-image,
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] .aislepilot-meal-image {
-        filter: saturate(0.82) brightness(0.9);
+        filter: saturate(0.58) brightness(0.78);
     }
 
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="prev"] .aislepilot-meal-image-hint,
     .aislepilot-day-carousel-track > .aislepilot-day-card[data-day-carousel-position="next"] .aislepilot-meal-image-hint {
-        opacity: 0.18;
+        opacity: 0.08;
     }
 
     .aislepilot-day-meal-tabs {

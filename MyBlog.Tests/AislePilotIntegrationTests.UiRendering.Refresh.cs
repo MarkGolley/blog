@@ -256,7 +256,12 @@ public partial class AislePilotIntegrationTests
             css);
         Assert.Matches(
             new Regex(
-                @"\.aislepilot-day-carousel-track\s*>\s*\.aislepilot-day-card\[data-day-carousel-position=""prev""\]\s*\{[\s\S]*opacity:\s*0\.62;",
+                @"\.aislepilot-day-carousel-track\s*>\s*\.aislepilot-day-card\[data-day-carousel-position=""prev""\]\s*\{[\s\S]*opacity:\s*0\.44;[\s\S]*rotateY\(8deg\)\s*scale\(0\.92\);",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel-track\s*>\s*\.aislepilot-day-card\[data-day-carousel-position=""prev""\]\s+\.aislepilot-day-card-head,[\s\S]*\.aislepilot-day-carousel-track\s*>\s*\.aislepilot-day-card\[data-day-carousel-position=""next""\]\s+\.aislepilot-day-meal-tabs\s*\{[\s\S]*opacity:\s*0\.18;",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(

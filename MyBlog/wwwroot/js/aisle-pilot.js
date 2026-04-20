@@ -1255,6 +1255,7 @@
     };
 
     let cardMoreActionsBackdrop = null;
+    let cardMoreActionsGlobalWired = false;
     let cardMoreActionsLastOpenedAt = 0;
     const cardMoreActionsCloseAnimationMs = 420;
     const cardMoreActionsCloseTimers = new WeakMap();

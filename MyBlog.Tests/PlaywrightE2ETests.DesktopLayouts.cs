@@ -327,6 +327,75 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Desktop_AislePilotDayCarousel_WiresInitialSlideStateOnLoad()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+        var pageErrors = new List<string>();
+        page.PageError += (_, message) =>
+        {
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                pageErrors.Add(message.Trim());
+            }
+        };
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var carouselState = await page.EvaluateAsync<object[]>(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeSlides = slides.filter(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const positionedSlides = slides.filter(slide => slide instanceof HTMLElement && (slide.getAttribute("data-day-carousel-position") || "").length > 0);
+                const activePositionSlides = slides.filter(slide => slide instanceof HTMLElement && slide.getAttribute("data-day-carousel-position") === "active");
+                const status = document.querySelector("[data-day-carousel-status]");
+                const coreKeys = window.AislePilotCore ? Object.keys(window.AislePilotCore).sort().join(",") : "";
+
+                return [
+                    carousel instanceof HTMLElement ? (carousel.getAttribute("data-day-card-carousel-wired") || "") : "missing",
+                    slides.length,
+                    activeSlides.length,
+                    positionedSlides.length,
+                    activePositionSlides.length,
+                    status instanceof HTMLElement ? (status.textContent || "").trim() : "",
+                    window.__aislePilotCoreWired === true ? "1" : "0",
+                    window.__aislePilotScriptWired === true ? "1" : "0",
+                    window.AislePilotCore ? "1" : "0",
+                    coreKeys
+                ];
+            }
+            """);
+
+        Assert.Equal(10, carouselState.Length);
+        var debugState =
+            $"wired={carouselState[0]}; slides={carouselState[1]}; activeSlides={carouselState[2]}; " +
+            $"positioned={carouselState[3]}; activePositioned={carouselState[4]}; status={carouselState[5]}; " +
+            $"coreWired={carouselState[6]}; scriptWired={carouselState[7]}; corePresent={carouselState[8]}; coreKeys={carouselState[9]}";
+        if (pageErrors.Count > 0)
+        {
+            debugState = $"{debugState}; pageErrors={string.Join(" || ", pageErrors)}";
+        }
+
+        Assert.True(string.Equals("true", Convert.ToString(carouselState[0]), StringComparison.Ordinal), debugState);
+        Assert.True(Convert.ToInt32(carouselState[1]) >= 7, debugState);
+        Assert.Equal(1, Convert.ToInt32(carouselState[2]));
+        Assert.Equal(Convert.ToInt32(carouselState[1]), Convert.ToInt32(carouselState[3]));
+        Assert.Equal(1, Convert.ToInt32(carouselState[4]));
+        Assert.Contains("1 of", Convert.ToString(carouselState[5]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("1", Convert.ToString(carouselState[6]));
+        Assert.Equal("1", Convert.ToString(carouselState[7]));
+        Assert.Equal("1", Convert.ToString(carouselState[8]));
+        Assert.Contains("wirePlanBasicsSliders", Convert.ToString(carouselState[9]) ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Desktop_AislePilotDayCarousel_UsesMutedPreviewCardsAndCompactOverlayChrome()
     {
         if (!IsE2EEnabled())
@@ -345,6 +414,22 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         await page.WaitForFunctionAsync(
             """
             () => {
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
+                const activeSlide = slides[activeIndex];
+                const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
+                return activeIndex === 3
+                    && activeSlide instanceof HTMLElement
+                    && activeSlide.getAttribute("data-day-carousel-position") === "active"
+                    && activeSlide.getAttribute("data-day-carousel-settling") !== "true"
+                    && activeDot instanceof HTMLElement
+                    && activeDot.getAttribute("data-day-carousel-target") === "3";
+            }
+            """);
+
+        var metrics = await page.EvaluateAsync<object[]>(
+            """
+            () => {
                 const parseAlpha = value => {
                     if (typeof value !== "string") {
                         return 0;
@@ -361,9 +446,10 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
                 const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
-                const activeSlide = slides[activeIndex];
-                const previousSlide = slides[activeIndex - 1];
-                const nextSlide = slides[activeIndex + 1];
+                const activeSlide = slides.find(slide => slide instanceof HTMLElement && slide.getAttribute("data-day-carousel-position") === "active");
+                const activeResolvedIndex = slides.findIndex(slide => slide === activeSlide);
+                const previousSlide = slides[activeResolvedIndex - 1];
+                const nextSlide = slides[activeResolvedIndex + 1];
                 const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
                 const inactiveDot = document.querySelector("[data-day-carousel-dot][aria-selected='false']");
                 const hint = activeSlide instanceof HTMLElement ? activeSlide.querySelector(".aislepilot-meal-image-hint") : null;
@@ -373,6 +459,12 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     ? activeSlide.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] > summary")
                     : null;
                 const title = activeSlide instanceof HTMLElement ? activeSlide.querySelector(".aislepilot-day-meal-panel > h3") : null;
+                const previousTitle = previousSlide instanceof HTMLElement ? previousSlide.querySelector(".aislepilot-day-meal-panel > h3") : null;
+                const nextTitle = nextSlide instanceof HTMLElement ? nextSlide.querySelector(".aislepilot-day-meal-panel > h3") : null;
+                const metaBadge = activeSlide instanceof HTMLElement
+                    ? activeSlide.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta")
+                    : null;
+
                 if (!(activeSlide instanceof HTMLElement)
                     || !(previousSlide instanceof HTMLElement)
                     || !(nextSlide instanceof HTMLElement)
@@ -381,49 +473,72 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     || !(hint instanceof HTMLElement)
                     || !(actionsTrigger instanceof HTMLElement)
                     || !(primaryHint instanceof HTMLElement)
-                    || !(title instanceof HTMLElement)) {
-                    return false;
+                    || !(title instanceof HTMLElement)
+                    || !(previousTitle instanceof HTMLElement)
+                    || !(nextTitle instanceof HTMLElement)) {
+                    return [];
                 }
 
                 const activeRect = activeSlide.getBoundingClientRect();
                 const previousRect = previousSlide.getBoundingClientRect();
                 const nextRect = nextSlide.getBoundingClientRect();
-                const activeOpacity = Number.parseFloat(getComputedStyle(activeSlide).opacity || "0");
-                const previousOpacity = Number.parseFloat(getComputedStyle(previousSlide).opacity || "0");
-                const nextOpacity = Number.parseFloat(getComputedStyle(nextSlide).opacity || "0");
-                const activeDotOpacity = Number.parseFloat(getComputedStyle(activeDot).opacity || "0");
-                const inactiveDotOpacity = Number.parseFloat(getComputedStyle(inactiveDot).opacity || "0");
-                const hintAlpha = parseAlpha(getComputedStyle(hint).backgroundColor || "");
-                const triggerAlpha = parseAlpha(getComputedStyle(actionsTrigger).backgroundColor || "");
                 const triggerRect = actionsTrigger.getBoundingClientRect();
                 const hintRect = hint.getBoundingClientRect();
-                const hintChipsDisplay = hintChips instanceof HTMLElement ? getComputedStyle(hintChips).display : "missing";
-                const primaryText = (primaryHint.textContent || "").trim();
-                const titleSize = Number.parseFloat(getComputedStyle(title).fontSize || "0");
-                const metaBadge = activeSlide.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta");
-                const metaRadius = metaBadge instanceof HTMLElement
-                    ? Number.parseFloat(getComputedStyle(metaBadge).borderTopLeftRadius || "0")
-                    : 0;
 
-                return activeIndex === 3
-                    && activeRect.width > previousRect.width + 14
-                    && activeRect.width > nextRect.width + 14
-                    && activeOpacity >= 0.98
-                    && previousOpacity >= 0.6 && previousOpacity <= 0.8
-                    && nextOpacity >= 0.6 && nextOpacity <= 0.8
-                    && activeDotOpacity >= 0.98
-                    && inactiveDotOpacity >= 0.9
-                    && hintAlpha >= 0.3 && hintAlpha <= 0.58
-                    && hintRect.width <= 136
-                    && hintChipsDisplay === "none"
-                    && /Recipe/i.test(primaryText)
-                    && triggerAlpha >= 0.28 && triggerAlpha <= 0.56
-                    && triggerRect.width <= 34
-                    && triggerRect.height <= 34
-                    && titleSize >= 15 && titleSize <= 17
-                    && metaRadius >= 20;
+                return [
+                    activeResolvedIndex,
+                    activeRect.width,
+                    previousRect.width,
+                    nextRect.width,
+                    Number.parseFloat(getComputedStyle(activeSlide).opacity || "0"),
+                    Number.parseFloat(getComputedStyle(previousSlide).opacity || "0"),
+                    Number.parseFloat(getComputedStyle(nextSlide).opacity || "0"),
+                    Number.parseFloat(getComputedStyle(previousTitle).opacity || "0"),
+                    Number.parseFloat(getComputedStyle(nextTitle).opacity || "0"),
+                    Number.parseFloat(getComputedStyle(activeDot).opacity || "0"),
+                    Number.parseFloat(getComputedStyle(inactiveDot).opacity || "0"),
+                    parseAlpha(getComputedStyle(hint).backgroundColor || ""),
+                    hintRect.width,
+                    hintChips instanceof HTMLElement ? getComputedStyle(hintChips).display : "missing",
+                    (primaryHint.textContent || "").trim(),
+                    parseAlpha(getComputedStyle(actionsTrigger).backgroundColor || ""),
+                    triggerRect.width,
+                    triggerRect.height,
+                    Number.parseFloat(getComputedStyle(title).fontSize || "0"),
+                    metaBadge instanceof HTMLElement
+                        ? Number.parseFloat(getComputedStyle(metaBadge).borderTopLeftRadius || "0")
+                        : 0
+                ];
             }
             """);
+
+        Assert.Equal(20, metrics.Length);
+        var debugState =
+            $"activeIndex={metrics[0]}; widths={metrics[1]}/{metrics[2]}/{metrics[3]}; " +
+            $"cardOpacity={metrics[4]}/{metrics[5]}/{metrics[6]}; titleOpacity={metrics[7]}/{metrics[8]}; " +
+            $"dotOpacity={metrics[9]}/{metrics[10]}; hintAlpha={metrics[11]}; hintWidth={metrics[12]}; " +
+            $"hintChips={metrics[13]}; hintText={metrics[14]}; triggerAlpha={metrics[15]}; " +
+            $"triggerSize={metrics[16]}x{metrics[17]}; titleSize={metrics[18]}; metaRadius={metrics[19]}";
+
+        Assert.Equal(3, Convert.ToInt32(metrics[0]));
+        Assert.True(Convert.ToDouble(metrics[1]) > Convert.ToDouble(metrics[2]) + 14, debugState);
+        Assert.True(Convert.ToDouble(metrics[1]) > Convert.ToDouble(metrics[3]) + 14, debugState);
+        Assert.True(Convert.ToDouble(metrics[4]) >= 0.98, debugState);
+        Assert.InRange(Convert.ToDouble(metrics[5]), 0.38, 0.52);
+        Assert.InRange(Convert.ToDouble(metrics[6]), 0.38, 0.52);
+        Assert.InRange(Convert.ToDouble(metrics[7]), 0.08, 0.28);
+        Assert.InRange(Convert.ToDouble(metrics[8]), 0.08, 0.28);
+        Assert.True(Convert.ToDouble(metrics[9]) >= 0.98, debugState);
+        Assert.True(Convert.ToDouble(metrics[10]) >= 0.9, debugState);
+        Assert.InRange(Convert.ToDouble(metrics[11]), 0.3, 0.58);
+        Assert.True(Convert.ToDouble(metrics[12]) <= 136, debugState);
+        Assert.Equal("none", Convert.ToString(metrics[13]));
+        Assert.Contains("Recipe", Convert.ToString(metrics[14]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.InRange(Convert.ToDouble(metrics[15]), 0.28, 0.56);
+        Assert.True(Convert.ToDouble(metrics[16]) <= 34, debugState);
+        Assert.True(Convert.ToDouble(metrics[17]) <= 34, debugState);
+        Assert.InRange(Convert.ToDouble(metrics[18]), 17, 19.5);
+        Assert.True(Convert.ToDouble(metrics[19]) >= 20, debugState);
     }
 
     [Fact]
