@@ -1067,7 +1067,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Desktop_AislePilotOverview_KeepsSnapshotGridCompactBesideSupermarketCard()
+    public async Task Desktop_AislePilotOverview_KeepsSupermarketCardCompactAndShowsResearchInFullWidthStrip()
     {
         if (!IsE2EEnabled())
         {
@@ -1082,23 +1082,57 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var snapshotMetrics = await page.EvaluateAsync<double[]>(
             """
             () => {
-                const supermarket = document.querySelector(".aislepilot-stat-card--supermarket");
+                const primaryGrid = document.querySelector("[data-overview-primary-grid]");
+                const supportGrid = document.querySelector("[data-overview-support-grid]");
+                const supermarket = document.querySelector("[data-supermarket-card]");
+                const estimate = Array.from(document.querySelectorAll("[data-overview-primary-grid] .aislepilot-stat-card"))
+                    .find(card => card.textContent?.toLowerCase().includes("meal ingredient estimate"));
                 const featured = document.querySelector(".aislepilot-stat-card--featured");
-                const support = document.querySelector(".aislepilot-stat-card--support");
-                if (!(supermarket instanceof HTMLElement) || !(featured instanceof HTMLElement) || !(support instanceof HTMLElement)) {
-                    return [-1, -1, -1];
+                const strip = document.querySelector("[data-supermarket-insight-strip]");
+                const summaryCards = Array.from(document.querySelectorAll("[data-overview-support-grid] .aislepilot-stat-card"))
+                    .filter(node => node instanceof HTMLElement);
+                const stripPanels = Array.from(document.querySelectorAll("[data-supermarket-insight-panel]"))
+                    .filter(node => node instanceof HTMLElement);
+                if (!(primaryGrid instanceof HTMLElement) || !(supportGrid instanceof HTMLElement) || !(supermarket instanceof HTMLElement) || !(estimate instanceof HTMLElement) || !(featured instanceof HTMLElement) || !(strip instanceof HTMLElement)) {
+                    return [-1, -1, -1, -1, -1, -1, -1, -1];
                 }
 
                 const supermarketRect = supermarket.getBoundingClientRect();
+                const estimateRect = estimate.getBoundingClientRect();
                 const featuredRect = featured.getBoundingClientRect();
-                const supportRect = support.getBoundingClientRect();
-                return [supermarketRect.bottom - featuredRect.bottom, supermarketRect.bottom - supportRect.top, featuredRect.height];
+                const stripRect = strip.getBoundingClientRect();
+                const primaryGridRect = primaryGrid.getBoundingClientRect();
+                const supportGridRect = supportGrid.getBoundingClientRect();
+                let summaryCoverage = 0;
+                if (summaryCards.length > 0) {
+                    const summaryRects = summaryCards.map(card => card.getBoundingClientRect());
+                    const left = Math.min(...summaryRects.map(rect => rect.left));
+                    const right = Math.max(...summaryRects.map(rect => rect.right));
+                    summaryCoverage = (right - left) / supportGridRect.width;
+                }
+
+                return [
+                    supermarketRect.height,
+                    estimateRect.height,
+                    featuredRect.height,
+                    stripRect.width / primaryGridRect.width,
+                    supportGridRect.top - primaryGridRect.bottom,
+                    stripRect.top - supportGridRect.bottom,
+                    stripPanels.length,
+                    summaryCoverage,
+                    estimate.querySelector(".aislepilot-card-meta") ? 1 : 0
+                ];
             }
             """);
 
-        Assert.Equal(3, snapshotMetrics.Length);
-        Assert.True(snapshotMetrics[0] >= 36, $"Expected featured snapshot cards to stay shorter than the supermarket card. Delta={snapshotMetrics[0]:F1}px.");
-        Assert.True(snapshotMetrics[1] >= 28, $"Expected the support row to begin before the supermarket card finishes so the grid stays compact. Delta={snapshotMetrics[1]:F1}px.");
-        Assert.True(snapshotMetrics[2] <= 180, $"Expected featured snapshot cards to remain compact on desktop. Height={snapshotMetrics[2]:F1}px.");
+        Assert.Equal(9, snapshotMetrics.Length);
+        Assert.True(snapshotMetrics[0] <= snapshotMetrics[2] + 18, $"Expected the supermarket card to stay close to the primary stat card height. Supermarket={snapshotMetrics[0]:F1}px Featured={snapshotMetrics[2]:F1}px.");
+        Assert.True(snapshotMetrics[1] <= snapshotMetrics[2] + 18, $"Expected the estimate card to stay compact beside the other primary cards. Estimate={snapshotMetrics[1]:F1}px Featured={snapshotMetrics[2]:F1}px.");
+        Assert.True(snapshotMetrics[3] >= 0.92, $"Expected the supermarket insight strip to use most of the snapshot width. Ratio={snapshotMetrics[3]:F2}.");
+        Assert.True(snapshotMetrics[4] >= 8 && snapshotMetrics[4] <= 24, $"Expected the support grid to sit directly below the primary grid. Gap={snapshotMetrics[4]:F1}px.");
+        Assert.True(snapshotMetrics[5] >= 8 && snapshotMetrics[5] <= 28, $"Expected the insight strip to sit directly below the support grid. Gap={snapshotMetrics[5]:F1}px.");
+        Assert.True(snapshotMetrics[6] >= 2, $"Expected structured supermarket insight panels. Count={snapshotMetrics[6]:F0}.");
+        Assert.True(snapshotMetrics[7] >= 0.92, $"Expected the summary row to use most of the snapshot width. Coverage={snapshotMetrics[7]:F2}.");
+        Assert.Equal(0, snapshotMetrics[8]);
     }
 }

@@ -129,10 +129,14 @@
         : priceInsight.NeedsReview
             ? "Pricing is estimated from stored public basket data."
             : null;
+    var supermarketInsights = AislePilotSupermarketInsightStripViewModel.Create(
+        layoutInsight,
+        priceInsight,
+        priceAdjustmentText,
+        layoutSummary,
+        supermarketPriceSummary,
+        layoutReviewSummary);
     var mealIngredientEstimateLabel = "Meal ingredient estimate";
-    var mealIngredientEstimateSummary = !string.IsNullOrWhiteSpace(priceInsight.RelativeCostBasis)
-        ? $"{priceAdjustmentText}. {priceInsight.RelativeCostBasis}. {priceVerificationText}."
-        : $"{priceAdjustmentText}. {priceVerificationText}.";
     var shoppingEstimateDisclaimer = "This estimate covers the ingredients used in these meals. It adjusts for your selected supermarket using stored public pricing data. Actual checkout can be higher if shops only sell larger packs or bags.";
     var shoppingListNotesBuilder = new StringBuilder();
     shoppingListNotesBuilder.AppendLine("AislePilot Shopping List");
@@ -155,6 +159,10 @@
         shoppingListNotesBuilder.AppendLine();
     }
     var shoppingListNotesText = shoppingListNotesBuilder.ToString().TrimEnd();
+    var supportGridClasses = result.LeftoverDays > 0
+        ? "aislepilot-budget-grid aislepilot-budget-grid--support has-leftovers"
+        : "aislepilot-budget-grid aislepilot-budget-grid--support";
+    var summaryCardClasses = "aislepilot-stat-card aislepilot-stat-card--support";
     AislePilotHiddenRequestFieldsViewModel BuildHiddenRequestFields(
         bool includeCurrentPlanMealNames = false,
         bool includeLeftoverCsvDataAttribute = false)
@@ -381,22 +389,12 @@
                     </form>
                 </div>
             }
-            <div class="aislepilot-budget-grid">
-                <article class="aislepilot-stat-card aislepilot-stat-card--meta aislepilot-stat-card--supermarket">
+            <div class="aislepilot-budget-grid aislepilot-budget-grid--primary"
+                 data-overview-primary-grid>
+                <article class="aislepilot-stat-card aislepilot-stat-card--meta aislepilot-stat-card--supermarket"
+                         data-supermarket-card>
                     <p class="aislepilot-stat-label">Supermarket</p>
                     <p class="aislepilot-stat-value">@result.Supermarket</p>
-                    @if (!string.IsNullOrWhiteSpace(layoutSummary))
-                    {
-                        <p class="aislepilot-card-meta">@layoutSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(layoutReviewSummary))
-                    {
-                        <p class="aislepilot-card-meta">@layoutReviewSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(supermarketPriceSummary))
-                    {
-                        <p class="aislepilot-card-meta">@supermarketPriceSummary</p>
-                    }
                 </article>
                 <article class="aislepilot-stat-card aislepilot-stat-card--meta">
                     <p class="aislepilot-stat-label">Portion size</p>
@@ -413,7 +411,6 @@
                 <article class="aislepilot-stat-card aislepilot-stat-card--featured">
                     <p class="aislepilot-stat-label">@mealIngredientEstimateLabel</p>
                     <p class="aislepilot-stat-value">@result.EstimatedTotalCost.ToString("C", ukCulture)</p>
-                    <p class="aislepilot-card-meta">@mealIngredientEstimateSummary</p>
                 </article>
                 <article class="aislepilot-stat-card aislepilot-stat-card--status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                     <p class="aislepilot-stat-label">Budget difference</p>
@@ -421,26 +418,30 @@
                         @result.BudgetDelta.ToString("C", ukCulture)
                     </p>
                 </article>
-                <article class="aislepilot-stat-card aislepilot-stat-card--support">
+            </div>
+            <div class="@supportGridClasses"
+                 data-overview-support-grid>
+                <article class="@summaryCardClasses">
                     <p class="aislepilot-stat-label">Plan length</p>
                     <p class="aislepilot-stat-value">@result.PlanDays day(s)</p>
                 </article>
-                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
+                <article class="@summaryCardClasses">
                     <p class="aislepilot-stat-label">Cook days</p>
                     <p class="aislepilot-stat-value">@result.CookDays</p>
                 </article>
-                <article class="aislepilot-stat-card aislepilot-stat-card--meta">
+                <article class="@summaryCardClasses">
                     <p class="aislepilot-stat-label">Meals per day</p>
                     <p class="aislepilot-stat-value">@result.MealsPerDay</p>
                 </article>
                 @if (result.LeftoverDays > 0)
                 {
-                    <article class="aislepilot-stat-card aislepilot-stat-card--meta">
+                    <article class="@summaryCardClasses">
                         <p class="aislepilot-stat-label">Leftovers</p>
                         <p class="aislepilot-stat-value">@result.LeftoverDays day(s)</p>
                     </article>
                 }
             </div>
+            <partial name="_AislePilotOverviewSupermarketInsights" model="supermarketInsights" />
         </div>
     </section>
 

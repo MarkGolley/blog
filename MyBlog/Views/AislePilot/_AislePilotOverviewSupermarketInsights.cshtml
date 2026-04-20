@@ -1,0 +1,43 @@
+@model MyBlog.Models.AislePilotSupermarketInsightStripViewModel
+
+@if (Model.HasContent)
+{
+    <aside class="aislepilot-overview-supermarket-insights"
+           data-supermarket-insight-strip
+           aria-label="Supermarket research summary">
+        <div class="aislepilot-overview-supermarket-insights-head">
+            <p class="aislepilot-overview-supermarket-insights-kicker">Supermarket research</p>
+            <div class="aislepilot-overview-supermarket-facts">
+                @foreach (var fact in Model.Facts)
+                {
+                    <span class="aislepilot-card-meta-pill">@fact</span>
+                }
+            </div>
+        </div>
+        <div class="aislepilot-overview-supermarket-panels">
+            @if (!string.IsNullOrWhiteSpace(Model.LayoutDetail))
+            {
+                <section class="aislepilot-overview-supermarket-panel"
+                         data-supermarket-insight-panel="layout"
+                         aria-label="Layout source">
+                    <p class="aislepilot-overview-supermarket-panel-label">Layout source</p>
+                    <p class="aislepilot-overview-supermarket-note">@Model.LayoutDetail</p>
+                </section>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.PricingDetail))
+            {
+                <section class="aislepilot-overview-supermarket-panel"
+                         data-supermarket-insight-panel="pricing"
+                         aria-label="Pricing source">
+                    <p class="aislepilot-overview-supermarket-panel-label">Pricing source</p>
+                    <p class="aislepilot-overview-supermarket-note">@Model.PricingDetail</p>
+                </section>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Model.ReviewDetail))
+        {
+            <p class="aislepilot-overview-supermarket-alert"
+               data-supermarket-insight-warning>@Model.ReviewDetail</p>
+        }
+    </aside>
+}
