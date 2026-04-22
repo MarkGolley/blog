@@ -1,0 +1,5 @@
+@media (min-width: 760px) {
+    .aislepilot-budget-grid--primary > .aislepilot-stat-card--supermarket {
+        grid-row: span 1;
+    }
+}

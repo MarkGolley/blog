@@ -26,6 +26,65 @@
         wireSubmitLoadingHandlers
     } = aislePilotCore;
 
+    const isLocalSwapDebugEnabled = (() => {
+        try {
+            const host = (window.location.hostname ?? "").trim().toLowerCase();
+            return host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
+        } catch {
+            return false;
+        }
+    })();
+    const swapDebugEndpoint = "/projects/aisle-pilot/debug-client-log";
+
+    const sendSwapDebugToServer = payload => {
+        if (!isLocalSwapDebugEnabled || !payload || typeof payload !== "object") {
+            return;
+        }
+
+        try {
+            const body = JSON.stringify(payload);
+            if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+                const blob = new Blob([body], { type: "application/json" });
+                navigator.sendBeacon(swapDebugEndpoint, blob);
+                return;
+            }
+
+            if (typeof fetch === "function") {
+                void fetch(swapDebugEndpoint, {
+                    method: "POST",
+                    body,
+                    keepalive: true,
+                    credentials: "same-origin",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+            }
+        } catch {
+            // Ignore debug transport failures.
+        }
+    };
+
+    const writeSwapDebug = (stage, details = {}) => {
+        if (!isLocalSwapDebugEnabled) {
+            return;
+        }
+
+        try {
+            const payload = {
+                stage,
+                details,
+                href: window.location.href,
+                userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+                timestampUtc: new Date().toISOString()
+            };
+            console.info("[AislePilot swap debug]", stage, details);
+            sendSwapDebugToServer(payload);
+        } catch {
+            // Ignore console write issues.
+        }
+    };
+
     const root = document.querySelector("[data-aislepilot-window]");
     if (!root) {
         const savedWeeksPanel = document.querySelector("[data-saved-weeks-panel]");
@@ -884,6 +943,68 @@
         };
     };
 
+    const resolveCardMoreActionsMenuForForm = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return null;
+        }
+
+        const inlineMenu = form.closest("[data-card-more-actions]");
+        if (inlineMenu instanceof HTMLDetailsElement) {
+            return inlineMenu;
+        }
+
+        const actionsPanel = form.closest("[data-card-more-actions-panel]");
+        if (!(actionsPanel instanceof HTMLElement) || !actionsPanel.id) {
+            return null;
+        }
+
+        const menus = Array.from(document.querySelectorAll("[data-card-more-actions]"));
+        const matchingMenuByPanel = menus.find(menu =>
+            menu instanceof HTMLDetailsElement &&
+            getCardMoreActionsPanel(menu) instanceof HTMLElement &&
+            getCardMoreActionsPanel(menu).contains(form));
+        if (matchingMenuByPanel instanceof HTMLDetailsElement) {
+            return matchingMenuByPanel;
+        }
+
+        const portalState = cardMoreActionsPanelPortalState.get(actionsPanel);
+        if (portalState?.ownerMenu instanceof HTMLDetailsElement) {
+            return portalState.ownerMenu;
+        }
+
+        const escapedPanelId = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+            ? CSS.escape(actionsPanel.id)
+            : actionsPanel.id.replace(/["\\]/g, "\\$&");
+        const trigger = document.querySelector(`summary[aria-controls="${escapedPanelId}"]`);
+        const matchingMenu = trigger?.closest("[data-card-more-actions]");
+        return matchingMenu instanceof HTMLDetailsElement ? matchingMenu : null;
+    };
+
+    const findMealCardBySlotIndex = (scope, slotIndex) => {
+        if (!(scope instanceof Document || scope instanceof Element) || !Number.isInteger(slotIndex) || slotIndex < 0) {
+            return null;
+        }
+
+        let matchingCard = null;
+        let matchingCardDayIndex = -1;
+        const cards = Array.from(scope.querySelectorAll("[data-day-meal-card][data-day-index]"));
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+
+            const cardDayIndex = Number.parseInt(card.dataset.dayIndex ?? "", 10);
+            if (!Number.isInteger(cardDayIndex) || cardDayIndex > slotIndex || cardDayIndex < matchingCardDayIndex) {
+                return;
+            }
+
+            matchingCard = card;
+            matchingCardDayIndex = cardDayIndex;
+        });
+
+        return matchingCard instanceof HTMLElement ? matchingCard : null;
+    };
+
     const resolveSwapTargetCard = form => {
         if (!(form instanceof HTMLFormElement)) {
             return null;
@@ -894,20 +1015,19 @@
             return inlineCard;
         }
 
+        const parentActionsMenu = resolveCardMoreActionsMenuForForm(form);
+        const menuCard = parentActionsMenu?.closest("[data-day-meal-card]");
+        if (menuCard instanceof HTMLElement) {
+            return menuCard;
+        }
+
         const dayInput = form.querySelector("input[name='dayIndex']");
         const parsedDayIndex = Number.parseInt(dayInput?.value ?? "", 10);
         if (!Number.isInteger(parsedDayIndex) || parsedDayIndex < 0) {
             return null;
         }
 
-        const selector = `[data-day-card-header-actions][data-slot-index='${parsedDayIndex}']`;
-        const matchingActionRow = document.querySelector(selector);
-        if (!(matchingActionRow instanceof HTMLElement)) {
-            return null;
-        }
-
-        const matchingCard = matchingActionRow.closest(".aislepilot-card");
-        return matchingCard instanceof HTMLElement ? matchingCard : null;
+        return findMealCardBySlotIndex(document, parsedDayIndex);
     };
 
     const restoreInlineSwapScroll = snapshot => {
@@ -1343,7 +1463,8 @@
         if (actionsMenu.parentElement !== document.body) {
             cardMoreActionsPanelPortalState.set(actionsMenu, {
                 parent: actionsMenu.parentNode,
-                nextSibling: actionsMenu.nextSibling
+                nextSibling: actionsMenu.nextSibling,
+                ownerMenu: menu
             });
             document.body.appendChild(actionsMenu);
         }
@@ -1544,6 +1665,32 @@
         cardMoreActionsCloseTimers.set(menu, closeTimer);
     };
 
+    const closeCardMoreActionsMenuImmediately = menu => {
+        if (!(menu instanceof HTMLDetailsElement)) {
+            return;
+        }
+
+        menu.open = false;
+        finishClosingCardMoreActionsMenu(menu);
+    };
+
+    const restoreAllCardMoreActionsPanelsToMenus = () => {
+        const menus = Array.from(document.querySelectorAll("[data-card-more-actions]"));
+        menus.forEach(menu => {
+            if (!(menu instanceof HTMLDetailsElement)) {
+                return;
+            }
+
+            const actionsMenu = getCardMoreActionsPanel(menu);
+            const isPortaled = actionsMenu instanceof HTMLElement && actionsMenu.parentElement === document.body;
+            if (!menu.open && !menu.classList.contains("is-closing") && !isPortaled) {
+                return;
+            }
+
+            closeCardMoreActionsMenuImmediately(menu);
+        });
+    };
+
     const closeOpenCardMoreActions = except => {
         getVisibleCardMoreActionsMenus().forEach(menu => {
             if (!(menu instanceof HTMLDetailsElement) || menu === except) {
@@ -1651,17 +1798,6 @@
                 }
             });
 
-            const actionButtons = Array.from(menu.querySelectorAll("button[type='submit']"));
-            actionButtons.forEach(button => {
-                if (!(button instanceof HTMLButtonElement)) {
-                    return;
-                }
-
-                button.addEventListener("click", () => {
-                    closeCardMoreActionsMenu(menu);
-                });
-            });
-
             const closeButtons = Array.from(menu.querySelectorAll("[data-card-more-actions-close]"));
             closeButtons.forEach(closeButton => {
                 if (!(closeButton instanceof HTMLButtonElement)) {
@@ -1671,6 +1807,55 @@
                 closeButton.addEventListener("click", event => {
                     event.preventDefault();
                     closeCardMoreActionsMenu(menu, { restoreFocus: true });
+                });
+            });
+
+            const actionButtons = Array.from(menu.querySelectorAll("button[type='submit']"));
+            actionButtons.forEach(button => {
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                button.addEventListener("click", event => {
+                    const form = button.closest("form");
+                    const dayInput = form instanceof HTMLFormElement
+                        ? form.querySelector("input[name='dayIndex']")
+                        : null;
+                    writeSwapDebug("menu-submit-click", {
+                        ariaLabel: button.getAttribute("aria-label") ?? "",
+                        formAction: form instanceof HTMLFormElement ? form.getAttribute("action") ?? "" : "",
+                        dayIndex: dayInput instanceof HTMLInputElement ? dayInput.value : "",
+                        portaled: shouldUseMobileCardActionsSheet()
+                    });
+
+                    if (!(form instanceof HTMLFormElement)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    if (form.hasAttribute("data-ajax-swap-form")) {
+                        writeSwapDebug("menu-submit-direct-handler", {
+                            formAction: form.getAttribute("action") ?? "",
+                            dayIndex: dayInput instanceof HTMLInputElement ? dayInput.value : ""
+                        });
+                        void handleAjaxSwapFormSubmit(form, button);
+                        return;
+                    }
+
+                    if (typeof form.requestSubmit === "function") {
+                        writeSwapDebug("menu-submit-request-submit", {
+                            formAction: form.getAttribute("action") ?? "",
+                            dayIndex: dayInput instanceof HTMLInputElement ? dayInput.value : ""
+                        });
+                        form.requestSubmit(button);
+                        return;
+                    }
+
+                    writeSwapDebug("menu-submit-native-submit-fallback", {
+                        formAction: form.getAttribute("action") ?? "",
+                        dayIndex: dayInput instanceof HTMLInputElement ? dayInput.value : ""
+                    });
+                    HTMLFormElement.prototype.submit.call(form);
                 });
             });
         });
@@ -2829,21 +3014,6 @@
         });
     };
 
-    const findMealCardBySlotIndex = (scope, slotIndex) => {
-        if (!(scope instanceof Document || scope instanceof Element) || !Number.isInteger(slotIndex) || slotIndex < 0) {
-            return null;
-        }
-
-        const selector = `.aislepilot-swap-form[action*='/swap-meal'] input[name='dayIndex'][value='${slotIndex}']`;
-        const dayInput = scope.querySelector(selector);
-        if (!(dayInput instanceof HTMLInputElement)) {
-            return null;
-        }
-
-        const card = dayInput.closest("[data-day-meal-card]");
-        return card instanceof HTMLElement ? card : null;
-    };
-
     const closeCardMoreActionsWithinCard = card => {
         if (!(card instanceof HTMLElement)) {
             return;
@@ -3250,6 +3420,7 @@
         }
 
         rememberDayMealSlots(document);
+        restoreAllCardMoreActionsPanelsToMenus();
         const preservedMealImageSources = captureRenderedMealImageSources(document);
         const wasOverviewExpanded = (() => {
             const currentOverviewContent = getOverviewContent();
@@ -3257,8 +3428,8 @@
         })();
         const responseDocument = new DOMParser().parseFromString(responseText, "text/html");
         const didReplaceMeals =
-            replaceSwappedMealCard(responseDocument, slotIndex) ||
-            replaceSectionContent(responseDocument, "#aislepilot-meals");
+            replaceSectionContent(responseDocument, "#aislepilot-meals") ||
+            replaceSwappedMealCard(responseDocument, slotIndex);
         if (!didReplaceMeals) {
             return false;
         }
@@ -3516,42 +3687,82 @@
         }, 520);
     };
 
-    const wireAjaxSwapForm = form => {
-        if (!(form instanceof HTMLFormElement) || form.dataset.ajaxSwapWired === "true") {
+    const handleAjaxSwapFormSubmit = async (swapForm, submitButton = null) => {
+        if (!(swapForm instanceof HTMLFormElement)) {
             return;
         }
 
-        form.dataset.ajaxSwapWired = "true";
-        form.addEventListener("submit", async event => {
-            if (!(event.currentTarget instanceof HTMLFormElement) || typeof fetch !== "function") {
+        if (swapForm.dataset.ajaxSwapSubmitting === "true") {
+            return;
+        }
+
+        if (typeof fetch !== "function") {
+            HTMLFormElement.prototype.submit.call(swapForm);
+            return;
+        }
+
+        swapForm.dataset.ajaxSwapSubmitting = "true";
+        const submitActionLabel = submitButton instanceof HTMLButtonElement
+            ? (submitButton.getAttribute("aria-label") ?? submitButton.textContent ?? "").trim()
+            : "";
+        const isFavoriteForm = swapForm.classList.contains("aislepilot-favorite-form");
+        const wasSavedMealFavorite =
+            isFavoriteForm &&
+            submitButton instanceof HTMLButtonElement &&
+            submitButton.classList.contains("is-saved-meal");
+        const isIgnoreForm = swapForm.classList.contains("aislepilot-ignore-form");
+        const isLeftoverRebalanceForm = swapForm.hasAttribute("data-leftover-rebalance-form");
+        const isDessertSwapForm = swapForm.action.toLowerCase().includes("/swap-dessert");
+        const isDayReorderForm = swapForm.hasAttribute("data-day-reorder-form");
+        const isDirectMealSwapForm =
+            !isFavoriteForm &&
+            !isIgnoreForm &&
+            !isLeftoverRebalanceForm &&
+            !isDessertSwapForm &&
+            !isDayReorderForm;
+        const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
+        const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
+            ? scrollSnapshot.anchorDayIndex
+            : null;
+        const parentActionsMenu = resolveCardMoreActionsMenuForForm(swapForm);
+        const currentCard = resolveSwapTargetCard(swapForm);
+        const actionSheetPanel = swapForm.closest("[data-card-more-actions-panel]");
+        const isMobileSheetSwapForm =
+            isDirectMealSwapForm &&
+            actionSheetPanel instanceof HTMLElement &&
+            actionSheetPanel.classList.contains("is-mobile-sheet");
+        writeSwapDebug("submit-start", {
+            formAction: swapForm.getAttribute("action") ?? "",
+            submitActionLabel,
+            isFavoriteForm,
+            isIgnoreForm,
+            isLeftoverRebalanceForm,
+            isDessertSwapForm,
+            isDayReorderForm,
+            isDirectMealSwapForm,
+            isMobileSheetSwapForm,
+            swapDayIndex,
+            parentMenuOpen: parentActionsMenu instanceof HTMLDetailsElement ? parentActionsMenu.open : false,
+            currentCardFound: currentCard instanceof HTMLElement
+        });
+        try {
+            if (isMobileSheetSwapForm) {
+                if (parentActionsMenu instanceof HTMLDetailsElement && parentActionsMenu.open) {
+                    closeCardMoreActionsMenuImmediately(parentActionsMenu);
+                }
+
+                const nativeActionUrl = stripHashFromFormAction(swapForm);
+                persistSwapScrollPosition(swapForm);
+                writeSwapDebug("native-submit-branch", {
+                    actionUrl: nativeActionUrl ?? "",
+                    swapDayIndex
+                });
+                HTMLFormElement.prototype.submit.call(swapForm);
                 return;
             }
-
-            event.preventDefault();
-            const swapForm = event.currentTarget;
-            if (swapForm.dataset.ajaxSwapSubmitting === "true") {
-                return;
+            if (parentActionsMenu instanceof HTMLDetailsElement && parentActionsMenu.open) {
+                closeCardMoreActionsMenuImmediately(parentActionsMenu);
             }
-
-            swapForm.dataset.ajaxSwapSubmitting = "true";
-            const submitButton = getSubmitButton(event);
-            const submitActionLabel = submitButton instanceof HTMLButtonElement
-                ? (submitButton.getAttribute("aria-label") ?? submitButton.textContent ?? "").trim()
-                : "";
-            const isFavoriteForm = swapForm.classList.contains("aislepilot-favorite-form");
-            const wasSavedMealFavorite =
-                isFavoriteForm &&
-                submitButton instanceof HTMLButtonElement &&
-                submitButton.classList.contains("is-saved-meal");
-            const isIgnoreForm = swapForm.classList.contains("aislepilot-ignore-form");
-            const isLeftoverRebalanceForm = swapForm.hasAttribute("data-leftover-rebalance-form");
-            const isDessertSwapForm = swapForm.action.toLowerCase().includes("/swap-dessert");
-            const isDayReorderForm = swapForm.hasAttribute("data-day-reorder-form");
-            const scrollSnapshot = buildSwapScrollSnapshot(swapForm);
-            const swapDayIndex = Number.isInteger(scrollSnapshot.anchorDayIndex)
-                ? scrollSnapshot.anchorDayIndex
-                : null;
-            const currentCard = resolveSwapTargetCard(swapForm);
             if (!isFavoriteForm && currentCard instanceof HTMLElement) {
                 currentCard.classList.add("is-swap-fading-out");
                 currentCard.setAttribute("aria-busy", "true");
@@ -3559,11 +3770,11 @@
                     ? "Updating meal plan..."
                     : isDayReorderForm
                         ? "Moving meal card..."
-                    : isIgnoreForm
-                        ? "Updating meal..."
-                        : isDessertSwapForm
-                            ? "Loading new dessert..."
-                            : "Loading new meal...";
+                        : isIgnoreForm
+                            ? "Updating meal..."
+                            : isDessertSwapForm
+                                ? "Loading new dessert..."
+                                : "Loading new meal...";
             }
             if (!isFavoriteForm && submitButton instanceof HTMLButtonElement && !swapForm.hasAttribute("data-skip-submit-loading")) {
                 clearSubmitLoadingDelay(swapForm);
@@ -3571,13 +3782,20 @@
             }
             const actionUrl = stripHashFromFormAction(swapForm);
             if (!actionUrl) {
+                writeSwapDebug("missing-action-url", {
+                    swapDayIndex
+                });
                 persistSwapScrollPosition(swapForm);
                 HTMLFormElement.prototype.submit.call(swapForm);
                 return;
             }
 
-            try {
-                const response = await fetch(actionUrl, {
+            writeSwapDebug("fetch-start", {
+                actionUrl,
+                swapDayIndex,
+                isDirectMealSwapForm
+            });
+            const response = await fetch(actionUrl, {
                     method: "POST",
                     body: new FormData(swapForm),
                     credentials: "same-origin",
@@ -3593,6 +3811,14 @@
                     contentType.includes("text/html") ||
                     responseText.includes("<html") ||
                     responseText.includes("<!DOCTYPE html");
+                writeSwapDebug("fetch-response", {
+                    status: response.status,
+                    ok: response.ok,
+                    contentType,
+                    isHtmlResponse,
+                    responseLength: responseText.length,
+                    swapDayIndex
+                });
 
                 if (isHtmlResponse) {
                     const parsedResponseDocument = parseHtmlDocument(responseText);
@@ -3604,14 +3830,24 @@
                                     message.length > 0 ? message : "Could not update saved meals. Try again.",
                                     "warning");
                                 clearPersistedSwapScroll();
+                                writeSwapDebug("favorite-ajax-failed", {
+                                    swapDayIndex,
+                                    message
+                                });
                                 return;
                             }
 
                             persistSwapScrollPosition(swapForm);
+                            writeSwapDebug("favorite-replace-document", {
+                                swapDayIndex
+                            });
                             replaceDocumentWithHtml(responseText);
                             return;
                         }
 
+                        if (parentActionsMenu instanceof HTMLDetailsElement) {
+                            closeCardMoreActionsMenuImmediately(parentActionsMenu);
+                        }
                         showToast(
                             wasSavedMealFavorite
                                 ? "Meal removed from saved meals."
@@ -3619,22 +3855,41 @@
                             "success");
                         restoreInlineSwapScroll(scrollSnapshot);
                         clearPersistedSwapScroll();
+                        writeSwapDebug("favorite-ajax-success", {
+                            swapDayIndex
+                        });
                         return;
                     }
 
-                    if (!applyAjaxSwapResponse(responseText, swapDayIndex)) {
+                    const didApplySwapResponse = applyAjaxSwapResponse(responseText, swapDayIndex);
+                    writeSwapDebug("apply-ajax-swap-response", {
+                        swapDayIndex,
+                        didApplySwapResponse
+                    });
+                    if (!didApplySwapResponse) {
                         if (parsedResponseDocument && !hasAislePilotWindowRoot(parsedResponseDocument)) {
                             const message = readAjaxFailureMessage(parsedResponseDocument);
                             showToast(
                                 message.length > 0 ? message : "No alternative meal is available right now. Try another swap or regenerate.",
                                 "warning");
-                            clearPersistedSwapScroll();
+                                clearPersistedSwapScroll();
+                            writeSwapDebug("ajax-swap-failed-with-message", {
+                                swapDayIndex,
+                                message
+                            });
                             return;
                         }
 
                         persistSwapScrollPosition(swapForm);
+                        writeSwapDebug("ajax-swap-replace-document", {
+                            swapDayIndex
+                        });
                         replaceDocumentWithHtml(responseText);
                         return;
+                    }
+
+                    if (parentActionsMenu instanceof HTMLDetailsElement) {
+                        closeCardMoreActionsMenuImmediately(parentActionsMenu);
                     }
 
                     if (isLeftoverRebalanceForm) {
@@ -3661,11 +3916,18 @@
                     restoreInlineSwapScroll(scrollSnapshot);
                     clearPersistedSwapScroll();
                     animateSwappedMeal(swapDayIndex);
+                    writeSwapDebug("ajax-swap-success", {
+                        swapDayIndex
+                    });
                     return;
                 }
 
                 if (response.ok) {
                     persistSwapScrollPosition(swapForm);
+                    writeSwapDebug("non-html-response-reload", {
+                        swapDayIndex,
+                        status: response.status
+                    });
                     window.location.reload();
                     return;
                 }
@@ -3673,20 +3935,51 @@
                 showToast("Could not complete that action. Try again.", "warning");
                 clearPersistedSwapScroll();
                 resetSubmittingState();
+                writeSwapDebug("response-not-ok", {
+                    swapDayIndex,
+                    status: response.status
+                });
                 return;
-            } catch {
-                persistSwapScrollPosition(swapForm);
-                HTMLFormElement.prototype.submit.call(swapForm);
-                return;
-            } finally {
-                if (!isFavoriteForm && currentCard instanceof HTMLElement && currentCard.isConnected) {
-                    currentCard.classList.remove("is-swap-fading-out");
-                    currentCard.removeAttribute("aria-busy");
-                    delete currentCard.dataset.swapStatus;
-                }
-                clearSubmitLoadingDelay(swapForm);
-                delete swapForm.dataset.ajaxSwapSubmitting;
+        } catch (error) {
+            persistSwapScrollPosition(swapForm);
+            writeSwapDebug("submit-handler-exception-native-submit", {
+                swapDayIndex,
+                error: error instanceof Error ? error.message : `${error ?? ""}`
+            });
+            HTMLFormElement.prototype.submit.call(swapForm);
+            return;
+        } finally {
+            if (!isFavoriteForm && currentCard instanceof HTMLElement && currentCard.isConnected) {
+                currentCard.classList.remove("is-swap-fading-out");
+                currentCard.removeAttribute("aria-busy");
+                delete currentCard.dataset.swapStatus;
             }
+            if (swapForm.isConnected) {
+                resetFormSubmittingState(swapForm);
+            } else {
+                clearSubmitLoadingDelay(swapForm);
+            }
+            delete swapForm.dataset.ajaxSwapSubmitting;
+            writeSwapDebug("submit-finally", {
+                swapDayIndex,
+                formStillConnected: swapForm.isConnected
+            });
+        }
+    };
+
+    const wireAjaxSwapForm = form => {
+        if (!(form instanceof HTMLFormElement) || form.dataset.ajaxSwapWired === "true") {
+            return;
+        }
+
+        form.dataset.ajaxSwapWired = "true";
+        form.addEventListener("submit", event => {
+            if (!(event.currentTarget instanceof HTMLFormElement)) {
+                return;
+            }
+
+            event.preventDefault();
+            void handleAjaxSwapFormSubmit(event.currentTarget, getSubmitButton(event));
         });
     };
 
