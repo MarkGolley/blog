@@ -2445,7 +2445,11 @@
     const swapScrollKey = "aislepilot:swap-scroll";
     const swapScrollRestoreDurationMs = 1100;
     const clearPersistedSwapScroll = () => {
-        sessionStorage.removeItem(swapScrollKey);
+        try {
+            sessionStorage.removeItem(swapScrollKey);
+        } catch {
+            // Ignore storage failures; stale scroll state is non-critical.
+        }
     };
     const clearRestorePending = () => {
         document.documentElement.classList.remove("aislepilot-restore-pending");
@@ -2486,12 +2490,15 @@
         hidePlanLoadingShell,
         resetFormSubmittingState,
         schedulePlanBasicsSliderRefresh,
+        setSubmitButtonLoadingState,
         showToast,
         startMealImagePolling,
+        swapScrollRestoreDurationMs,
         syncMobileContextOffset,
         wireCustomAisleFieldVisibility,
         wireExportThemeForms,
         wireMealTypeSelectors,
+        wireNotesExportButtons,
         wirePlanBasicsSliders,
         wireSubmitLoadingHandlers
     };
