@@ -96,7 +96,7 @@ public sealed partial class AislePilotService
                         ingredient.QuantityForTwo * householdFactor * mealPortionMultiplier,
                         2,
                         MidpointRounding.AwayFromZero);
-                    return $"{QuantityDisplayFormatter.FormatForRecipe(quantity, ingredient.Unit)} {NormalizeIngredientDisplayName(ingredient.Name)}";
+                    return $"{QuantityDisplayFormatter.FormatForRecipe(quantity, ingredient.Unit, ingredient.Name)} {NormalizeIngredientDisplayName(ingredient.Name)}";
                 })
                 .ToList();
             var recipeSteps = _nutritionRecipeFallbackEngine.BuildRecipeSteps(template);
@@ -575,7 +575,7 @@ public sealed partial class AislePilotService
                     ingredient.QuantityForTwo * scale,
                     2,
                     MidpointRounding.AwayFromZero);
-                return $"{QuantityDisplayFormatter.FormatForRecipe(scaledQuantity, ingredient.Unit)} {NormalizeIngredientDisplayName(ingredient.Name)}";
+                return $"{QuantityDisplayFormatter.FormatForRecipe(scaledQuantity, ingredient.Unit, ingredient.Name)} {NormalizeIngredientDisplayName(ingredient.Name)}";
             })
             .ToList();
     }

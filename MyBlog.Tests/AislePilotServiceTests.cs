@@ -4,7 +4,11 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
+using Google.Api.Gax;
+using Google.Cloud.Firestore;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
 using MyBlog.Models;
 using MyBlog.Services;
 using MyBlog.Utilities;
@@ -832,6 +836,39 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public async Task BuildPlanAvoidingMealsAsync_WhenRefreshExclusionsRemoveAllLunchCoverage_RelaxesExclusionsInsteadOfFailing()
+    {
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 90m,
+            HouseholdSize = 2,
+            PlanDays = 7,
+            CookDays = 7,
+            MealsPerDay = 2,
+            SelectedMealTypes = ["Lunch", "Dinner"]
+        };
+        var excludedLunchMealNames = GetCompatibleTemplateMealNamesForSlot(
+            request.DietaryModes,
+            request.DislikesOrAllergens,
+            "Lunch");
+
+        var result = await _service.BuildPlanAvoidingMealsAsync(request, excludedLunchMealNames);
+        var lunchMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Lunch", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var dinnerMeals = result.MealPlan
+            .Where(meal => meal.MealType.Equals("Dinner", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        Assert.Equal(14, result.MealPlan.Count);
+        Assert.Equal(7, lunchMeals.Count);
+        Assert.Equal(7, dinnerMeals.Count);
+        Assert.All(lunchMeals, meal =>
+            Assert.Contains(meal.MealName, excludedLunchMealNames, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void BuildPlan_WithLunchAndDinnerSlots_ReturnsLunchThenDinnerPerCookDay()
     {
         var request = new AislePilotRequestModel
@@ -1381,6 +1418,58 @@ public partial class AislePilotServiceTests
             Assert.Equal("ml", oliveOil.Unit);
             Assert.Equal(66.25m, oliveOil.Quantity);
             Assert.Equal("4 1/2 tbsp", oliveOil.QuantityDisplay);
+        }
+        finally
+        {
+            ClearAiPool();
+        }
+    }
+
+    [Fact]
+    public async Task BuildPlanFromCurrentMealsAsync_NormalizesGramBasedSeasoningsAcrossMealAndShoppingDisplays()
+    {
+        ClearAiPool();
+
+        var mealName = $"Seasoned chickpea toast {Guid.NewGuid():N}";
+        var meal = CreateMealTemplateWithIngredients(
+            mealName,
+            [
+                ("Canned chickpeas", "Tins & Dry Goods", 0.5m, "tin", 0.55m),
+                ("Fresh spinach", "Produce", 37.5m, "g", 0.30m),
+                ("Wholemeal bread", "Bakery", 1.5m, "slices", 0.25m),
+                ("Olive oil", "Spices & Sauces", 1m, "tsp", 0.08m),
+                ("Smoked paprika", "Spices & Sauces", 0.75m, "g", 0.05m),
+                ("Salt", "Spices & Sauces", 0.38m, "g", 0.01m),
+                ("Black pepper", "Spices & Sauces", 0.38m, "g", 0.01m)
+            ]);
+
+        InvokeAddMealsToAiPool([meal]);
+
+        var request = new AislePilotRequestModel
+        {
+            WeeklyBudget = 40m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            MealsPerDay = 1,
+            DietaryModes = ["Balanced"]
+        };
+
+        try
+        {
+            var result = await _service.BuildPlanFromCurrentMealsAsync(request, [mealName]);
+            var mealPlan = Assert.Single(result.MealPlan);
+            var paprika = Assert.Single(result.ShoppingItems, item => item.Name.Equals("Smoked paprika", StringComparison.OrdinalIgnoreCase));
+            var salt = Assert.Single(result.ShoppingItems, item => item.Name.Equals("Salt", StringComparison.OrdinalIgnoreCase));
+            var blackPepper = Assert.Single(result.ShoppingItems, item => item.Name.Equals("Black pepper", StringComparison.OrdinalIgnoreCase));
+
+            Assert.Contains("1/2 tsp Smoked paprika", mealPlan.IngredientLines, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains("1/4 tsp Salt", mealPlan.IngredientLines, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains("1/4 tsp Black pepper", mealPlan.IngredientLines, StringComparer.OrdinalIgnoreCase);
+
+            Assert.Equal("1/2 tsp", paprika.QuantityDisplay);
+            Assert.Equal("1/4 tsp", salt.QuantityDisplay);
+            Assert.Equal("1/4 tsp", blackPepper.QuantityDisplay);
         }
         finally
         {
@@ -2144,6 +2233,53 @@ public partial class AislePilotServiceTests
         ]);
     }
 
+    private static IConfiguration BuildFastPathConfiguration()
+    {
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AislePilot:EnableAiGeneration"] = "false",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+    }
+
+    private static FirestoreDb CreateUnreachableFirestoreDb()
+    {
+        var originalHost = Environment.GetEnvironmentVariable("FIRESTORE_EMULATOR_HOST");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("FIRESTORE_EMULATOR_HOST", "127.0.0.1:1");
+            return new FirestoreDbBuilder
+            {
+                ProjectId = "aislepilot-test-project",
+                EmulatorDetection = EmulatorDetection.EmulatorOnly
+            }.Build();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("FIRESTORE_EMULATOR_HOST", originalHost);
+        }
+    }
+
+    private static IWebHostEnvironment CreateTestWebHostEnvironment()
+    {
+        var contentRootPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "MyBlog"));
+        var webRootPath = Path.Combine(contentRootPath, "wwwroot");
+        return new TestWebHostEnvironment(contentRootPath, webRootPath);
+    }
+
+    private sealed class TestWebHostEnvironment(string contentRootPath, string webRootPath) : IWebHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Development";
+        public string ApplicationName { get; set; } = "MyBlog.Tests";
+        public string WebRootPath { get; set; } = webRootPath;
+        public IFileProvider WebRootFileProvider { get; set; } = new PhysicalFileProvider(webRootPath);
+        public string ContentRootPath { get; set; } = contentRootPath;
+        public IFileProvider ContentRootFileProvider { get; set; } = new PhysicalFileProvider(contentRootPath);
+    }
+
     private static void InvokeAddMealsToAiPool(IReadOnlyList<object> meals)
     {
         Assert.NotEmpty(meals);
@@ -2366,6 +2502,30 @@ public partial class AislePilotServiceTests
             {
                 Content = new StringContent(response.ResponseBody)
             });
+        }
+    }
+
+    private sealed class CapturingResponseHandler(HttpStatusCode statusCode, string responseBody) : HttpMessageHandler
+    {
+        private readonly HttpStatusCode _statusCode = statusCode;
+        private readonly string _responseBody = responseBody;
+
+        public Uri? LastRequestUri { get; private set; }
+        public string LastRequestBody { get; private set; } = string.Empty;
+        public int CallCount { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            CallCount++;
+            LastRequestUri = request.RequestUri;
+            LastRequestBody = request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+
+            return new HttpResponseMessage(_statusCode)
+            {
+                Content = new StringContent(_responseBody)
+            };
         }
     }
 }

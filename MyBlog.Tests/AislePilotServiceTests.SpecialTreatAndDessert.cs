@@ -805,4 +805,51 @@ public partial class AislePilotServiceTests
         Assert.NotNull(isUsable);
         Assert.False((bool)isUsable!);
     }
+
+    [Fact]
+    public async Task TryGenerateMealImageBytesWithAiAsync_UsesThumbnailOptimizedRequestDefaults()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key"
+            })
+            .Build();
+        var imageResponseBody = JsonSerializer.Serialize(new
+        {
+            data = new[]
+            {
+                new
+                {
+                    b64_json = Convert.ToBase64String([1, 2, 3])
+                }
+            }
+        });
+
+        using var handler = new CapturingResponseHandler(HttpStatusCode.OK, imageResponseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+        var meal = CreateMealTemplateWithIngredients(
+            "Egg fried rice",
+            [
+                ("Eggs", "Dairy & Eggs", 4m, "pcs", 1.20m),
+                ("Rice", "Tins & Dry Goods", 180m, "g", 0.55m),
+                ("Frozen mixed veg", "Frozen", 0.3m, "bag", 0.85m)
+            ]);
+        var method = typeof(AislePilotService).GetMethod(
+            "TryGenerateMealImageBytesWithAiAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        var task = method!.Invoke(service, [meal, CancellationToken.None]) as Task<byte[]?>;
+        Assert.NotNull(task);
+        var bytes = await task!;
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Equal("https://api.openai.com/v1/images/generations", handler.LastRequestUri?.ToString());
+        Assert.Equal(new byte[] { 1, 2, 3 }, bytes);
+        Assert.Contains("\"model\":\"gpt-image-1-mini\"", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"size\":\"1024x1024\"", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"quality\":\"low\"", handler.LastRequestBody, StringComparison.Ordinal);
+    }
 }

@@ -56,4 +56,19 @@ public partial class AislePilotIntegrationTests
             }
         }
     }
+
+    [Fact]
+    public async Task AislePilotScript_MealImagePolling_UsesFasterEarlyFollowupIntervals()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var script = await client.GetStringAsync("/js/aisle-pilot/meal-image-polling.js");
+
+        Assert.Contains("const fastFollowupPollIntervalMs = 750;", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const mediumFollowupPollIntervalMs = 1500;", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (pollAttempts <= 4)", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("return fastFollowupPollIntervalMs;", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (pollAttempts <= 12)", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("return mediumFollowupPollIntervalMs;", script, StringComparison.OrdinalIgnoreCase);
+    }
 }
