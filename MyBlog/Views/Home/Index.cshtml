@@ -29,23 +29,23 @@
             <div class="hero-actions hero-actions-secondary">
                 @if (!string.IsNullOrWhiteSpace(aislePilotPublicUrl))
                 {
-                    <a class="btn btn-secondary" href="@aislePilotPublicUrl" data-recruiter-link="aislepilot">Try AislePilot</a>
+                    <a class="btn btn-secondary" href="@aislePilotPublicUrl" data-profile-link="aislepilot">Try AislePilot</a>
                 }
                 else if (aislePilotLocalEnabled)
                 {
-                    <a class="btn btn-secondary" asp-controller="AislePilot" asp-action="Index" asp-route-returnUrl="/" data-recruiter-link="aislepilot">Try AislePilot</a>
+                    <a class="btn btn-secondary" asp-controller="AislePilot" asp-action="Index" asp-route-returnUrl="/" data-profile-link="aislepilot">Try AislePilot</a>
                 }
                 @if (!string.IsNullOrWhiteSpace(resumeUrl))
                 {
-                    <a class="btn btn-secondary" href="@resumeUrl" target="_blank" rel="noreferrer" data-recruiter-link="resume">Resume</a>
+                    <a class="btn btn-secondary" href="@resumeUrl" target="_blank" rel="noreferrer" data-profile-link="resume">Resume</a>
                 }
                 @if (!string.IsNullOrWhiteSpace(gitHubUrl))
                 {
-                    <a class="btn btn-secondary" href="@gitHubUrl" target="_blank" rel="noreferrer" data-recruiter-link="github">GitHub</a>
+                    <a class="btn btn-secondary" href="@gitHubUrl" target="_blank" rel="noreferrer" data-profile-link="github">GitHub</a>
                 }
                 @if (!string.IsNullOrWhiteSpace(linkedInUrl))
                 {
-                    <a class="btn btn-secondary" href="@linkedInUrl" target="_blank" rel="noreferrer" data-recruiter-link="linkedin">LinkedIn</a>
+                    <a class="btn btn-secondary" href="@linkedInUrl" target="_blank" rel="noreferrer" data-profile-link="linkedin">LinkedIn</a>
                 }
             </div>
             <div class="hero-metrics">
@@ -81,10 +81,10 @@
 
                 <div class="hero-focus-card" data-focus-panel>
                     <p class="hero-focus-period" data-focus-period>Now</p>
-                    <p class="hero-focus-heading" data-focus-heading>Recruiter-ready portfolio proof and stronger case studies.</p>
+                    <p class="hero-focus-heading" data-focus-heading>Clear portfolio proof and stronger case studies.</p>
                     <p class="hero-focus-copy" data-focus-copy>
                         The current emphasis is turning this site into stronger proof of delivery: clearer project framing,
-                        tighter recruiter paths, and sharper evidence of how I build.
+                        clearer paths through the work, and sharper evidence of how I build.
                     </p>
                 </div>
 
@@ -100,8 +100,8 @@
                       {
                         "label": "Current emphasis",
                         "period": "Now",
-                        "heading": "Recruiter-ready portfolio proof and stronger case studies.",
-                        "copy": "The current emphasis is turning this site into stronger proof of delivery: clearer project framing, tighter recruiter paths, and sharper evidence of how I build."
+                        "heading": "Clear portfolio proof and stronger case studies.",
+                        "copy": "The current emphasis is turning this site into stronger proof of delivery: clearer project framing, clearer paths through the work, and sharper evidence of how I build."
                       },
                       {
                         "label": "Recent highlight",
