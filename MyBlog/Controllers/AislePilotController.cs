@@ -42,14 +42,48 @@ public partial class AislePilotController : Controller
     };
 
     [HttpGet("")]
-    public IActionResult Index(string? returnUrl = null)
+    public async Task<IActionResult> Index(
+        string? returnUrl = null,
+        bool restoreCurrentPlan = false,
+        CancellationToken cancellationToken = default)
     {
         var request = NormalizeRequest(TryReadSavedSetupState() ?? new AislePilotRequestModel
         {
             MealsPerDay = DefaultMealsPerDay
         });
         var resolvedReturnUrl = ResolveReturnUrl(returnUrl);
-        return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        if (!restoreCurrentPlan)
+        {
+            return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        var currentPlanMealNames = TryReadCurrentPlanState();
+        if (currentPlanMealNames is null || currentPlanMealNames.Count == 0)
+        {
+            return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+
+        try
+        {
+            var result = await aislePilotService.BuildPlanFromCurrentMealsAsync(
+                request,
+                currentPlanMealNames,
+                cancellationToken);
+            SyncRequestWithResult(request, result);
+            PersistSetupState(request);
+            PersistCurrentPlanState(result);
+            return View(BuildPageModel(request, result, returnUrl: resolvedReturnUrl));
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogInformation(ex, "AislePilot could not rebuild the current plan from cookie state on index load.");
+            return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AislePilot failed to rebuild the current plan from cookie state on index load.");
+            return View(BuildPageModel(request, returnUrl: resolvedReturnUrl));
+        }
     }
 
     [HttpPost("")]
@@ -250,6 +284,13 @@ public partial class AislePilotController : Controller
         }
 
         var seenMealNames = GetSeenMealsForSwap(request.SwapHistoryState, currentMealName);
+        logger.LogInformation(
+            "AislePilot swap meal request received. Ajax={IsAjaxRequest}, DayIndex={DayIndex}, CurrentMealName={CurrentMealName}, CurrentPlanMealCount={CurrentPlanMealCount}, SeenMealCount={SeenMealCount}",
+            IsAjaxRequest(),
+            dayIndex,
+            currentMealName ?? string.Empty,
+            currentPlanMealNames?.Count ?? 0,
+            seenMealNames.Count);
 
         try
         {
@@ -271,15 +312,27 @@ public partial class AislePilotController : Controller
             PersistSetupState(request);
             PersistCurrentPlanState(result);
             var responseModel = BuildPageModel(request, result, returnUrl: resolvedReturnUrl);
+            logger.LogInformation(
+                "AislePilot swap meal request completed. Ajax={IsAjaxRequest}, DayIndex={DayIndex}, PreviousMealName={PreviousMealName}, ReplacementMealName={ReplacementMealName}",
+                IsAjaxRequest(),
+                dayIndex,
+                currentMealName ?? string.Empty,
+                result.MealPlan.ElementAtOrDefault(dayIndex)?.MealName ?? string.Empty);
             if (IsAjaxRequest())
             {
                 return PartialView("_AislePilotResultSections", responseModel);
             }
 
-            return View("Index", responseModel);
+            return Redirect(BuildAislePilotIndexUrl(resolvedReturnUrl, "aislepilot-meals", restoreCurrentPlan: true));
         }
         catch (InvalidOperationException ex)
         {
+            logger.LogInformation(
+                ex,
+                "AislePilot swap meal request returned validation-style failure. Ajax={IsAjaxRequest}, DayIndex={DayIndex}, CurrentMealName={CurrentMealName}",
+                IsAjaxRequest(),
+                dayIndex,
+                currentMealName ?? string.Empty);
             ModelState.AddModelError(string.Empty, ex.Message);
             return View("Index", BuildPageModel(request, returnUrl: resolvedReturnUrl));
         }

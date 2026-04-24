@@ -1,0 +1,30 @@
+.aislepilot-app-head.is-compact .aislepilot-app-highlights {
+    margin-top: 0.38rem;
+    gap: 0.42rem;
+}
+
+.aislepilot-app-head.is-compact .aislepilot-app-highlights li {
+    min-height: 1.78rem;
+    padding: 0.28rem 0.62rem;
+    border-color: var(--ap-refresh-border-strong);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+        var(--ap-refresh-surface);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    color: var(--ap-refresh-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.015em;
+}
+
+@media (max-width: 720px) {
+    .aislepilot-app-head.is-compact .aislepilot-app-highlights {
+        gap: 0.34rem;
+    }
+
+    .aislepilot-app-head.is-compact .aislepilot-app-highlights li {
+        min-height: 1.68rem;
+        padding: 0.24rem 0.56rem;
+        font-size: 0.76rem;
+    }
+}

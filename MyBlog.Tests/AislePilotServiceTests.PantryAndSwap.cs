@@ -492,4 +492,235 @@ public partial class AislePilotServiceTests
         Assert.Equal("Zesty chickpea tray bake", swappedPlan.MealPlan[0].MealName);
         Assert.NotEqual("Aubergine mackerel skillet", swappedPlan.MealPlan[0].MealName);
     }
+
+    [Fact]
+    public void SwapMealForDay_WhenAiSwapFirstResponseRepeatsMeal_RetriesUntilUniqueReplacement()
+    {
+        ClearAiPool();
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var initialPlan = _service.BuildPlan(request);
+        Assert.Single(initialPlan.MealPlan);
+        var currentMealName = initialPlan.MealPlan[0].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan.Select(meal => meal.MealName).ToList();
+        var seenMealNames = GetCompatibleTemplateMealNamesForSlot(
+                request.DietaryModes,
+                request.DislikesOrAllergens,
+                "Breakfast")
+            .Where(name => !name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var duplicateResponseContent = JsonSerializer.Serialize(new
+        {
+            name = currentMealName,
+            baseCostForTwo = 4.8m,
+            isQuick = true,
+            tags = new[] { "Balanced" },
+            recipeSteps = new[]
+            {
+                "Toast oats and seeds in a dry pan for two minutes.",
+                "Warm the fruit gently until softened and juicy.",
+                "Fold the yogurt through the oats until creamy.",
+                "Top with the fruit and a spoonful of seeds.",
+                "Serve straight away while chilled ingredients stay cool."
+            },
+            ingredients = new object[]
+            {
+                new { name = "Greek yogurt", department = "Dairy & Eggs", quantityForTwo = 0.3m, unit = "kg", estimatedCostForTwo = 1.4m },
+                new { name = "Rolled oats", department = "Tins & Dry Goods", quantityForTwo = 0.14m, unit = "kg", estimatedCostForTwo = 0.4m },
+                new { name = "Blueberries", department = "Produce", quantityForTwo = 0.15m, unit = "kg", estimatedCostForTwo = 1.1m }
+            }
+        });
+        var uniqueMealName = $"Pear quinoa breakfast bowl {Guid.NewGuid():N}";
+        var uniqueResponseContent = JsonSerializer.Serialize(new
+        {
+            name = uniqueMealName,
+            baseCostForTwo = 5.6m,
+            isQuick = true,
+            tags = new[] { "Balanced" },
+            recipeSteps = new[]
+            {
+                "Rinse the quinoa well and simmer it until fluffy.",
+                "Slice the pears and warm them gently with cinnamon until soft.",
+                "Stir almond butter through the warm quinoa until glossy.",
+                "Spoon over the pears and sprinkle over chopped almonds.",
+                "Serve warm as a breakfast bowl."
+            },
+            ingredients = new object[]
+            {
+                new { name = "Quinoa", department = "Tins & Dry Goods", quantityForTwo = 0.18m, unit = "kg", estimatedCostForTwo = 0.9m },
+                new { name = "Pears", department = "Produce", quantityForTwo = 2m, unit = "pcs", estimatedCostForTwo = 0.8m },
+                new { name = "Almond butter", department = "Spices & Sauces", quantityForTwo = 0.12m, unit = "jar", estimatedCostForTwo = 1.4m }
+            }
+        });
+
+        var duplicateResponseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = duplicateResponseContent
+                    }
+                }
+            }
+        });
+        var uniqueResponseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = uniqueResponseContent
+                    }
+                }
+            }
+        });
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        using var handler = new SequentialResponseHandler(
+            (HttpStatusCode.OK, duplicateResponseBody),
+            (HttpStatusCode.OK, uniqueResponseBody));
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        try
+        {
+            var swappedPlan = service.SwapMealForDay(
+                request,
+                dayIndex: 0,
+                currentMealName,
+                currentPlanMealNames,
+                seenMealNames);
+
+            Assert.Equal(2, handler.CallCount);
+            Assert.NotEqual(currentMealName, swappedPlan.MealPlan[0].MealName);
+            Assert.Equal(uniqueMealName, swappedPlan.MealPlan[0].MealName);
+            Assert.Equal("Breakfast", swappedPlan.MealPlan[0].MealType);
+        }
+        finally
+        {
+            ClearAiPool();
+        }
+    }
+
+    [Fact]
+    public void SwapMealForDay_WhenAiSwapIncludesLowVolumeSeasonings_AcceptsReplacement()
+    {
+        ClearAiPool();
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Breakfast"]
+        };
+
+        var initialPlan = _service.BuildPlan(request);
+        Assert.Single(initialPlan.MealPlan);
+        var currentMealName = initialPlan.MealPlan[0].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan.Select(meal => meal.MealName).ToList();
+        var seenMealNames = GetCompatibleTemplateMealNamesForSlot(
+                request.DietaryModes,
+                request.DislikesOrAllergens,
+                "Breakfast")
+            .Where(name => !name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var uniqueMealName = $"Turmeric chickpea breakfast scramble {Guid.NewGuid():N}";
+        var aiResponseContent = JsonSerializer.Serialize(new
+        {
+            name = uniqueMealName,
+            baseCostForTwo = 5.4m,
+            isQuick = true,
+            tags = new[] { "Balanced" },
+            recipeSteps = new[]
+            {
+                "Warm a non-stick pan over a medium heat.",
+                "Cook the chickpeas with turmeric and smoked paprika for two minutes.",
+                "Stir in the spinach until wilted and tender.",
+                "Fold in the eggs and scramble until softly set.",
+                "Season with black pepper and serve straight away."
+            },
+            ingredients = new object[]
+            {
+                new { name = "Eggs", department = "Dairy & Eggs", quantityForTwo = 4m, unit = "pcs", estimatedCostForTwo = 1.2m },
+                new { name = "Chickpeas", department = "Tins & Dry Goods", quantityForTwo = 1m, unit = "tin", estimatedCostForTwo = 0.7m },
+                new { name = "Spinach", department = "Produce", quantityForTwo = 0.18m, unit = "kg", estimatedCostForTwo = 0.9m },
+                new { name = "Smoked Paprika", department = "Spices & Sauces", quantityForTwo = 2m, unit = "g", estimatedCostForTwo = 0.10m },
+                new { name = "Turmeric", department = "Spices & Sauces", quantityForTwo = 2m, unit = "g", estimatedCostForTwo = 0.10m },
+                new { name = "Black pepper", department = "Spices & Sauces", quantityForTwo = 0.5m, unit = "g", estimatedCostForTwo = 0.00m }
+            }
+        });
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = aiResponseContent
+                    }
+                }
+            }
+        });
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        try
+        {
+            var swappedPlan = service.SwapMealForDay(
+                request,
+                dayIndex: 0,
+                currentMealName,
+                currentPlanMealNames,
+                seenMealNames);
+
+            Assert.Equal(1, handler.CallCount);
+            Assert.Equal(uniqueMealName, swappedPlan.MealPlan[0].MealName);
+            Assert.Equal("Breakfast", swappedPlan.MealPlan[0].MealType);
+        }
+        finally
+        {
+            ClearAiPool();
+        }
+    }
 }

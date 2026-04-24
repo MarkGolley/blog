@@ -191,24 +191,235 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
 
-        using var response = await client.PostAsync("/projects/aisle-pilot/swap-meal", new FormUrlEncodedContent(new Dictionary<string, string>
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["Request.Supermarket"] = "Tesco",
             ["Request.WeeklyBudget"] = "65",
             ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
             ["Request.CustomAisleOrder"] = string.Empty,
             ["Request.DislikesOrAllergens"] = string.Empty,
             ["Request.PreferQuickMeals"] = "true",
             ["Request.DietaryModes"] = "Balanced",
-            ["dayIndex"] = "0",
-            ["currentMealName"] = string.Empty,
             ["__RequestVerificationToken"] = antiForgeryToken
         }));
 
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        var baselineHtml = await baselineResponse.Content.ReadAsStringAsync();
+        var baselineMealNames = ExtractRenderedMealNames(baselineHtml);
+        Assert.True(baselineMealNames.Count >= 2, "Expected baseline plan to include at least two meals.");
+        var currentMealName = baselineMealNames[0];
+
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        var swapForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("Request.SwapHistoryState", currentMealName),
+            new("dayIndex", "0"),
+            new("currentMealName", currentMealName),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in baselineMealNames)
+        {
+            swapForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var response = await client.PostAsync("/projects/aisle-pilot/swap-meal", new FormUrlEncodedContent(swapForm));
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Meals", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Swap meal", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("id=\"aislepilot-meals\"", html, StringComparison.OrdinalIgnoreCase);
+        var swappedMealNames = ExtractRenderedMealNames(html);
+        Assert.Equal(baselineMealNames.Count, swappedMealNames.Count);
+        Assert.NotEqual(currentMealName, swappedMealNames[0]);
+    }
+
+    [Fact]
+    public async Task SwapMeal_AjaxRequest_UpdatesReturnedMealPlan()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        var baselineHtml = await baselineResponse.Content.ReadAsStringAsync();
+        var baselineMealNames = ExtractRenderedMealNames(baselineHtml);
+        Assert.True(baselineMealNames.Count >= 2, "Expected baseline plan to include at least two meals.");
+        var currentMealName = baselineMealNames[0];
+
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        client.DefaultRequestHeaders.Remove("X-Requested-With");
+        client.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
+
+        var swapForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("Request.SwapHistoryState", currentMealName),
+            new("dayIndex", "0"),
+            new("currentMealName", currentMealName),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in baselineMealNames)
+        {
+            swapForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var swappedResponse = await client.PostAsync("/projects/aisle-pilot/swap-meal", new FormUrlEncodedContent(swapForm));
+
+        client.DefaultRequestHeaders.Remove("X-Requested-With");
+
+        Assert.Equal(HttpStatusCode.OK, swappedResponse.StatusCode);
+        var swappedHtml = await swappedResponse.Content.ReadAsStringAsync();
+        Assert.Contains("id=\"aislepilot-meals\"", swappedHtml, StringComparison.OrdinalIgnoreCase);
+        var swappedMealNames = ExtractRenderedMealNames(swappedHtml);
+        Assert.Equal(baselineMealNames.Count, swappedMealNames.Count);
+        Assert.NotEqual(currentMealName, swappedMealNames[0]);
+    }
+
+    [Fact]
+    public async Task SwapMeal_NonAjaxSuccess_RedirectsToIndexMealsAnchor()
+    {
+        using var client = CreateClient(allowAutoRedirect: false);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+        var baselineHtml = await baselineResponse.Content.ReadAsStringAsync();
+        var baselineMealNames = ExtractRenderedMealNames(baselineHtml);
+        Assert.True(baselineMealNames.Count >= 2, "Expected baseline plan to include at least two meals.");
+        var currentMealName = baselineMealNames[0];
+
+        antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+        var swapForm = new List<KeyValuePair<string, string>>
+        {
+            new("Request.Supermarket", "Tesco"),
+            new("Request.WeeklyBudget", "65"),
+            new("Request.HouseholdSize", "2"),
+            new("Request.PlanDays", "2"),
+            new("Request.CookDays", "2"),
+            new("Request.MealsPerDay", "1"),
+            new("Request.SelectedMealTypes", "Dinner"),
+            new("Request.CustomAisleOrder", string.Empty),
+            new("Request.DislikesOrAllergens", string.Empty),
+            new("Request.PreferQuickMeals", "true"),
+            new("Request.DietaryModes", "Balanced"),
+            new("Request.SwapHistoryState", currentMealName),
+            new("dayIndex", "0"),
+            new("currentMealName", currentMealName),
+            new("__RequestVerificationToken", antiForgeryToken)
+        };
+        foreach (var mealName in baselineMealNames)
+        {
+            swapForm.Add(new KeyValuePair<string, string>("currentPlanMealNames", mealName));
+        }
+
+        using var swappedResponse = await client.PostAsync("/projects/aisle-pilot/swap-meal", new FormUrlEncodedContent(swapForm));
+
+        Assert.Equal(HttpStatusCode.Found, swappedResponse.StatusCode);
+        Assert.NotNull(swappedResponse.Headers.Location);
+        var redirectTarget = swappedResponse.Headers.Location!.OriginalString;
+        Assert.StartsWith("/projects/aisle-pilot", redirectTarget, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("restoreCurrentPlan=True", redirectTarget, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith("#aislepilot-meals", redirectTarget, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_DefaultGet_DoesNotRestoreCurrentPlanCookieWithoutRestoreFlag()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+        var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
+
+        using var baselineResponse = await client.PostAsync("/projects/aisle-pilot", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["Request.Supermarket"] = "Tesco",
+            ["Request.WeeklyBudget"] = "65",
+            ["Request.HouseholdSize"] = "2",
+            ["Request.PlanDays"] = "2",
+            ["Request.CookDays"] = "2",
+            ["Request.MealsPerDay"] = "1",
+            ["Request.SelectedMealTypes"] = "Dinner",
+            ["Request.CustomAisleOrder"] = string.Empty,
+            ["Request.DislikesOrAllergens"] = string.Empty,
+            ["Request.PreferQuickMeals"] = "true",
+            ["Request.DietaryModes"] = "Balanced",
+            ["__RequestVerificationToken"] = antiForgeryToken
+        }));
+
+        Assert.Equal(HttpStatusCode.OK, baselineResponse.StatusCode);
+
+        using var indexResponse = await client.GetAsync("/projects/aisle-pilot");
+
+        Assert.Equal(HttpStatusCode.OK, indexResponse.StatusCode);
+        var html = await indexResponse.Content.ReadAsStringAsync();
+        Assert.Contains("id=\"aislepilot-setup\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("id=\"aislepilot-meals\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DebugClientLog_PostedPayload_ReturnsNoContent()
+    {
+        using var client = CreateClient(allowAutoRedirect: false);
+        using var response = await client.PostAsync(
+            "/projects/aisle-pilot/debug-client-log",
+            new StringContent(
+                """{"stage":"submit-start","details":{"swapDayIndex":0},"href":"http://localhost:8080/projects/aisle-pilot","userAgent":"integration-test","timestampUtc":"2026-04-22T12:00:00.000Z"}""",
+                System.Text.Encoding.UTF8,
+                "application/json"));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     [Fact]

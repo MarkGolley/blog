@@ -186,6 +186,43 @@ public sealed partial class AislePilotService
         return decimal.Round(adjustedCost, 2, MidpointRounding.AwayFromZero);
     }
 
+    private static bool IsAiLowVolumeSeasoningIngredient(
+        string ingredientName,
+        string department,
+        string unit,
+        decimal quantityForTwo)
+    {
+        if (!department.Equals("Spices & Sauces", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var normalizedUnit = NormalizeAiUnitForPricing(unit);
+        if (normalizedUnit.Equals("g", StringComparison.OrdinalIgnoreCase) && quantityForTwo > 0m && quantityForTwo <= 8m)
+        {
+            return true;
+        }
+
+        return IsMinorPantryAssumptionIngredient(ingredientName);
+    }
+
+    private static decimal NormalizeAiLowVolumeSeasoningEstimatedCost(
+        string unit,
+        decimal quantityForTwo,
+        decimal estimatedCostForTwo)
+    {
+        var normalizedUnit = NormalizeAiUnitForPricing(unit);
+        if (normalizedUnit.Equals("g", StringComparison.OrdinalIgnoreCase) && quantityForTwo > 0m)
+        {
+            var maxReasonableCost = Math.Max(0.01m, quantityForTwo * ResolveGenericAiIngredientMaxUnitPrice(normalizedUnit));
+            var minReasonableCost = 0.01m;
+            var seedCost = estimatedCostForTwo > 0m ? estimatedCostForTwo : minReasonableCost;
+            return Math.Min(maxReasonableCost, Math.Max(minReasonableCost, seedCost));
+        }
+
+        return Math.Max(0.01m, estimatedCostForTwo);
+    }
+
     private static bool TryGetTemplateIngredientUnitPriceBounds(
         string ingredientName,
         string normalizedUnit,
@@ -464,6 +501,13 @@ public sealed partial class AislePilotService
             unit,
             quantityForTwo,
             estimatedCostForTwo);
+        if (IsAiLowVolumeSeasoningIngredient(name, department, unit, quantityForTwo))
+        {
+            normalizedEstimatedCostForTwo = NormalizeAiLowVolumeSeasoningEstimatedCost(
+                unit,
+                quantityForTwo,
+                normalizedEstimatedCostForTwo);
+        }
 
         if (string.IsNullOrWhiteSpace(name) ||
             string.IsNullOrWhiteSpace(department) ||

@@ -62,6 +62,8 @@ public sealed partial class AislePilotService
             return null;
         }
 
+        const int maxSemanticGenerationAttempts = 3;
+
         var currentMeal = dayIndex >= 0 && dayIndex < selectedMeals.Count
             ? selectedMeals[dayIndex]
             : null;
@@ -99,61 +101,83 @@ public sealed partial class AislePilotService
             }
         };
 
-        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
-        if (string.IsNullOrWhiteSpace(responseContent))
+        for (var attempt = 1; attempt <= maxSemanticGenerationAttempts; attempt++)
         {
-            return null;
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+            if (string.IsNullOrWhiteSpace(responseContent))
+            {
+                continue;
+            }
+
+            var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
+            var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+            if (string.IsNullOrWhiteSpace(rawJson))
+            {
+                continue;
+            }
+
+            var normalizedJson = NormalizeModelJson(rawJson);
+            if (!TryParseAiMealPayloadWithRecovery(normalizedJson, out var aiPayload))
+            {
+                continue;
+            }
+
+            var strictModes = ResolveHardDietaryModes(context.DietaryModes);
+            var replacement = ValidateAndMapAiMeal(
+                aiPayload,
+                strictModes,
+                requireRecipeSteps: true,
+                suitableMealTypes: [mealType],
+                out var validationReason);
+            if (replacement is null)
+            {
+                _logger?.LogInformation(
+                    "AislePilot AI swap generation attempt {Attempt}/{MaxAttempts} produced an invalid meal. Reason={ValidationReason}",
+                    attempt,
+                    maxSemanticGenerationAttempts,
+                    validationReason ?? "unknown");
+                continue;
+            }
+
+            if (replacement.Name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase) ||
+                excludedMealNames.Contains(replacement.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                _logger?.LogInformation(
+                    "AislePilot AI swap generation attempt {Attempt}/{MaxAttempts} repeated an excluded meal '{MealName}'.",
+                    attempt,
+                    maxSemanticGenerationAttempts,
+                    replacement.Name);
+                continue;
+            }
+
+            if (currentMeal is not null && SharesKeySwapIngredients(replacement, currentMeal))
+            {
+                _logger?.LogInformation(
+                    "AislePilot AI swap generation attempt {Attempt}/{MaxAttempts} reused key ingredients for '{MealName}'.",
+                    attempt,
+                    maxSemanticGenerationAttempts,
+                    replacement.Name);
+                continue;
+            }
+
+            var persistedMeals = await PersistAiMealsAsync([replacement], cancellationToken);
+            if (persistedMeals.Count > 0)
+            {
+                AddMealsToAiPool(persistedMeals);
+            }
+            else
+            {
+                _logger?.LogWarning(
+                    "AislePilot generated swap meal '{MealName}' but it was not persisted; skipping shared AI meal pool update.",
+                    replacement.Name);
+            }
+
+            return replacement;
         }
 
-        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
-        if (string.IsNullOrWhiteSpace(rawJson))
-        {
-            return null;
-        }
-
-        var normalizedJson = NormalizeModelJson(rawJson);
-        if (!TryParseAiMealPayloadWithRecovery(normalizedJson, out var aiPayload))
-        {
-            return null;
-        }
-
-        var strictModes = ResolveHardDietaryModes(context.DietaryModes);
-        var replacement = ValidateAndMapAiMeal(
-            aiPayload,
-            strictModes,
-            requireRecipeSteps: true,
-            suitableMealTypes: [mealType],
-            out _);
-        if (replacement is null)
-        {
-            return null;
-        }
-
-        if (replacement.Name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase) ||
-            excludedMealNames.Contains(replacement.Name, StringComparer.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        if (currentMeal is not null && SharesKeySwapIngredients(replacement, currentMeal))
-        {
-            return null;
-        }
-
-        var persistedMeals = await PersistAiMealsAsync([replacement], cancellationToken);
-        if (persistedMeals.Count > 0)
-        {
-            AddMealsToAiPool(persistedMeals);
-        }
-        else
-        {
-            _logger?.LogWarning(
-                "AislePilot generated swap meal '{MealName}' but it was not persisted; skipping shared AI meal pool update.",
-                replacement.Name);
-        }
-
-        return replacement;
+        return null;
     }
 
     internal static MealTemplate? TrySelectTemplateSwapCandidate(

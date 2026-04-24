@@ -31,6 +31,18 @@ public partial class AislePilotController
         return fallbackReturnUrl;
     }
 
+    private string BuildAislePilotIndexUrl(string? returnUrl, string? hash = null, bool restoreCurrentPlan = false)
+    {
+        var indexUrl = Url.Action(nameof(Index), new { returnUrl, restoreCurrentPlan }) ?? "/projects/aisle-pilot";
+        if (string.IsNullOrWhiteSpace(hash))
+        {
+            return indexUrl;
+        }
+
+        var normalizedHash = hash.StartsWith('#') ? hash : $"#{hash}";
+        return $"{indexUrl}{normalizedHash}";
+    }
+
     private static bool IsAislePilotPath(string? url)
     {
         if (string.IsNullOrWhiteSpace(url))
