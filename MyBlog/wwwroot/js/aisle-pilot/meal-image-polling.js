@@ -4,6 +4,8 @@
         const documentRef = config.documentRef instanceof Document ? config.documentRef : document;
         const pollIntervalMs = Number.isInteger(config.intervalMs) ? config.intervalMs : 5000;
         const pollMaxAttempts = Number.isInteger(config.maxAttempts) ? config.maxAttempts : 48;
+        const fastFollowupPollIntervalMs = 750;
+        const mediumFollowupPollIntervalMs = 1500;
         const mealImageCacheStorageKey = "aislepilot:meal-image-cache";
         const mealImageCacheTtlMs = Number.isInteger(config.cacheTtlMs) ? config.cacheTtlMs : 1000 * 60 * 60 * 12;
 
@@ -498,12 +500,12 @@
         };
 
         const getNextPollDelayMs = () => {
-            if (pollAttempts <= 2) {
-                return 1200;
+            if (pollAttempts <= 4) {
+                return fastFollowupPollIntervalMs;
             }
 
-            if (pollAttempts <= 7) {
-                return 2500;
+            if (pollAttempts <= 12) {
+                return mediumFollowupPollIntervalMs;
             }
 
             return pollIntervalMs;

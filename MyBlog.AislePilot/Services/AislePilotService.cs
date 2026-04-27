@@ -1099,7 +1099,7 @@ public sealed partial class AislePilotService : IAislePilotService
         _pantryRankingEngine = pantryRankingEngine ?? new AislePilotPantryRankingEngine();
         _apiKey = configuration?["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         _model = configuration?["AislePilot:Model"] ?? "gpt-4.1-mini";
-        _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-1";
+        _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-1-mini";
         _enableAiGeneration = !bool.TryParse(configuration?["AislePilot:EnableAiGeneration"], out var parsed) || parsed;
         _enableAiImageGeneration = !bool.TryParse(
             configuration?["AislePilot:EnableAiImageGeneration"],

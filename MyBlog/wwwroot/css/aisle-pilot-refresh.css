@@ -386,22 +386,46 @@
 
 .aislepilot-setup-mode-toggle.is-active {
     background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(21, 128, 61, 0.18)) !important;
-    color: var(--ap-refresh-text);
-    border-color: rgba(20, 184, 166, 0.28) !important;
+    color: var(--ap-refresh-text) !important;
+    border-color: rgba(17, 92, 78, 0.36) !important;
+}
+
+.aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-title {
+    color: var(--ap-refresh-text) !important;
 }
 
 .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-kicker {
-    color: var(--ap-refresh-text);
+    color: color-mix(in srgb, var(--ap-refresh-primary-strong) 54%, var(--ap-refresh-accent) 46%);
 }
 
 .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-icon {
-    border-color: rgba(248, 251, 255, 0.18);
-    background: rgba(248, 251, 255, 0.12);
-    color: var(--ap-refresh-text);
+    border-color: rgba(17, 92, 78, 0.18);
+    background: rgba(255, 255, 255, 0.58);
+    color: color-mix(in srgb, var(--ap-refresh-primary-strong) 68%, var(--ap-refresh-text) 32%);
 }
 
 .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-note,
 .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-detail {
+    color: color-mix(in srgb, var(--ap-refresh-text) 84%, var(--ap-refresh-text-muted) 16%) !important;
+}
+
+:root[data-theme="dark"] .aislepilot-setup-mode-toggle.is-active {
+    color: #f8fbff !important;
+    border-color: transparent !important;
+}
+
+:root[data-theme="dark"] .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-kicker {
+    color: #f8fbff;
+}
+
+:root[data-theme="dark"] .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-icon {
+    border-color: rgba(248, 251, 255, 0.18);
+    background: rgba(248, 251, 255, 0.12);
+    color: #f8fbff;
+}
+
+:root[data-theme="dark"] .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-note,
+:root[data-theme="dark"] .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-detail {
     color: rgba(248, 251, 255, 0.82);
 }
 

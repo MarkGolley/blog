@@ -531,7 +531,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
-    public async Task HomeIndex_RendersRecruiterFacingNavigationAndFeaturedWriting()
+    public async Task HomeIndex_RendersPortfolioNavigationAndFeaturedWritingWithoutRecruiterLanguage()
     {
         using var client = _factory.CreateClient();
 
@@ -542,6 +542,9 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("View selected work", html, StringComparison.Ordinal);
         Assert.Contains("Read featured writing", html, StringComparison.Ordinal);
         Assert.Contains("Featured writing", html, StringComparison.Ordinal);
+        Assert.Contains("Clear portfolio proof and stronger case studies.", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Recruiter-ready", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("tighter recruiter paths", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -557,7 +560,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
-    public async Task AboutIndex_RendersRecruiterFocusedSummary()
+    public async Task AboutIndex_RendersConciseSummaryWithoutRecruiterLanguage()
     {
         using var client = _factory.CreateClient();
 
@@ -566,10 +569,12 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("focused on reliable delivery", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("View selected work", html, StringComparison.Ordinal);
         Assert.Contains("Working style", html, StringComparison.Ordinal);
+        Assert.Contains("the concise version is", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("short recruiter version", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task HomeIndex_RendersRecruiterActions_WhenProfileLinksAreConfigured()
+    public async Task HomeIndex_RendersProfileActions_WhenProfileLinksAreConfigured()
     {
         var factory = CreateFactoryWithConfiguration(new Dictionary<string, string?>
         {
@@ -583,13 +588,13 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         var html = await client.GetStringAsync("/");
 
         Assert.Contains("Try AislePilot", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-recruiter-link=\"aislepilot\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-profile-link=\"aislepilot\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("https://aislepilot.example.com/projects/aisle-pilot", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-recruiter-link=\"resume\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-profile-link=\"resume\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("https://example.com/resume.pdf", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-recruiter-link=\"github\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-profile-link=\"github\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("https://github.com/example", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-recruiter-link=\"linkedin\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-profile-link=\"linkedin\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("https://www.linkedin.com/in/example/", html, StringComparison.OrdinalIgnoreCase);
     }
 

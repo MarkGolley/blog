@@ -141,6 +141,35 @@ public partial class AislePilotIntegrationTests
     }
 
     [Fact]
+    public async Task AislePilotRefreshStylesheet_UsesReadableSelectedSetupModeContrastInLightTheme()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot-refresh.css");
+
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-setup-mode-toggle\.is-active\s*\{[\s\S]*color:\s*var\(--ap-refresh-text\)\s*!important;[\s\S]*border-color:\s*rgba\(17,\s*92,\s*78,\s*0\.36\)\s*!important;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-setup-mode-toggle\.is-active\s+\.aislepilot-setup-mode-toggle-title\s*\{[\s\S]*color:\s*var\(--ap-refresh-text\)\s*!important;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-setup-mode-toggle\.is-active\s+\.aislepilot-setup-mode-toggle-note,\s*[\s\S]*\.aislepilot-setup-mode-toggle\.is-active\s+\.aislepilot-setup-mode-toggle-detail\s*\{[\s\S]*color:\s*color-mix\(in srgb,\s*var\(--ap-refresh-text\)\s*84%,\s*var\(--ap-refresh-text-muted\)\s*16%\)\s*!important;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @":root\[data-theme=""dark""\]\s+\.aislepilot-setup-mode-toggle\.is-active\s*\{[\s\S]*color:\s*#f8fbff\s*!important;",
+                RegexOptions.IgnoreCase),
+            css);
+    }
+
+    [Fact]
     public async Task AislePilotRefreshStylesheet_DefinesSubBrandTypographyWithoutImportingFontsInline()
     {
         using var client = CreateClient(allowAutoRedirect: true);

@@ -139,13 +139,13 @@ public sealed partial class AislePilotService
                 }
 
                 var normalizedName = NormalizePantryText(ingredient.Name);
-                var normalizedUnit = NormalizeAiUnitForPricing(ingredient.Unit);
+                var (normalizedUnit, normalizedQuantityForTwo) = ResolveAiPricingMeasure(ingredient.Unit, ingredient.QuantityForTwo);
                 if (string.IsNullOrWhiteSpace(normalizedName) || string.IsNullOrWhiteSpace(normalizedUnit))
                 {
                     continue;
                 }
 
-                var unitPrice = ingredient.EstimatedCostForTwo / ingredient.QuantityForTwo;
+                var unitPrice = ingredient.EstimatedCostForTwo / normalizedQuantityForTwo;
                 references.Add(new IngredientUnitPriceReference(
                     normalizedName,
                     normalizedUnit,
@@ -167,22 +167,22 @@ public sealed partial class AislePilotService
             return decimal.Round(estimatedCostForTwo, 2, MidpointRounding.AwayFromZero);
         }
 
-        var normalizedUnit = NormalizeAiUnitForPricing(unit);
-        var adjustedUnitPrice = estimatedCostForTwo / quantityForTwo;
-        var genericMaxUnitPrice = ResolveGenericAiIngredientMaxUnitPrice(normalizedUnit);
+        var (pricingUnit, pricingQuantityForTwo) = ResolveAiPricingMeasure(unit, quantityForTwo);
+        var adjustedUnitPrice = estimatedCostForTwo / pricingQuantityForTwo;
+        var genericMaxUnitPrice = ResolveGenericAiIngredientMaxUnitPrice(pricingUnit);
         if (adjustedUnitPrice > genericMaxUnitPrice)
         {
             adjustedUnitPrice = genericMaxUnitPrice;
         }
 
-        if (TryGetTemplateIngredientUnitPriceBounds(ingredientName, normalizedUnit, out var minKnownUnitPrice, out var maxKnownUnitPrice))
+        if (TryGetTemplateIngredientUnitPriceBounds(ingredientName, pricingUnit, out var minKnownUnitPrice, out var maxKnownUnitPrice))
         {
             var lowerBound = minKnownUnitPrice * AiIngredientKnownUnitPriceMinFactor;
             var upperBound = maxKnownUnitPrice * AiIngredientKnownUnitPriceMaxFactor;
             adjustedUnitPrice = Math.Clamp(adjustedUnitPrice, lowerBound, upperBound);
         }
 
-        var adjustedCost = adjustedUnitPrice * quantityForTwo;
+        var adjustedCost = adjustedUnitPrice * pricingQuantityForTwo;
         return decimal.Round(adjustedCost, 2, MidpointRounding.AwayFromZero);
     }
 
@@ -203,6 +203,12 @@ public sealed partial class AislePilotService
             return true;
         }
 
+        if ((normalizedUnit.Equals("tsp", StringComparison.OrdinalIgnoreCase) && quantityForTwo > 0m && quantityForTwo <= 2m) ||
+            (normalizedUnit.Equals("tbsp", StringComparison.OrdinalIgnoreCase) && quantityForTwo > 0m && quantityForTwo <= 1m))
+        {
+            return true;
+        }
+
         return IsMinorPantryAssumptionIngredient(ingredientName);
     }
 
@@ -211,10 +217,11 @@ public sealed partial class AislePilotService
         decimal quantityForTwo,
         decimal estimatedCostForTwo)
     {
-        var normalizedUnit = NormalizeAiUnitForPricing(unit);
-        if (normalizedUnit.Equals("g", StringComparison.OrdinalIgnoreCase) && quantityForTwo > 0m)
+        var (pricingUnit, pricingQuantityForTwo) = ResolveAiPricingMeasure(unit, quantityForTwo);
+        if ((pricingUnit.Equals("g", StringComparison.OrdinalIgnoreCase) || pricingUnit.Equals("ml", StringComparison.OrdinalIgnoreCase)) &&
+            pricingQuantityForTwo > 0m)
         {
-            var maxReasonableCost = Math.Max(0.01m, quantityForTwo * ResolveGenericAiIngredientMaxUnitPrice(normalizedUnit));
+            var maxReasonableCost = Math.Max(0.01m, pricingQuantityForTwo * ResolveGenericAiIngredientMaxUnitPrice(pricingUnit));
             var minReasonableCost = 0.01m;
             var seedCost = estimatedCostForTwo > 0m ? estimatedCostForTwo : minReasonableCost;
             return Math.Min(maxReasonableCost, Math.Max(minReasonableCost, seedCost));
@@ -275,7 +282,30 @@ public sealed partial class AislePilotService
 
     private static string NormalizeAiUnitForPricing(string? unit)
     {
-        return (unit ?? string.Empty).Trim().ToLowerInvariant();
+        var normalized = (unit ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "gram" or "grams" => "g",
+            "kilogram" or "kilograms" or "kgs" => "kg",
+            "milliliter" or "milliliters" or "millilitre" or "millilitres" => "ml",
+            "liter" or "liters" or "litre" or "litres" => "l",
+            "teaspoon" or "teaspoons" or "tsps" => "tsp",
+            "tablespoon" or "tablespoons" or "tbsps" => "tbsp",
+            "piece" or "pieces" or "pc" => "pcs",
+            "heads" => "head",
+            _ => normalized
+        };
+    }
+
+    private static (string PricingUnit, decimal PricingQuantityForTwo) ResolveAiPricingMeasure(string unit, decimal quantityForTwo)
+    {
+        var normalizedUnit = NormalizeAiUnitForPricing(unit);
+        return normalizedUnit switch
+        {
+            "tsp" => ("ml", quantityForTwo * 5m),
+            "tbsp" => ("ml", quantityForTwo * 15m),
+            _ => (normalizedUnit, quantityForTwo)
+        };
     }
 
     private static decimal ResolveGenericAiIngredientMaxUnitPrice(string normalizedUnit)
@@ -533,8 +563,8 @@ public sealed partial class AislePilotService
 
     private static bool IsAiIngredientQuantityReasonable(string unit, decimal quantity)
     {
-        var normalizedUnit = NormalizeAiUnitForPricing(unit);
-        var max = normalizedUnit switch
+        var (pricingUnit, normalizedQuantity) = ResolveAiPricingMeasure(unit, quantity);
+        var max = pricingUnit switch
         {
             "g" => 5000m,
             "ml" => 5000m,
@@ -556,7 +586,7 @@ public sealed partial class AislePilotService
             _ => 100m
         };
 
-        return quantity <= max;
+        return normalizedQuantity <= max;
     }
 
     private static bool IsAiIngredientPriceReasonable(
@@ -572,9 +602,9 @@ public sealed partial class AislePilotService
             return false;
         }
 
-        var normalizedUnit = NormalizeAiUnitForPricing(unit);
-        var unitPrice = estimatedCostForTwo / quantityForTwo;
-        var minUnitPrice = normalizedUnit switch
+        var (pricingUnit, normalizedQuantityForTwo) = ResolveAiPricingMeasure(unit, quantityForTwo);
+        var unitPrice = estimatedCostForTwo / normalizedQuantityForTwo;
+        var minUnitPrice = pricingUnit switch
         {
             "kg" => 0.65m,
             "g" => 0.00065m,
@@ -593,14 +623,14 @@ public sealed partial class AislePilotService
 
         if (unitPrice < minUnitPrice)
         {
-            validationReason = $"unit_price_too_low(unit={normalizedUnit},unit_price={unitPrice.ToString("0.####", CultureInfo.InvariantCulture)},min={minUnitPrice.ToString("0.####", CultureInfo.InvariantCulture)})";
+            validationReason = $"unit_price_too_low(unit={pricingUnit},unit_price={unitPrice.ToString("0.####", CultureInfo.InvariantCulture)},min={minUnitPrice.ToString("0.####", CultureInfo.InvariantCulture)})";
             return false;
         }
 
-        var maxUnitPrice = ResolveGenericAiIngredientMaxUnitPrice(normalizedUnit);
+        var maxUnitPrice = ResolveGenericAiIngredientMaxUnitPrice(pricingUnit);
         if (unitPrice > maxUnitPrice)
         {
-            validationReason = $"unit_price_too_high(unit={normalizedUnit},unit_price={unitPrice.ToString("0.####", CultureInfo.InvariantCulture)},max={maxUnitPrice.ToString("0.####", CultureInfo.InvariantCulture)})";
+            validationReason = $"unit_price_too_high(unit={pricingUnit},unit_price={unitPrice.ToString("0.####", CultureInfo.InvariantCulture)},max={maxUnitPrice.ToString("0.####", CultureInfo.InvariantCulture)})";
             return false;
         }
 

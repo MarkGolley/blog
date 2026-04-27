@@ -218,7 +218,7 @@ public sealed partial class AislePilotService
         {
             model = _imageModel,
             prompt = BuildAiMealImagePrompt(meal),
-            size = "auto",
+            size = "1024x1024",
             quality = "low",
             n = 1
         };

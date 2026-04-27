@@ -76,4 +76,48 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(expected, formatted);
     }
+
+    [Theory]
+    [InlineData(0.38, "g", "Black pepper", "1/4 tsp")]
+    [InlineData(0.75, "g", "Smoked paprika", "1/2 tsp")]
+    [InlineData(6.75, "g", "Olive oil", "1 1/2 tsp")]
+    public void QuantityDisplayFormatter_ShoppingListFormatting_NormalizesGramBasedSeasoningsToSpoonMeasures(
+        decimal quantity,
+        string unit,
+        string ingredientName,
+        string expected)
+    {
+        var formatted = QuantityDisplayFormatter.Format(quantity, unit, ingredientName);
+
+        Assert.Equal(expected, formatted);
+    }
+
+    [Theory]
+    [InlineData(0.38, "g", "Black pepper", "1/4 tsp")]
+    [InlineData(0.75, "g", "Smoked paprika", "1/2 tsp")]
+    [InlineData(6.75, "g", "Olive oil", "1 1/2 tsp")]
+    public void QuantityDisplayFormatter_RecipeFormatting_NormalizesGramBasedSeasoningsToSpoonMeasures(
+        decimal quantity,
+        string unit,
+        string ingredientName,
+        string expected)
+    {
+        var formatted = QuantityDisplayFormatter.FormatForRecipe(quantity, unit, ingredientName);
+
+        Assert.Equal(expected, formatted);
+    }
+
+    [Theory]
+    [InlineData(33.75, "g", "35 g")]
+    [InlineData(37.5, "grams", "40 g")]
+    [InlineData(41.01, "g", "45 g")]
+    public void QuantityDisplayFormatter_RecipeFormatting_RoundsGramWeightsUpToNearestFiveGrams(
+        decimal quantity,
+        string unit,
+        string expected)
+    {
+        var formatted = QuantityDisplayFormatter.FormatForRecipe(quantity, unit);
+
+        Assert.Equal(expected, formatted);
+    }
 }

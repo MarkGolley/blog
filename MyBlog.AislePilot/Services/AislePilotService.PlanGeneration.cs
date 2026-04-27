@@ -763,15 +763,54 @@ public sealed partial class AislePilotService
         int totalMealCount,
         IReadOnlyList<string>? excludedMealNames = null)
     {
-        EnsureAiMealPoolHydrated();
-        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var pooledPlan = TryBuildPlanFromPoolMeals(
+            request,
+            context,
+            totalMealCount,
+            mealTypeSlots,
+            GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens),
+            excludedMealNames);
+        if (pooledPlan is null)
+        {
+            EnsureAiMealPoolHydrated();
+            pooledPlan = TryBuildPlanFromPoolMeals(
+                request,
+                context,
+                totalMealCount,
+                mealTypeSlots,
+                GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens),
+                excludedMealNames);
+        }
+
+        if (pooledPlan is null)
+        {
+            return null;
+        }
+
+        return BuildPlanFromMeals(
+            request,
+            context,
+            pooledPlan,
+            cookDays,
+            usedAiGeneratedMeals: true,
+            planSourceLabel: "AI meal pool");
+    }
+
+    private IReadOnlyList<MealTemplate>? TryBuildPlanFromPoolMeals(
+        AislePilotRequestModel request,
+        PlanContext context,
+        int totalMealCount,
+        IReadOnlyList<string> mealTypeSlots,
+        IReadOnlyList<MealTemplate> pooledMeals,
+        IReadOnlyList<string>? excludedMealNames)
+    {
         if (pooledMeals.Count == 0)
         {
             _logger?.LogWarning("AislePilot AI meal pool did not contain compatible meals for the current request.");
             return null;
         }
 
-        var mealTypeSlots = BuildMealTypeSlots(request);
         if (!HasSlotCoverageForMealTypes(pooledMeals, mealTypeSlots))
         {
             _logger?.LogInformation(
@@ -866,13 +905,7 @@ public sealed partial class AislePilotService
             return null;
         }
 
-        return BuildPlanFromMeals(
-            request,
-            context,
-            selectedMeals,
-            cookDays,
-            usedAiGeneratedMeals: true,
-            planSourceLabel: "AI meal pool");
+        return selectedMeals;
     }
 
     internal async Task<AislePilotPlanResultViewModel?> TryBuildPlanFromAiPoolAsync(
@@ -883,113 +916,44 @@ public sealed partial class AislePilotService
         IReadOnlyList<string>? excludedMealNames = null,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAiMealPoolHydratedAsync(cancellationToken);
-        var pooledMeals = GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens);
-        if (pooledMeals.Count == 0)
-        {
-            _logger?.LogWarning("AislePilot AI meal pool did not contain compatible meals for the current request.");
-            return null;
-        }
-
         var mealTypeSlots = BuildMealTypeSlots(request);
-        if (!HasSlotCoverageForMealTypes(pooledMeals, mealTypeSlots))
+
+        var poolPlan = TryBuildPlanFromPoolMeals(
+            request,
+            context,
+            totalMealCount,
+            mealTypeSlots,
+            GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens),
+            excludedMealNames);
+        if (poolPlan is not null)
         {
-            _logger?.LogInformation(
-                "AislePilot AI meal pool lacked slot coverage for requested meal types {MealTypes}; requesting fresh AI meals.",
-                string.Join(",", mealTypeSlots));
-            return null;
+            return await BuildPlanFromMealsAsync(
+                request,
+                context,
+                poolPlan,
+                cookDays,
+                usedAiGeneratedMeals: true,
+                planSourceLabel: "AI meal pool",
+                cancellationToken: cancellationToken);
         }
 
-        IReadOnlyList<MealTemplate> selectedMeals;
-        try
+        await EnsureAiMealPoolHydratedAsync(cancellationToken);
+        poolPlan = TryBuildPlanFromPoolMeals(
+            request,
+            context,
+            totalMealCount,
+            mealTypeSlots,
+            GetCompatibleAiPoolMeals(context.DietaryModes, context.DislikesOrAllergens),
+            excludedMealNames);
+        if (poolPlan is null)
         {
-            selectedMeals = SelectMeals(
-                pooledMeals,
-                context.DietaryModes,
-                request.WeeklyBudget,
-                context.HouseholdFactor,
-                context.PriceProfile.RelativeCostFactor,
-                request.PreferQuickMeals,
-                context.DislikesOrAllergens,
-                totalMealCount,
-                mealTypeSlots,
-                request.IncludeSpecialTreatMeal,
-                request.SelectedSpecialTreatCookDayIndex,
-                savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
-                enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
-                excludedMealNames: excludedMealNames);
-        }
-        catch (InvalidOperationException ex) when (request.IncludeSpecialTreatMeal)
-        {
-            _logger?.LogInformation(
-                ex,
-                "AislePilot AI meal pool lacked a valid special treat dinner; serving core meals and queueing background special generation.");
-            try
-            {
-                var templateMeals = FilterMeals(context.DietaryModes, context.DislikesOrAllergens, MealTemplates);
-                var combinedCandidates = pooledMeals
-                    .Concat(templateMeals)
-                    .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group.OrderBy(meal => meal.BaseCostForTwo).First())
-                    .ToList();
-                selectedMeals = SelectMeals(
-                    combinedCandidates,
-                    context.DietaryModes,
-                    request.WeeklyBudget,
-                    context.HouseholdFactor,
-                    context.PriceProfile.RelativeCostFactor,
-                    request.PreferQuickMeals,
-                    context.DislikesOrAllergens,
-                    totalMealCount,
-                    mealTypeSlots,
-                    includeSpecialTreatMeal: true,
-                    selectedSpecialTreatCookDayIndex: request.SelectedSpecialTreatCookDayIndex,
-                    savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
-                    enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                    savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
-                    excludedMealNames: excludedMealNames);
-            }
-            catch (InvalidOperationException)
-            {
-                QueueSpecialTreatGeneration(request, context, pooledMeals.Select(meal => meal.Name).ToArray());
-                try
-                {
-                    selectedMeals = SelectMeals(
-                        pooledMeals,
-                        context.DietaryModes,
-                        request.WeeklyBudget,
-                        context.HouseholdFactor,
-                        context.PriceProfile.RelativeCostFactor,
-                        request.PreferQuickMeals,
-                        context.DislikesOrAllergens,
-                        totalMealCount,
-                        mealTypeSlots,
-                        includeSpecialTreatMeal: false,
-                        savedEnjoyedMealNames: ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState),
-                        enableSavedMealRepeats: request.EnableSavedMealRepeats,
-                        savedMealRepeatRatePercent: request.SavedMealRepeatRatePercent,
-                        excludedMealNames: excludedMealNames);
-                }
-                catch (InvalidOperationException)
-                {
-                    return null;
-                }
-            }
-        }
-
-        if (!HasUniqueMealNames(selectedMeals, totalMealCount, mealTypeSlots))
-        {
-            _logger?.LogInformation(
-                "AislePilot AI meal pool did not contain enough slot-compatible meals for {MealCount} requested meals; requesting fresh AI meals.",
-                totalMealCount);
             return null;
         }
 
         return await BuildPlanFromMealsAsync(
             request,
             context,
-            selectedMeals,
+            poolPlan,
             cookDays,
             usedAiGeneratedMeals: true,
             planSourceLabel: "AI meal pool",

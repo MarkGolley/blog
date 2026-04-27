@@ -24,23 +24,31 @@ public sealed class AislePilotSlotSelectionEngine
             .Select(name => name.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var candidates = AislePilotService.FilterMeals(dietaryModes, dislikesOrAllergens, mealSource)
+        var resolvedMealTypeSlots = AislePilotService.NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
+        var normalizedMealCount = AislePilotService.NormalizeRequestedMealCount(requestedMealCount);
+        var allCompatibleCandidates = AislePilotService.FilterMeals(dietaryModes, dislikesOrAllergens, mealSource)
             .Select(meal => AislePilotService.EnsureMealTypeSuitability(meal))
-            .Where(meal => !normalizedExcludedMealNames.Contains(meal.Name))
             .ToList();
-        if (candidates.Count == 0)
+        if (allCompatibleCandidates.Count == 0)
         {
-            if (normalizedExcludedMealNames.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    "Could not find a fully refreshed week with the current settings. Try loosening filters or swapping individual meals.");
-            }
-
             throw new InvalidOperationException(
                 "No meals match the selected dietary modes and dislikes/allergens.");
         }
 
-        var resolvedMealTypeSlots = AislePilotService.NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1);
+        var effectiveExcludedMealNames = RelaxExcludedMealNamesForRequiredSlotCoverage(
+            allCompatibleCandidates,
+            normalizedExcludedMealNames,
+            resolvedMealTypeSlots,
+            normalizedMealCount);
+        var candidates = allCompatibleCandidates
+            .Where(meal => !effectiveExcludedMealNames.Contains(meal.Name))
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Could not find a fully refreshed week with the current settings. Try loosening filters or swapping individual meals.");
+        }
+
         var safeMealsPerDay = resolvedMealTypeSlots.Count;
         var targetMealCost = weeklyBudget / (7m * safeMealsPerDay);
         var preferHighProtein = AislePilotService.IsHighProteinPreferred(dietaryModes);
@@ -63,7 +71,6 @@ public sealed class AislePilotSlotSelectionEngine
             .Select(item => item.template)
             .ToList();
 
-        var normalizedMealCount = AislePilotService.NormalizeRequestedMealCount(requestedMealCount);
         var selected = new List<AislePilotService.MealTemplate>(normalizedMealCount);
         var daySeed = DateOnly.FromDateTime(DateTime.UtcNow).DayNumber;
         var budgetSeed = (long)decimal.Truncate(Math.Abs(weeklyBudget) * 100m);
@@ -127,6 +134,85 @@ public sealed class AislePilotSlotSelectionEngine
         }
 
         return selected;
+    }
+
+    private static HashSet<string> RelaxExcludedMealNamesForRequiredSlotCoverage(
+        IReadOnlyList<AislePilotService.MealTemplate> compatibleCandidates,
+        IReadOnlySet<string> excludedMealNames,
+        IReadOnlyList<string> resolvedMealTypeSlots,
+        int requestedMealCount)
+    {
+        var effectiveExcludedMealNames = new HashSet<string>(excludedMealNames, StringComparer.OrdinalIgnoreCase);
+        if (effectiveExcludedMealNames.Count == 0 ||
+            compatibleCandidates.Count == 0 ||
+            resolvedMealTypeSlots.Count == 0 ||
+            requestedMealCount <= 0)
+        {
+            return effectiveExcludedMealNames;
+        }
+
+        foreach (var slotMealType in resolvedMealTypeSlots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var compatibleMealNamesForSlot = compatibleCandidates
+                .Where(meal => AislePilotService.SupportsMealType(meal, slotMealType))
+                .Select(meal => meal.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (compatibleMealNamesForSlot.Count == 0)
+            {
+                continue;
+            }
+
+            var slotCount = CountSlotsForMealType(resolvedMealTypeSlots, slotMealType, requestedMealCount);
+            var maxRepeatsForSlot = Math.Max(
+                1,
+                AislePilotService.ResolveMaxMealRepeatsForSlotType(slotMealType, slotCount));
+            var preferredUniqueMealCount = Math.Max(
+                1,
+                (int)Math.Ceiling(slotCount / (decimal)maxRepeatsForSlot));
+            var currentlyAvailableCount = compatibleMealNamesForSlot.Count(name =>
+                !effectiveExcludedMealNames.Contains(name));
+            if (currentlyAvailableCount >= preferredUniqueMealCount)
+            {
+                continue;
+            }
+
+            foreach (var mealName in compatibleMealNamesForSlot.Where(effectiveExcludedMealNames.Contains))
+            {
+                effectiveExcludedMealNames.Remove(mealName);
+                currentlyAvailableCount++;
+                if (currentlyAvailableCount >= preferredUniqueMealCount)
+                {
+                    break;
+                }
+            }
+        }
+
+        return effectiveExcludedMealNames;
+    }
+
+    private static int CountSlotsForMealType(
+        IReadOnlyList<string> resolvedMealTypeSlots,
+        string mealType,
+        int requestedMealCount)
+    {
+        if (resolvedMealTypeSlots.Count == 0 || requestedMealCount <= 0)
+        {
+            return 0;
+        }
+
+        var slotCount = 0;
+        for (var slotIndex = 0; slotIndex < requestedMealCount; slotIndex++)
+        {
+            if (resolvedMealTypeSlots[slotIndex % resolvedMealTypeSlots.Count].Equals(
+                    mealType,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                slotCount++;
+            }
+        }
+
+        return slotCount;
     }
 
     private static bool ShouldPreferSavedMealForSlot(
