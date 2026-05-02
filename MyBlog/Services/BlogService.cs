@@ -10,9 +10,9 @@ public class BlogService
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
     private static readonly string[] FeaturedPostIds =
     [
-        "the_16_hour_ai_moderation_build",
-        "Using_xUnit_For_Testing",
-        "Migrating_To_GCP"
+        "orleans_the_mystery_revealed",
+        "Balancing_Quality_And_Value_Delivery",
+        "early_thoughts_on_agentic_systems"
     ];
 
     private static readonly (string Keyword, string Tag)[] TagKeywords =
