@@ -198,6 +198,11 @@ public partial class AislePilotIntegrationTests
             css);
         Assert.Matches(
             new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-meal-image\s*\{[\s\S]*transform:\s*none;[\s\S]*object-position:\s*center\s*42%;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
                 @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-meal-section\s*>\s*summary\s*\{[\s\S]*font-size:\s*0\.82rem;[\s\S]*line-height:\s*1\.34;",
                 RegexOptions.IgnoreCase),
             css);
@@ -249,6 +254,11 @@ public partial class AislePilotIntegrationTests
             ":root[data-theme=\"dark\"] .aislepilot-day-carousel:not([data-day-stacked-mode=\"true\"]):not([data-day-reorder-mode=\"true\"]) .aislepilot-meal-section",
             css,
             StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-meal-image-shell\s*\{[\s\S]*max-height:\s*clamp\(10\.2rem,\s*20vw,\s*12\.4rem\);[\s\S]*aspect-ratio:\s*4\s*/\s*3;",
+                RegexOptions.IgnoreCase),
+            css);
     }
 
     [Fact]
