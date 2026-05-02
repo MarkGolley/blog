@@ -942,6 +942,241 @@
     color: var(--ap-refresh-text);
 }
 
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-tabs {
+    display: none;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panels {
+    display: block;
+    margin-top: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel {
+    display: block;
+    margin: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section {
+    border-color: rgba(15, 23, 42, 0.12);
+    border-radius: 10px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(249, 252, 255, 0.94));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section + .aislepilot-meal-section {
+    margin-top: 0.3rem;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section > summary {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.46rem;
+    padding: 0.6rem 2.05rem 0.62rem 0.76rem;
+    color: var(--ap-refresh-text);
+    font-size: 0.82rem;
+    line-height: 1.34;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section > summary::before {
+    content: "";
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: rgba(21, 128, 61, 0.5);
+    box-shadow: 0 0 0 1px rgba(21, 128, 61, 0.2);
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section[data-meal-section="nutrition"] > summary::before {
+    background: rgba(37, 99, 146, 0.54);
+    box-shadow: 0 0 0 1px rgba(37, 99, 146, 0.24);
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section[data-meal-section="ingredients"] > summary::before {
+    background: rgba(21, 128, 61, 0.5);
+    box-shadow: 0 0 0 1px rgba(21, 128, 61, 0.2);
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section[data-meal-section="method"] > summary::before {
+    background: rgba(126, 34, 206, 0.44);
+    box-shadow: 0 0 0 1px rgba(126, 34, 206, 0.2);
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section > summary::after {
+    right: 0.82rem;
+    width: 0.44rem;
+    height: 0.44rem;
+    border-right-width: 1.7px;
+    border-bottom-width: 1.7px;
+    border-right-color: rgba(15, 23, 42, 0.62);
+    border-bottom-color: rgba(15, 23, 42, 0.62);
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section-content {
+    padding: 0.16rem 0.86rem 0.78rem;
+    border-top-color: rgba(15, 23, 42, 0.1);
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-card-reason {
+    color: var(--ap-refresh-text-muted);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.48;
+    letter-spacing: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] > .aislepilot-card-reason {
+    color: var(--ap-refresh-text-muted);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.48;
+    letter-spacing: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list),
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li {
+    color: var(--ap-refresh-text);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.48;
+    letter-spacing: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list),
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li {
+    color: var(--ap-refresh-text);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.48;
+    letter-spacing: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content {
+    color: var(--ap-refresh-text);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.48;
+    letter-spacing: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content {
+    color: var(--ap-refresh-text);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.48;
+    letter-spacing: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(ul, ol, li, span, p) {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    letter-spacing: inherit;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(ul, ol, li, span, p) {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    letter-spacing: inherit;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) {
+    margin: 0.2rem 0 0;
+    padding-left: 1.08rem;
+    display: grid;
+    gap: 0.32rem;
+    list-style-position: outside;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) {
+    margin: 0.2rem 0 0;
+    padding-left: 1.08rem;
+    display: grid;
+    gap: 0.32rem;
+    list-style-position: outside;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li {
+    margin: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li {
+    margin: 0;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li::marker {
+    color: rgba(148, 163, 184, 0.95);
+    font-weight: 600;
+}
+
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li::marker {
+    color: rgba(148, 163, 184, 0.95);
+    font-weight: 600;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-tab {
+    border-color: var(--ap-refresh-border);
+    background: rgba(255, 255, 255, 0.84);
+    color: var(--ap-refresh-text-muted);
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-tab.is-active {
+    border-color: rgba(22, 163, 74, 0.24);
+    background: rgba(240, 253, 244, 0.94);
+    color: var(--ap-refresh-text);
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) {
+    margin-top: 0.08rem;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-panel > .aislepilot-meal-details-panel {
+    margin-top: 0.88rem;
+    padding: 0.48rem 0.56rem;
+    gap: 0.34rem;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-card-reason {
+    margin: 0;
+    line-height: 1.35;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel :is(.aislepilot-card-reason, .aislepilot-meal-section-content, .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list), .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li) {
+    color: var(--ap-refresh-text-muted);
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1.42;
+    letter-spacing: 0;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) {
+    margin: 0;
+    padding-left: 1rem;
+    display: block;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li {
+    margin: 0 0 0.18rem;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li:last-child {
+    margin-bottom: 0;
+}
+
+.aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li::marker {
+    color: rgba(83, 101, 121, 0.9);
+    font-weight: 600;
+}
+
 .aislepilot-export-intro {
     border-color: rgba(21, 128, 61, 0.16);
     background:
@@ -1069,6 +1304,93 @@
 
 :root[data-theme="dark"] .aislepilot-day-meal-panel > .aislepilot-meal-details-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) {
     color: var(--ap-refresh-text);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section {
+    border-color: rgba(148, 163, 184, 0.2);
+    background: linear-gradient(180deg, rgba(12, 20, 33, 0.72), rgba(12, 20, 33, 0.82));
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section > summary {
+    color: #f8fbff;
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section[data-meal-section="nutrition"] > summary::before {
+    background: rgba(56, 189, 248, 0.68);
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section[data-meal-section="ingredients"] > summary::before {
+    background: rgba(74, 222, 128, 0.64);
+    box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.28);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section[data-meal-section="method"] > summary::before {
+    background: rgba(167, 139, 250, 0.62);
+    box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.28);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section > summary::after {
+    border-right-color: rgba(203, 213, 225, 0.76);
+    border-bottom-color: rgba(203, 213, 225, 0.76);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section-content {
+    border-top-color: rgba(148, 163, 184, 0.16);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-card-reason {
+    color: var(--ap-refresh-text-muted);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] > .aislepilot-card-reason {
+    color: var(--ap-refresh-text-muted);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list),
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li {
+    color: var(--ap-refresh-text);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list),
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li {
+    color: var(--ap-refresh-text);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content {
+    color: var(--ap-refresh-text);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content {
+    color: var(--ap-refresh-text);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li::marker {
+    color: rgba(203, 213, 225, 0.9);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li::marker {
+    color: rgba(203, 213, 225, 0.9);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-tab {
+    border-color: rgba(148, 163, 184, 0.2);
+    background: rgba(12, 20, 33, 0.84);
+    color: var(--ap-refresh-text-muted);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-tab.is-active {
+    border-color: rgba(45, 212, 191, 0.34);
+    background: rgba(20, 41, 61, 0.92);
+    color: var(--ap-refresh-text);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-tabs {
+    border-bottom-color: rgba(148, 163, 184, 0.2);
+}
+
+:root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li::marker {
+    color: rgba(203, 213, 225, 0.88);
 }
 
 :root[data-theme="dark"] .aislepilot-window-meta {
@@ -1455,6 +1777,317 @@
 }
 
 @media (min-width: 981px) {
+    .aislepilot-day-carousel-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.7rem;
+    }
+
+    .aislepilot-day-carousel-header-actions {
+        gap: 0.44rem;
+    }
+
+    .aislepilot-day-reorder-toggle,
+    .aislepilot-day-view-toggle {
+        min-height: 2.2rem;
+        padding: 0.3rem 0.78rem;
+        gap: 0.3rem;
+        font-size: 0.74rem;
+        letter-spacing: 0.02em;
+    }
+
+    .aislepilot-day-reorder-toggle .aislepilot-symbol-glyph,
+    .aislepilot-day-view-toggle .aislepilot-symbol-glyph {
+        width: 0.92rem;
+        height: 0.92rem;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tabs {
+        grid-area: tabs;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.36rem;
+        padding: 0.24rem;
+        margin-top: 0;
+        border: 1px solid rgba(15, 23, 42, 0.1);
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.04);
+        width: 100%;
+        max-width: calc(100% - clamp(11rem, 23vw, 14rem));
+        justify-self: start;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-slider {
+        grid-area: preview;
+        margin-top: 0.12rem;
+        overflow: visible;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-card-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "head"
+            "tabs"
+            "preview";
+        align-items: start;
+        gap: 0.28rem;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-card-head {
+        grid-area: head;
+        margin-bottom: 0.16rem;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "eyebrow caret"
+            "title caret"
+            "meta caret";
+        align-items: start;
+        gap: 0.06rem 0.42rem;
+        padding: 0.4rem 0.52rem !important;
+        min-height: 3.18rem !important;
+        border: 1px solid rgba(15, 23, 42, 0.14) !important;
+        border-radius: 10px !important;
+        background: rgba(248, 250, 252, 0.9) !important;
+        color: rgba(15, 23, 42, 0.86) !important;
+        text-align: left;
+        white-space: normal;
+        text-overflow: clip;
+        overflow: visible;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-pill-label {
+        display: none;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-eyebrow {
+        display: block;
+        grid-area: eyebrow;
+        font-size: 0.58rem;
+        line-height: 1.15;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-title {
+        display: -webkit-box;
+        grid-area: title;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin-top: 0.02rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: 0;
+        text-transform: none;
+        color: rgba(15, 23, 42, 0.96);
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-meta {
+        display: block;
+        grid-area: meta;
+        margin-top: 0.06rem;
+        font-size: 0.62rem;
+        line-height: 1.2;
+        letter-spacing: 0;
+        text-transform: none;
+        color: rgba(15, 23, 42, 0.72);
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-caret {
+        display: none;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-track > .aislepilot-day-meal-panel {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) clamp(10.5rem, 22vw, 13rem);
+        grid-template-areas: "details image";
+        column-gap: 0.86rem;
+        row-gap: 0;
+        align-items: start;
+        align-content: start;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+        overflow: visible;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-track {
+        display: block;
+        width: 100%;
+        transform: none !important;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-panel[aria-hidden="true"] {
+        display: none;
+        height: 0;
+        min-height: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-panel > h3,
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-summary,
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-summary-separator {
+        display: none;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-meal-details-image-toggle {
+        grid-area: image;
+        display: block;
+        margin: 0;
+        align-self: start;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-meal-image-summary {
+        display: block;
+        margin: 0;
+        height: 100%;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary {
+        pointer-events: none;
+        cursor: default;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-meal-image-shell {
+        min-height: 9.8rem;
+        max-height: 11.6rem;
+        border-radius: 12px;
+        aspect-ratio: 4 / 3;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-panel > .aislepilot-meal-details-panel {
+        grid-area: details;
+        margin-top: 0;
+        min-height: 0;
+        align-self: start;
+        display: block;
+        padding: 0.62rem 0.66rem;
+        gap: 0.46rem;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-tabs {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.24rem;
+        margin: 0;
+        padding: 0 0 0.4rem;
+        border-right: none;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-tab {
+        min-height: 1.7rem;
+        width: auto;
+        padding: 0.24rem 0.54rem;
+        border-radius: 999px;
+        font-size: 0.62rem;
+        text-align: center;
+        justify-content: center;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panels {
+        display: block;
+        min-width: 0;
+        min-height: 0;
+        margin-top: 0.42rem;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel {
+        display: none;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel.is-active {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        justify-content: flex-start;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tabs {
+        gap: 0.3rem;
+        padding: 0.18rem;
+        border-radius: 11px;
+        background:
+            linear-gradient(180deg, rgba(15, 23, 42, 0.045), rgba(15, 23, 42, 0.03));
+        max-width: calc(100% - clamp(10.2rem, 21vw, 12.5rem));
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab {
+        min-height: 2.9rem !important;
+        padding: 0.34rem 0.48rem !important;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-title {
+        font-size: 0.75rem;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-meta {
+        margin-top: 0.04rem;
+        font-size: 0.6rem;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-panel > .aislepilot-meal-details-panel {
+        padding: 0.56rem 0.6rem;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.015);
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-track > .aislepilot-day-meal-panel:has(> .aislepilot-meal-details-panel[hidden]) {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "image";
+        justify-items: end;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-track > .aislepilot-day-meal-panel:has(> .aislepilot-meal-details-panel[hidden]) .aislepilot-meal-details-image-toggle {
+        width: clamp(9.25rem, 20vw, 12rem);
+        justify-self: end;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-track > .aislepilot-day-meal-panel:has(> .aislepilot-meal-details-panel[hidden]) .aislepilot-meal-image-shell {
+        min-height: 7.35rem;
+        max-height: 8.45rem;
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab {
+        border-color: rgba(148, 163, 184, 0.36) !important;
+        background: rgba(241, 245, 249, 0.86) !important;
+        color: rgba(15, 23, 42, 0.9) !important;
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab.is-active {
+        border-color: rgba(14, 116, 144, 0.42) !important;
+        background: linear-gradient(135deg, rgba(224, 242, 254, 0.98), rgba(240, 249, 255, 0.94)) !important;
+        color: rgba(15, 23, 42, 0.96) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.78),
+            0 8px 14px rgba(2, 6, 23, 0.14) !important;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel .aislepilot-card-reason {
+        -webkit-line-clamp: 4;
+        line-height: 1.45;
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-inspector-panel :is(.aislepilot-card-reason, .aislepilot-meal-section-content, .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list), .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li) {
+        font-size: 0.78rem;
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-panel > .aislepilot-meal-details-panel {
+        border-color: rgba(148, 163, 184, 0.22);
+        background: rgba(12, 20, 33, 0.42);
+    }
+
     [data-aislepilot-window] .aislepilot-window-viewport {
         transition: none;
         overflow-anchor: none;

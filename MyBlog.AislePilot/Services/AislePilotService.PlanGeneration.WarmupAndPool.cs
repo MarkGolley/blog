@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
@@ -440,6 +441,7 @@ Return JSON only with this schema:
         IReadOnlyList<MealTemplate> meals,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         if (meals.Count == 0)
         {
             return [];
@@ -476,7 +478,101 @@ Return JSON only with this schema:
                 meals.Count);
         }
 
+        if (persistedMeals.Count > 0 || stopwatch.ElapsedMilliseconds >= 150)
+        {
+            _logger?.LogInformation(
+                "AislePilot AI meal persistence completed in {ElapsedMs}ms. PersistedCount={PersistedCount}, TotalCount={TotalCount}",
+                stopwatch.ElapsedMilliseconds,
+                persistedMeals.Count,
+                meals.Count);
+        }
+
         return persistedMeals;
+    }
+
+    private void AddAiMealsToPoolAndQueuePersistence(
+        IReadOnlyList<MealTemplate> meals,
+        string sourceLabel)
+    {
+        if (meals.Count == 0)
+        {
+            return;
+        }
+
+        AddMealsToAiPool(meals);
+        QueueAiMealPersistence(meals, sourceLabel);
+    }
+
+    private void QueueAiMealPersistence(
+        IReadOnlyList<MealTemplate> meals,
+        string sourceLabel)
+    {
+        if (_db is null || meals.Count == 0)
+        {
+            if (_db is null && meals.Count > 0)
+            {
+                _logger?.LogInformation(
+                    "AislePilot keeping {MealCount} AI meals in memory only because Firestore is unavailable. Source={Source}",
+                    meals.Count,
+                    sourceLabel);
+            }
+
+            return;
+        }
+
+        var queuedMeals = new List<MealTemplate>(meals.Count);
+        var queuedKeys = new List<string>(meals.Count);
+        foreach (var meal in meals
+                     .Where(meal => !string.IsNullOrWhiteSpace(meal.Name))
+                     .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+                     .Select(group => group.First()))
+        {
+            var docId = ToAiMealDocumentId(meal.Name);
+            if (!AiMealPersistenceInFlight.TryAdd(docId, 1))
+            {
+                continue;
+            }
+
+            queuedMeals.Add(meal);
+            queuedKeys.Add(docId);
+        }
+
+        if (queuedMeals.Count == 0)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var backgroundPersistenceCts = new CancellationTokenSource(AiMealPersistenceBackgroundBudget);
+                var persistedMeals = await PersistAiMealsAsync(queuedMeals, backgroundPersistenceCts.Token);
+                if (persistedMeals.Count < queuedMeals.Count)
+                {
+                    _logger?.LogWarning(
+                        "AislePilot background AI meal persistence completed partially. PersistedCount={PersistedCount}, TotalCount={TotalCount}, Source={Source}",
+                        persistedMeals.Count,
+                        queuedMeals.Count,
+                        sourceLabel);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(
+                    ex,
+                    "AislePilot background AI meal persistence failed. MealCount={MealCount}, Source={Source}",
+                    queuedMeals.Count,
+                    sourceLabel);
+            }
+            finally
+            {
+                foreach (var docId in queuedKeys)
+                {
+                    AiMealPersistenceInFlight.TryRemove(docId, out _);
+                }
+            }
+        });
     }
 
     private static string BuildAiMealSwapPrompt(

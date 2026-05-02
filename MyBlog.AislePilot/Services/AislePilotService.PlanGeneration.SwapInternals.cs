@@ -162,17 +162,7 @@ public sealed partial class AislePilotService
                 continue;
             }
 
-            var persistedMeals = await PersistAiMealsAsync([replacement], cancellationToken);
-            if (persistedMeals.Count > 0)
-            {
-                AddMealsToAiPool(persistedMeals);
-            }
-            else
-            {
-                _logger?.LogWarning(
-                    "AislePilot generated swap meal '{MealName}' but it was not persisted; skipping shared AI meal pool update.",
-                    replacement.Name);
-            }
+            AddAiMealsToPoolAndQueuePersistence([replacement], "swap generation");
 
             return replacement;
         }

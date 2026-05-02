@@ -4,7 +4,6 @@
 @using MyBlog.Models
 @using MyBlog.Services
 @model AislePilotPageViewModel
-
 @if (Model.HasResult && Model.Result is not null)
 {
     var result = Model.Result;
@@ -49,7 +48,6 @@
             {
                 return Enumerable.Empty<int>();
             }
-
             return Enumerable.Repeat(weekDayIndex, dayGroup.LeftoverDaysCovered);
         })
         .ToList();
@@ -63,7 +61,6 @@
         {
             return [];
         }
-
         try
         {
             var parsed = JsonSerializer.Deserialize<List<string>>(savedMealNamesState);
@@ -92,7 +89,6 @@
         {
             return [];
         }
-
         return ignoredMealSlotIndexesCsv
             .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(token => int.TryParse(token, out var index) ? index : -1)
@@ -179,7 +175,6 @@
             IncludeLeftoverCsvDataAttribute = includeLeftoverCsvDataAttribute
         };
     }
-
     void RenderMealImageHint(
         string screenReaderLabel,
         bool includeMacros = true,
@@ -247,7 +242,6 @@
         </span>
         <span class="sr-only">@screenReaderLabel</span>
     }
-
     <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-reveal>
         <div class="aislepilot-section-head aislepilot-overview-head">
             <div class="aislepilot-overview-title-row">
@@ -444,7 +438,6 @@
             <partial name="_AislePilotOverviewSupermarketInsights" model="supermarketInsights" />
         </div>
     </section>
-
     <section class="aislepilot-shell aislepilot-window-shell" aria-labelledby="aislepilot-window-title" data-aislepilot-window data-reveal>
         <div class="aislepilot-mobile-context" aria-label="Plan summary and quick navigation">
             <div class="aislepilot-mobile-context-summary">
@@ -622,7 +615,8 @@
                     <section class="aislepilot-day-carousel"
                              data-day-card-carousel
                              aria-label="Meal plan day cards"
-                             data-day-card-count="@dayMealGroups.Count">
+                             data-day-card-count="@dayMealGroups.Count" data-day-stacked-status="Stacked view: all days visible."
+                             data-day-reorder-status="Reorder mode: drag a day card onto another day to swap meals.">
                         <div class="aislepilot-day-carousel-header">
                             <div class="aislepilot-day-carousel-status"
                                  aria-live="polite"
@@ -630,6 +624,12 @@
                                  data-day-carousel-status>
                                 Day 1 of @dayMealGroups.Count
                             </div>
+                            @if (canReorderDayCards)
+                            {
+                                <div class="aislepilot-day-carousel-header-actions">
+                                    <partial name="_AislePilotDayReorderToggle" />
+                                </div>
+                            }
                             @if (dayMealGroups.Count > 1)
                             {
                                 <div class="aislepilot-day-carousel-controls">
@@ -717,6 +717,10 @@
                                         }
                                     </div>
                                     <div class="aislepilot-day-card-head-side">
+                                        @if (canReorderDayCards)
+                                        {
+                                            <partial name="_AislePilotDayReorderHandle" model="dayGroup.Day" />
+                                        }
                                         @if (result.PlanDays > 1)
                                         {
                                             var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0
@@ -739,7 +743,6 @@
                                         }
                                     </div>
                                 </div>
-
                                 @if (dayGroup.Entries.Count > 1)
                                 {
                                     <div class="aislepilot-day-meal-tabs" role="tablist" aria-label="Meal slots for @dayGroup.Day">
@@ -748,9 +751,8 @@
                                             var slotEntry = dayGroup.Entries[slotIndex];
                                             var slotMeal = slotEntry.meal;
                                             var slotIsIgnored = ignoredMealSlotIndexes.Contains(slotEntry.index) || slotMeal.IsIgnored;
-                                            var slotSummaryMeta = slotIsIgnored
-                                                ? "Removed"
-                                                : $"{slotMeal.EstimatedCost.ToString("C", ukCulture)} \u00A0\u00A0\u00B7\u00A0\u00A0 {Math.Max(0, slotMeal.EstimatedPrepMinutes)} mins";
+                                            var slotSummaryMeta = slotIsIgnored ? "Removed" : $"{slotMeal.EstimatedCost.ToString("C", ukCulture)} \u00A0\u00A0\u00B7\u00A0\u00A0 {Math.Max(0, slotMeal.EstimatedPrepMinutes)} mins";
+                                            var slotTabMeta = slotIsIgnored ? "Removed from this plan" : $"{slotMeal.EstimatedCost.ToString("C", ukCulture)} · {Math.Max(0, slotMeal.EstimatedPrepMinutes)} mins";
                                             var slotTabId = $"{tabPrefix}-tab-{slotIndex}";
                                             <button type="button"
                                                     id="@slotTabId"
@@ -763,13 +765,12 @@
                                                     role="tab"
                                                     aria-controls="@($"{tabPrefix}-panel-{slotIndex}")"
                                                     aria-selected="@(slotIndex == 0 ? "true" : "false")"
-                                                    aria-label="@(slotIsIgnored ? $"{slotMeal.MealType} (removed)" : slotMeal.MealType)">
-                                                @slotMeal.MealType
+                                                    aria-label="@(slotIsIgnored ? $"{slotMeal.MealType}: {slotMeal.MealName} (removed)" : $"{slotMeal.MealType}: {slotMeal.MealName}")">
+                                                <span class="aislepilot-day-meal-tab-pill-label">@slotMeal.MealType</span><span class="aislepilot-day-meal-tab-eyebrow">@slotMeal.MealType</span><span class="aislepilot-day-meal-tab-title">@slotMeal.MealName</span><span class="aislepilot-day-meal-tab-meta">@slotTabMeta</span><span class="aislepilot-day-meal-tab-caret" aria-hidden="true">&#9662;</span>
                                             </button>
                                         }
                                     </div>
                                 }
-
                                 <div class="aislepilot-day-meal-slider" data-day-meal-slider>
                                     <div class="aislepilot-day-meal-track" data-day-meal-track>
                                         @for (var slotIndex = 0; slotIndex < dayGroup.Entries.Count; slotIndex++)

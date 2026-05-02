@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
@@ -158,12 +159,21 @@ public sealed partial class AislePilotService
         _ = Task.Run(async () =>
         {
             var throttleAcquired = false;
+            var totalStopwatch = Stopwatch.StartNew();
+            var queueWaitStopwatch = Stopwatch.StartNew();
             try
             {
                 await MealImageGenerationThrottle.WaitAsync(CancellationToken.None);
                 throttleAcquired = true;
+                var queueWaitElapsedMs = queueWaitStopwatch.ElapsedMilliseconds;
+                var concurrencyCapacity = MealImageGenerationMaxConcurrency;
                 if (TryGetCachedMealImageUrl(meal.Name, out _))
                 {
+                    _logger?.LogInformation(
+                        "AislePilot meal image generation skipped because image was already available. MealName={MealName}, QueueWaitMs={QueueWaitMs}, MaxConcurrency={MaxConcurrency}",
+                        meal.Name,
+                        queueWaitElapsedMs,
+                        concurrencyCapacity);
                     return;
                 }
 
@@ -188,6 +198,12 @@ public sealed partial class AislePilotService
                 }
 
                 await PersistMealImageAsync(meal.Name, imageUrl, imageBytes, CancellationToken.None);
+                _logger?.LogInformation(
+                    "AislePilot meal image generation completed in {ElapsedMs}ms. MealName={MealName}, QueueWaitMs={QueueWaitMs}, MaxConcurrency={MaxConcurrency}",
+                    totalStopwatch.ElapsedMilliseconds,
+                    meal.Name,
+                    queueWaitElapsedMs,
+                    concurrencyCapacity);
             }
             catch (Exception ex)
             {

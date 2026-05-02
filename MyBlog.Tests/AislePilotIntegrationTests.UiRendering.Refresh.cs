@@ -170,6 +170,88 @@ public partial class AislePilotIntegrationTests
     }
 
     [Fact]
+    public async Task AislePilotRefreshStylesheet_UsesSingleCarouselPathForMealDetailsAndPolishedSectionHeaders()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await client.GetStringAsync("/css/aisle-pilot-refresh.css");
+
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-inspector-tabs\s*\{[\s\S]*display:\s*none;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-inspector-panels\s*\{[\s\S]*display:\s*block;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-inspector-panel\s*\{[\s\S]*display:\s*block;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-meal-section\s*>\s*summary\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*auto\s*minmax\(0,\s*1fr\);",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-meal-section\s*>\s*summary\s*\{[\s\S]*font-size:\s*0\.82rem;[\s\S]*line-height:\s*1\.34;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-inspector-panel\s+\.aislepilot-card-reason\s*\{[\s\S]*font-size:\s*0\.82rem;[\s\S]*line-height:\s*1\.48;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-inspector-panel\s+\.aislepilot-meal-section-content\s*:is\(\.aislepilot-nutrition-list,\s*\.case-list\),[\s\S]*font-size:\s*0\.82rem;[\s\S]*line-height:\s*1\.48;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-inspector-panel\s+\.aislepilot-meal-section-content\s*\{[\s\S]*font-size:\s*0\.82rem;[\s\S]*line-height:\s*1\.48;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Contains(
+            ".aislepilot-day-carousel:not([data-day-stacked-mode=\"true\"]):not([data-day-reorder-mode=\"true\"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(ul, ol, li, span, p)",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-day-carousel:not([data-day-stacked-mode=\"true\"]):not([data-day-reorder-mode=\"true\"]) [data-inline-details-panel] .aislepilot-meal-section-content :is(ul, ol, li, span, p)",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-day-carousel:not\(\[data-day-stacked-mode=""true""\]\):not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-inspector-panel\s+\.aislepilot-meal-section-content\s+:is\(\.aislepilot-nutrition-list,\s*\.case-list\)\s*\{[\s\S]*display:\s*grid;[\s\S]*list-style-position:\s*outside;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Contains(
+            ".aislepilot-day-carousel:not([data-day-stacked-mode=\"true\"]):not([data-day-reorder-mode=\"true\"]) .aislepilot-inspector-panel .aislepilot-meal-section-content :is(.aislepilot-nutrition-list, .case-list) li::marker",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-day-carousel:not([data-day-stacked-mode=\"true\"]):not([data-day-reorder-mode=\"true\"]) .aislepilot-meal-section[data-meal-section=\"nutrition\"] > summary::before",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-day-carousel:not([data-day-stacked-mode=\"true\"]):not([data-day-reorder-mode=\"true\"]) .aislepilot-meal-section[data-meal-section=\"ingredients\"] > summary::before",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-day-carousel:not([data-day-stacked-mode=\"true\"]):not([data-day-reorder-mode=\"true\"]) .aislepilot-meal-section[data-meal-section=\"method\"] > summary::before",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ":root[data-theme=\"dark\"] .aislepilot-day-carousel:not([data-day-stacked-mode=\"true\"]):not([data-day-reorder-mode=\"true\"]) .aislepilot-meal-section",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AislePilotRefreshStylesheet_DefinesSubBrandTypographyWithoutImportingFontsInline()
     {
         using var client = CreateClient(allowAutoRedirect: true);

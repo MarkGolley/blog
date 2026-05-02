@@ -477,19 +477,15 @@ public sealed partial class AislePilotService
             selectedMeals.Count,
             aiBatch.OpenAiRequestId ?? "n/a");
 
-        var persistedMeals = await PersistAiMealsAsync(aiMeals, generationToken);
-        if (persistedMeals.Count > 0)
-        {
-            AddMealsToAiPool(persistedMeals);
-        }
-        else
-        {
-            _logger?.LogWarning(
-                "AislePilot generated {MealCount} meals but none were persisted; skipping shared AI meal pool update.",
-                aiMeals.Count);
-        }
+        AddAiMealsToPoolAndQueuePersistence(aiMeals, "plan generation");
 
-        return BuildPlanFromMeals(request, context, selectedMeals, cookDays, usedAiGeneratedMeals: true);
+        return await BuildPlanFromMealsAsync(
+            request,
+            context,
+            selectedMeals,
+            cookDays,
+            usedAiGeneratedMeals: true,
+            cancellationToken: cancellationToken);
     }
 
     private async Task<AislePilotPlanResultViewModel?> TryBuildPlanWithDedicatedSpecialTreatAsync(
@@ -630,15 +626,7 @@ public sealed partial class AislePilotService
                 cancellationToken: cancellationToken);
         }
 
-        var persistedTreatMeals = await PersistAiMealsAsync([dedicatedSpecialTreatMeal], generationToken);
-        if (persistedTreatMeals.Count > 0)
-        {
-            AddMealsToAiPool(persistedTreatMeals);
-        }
-        else
-        {
-            AddMealsToAiPool([dedicatedSpecialTreatMeal]);
-        }
+        AddAiMealsToPoolAndQueuePersistence([dedicatedSpecialTreatMeal], "dedicated special treat");
 
         return await BuildPlanFromMealsAsync(
             request,

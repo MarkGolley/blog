@@ -2134,6 +2134,7 @@ public partial class AislePilotServiceTests
     {
         ClearConcurrentDictionary(GetRequiredStaticField("AiMealPool"));
         ClearConcurrentDictionary(GetRequiredStaticField("AiMealPoolLastTouchedUtc"));
+        ClearConcurrentDictionary(GetRequiredStaticField("AiMealPersistenceInFlight"));
     }
 
     private static object GetMealTemplateSeed()

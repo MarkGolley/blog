@@ -470,6 +470,26 @@
     color: rgba(222, 239, 255, 0.78);
 }
 
+:root[data-theme="dark"] .aislepilot-day-reorder-toggle {
+    border-color: rgba(125, 167, 213, 0.22);
+    background: rgba(10, 18, 29, 0.62);
+    color: #deefff;
+    box-shadow: 0 10px 18px rgba(2, 7, 14, 0.2);
+}
+
+:root[data-theme="dark"] .aislepilot-day-reorder-toggle:hover {
+    border-color: rgba(125, 167, 213, 0.38);
+    background: rgba(14, 25, 39, 0.86);
+}
+
+:root[data-theme="dark"] .aislepilot-day-reorder-toggle[aria-pressed="true"] {
+    border-color: rgba(125, 167, 213, 0.34);
+    background: linear-gradient(135deg, rgba(93, 154, 191, 0.7), rgba(30, 65, 95, 0.92));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        0 12px 18px rgba(2, 7, 14, 0.22);
+}
+
 :root[data-theme="dark"] .aislepilot-day-carousel::before {
     background:
         radial-gradient(circle at 50% 18%, rgba(65, 163, 214, 0.18), transparent 34%),
@@ -619,6 +639,45 @@
 
 :root[data-theme="dark"] .aislepilot-day-meal-summary-item {
     color: rgba(222, 239, 255, 0.7);
+}
+
+@media (max-width: 980px) {
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-summary-item {
+        border-color: rgba(125, 167, 213, 0.22);
+        background: rgba(29, 47, 68, 0.62);
+        color: rgba(231, 244, 255, 0.92);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab {
+        border-color: rgba(125, 167, 213, 0.22) !important;
+        background: rgba(16, 29, 44, 0.48) !important;
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab.is-active {
+        border-color: rgba(125, 167, 213, 0.36) !important;
+        background: linear-gradient(145deg, rgba(36, 66, 94, 0.72), rgba(20, 39, 59, 0.88)) !important;
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-eyebrow {
+        color: rgba(191, 219, 247, 0.76);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-title {
+        color: #f4faff;
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-meta {
+        color: rgba(214, 234, 253, 0.76);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-caret {
+        color: rgba(191, 219, 247, 0.84);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-track > .aislepilot-day-meal-panel {
+        border: none;
+        background: transparent;
+    }
 }
 
 :root[data-theme="dark"] .aislepilot-day-meal-summary-separator {
