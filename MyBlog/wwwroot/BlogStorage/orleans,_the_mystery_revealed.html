@@ -1,0 +1,1621 @@
+<!-- PublishedDate: 2026-05-02 -->
+<!-- Tags: .NET, Orleans, Distributed Systems, Architecture, Reliability, Career -->
+<!-- ReadingTime: 11 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Orleans, the mystery revealed</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+    <style>
+        .orleans-demo {
+            --orleans-token-duration: 1450ms;
+            --silo-a: #38bdf8;
+            --silo-b: #34d399;
+            --silo-c: #a78bfa;
+            --orleans-bg-a: #f7fbff;
+            --orleans-bg-b: #e8f1ff;
+            --orleans-bg-c: #deebff;
+            --orleans-grid-line: rgba(20, 45, 80, 0.08);
+            --orleans-surface-elev-1: rgba(255, 255, 255, 0.9);
+            --orleans-surface-elev-2: rgba(248, 251, 255, 0.96);
+            --orleans-border: rgba(20, 32, 51, 0.14);
+            --orleans-border-strong: rgba(16, 109, 120, 0.55);
+            --orleans-text: #142033;
+            --orleans-text-muted: #45556d;
+            --orleans-focus: #0f6d78;
+            --orleans-log-bg-a: #10203a;
+            --orleans-log-bg-b: #0d1a30;
+            --orleans-log-text: #dbeafe;
+            --orleans-log-text-strong: #e9f2ff;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--orleans-border);
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin: 1rem 0 1.25rem;
+            background: linear-gradient(165deg, var(--orleans-bg-a) 0%, var(--orleans-bg-b) 58%, var(--orleans-bg-c) 100%);
+            box-shadow: 0 16px 30px rgba(9, 25, 42, 0.12);
+            color: var(--orleans-text);
+            font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .orleans-demo::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+                repeating-linear-gradient(90deg, var(--orleans-grid-line) 0, var(--orleans-grid-line) 1px, transparent 1px, transparent 26px),
+                repeating-linear-gradient(0deg, var(--orleans-grid-line) 0, var(--orleans-grid-line) 1px, transparent 1px, transparent 26px);
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        :root[data-theme="dark"] .orleans-demo {
+            --orleans-bg-a: #071224;
+            --orleans-bg-b: #0b1f3a;
+            --orleans-bg-c: #123866;
+            --orleans-grid-line: rgba(148, 163, 184, 0.08);
+            --orleans-surface-elev-1: rgba(15, 38, 69, 0.95);
+            --orleans-surface-elev-2: rgba(9, 26, 48, 0.97);
+            --orleans-border: rgba(178, 203, 236, 0.2);
+            --orleans-border-strong: rgba(125, 211, 252, 0.52);
+            --orleans-text: #e2e8f0;
+            --orleans-text-muted: #9bb0cb;
+            --orleans-focus: #7dd3fc;
+            --orleans-log-bg-a: #040d1f;
+            --orleans-log-bg-b: #071833;
+            --orleans-log-text: #d6e7ff;
+            --orleans-log-text-strong: #e9f2ff;
+            box-shadow: 0 22px 36px rgba(3, 9, 23, 0.28);
+        }
+
+        .orleans-demo > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .orleans-demo h3 {
+            margin-top: 0;
+            margin-bottom: 0.55rem;
+            font-size: 1.36rem;
+            font-weight: 700;
+            letter-spacing: 0;
+            color: var(--orleans-text);
+        }
+
+        .orleans-demo-intro {
+            margin: 0 0 0.55rem;
+            font-size: 0.96rem;
+            line-height: 1.5;
+            color: var(--orleans-text);
+            max-width: 70ch;
+        }
+
+        .orleans-demo-helper {
+            margin: 0 0 1rem;
+            font-size: 0.84rem;
+            color: var(--orleans-text-muted);
+            line-height: 1.45;
+        }
+
+        .orleans-demo-collapsible {
+            margin: 1rem 0 1.3rem;
+        }
+
+        .orleans-demo-collapsible .post-capsule-details-body {
+            padding-top: 0.8rem;
+        }
+
+        .orleans-demo-mode {
+            display: grid;
+            gap: 0.55rem;
+            margin-bottom: 0.9rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            font-size: 0.9rem;
+        }
+
+        .orleans-demo-mode label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid var(--orleans-border);
+            border-radius: 8px;
+            padding: 0.55rem 0.65rem;
+            background: linear-gradient(180deg, var(--orleans-surface-elev-1) 0%, var(--orleans-surface-elev-2) 100%);
+            color: var(--orleans-text);
+            cursor: pointer;
+            transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+            min-height: 2.9rem;
+        }
+
+        .orleans-demo-mode label:hover {
+            border-color: rgba(125, 211, 252, 0.76);
+            transform: translateY(-1px);
+        }
+
+        .orleans-demo-mode label:has(input:checked) {
+            border-color: var(--orleans-border-strong);
+            box-shadow: 0 0 0 1px rgba(16, 109, 120, 0.22), inset 0 0 22px rgba(16, 109, 120, 0.12);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(233, 245, 255, 0.96) 100%);
+        }
+
+        .orleans-demo-mode input {
+            accent-color: var(--orleans-focus);
+            width: 1rem;
+            height: 1rem;
+            margin: 0;
+            flex: 0 0 auto;
+        }
+
+        .orleans-demo-controls {
+            display: flex;
+            gap: 0.52rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.15rem;
+            align-items: center;
+        }
+
+        .orleans-demo button {
+            border: 1px solid rgba(148, 163, 184, 0.34);
+            background: linear-gradient(100deg, var(--brand) 0%, var(--brand-deep) 100%);
+            color: #ffffff;
+            border-radius: 8px;
+            min-height: 2.6rem;
+            padding: 0.45rem 0.88rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
+            transition: transform 190ms ease, box-shadow 190ms ease, filter 190ms ease;
+            line-height: 1.25;
+        }
+
+        .orleans-demo button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(8, 47, 73, 0.42);
+            filter: saturate(1.1);
+        }
+
+        .orleans-demo button:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 5px 12px rgba(8, 47, 73, 0.38);
+        }
+
+        .orleans-demo button:focus-visible,
+        .orleans-demo-mode label:focus-within {
+            outline: 2px solid var(--orleans-focus);
+            outline-offset: 2px;
+        }
+
+        .orleans-demo button.secondary {
+            background: var(--panel-strong);
+            color: var(--ink);
+            border-color: var(--line-strong);
+            box-shadow: inset 0 0 0 1px var(--line);
+        }
+
+        .orleans-demo button.secondary:hover:not(:disabled) {
+            background: var(--panel);
+        }
+
+        .orleans-demo button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .orleans-button-icon {
+            width: 0.95rem;
+            height: 0.95rem;
+            display: inline-flex;
+        }
+
+        .orleans-button-icon svg {
+            width: 100%;
+            height: 100%;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .orleans-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.62rem;
+            margin-bottom: 0.9rem;
+        }
+
+        .orleans-metric {
+            border: 1px solid var(--orleans-border);
+            border-radius: 9px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 255, 0.98) 100%);
+            padding: 0.5rem 0.6rem;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+            min-height: 4.3rem;
+            display: grid;
+            align-content: center;
+        }
+
+        .orleans-metric-label {
+            display: block;
+            color: var(--orleans-text-muted);
+            font-size: 0.72rem;
+            margin-bottom: 0.18rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0;
+        }
+
+        .orleans-metric-value {
+            color: var(--orleans-text);
+            font-size: 1.35rem;
+            line-height: 1.1;
+            font-family: "Consolas", "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+            font-weight: 700;
+        }
+
+        .orleans-progress {
+            height: 0.56rem;
+            border-radius: 999px;
+            border: 1px solid var(--orleans-border);
+            background: rgba(227, 238, 252, 0.95);
+            overflow: hidden;
+            margin: -0.15rem 0 0.95rem;
+            position: relative;
+        }
+
+        .orleans-progress::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+            animation: orleans-sheen 2.8s linear infinite;
+            pointer-events: none;
+        }
+
+        .orleans-progress-bar {
+            height: 100%;
+            width: 0;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #0ea5e9 0%, #38bdf8 40%, #2dd4bf 100%);
+            transition: width 240ms ease;
+            box-shadow: 0 0 14px rgba(45, 212, 191, 0.48);
+        }
+
+        .orleans-topology,
+        .orleans-runtime-board,
+        .orleans-silo-lane-col {
+            border: 1px solid var(--orleans-border);
+            border-radius: 10px;
+            background: linear-gradient(180deg, var(--orleans-surface-elev-1) 0%, var(--orleans-surface-elev-2) 100%);
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08), 0 12px 20px rgba(9, 25, 42, 0.1);
+        }
+
+        .orleans-topology {
+            padding: 0.68rem;
+            margin-bottom: 1.05rem;
+        }
+
+        .orleans-topology-router {
+            border: 1px solid rgba(148, 163, 184, 0.36);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 248, 255, 0.96) 100%);
+            color: var(--orleans-text);
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 0.42rem;
+            margin-bottom: 0.52rem;
+            transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        }
+
+        .orleans-topology-router.active {
+            border-color: var(--orleans-border-strong);
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.22);
+            transform: translateY(-1px);
+        }
+
+        .orleans-topology-silos {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.5rem;
+        }
+
+        .orleans-silo {
+            border: 1px solid rgba(148, 163, 184, 0.36);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(243, 249, 255, 0.96) 100%);
+            min-height: 3.4rem;
+            padding: 0.5rem 0.56rem;
+            transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+        }
+
+        .orleans-silo strong {
+            display: block;
+            margin-bottom: 0.18rem;
+            font-size: 0.8rem;
+            color: var(--orleans-text);
+        }
+
+        .orleans-silo span {
+            color: var(--orleans-text-muted);
+            font-size: 0.75rem;
+            line-height: 1.35;
+        }
+
+        .orleans-silo.active {
+            border-color: var(--orleans-border-strong);
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2), 0 8px 20px rgba(11, 26, 47, 0.34);
+            transform: translateY(-2px);
+        }
+
+        .orleans-silo[data-silo="A"] {
+            border-left: 3px solid var(--silo-a);
+        }
+
+        .orleans-silo[data-silo="B"] {
+            border-left: 3px solid var(--silo-b);
+        }
+
+        .orleans-silo[data-silo="C"] {
+            border-left: 3px solid var(--silo-c);
+        }
+
+        .orleans-runtime-board {
+            padding: 0.62rem;
+            margin-bottom: 1.05rem;
+            display: grid;
+            gap: 0.56rem;
+        }
+
+        .orleans-activity-title {
+            margin: 0;
+            font-size: 0.92rem;
+            color: var(--orleans-text);
+            font-weight: 800;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+
+        .orleans-track {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.56rem;
+            margin-bottom: 0.55rem;
+            padding: 0.52rem;
+            border: 1px solid rgba(148, 163, 184, 0.34);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(253, 255, 255, 0.96) 0%, rgba(244, 251, 255, 0.98) 100%);
+            overflow: hidden;
+        }
+
+        .orleans-track-stop {
+            border: 1px solid rgba(148, 163, 184, 0.36);
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 255, 0.98) 100%);
+            padding: 0.48rem 0.54rem;
+            font-size: 0.8rem;
+            line-height: 1.34;
+            min-height: 3.2rem;
+            transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.05);
+        }
+
+        .orleans-track-stop strong {
+            display: block;
+            margin-bottom: 0.18rem;
+            font-size: 0.8rem;
+            color: var(--orleans-text);
+        }
+
+        .orleans-track-stop span {
+            color: var(--orleans-text-muted);
+            font-size: 0.76rem;
+        }
+
+        .orleans-track-stop.active {
+            border-color: var(--orleans-border-strong);
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .orleans-transit-token {
+            position: absolute;
+            top: 52%;
+            left: 9%;
+            transform: translate(-50%, -50%);
+            border-radius: 999px;
+            border: 1px solid rgba(125, 211, 252, 0.7);
+            background: rgba(12, 43, 76, 0.95);
+            color: #e0f2fe;
+            padding: 0.14rem 0.52rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            line-height: 1.15;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            animation: orleans-token-flight var(--orleans-token-duration) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            z-index: 3;
+            box-shadow: 0 0 16px rgba(14, 165, 233, 0.34);
+        }
+
+        .orleans-event-feed {
+            margin: 0;
+            padding: 0.6rem 0.66rem;
+            min-height: 4rem;
+            max-height: 10.2rem;
+            overflow: auto;
+            font-size: 0.8rem;
+            line-height: 1.46;
+            border-radius: 8px;
+            border: 1px solid rgba(129, 140, 248, 0.28);
+            background: linear-gradient(180deg, var(--orleans-log-bg-a) 0%, var(--orleans-log-bg-b) 100%);
+            color: var(--orleans-log-text-strong);
+            list-style: none;
+            font-family: "Consolas", "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+        }
+
+        .orleans-event-feed li {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--orleans-log-text);
+        }
+
+        .orleans-event-feed li + li {
+            margin-top: 0.22rem;
+        }
+
+        .orleans-silo-lane-grid {
+            display: grid;
+            gap: 0.72rem;
+        }
+
+        @media (min-width: 760px) {
+            .orleans-silo-lane-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        .orleans-silo-lane-col {
+            padding: 0.62rem;
+            min-height: 10.4rem;
+            transition: border-color 190ms ease, box-shadow 190ms ease;
+        }
+
+        .orleans-silo-lane-col h4 {
+            margin: 0 0 0.52rem;
+            font-size: 0.89rem;
+            color: var(--orleans-text);
+            text-transform: uppercase;
+            letter-spacing: 0;
+            font-weight: 800;
+        }
+
+        .orleans-silo-lane-col[data-silo="A"] h4 {
+            color: #0a6fae;
+        }
+
+        .orleans-silo-lane-col[data-silo="B"] h4 {
+            color: #0f766e;
+        }
+
+        .orleans-silo-lane-col[data-silo="C"] h4 {
+            color: #6d28d9;
+        }
+
+        .orleans-silo-lane-stack {
+            display: grid;
+            gap: 0.64rem;
+        }
+
+        .orleans-demo-grain {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 248, 255, 0.98) 100%);
+            border: 1px solid rgba(148, 163, 184, 0.36);
+            border-radius: 8px;
+            padding: 0.68rem;
+            transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+        }
+
+        .orleans-demo-grain:hover {
+            border-color: rgba(125, 211, 252, 0.54);
+            transform: translateY(-1px);
+        }
+
+        .orleans-demo-grain[data-silo="A"] {
+            border-top: 3px solid var(--silo-a);
+        }
+
+        .orleans-demo-grain[data-silo="B"] {
+            border-top: 3px solid var(--silo-b);
+        }
+
+        .orleans-demo-grain[data-silo="C"] {
+            border-top: 3px solid var(--silo-c);
+        }
+
+        .orleans-demo-grain.active {
+            border-color: var(--orleans-border-strong);
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.22), 0 12px 24px rgba(8, 20, 37, 0.36);
+            transform: translateY(-1px);
+        }
+
+        .orleans-demo-grain strong {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.92rem;
+            color: var(--orleans-text);
+        }
+
+        .orleans-demo-grain-state {
+            margin: 0 0 0.54rem;
+            font-size: 0.88rem;
+            color: var(--orleans-text);
+        }
+
+        .orleans-demo-grain-host {
+            margin: -0.12rem 0 0.55rem;
+            font-size: 0.76rem;
+            color: var(--orleans-text-muted);
+        }
+
+        .orleans-demo-grain-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .orleans-demo-badge {
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.38);
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--orleans-text-muted);
+            padding: 0.14rem 0.46rem;
+            font-size: 0.72rem;
+            line-height: 1.2;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .orleans-demo-badge.active {
+            border-color: #0f6d78;
+            background: rgba(217, 245, 248, 0.95);
+            color: #0f6d78;
+        }
+
+        .orleans-demo-list {
+            margin: 0;
+            padding-left: 1.05rem;
+            font-size: 0.89rem;
+            max-height: none;
+            overflow: visible;
+            color: var(--orleans-text-muted);
+            line-height: 1.4;
+        }
+
+        .orleans-demo-list li + li {
+            margin-top: 0.25rem;
+        }
+
+        .orleans-empty-state {
+            margin: 0;
+            border: 1px dashed rgba(148, 163, 184, 0.4);
+            border-radius: 8px;
+            padding: 0.8rem 0.75rem;
+            min-height: 8.2rem;
+            display: grid;
+            align-content: center;
+            justify-items: center;
+            gap: 0.35rem;
+            background: linear-gradient(180deg, rgba(251, 254, 255, 0.92) 0%, rgba(241, 247, 255, 0.96) 100%);
+            text-align: center;
+        }
+
+        .orleans-empty-state-icon {
+            width: 1.8rem;
+            height: 1.8rem;
+            border-radius: 999px;
+            border: 1px solid var(--orleans-border-strong);
+            color: var(--orleans-text);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.84rem;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.82);
+        }
+
+        .orleans-empty-state-label {
+            font-size: 0.82rem;
+            color: var(--orleans-text-muted);
+            line-height: 1.45;
+            max-width: 22ch;
+        }
+
+        .orleans-deep-dive pre {
+            margin: 0.6rem 0 1rem;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel-strong);
+            padding: 0.95rem 1rem;
+            overflow-x: auto;
+        }
+
+        .orleans-deep-dive code.language-csharp {
+            display: block;
+            color: var(--ink);
+            font-size: 0.88rem;
+            line-height: 1.6;
+            font-family: "JetBrains Mono", "Consolas", "SFMono-Regular", Menlo, monospace;
+        }
+
+        .orleans-deep-dive .code-comment {
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        :root[data-theme="dark"] .orleans-demo-mode label {
+            background: linear-gradient(180deg, rgba(15, 33, 59, 0.92) 0%, rgba(11, 25, 46, 0.92) 100%);
+            color: #d8e8ff;
+        }
+
+        :root[data-theme="dark"] .orleans-deep-dive .code-comment {
+            color: #9bb0cb;
+        }
+
+        :root[data-theme="dark"] .orleans-demo-mode label:has(input:checked) {
+            box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.2), inset 0 0 24px rgba(56, 189, 248, 0.14);
+            background: linear-gradient(180deg, rgba(17, 45, 78, 0.95) 0%, rgba(10, 27, 50, 0.95) 100%);
+        }
+
+        :root[data-theme="dark"] .orleans-topology-router {
+            background: linear-gradient(180deg, rgba(23, 48, 81, 0.95) 0%, rgba(13, 34, 60, 0.95) 100%);
+            color: #e4f2ff;
+        }
+
+        :root[data-theme="dark"] .orleans-silo {
+            background: linear-gradient(180deg, rgba(18, 48, 83, 0.96) 0%, rgba(13, 34, 60, 0.96) 100%);
+        }
+
+        :root[data-theme="dark"] .orleans-silo strong,
+        :root[data-theme="dark"] .orleans-activity-title,
+        :root[data-theme="dark"] .orleans-track-stop strong,
+        :root[data-theme="dark"] .orleans-demo-grain strong,
+        :root[data-theme="dark"] .orleans-demo-grain-state,
+        :root[data-theme="dark"] .orleans-silo-lane-col h4 {
+            color: #e8f3ff;
+        }
+
+        :root[data-theme="dark"] .orleans-silo span,
+        :root[data-theme="dark"] .orleans-track-stop span,
+        :root[data-theme="dark"] .orleans-demo-list,
+        :root[data-theme="dark"] .orleans-demo-grain-host {
+            color: #bed0e7;
+        }
+
+        :root[data-theme="dark"] .orleans-track {
+            background: linear-gradient(180deg, rgba(9, 23, 43, 0.94) 0%, rgba(8, 18, 34, 0.96) 100%);
+        }
+
+        :root[data-theme="dark"] .orleans-track-stop {
+            background: linear-gradient(180deg, rgba(20, 49, 83, 0.96) 0%, rgba(14, 35, 61, 0.96) 100%);
+        }
+
+        :root[data-theme="dark"] .orleans-demo-grain {
+            background: linear-gradient(180deg, rgba(20, 46, 79, 0.95) 0%, rgba(14, 34, 59, 0.96) 100%);
+        }
+
+        :root[data-theme="dark"] .orleans-metric {
+            background: linear-gradient(180deg, rgba(13, 32, 58, 0.9) 0%, rgba(11, 24, 44, 0.96) 100%);
+        }
+
+        :root[data-theme="dark"] .orleans-metric-value {
+            color: #f8fafc;
+        }
+
+        :root[data-theme="dark"] .orleans-progress {
+            background: rgba(10, 23, 43, 0.85);
+        }
+
+        :root[data-theme="dark"] .orleans-silo-lane-col[data-silo="A"] h4 {
+            color: #7dd3fc;
+        }
+
+        :root[data-theme="dark"] .orleans-silo-lane-col[data-silo="B"] h4 {
+            color: #86efac;
+        }
+
+        :root[data-theme="dark"] .orleans-silo-lane-col[data-silo="C"] h4 {
+            color: #c4b5fd;
+        }
+
+        :root[data-theme="dark"] .orleans-demo-badge {
+            background: rgba(15, 35, 62, 0.95);
+            color: #d0e2fa;
+        }
+
+        :root[data-theme="dark"] .orleans-demo-badge.active {
+            border-color: #67e8f9;
+            background: rgba(6, 45, 61, 0.9);
+            color: #ccfbf1;
+        }
+
+        :root[data-theme="dark"] .orleans-empty-state {
+            background: linear-gradient(180deg, rgba(13, 31, 55, 0.78) 0%, rgba(8, 20, 37, 0.88) 100%);
+        }
+
+        :root[data-theme="dark"] .orleans-empty-state-icon {
+            color: #bae6fd;
+            background: rgba(8, 47, 73, 0.5);
+        }
+
+        :root[data-theme="dark"] .orleans-demo-status {
+            color: #d4e7ff;
+            background: rgba(11, 27, 49, 0.86);
+        }
+
+        .orleans-demo-status {
+            margin-top: 0.82rem;
+            font-size: 0.88rem;
+            color: var(--orleans-text);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            border: 1px solid rgba(148, 163, 184, 0.38);
+            border-radius: 999px;
+            padding: 0.24rem 0.58rem;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .orleans-demo-status::before {
+            content: "";
+            width: 0.44rem;
+            height: 0.44rem;
+            border-radius: 999px;
+            background: #22d3ee;
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.76);
+        }
+
+        @keyframes orleans-token-flight {
+            0% {
+                left: 9%;
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            45% {
+                left: 49.5%;
+                opacity: 1;
+            }
+            85% {
+                left: 90%;
+                opacity: 1;
+            }
+            100% {
+                left: 92%;
+                opacity: 0;
+            }
+        }
+
+        @keyframes orleans-sheen {
+            0% {
+                transform: translateX(-110%);
+            }
+            100% {
+                transform: translateX(110%);
+            }
+        }
+
+        @media (max-width: 960px) {
+            .orleans-demo-mode {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .orleans-demo {
+                padding: 1rem;
+            }
+
+            .orleans-metrics {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .orleans-topology-silos {
+                grid-template-columns: 1fr;
+            }
+
+            .orleans-track {
+                grid-template-columns: 1fr;
+            }
+
+            .orleans-silo-lane-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .orleans-runtime-board {
+                grid-template-columns: 1fr;
+            }
+
+            .orleans-transit-token {
+                display: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .orleans-demo *,
+            .orleans-demo *::before,
+            .orleans-demo *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Orleans, the mystery revealed</h1>
+
+<h2>The problem Orleans solves</h2>
+
+<p>As systems grow, a business item (like an order) gets updated from many places at once, for example:</p>
+
+<ul>
+    <li>Web request updates order status</li>
+    <li>Payment callback updates payment state</li>
+    <li>Background job updates shipping state</li>
+    <li>Another service writes to the same record too</li>
+</ul>
+
+<p>But now you start to see problems:</p>
+
+<ul>
+    <li>Updates collide</li>
+    <li>State becomes inconsistent</li>
+    <li>You add locks, retries, and patch logic everywhere</li>
+    <li>The code becomes hard to reason about</li>
+</ul>
+
+<p>In simple terms, Orleans tries to solve this by giving each business item a single place where its updates are handled in order.</p>
+
+<h2>Where Orleans came from</h2>
+
+<p>Orleans started as a Microsoft Research project around 2010. It was built to help teams run large cloud services without drowning in complexity. Microsoft teams then used it in production (including game services for Halo), and Orleans was released as open source in January 2015.</p>
+
+<h2>Think of Orleans like this</h2>
+
+<p>Imagine every order has its own mini worker and inbox.</p>
+
+<ul>
+    <li>Order 12345 has worker 12345</li>
+    <li>Messages for order 12345 go to that worker</li>
+    <li>That worker handles one message at a time</li>
+    <li>So two updates cannot fight each other at the same moment</li>
+</ul>
+
+<p>Term mapping:</p>
+
+<ul>
+    <li>"worker" in this example = an Orleans <code>grain</code></li>
+    <li>"message" = a method call to that grain</li>
+</ul>
+
+<p>That is most of Orleans, in practice, if you'd like to see it in action then try the interactive walkthrough below...</p>
+
+<details class="post-capsule post-capsule-details orleans-demo-collapsible">
+    <summary>
+        <span class="post-capsule-label">Interactive walkthrough</span>
+        <span class="post-capsule-text">Run a live Orleans visualization (routing, silos, and grain turn processing).</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <section class="orleans-demo" aria-label="Orleans interactive demo">
+            <h3>Try Orleans</h3>
+            <p class="orleans-demo-intro">Visual mental model: requests are routed by identity, then each grain processes one message at a time.</p>
+            <p class="orleans-demo-helper">Each order id maps to one grain, and each grain handles its queue in order.</p>
+
+    <div class="orleans-demo-mode">
+        <label><input type="radio" name="orleansMode" value="same" checked> Same order id (single worker)</label>
+        <label><input type="radio" name="orleansMode" value="different"> Different order ids (different workers)</label>
+    </div>
+
+    <div class="orleans-demo-controls">
+        <button id="orleansTryBtn" type="button">
+            <span class="orleans-button-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M8 5v14l11-7z"></path>
+                </svg>
+            </span>
+            <span>Try Orleans</span>
+        </button>
+        <button id="orleansResetBtn" class="secondary" type="button">
+            <span class="orleans-button-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M20 4v6h-6"></path>
+                    <path d="M20 10a8 8 0 1 0 2.34 5.66"></path>
+                </svg>
+            </span>
+            <span>Reset</span>
+        </button>
+    </div>
+
+            <div class="orleans-metrics" aria-label="Runtime metrics">
+                <div class="orleans-metric"><span class="orleans-metric-label">Messages</span><strong id="orleansMetricTotal" class="orleans-metric-value">0</strong></div>
+                <div class="orleans-metric"><span class="orleans-metric-label">Completed</span><strong id="orleansMetricCompleted" class="orleans-metric-value">0</strong></div>
+                <div class="orleans-metric"><span class="orleans-metric-label">Active Grains</span><strong id="orleansMetricActive" class="orleans-metric-value">0</strong></div>
+            </div>
+            <div class="orleans-progress" aria-label="Run progress">
+                <div id="orleansProgressBar" class="orleans-progress-bar"></div>
+            </div>
+
+            <div class="orleans-topology" aria-label="Live Orleans silo topology">
+                <div id="orleansTopologyRouter" class="orleans-topology-router">Identity Router</div>
+                <div class="orleans-topology-silos">
+                    <div id="orleansSiloA" class="orleans-silo" data-silo="A"><strong>Silo A</strong><span id="orleansSiloAMeta">Idle.</span></div>
+                    <div id="orleansSiloB" class="orleans-silo" data-silo="B"><strong>Silo B</strong><span id="orleansSiloBMeta">Idle.</span></div>
+                    <div id="orleansSiloC" class="orleans-silo" data-silo="C"><strong>Silo C</strong><span id="orleansSiloCMeta">Idle.</span></div>
+                </div>
+            </div>
+
+            <div class="orleans-runtime-board">
+                <p class="orleans-activity-title">Live activity</p>
+                <div class="orleans-track" aria-label="Live Orleans routing view">
+                    <div id="orleansIngressStage" class="orleans-track-stop">
+                        <strong>Ingress</strong>
+                        <span id="orleansIngressMeta">Waiting for requests.</span>
+                    </div>
+                    <div id="orleansRouterStage" class="orleans-track-stop">
+                        <strong>Identity Router</strong>
+                        <span id="orleansRouterMeta">Idle.</span>
+                    </div>
+                    <div id="orleansLaneStage" class="orleans-track-stop">
+                        <strong>Grain Lane</strong>
+                        <span id="orleansLaneMeta">No message in flight.</span>
+                    </div>
+                    <div id="orleansTransitLayer" aria-hidden="true"></div>
+                </div>
+                <ol id="orleansEventFeed" class="orleans-event-feed" aria-live="polite"></ol>
+            </div>
+
+            <div id="orleansSiloLaneGrid" class="orleans-silo-lane-grid">
+                <section class="orleans-silo-lane-col" data-silo="A">
+                    <h4>Silo A Grain Logs</h4>
+                    <div id="orleansSiloLaneA" class="orleans-silo-lane-stack"></div>
+                </section>
+                <section class="orleans-silo-lane-col" data-silo="B">
+                    <h4>Silo B Grain Logs</h4>
+                    <div id="orleansSiloLaneB" class="orleans-silo-lane-stack"></div>
+                </section>
+                <section class="orleans-silo-lane-col" data-silo="C">
+                    <h4>Silo C Grain Logs</h4>
+                    <div id="orleansSiloLaneC" class="orleans-silo-lane-stack"></div>
+                </section>
+            </div>
+            <p id="orleansStatus" class="orleans-demo-status">Ready</p>
+        </section>
+    </div>
+</details>
+
+<h2>Grains are virtual, not permanent</h2>
+
+<p>One subtle but important detail is that grains are virtual, they are not permanently running objects sitting in memory forever. Orleans activates a grain when work arrives, keeps it alive while it is busy, and may deactivate it after a period of inactivity to free resources. If work arrives again later, Orleans can reactivate the grain and restore its persisted state.</p>
+
+<p>In practice, this gives you the feeling of always having "worker 12345", without needing millions of workers permanently running in memory at once.</p>
+
+<h2>How you make your service run on Orleans</h2>
+
+<p>At a very high level, a minimal Orleans service usually involves three parts:</p>
+
+<ul>
+    <li>Start an Orleans silo in your app</li>
+    <li>Define a grain (your per-item worker)</li>
+    <li>Call that grain from your API/controller</li>
+</ul>
+
+<p>Anything your grain needs should be passed in as dependencies (like state, loggers, or other services). In the example above, <code>IPersistentState&lt;OrderState&gt;</code> is injected into the grain constructor so the grain can load and save its own state.</p>
+
+<details class="post-capsule post-capsule-details orleans-deep-dive">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">Minimal Orleans wiring example (Program.cs + grain + endpoint).</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <p>Minimal host setup:</p>
+        <pre><code class="language-csharp"><span class="code-comment">// Program.cs</span>
+var builder = WebApplication.CreateBuilder(args);
+
+<span class="code-comment">// Start Orleans inside this app process.</span>
+builder.Host.UseOrleans(static silo =>
+{
+    <span class="code-comment">// Local dev cluster (single machine).</span>
+    silo.UseLocalhostClustering();
+    <span class="code-comment">// Simple in-memory storage for grain state (good for learning/dev).</span>
+    silo.AddMemoryGrainStorage("orders");
+});
+
+var app = builder.Build();
+app.Run();</code></pre>
+
+        <p>Grain contract and implementation:</p>
+        <pre><code class="language-csharp">public interface IOrderGrain : IGrainWithStringKey
+{
+    <span class="code-comment">// Business action: mark this order as paid.</span>
+    Task MarkPaidAsync(string paymentReference);
+    <span class="code-comment">// Read current order status.</span>
+    Task&lt;string&gt; GetStatusAsync();
+}
+
+public sealed class OrderGrain(
+    <span class="code-comment">// Orleans injects persisted state for this grain.</span>
+    [PersistentState("order", "orders")] IPersistentState&lt;OrderState&gt; state)
+    : Grain, IOrderGrain
+{
+    public async Task MarkPaidAsync(string paymentReference)
+    {
+        <span class="code-comment">// Update this order's state.</span>
+        state.State.Status = "Paid";
+        state.State.PaymentReference = paymentReference;
+        <span class="code-comment">// Persist the change.</span>
+        await state.WriteStateAsync();
+    }
+
+    <span class="code-comment">// Return current status from this grain's state.</span>
+    public Task&lt;string&gt; GetStatusAsync() => Task.FromResult(state.State.Status);
+}
+
+public sealed class OrderState
+{
+    public string Status { get; set; } = "Pending";
+    public string? PaymentReference { get; set; }
+}</code></pre>
+
+        <p>Endpoint/controller call:</p>
+        <pre><code class="language-csharp">app.MapPost("/orders/{orderId}/pay",
+    async (IGrainFactory grains, string orderId, string paymentRef) =>
+{
+    <span class="code-comment">// Get the worker for this exact order id.</span>
+    var order = grains.GetGrain&lt;IOrderGrain&gt;(orderId);
+    <span class="code-comment">// Send the "mark paid" command to that worker.</span>
+    await order.MarkPaidAsync(paymentRef);
+    return Results.Ok();
+});</code></pre>
+    </div>
+</details>
+
+<h2>When Orleans is a good fit (and when it is not)</h2>
+
+<p>Use Orleans when one specific thing gets lots of updates from different places and update order matters. Simple examples:</p>
+
+<ul>
+    <li>One order that can be changed by checkout, payments, refunds, and shipping events</li>
+    <li>One booking/seat where double-booking must never happen</li>
+    <li>One user wallet/balance where every change must be applied in the right order</li>
+</ul>
+
+<p>Orleans is usually <strong>not</strong> needed for simple read-only pages or straightforward CRUD with low write contention.</p>
+
+<p>Quick rule: if your pain is "too many writers touching the same record at the same time", Orleans is likely worth considering.</p>
+
+<h2>The execution model that changes design choices</h2>
+
+<p>A healthy Orleans design starts by respecting grain turn-based execution, where each grain processes one request at a time:</p>
+
+<ul>
+    <li>Keep grain methods focused and quick - for example, update state and return, rather than performing heavy processing inline</li>
+    <li>Avoid slow or blocking work in frequently used grain methods - for example, waiting on a slow database query or third party API call on every request</li>
+    <li>Assume external services can fail or respond slowly - for example, add timeouts, retries, and fallback behaviour when calling APIs or queues</li>
+    <li>Make handlers safe to retry - for example, avoid charging a customer twice if the same payment message is delivered twice</li>
+</ul>
+
+<h2>A grain example</h2>
+
+<p>Good first principles for the following grain:</p>
+
+<pre><code class="language-csharp">public interface IOrderGrain : IGrainWithStringKey
+{
+    Task PlaceAsync(OrderDraft draft);
+    Task MarkPaidAsync(string paymentReference);
+    Task CancelAsync(string reason);
+    Task&lt;OrderState&gt; GetStateAsync();
+}</code></pre>
+
+<ul>
+    <li>All state transitions should be explicit methods</li>
+    <li>Every transition validates current state before mutating</li>
+    <li>When state changes, publish events so other parts of the system can react</li>
+    <li>State changes should be safe to retry where sensible, so duplicate requests do not accidentally repeat work</li>
+</ul>
+
+<p>This pattern keeps business rules in one place and avoids race conditions from multiple stateless services writing the same row concurrently.</p>
+
+<h2>Timers vs reminders</h2>
+
+<p>Orleans grains can deactivate when idle, so delayed or recurring work needs careful design. Some scheduled work only needs to happen while a grain is active, while other work must still happen later even after deactivation.</p>
+
+<ul>
+    <li><strong>Timers</strong>: lightweight, activation-local scheduling for short periodic work while a grain is active (for example, polling for updates every 5 seconds, refreshing cached data, or sending a heartbeat while a user session is live)</li>
+    <li><strong>Reminders</strong>: durable scheduling that survives deactivation and can reactivate a grain later (for example, retrying a failed payment in 30 minutes, expiring a reservation after 2 hours, or checking a long running workflow tomorrow)</li>
+</ul>
+
+<h2>Where streams fit</h2>
+
+<p>Orleans streams are a built in publish and subscribe mechanism for passing events between grains and services. They are useful when one part of your system needs to publish an event, and multiple independent consumers may want to react to it, without tightly coupling everything together.</p>
+
+<ul>
+    <li>Order grain publishes <code>OrderPaid</code></li>
+    <li>Loyalty grain awards customer points</li>
+    <li>Email grain sends a confirmation email</li>
+    <li>Analytics grain updates reporting metrics</li>
+</ul>
+
+<p>This makes systems easier to extend, because new consumers can subscribe without changing the producer. However, distributed event processing introduces complexity, such as duplicate delivery, retries, partial failure, and consumers processing events at different times.</p>
+
+<h2>Common mistakes to watch for</h2>
+
+<ul>
+    <li>Making one grain do too much, rather than keeping it focused on one clear responsibility</li>
+    <li>Using Orleans for simple CRUD or read-only endpoints where a normal API would be simpler</li>
+    <li>Keeping important state only in memory and forgetting that grains may deactivate and lose it</li>
+    <li>Letting grains wait too long on databases or APIs, creating bottlenecks when external systems are slow. Prefer short timeouts, async calls, retries with limits, and moving slow work outside where possible.
+    </li>
+    <li>Assuming downstream systems update instantly, when messages may be delayed, retried, or processed at different times</li>
+</ul>
+
+<p>Orleans is not a silver bullet. It is most useful when one business entity has lots of concurrent updates, ordering matters, and coordinating that safely at scale becomes difficult.</p>
+
+<h2>Final take</h2>
+
+<p>Orleans became much less mysterious once I stopped seeing it as background message magic, and started seeing it as giving each business entity its own safe place to process work sequentially.</p>
+
+<p>That framing has improved both how I think about system design and how quickly I can reason about concurrency problems. I am still learning, but Orleans now feels far less like magic, and much more like a practical concurrency model.</p>
+
+<script>
+    (() => {
+        const tryBtn = document.getElementById("orleansTryBtn");
+        const resetBtn = document.getElementById("orleansResetBtn");
+        const demoSurface = document.querySelector(".orleans-demo");
+        const status = document.getElementById("orleansStatus");
+        const transitLayer = document.getElementById("orleansTransitLayer");
+        const eventFeed = document.getElementById("orleansEventFeed");
+        const siloLaneA = document.getElementById("orleansSiloLaneA");
+        const siloLaneB = document.getElementById("orleansSiloLaneB");
+        const siloLaneC = document.getElementById("orleansSiloLaneC");
+        const ingressStage = document.getElementById("orleansIngressStage");
+        const routerStage = document.getElementById("orleansRouterStage");
+        const laneStage = document.getElementById("orleansLaneStage");
+        const ingressMeta = document.getElementById("orleansIngressMeta");
+        const routerMeta = document.getElementById("orleansRouterMeta");
+        const laneMeta = document.getElementById("orleansLaneMeta");
+        const topologyRouter = document.getElementById("orleansTopologyRouter");
+        const metricTotal = document.getElementById("orleansMetricTotal");
+        const metricCompleted = document.getElementById("orleansMetricCompleted");
+        const metricActive = document.getElementById("orleansMetricActive");
+        const progressBar = document.getElementById("orleansProgressBar");
+        const silos = [
+            {
+                key: "A",
+                element: document.getElementById("orleansSiloA"),
+                meta: document.getElementById("orleansSiloAMeta")
+            },
+            {
+                key: "B",
+                element: document.getElementById("orleansSiloB"),
+                meta: document.getElementById("orleansSiloBMeta")
+            },
+            {
+                key: "C",
+                element: document.getElementById("orleansSiloC"),
+                meta: document.getElementById("orleansSiloCMeta")
+            }
+        ];
+
+        let running = false;
+        let timers = [];
+        let activeLanes = [];
+        let runStartedAt = 0;
+        let totalMessages = 0;
+        let completedMessages = 0;
+        let activeWorkers = 0;
+        let runSpeedMultiplier = 1.9;
+
+        const setStatusText = (text) => {
+            status.textContent = text;
+        };
+
+        const appendItem = (list, text) => {
+            const li = document.createElement("li");
+            li.textContent = text;
+            list.appendChild(li);
+        };
+
+        const clearNode = (node) => {
+            while (node.firstChild) {
+                node.removeChild(node.firstChild);
+            }
+        };
+
+        const orderIdToSilo = (orderId) => {
+            let checksum = 0;
+            for (const ch of orderId) {
+                checksum += ch.charCodeAt(0);
+            }
+            return silos[checksum % silos.length];
+        };
+
+        const siloLaneContainers = {
+            A: siloLaneA,
+            B: siloLaneB,
+            C: siloLaneC
+        };
+
+        const refreshSiloLanePlaceholders = () => {
+            Object.keys(siloLaneContainers).forEach((key) => {
+                const container = siloLaneContainers[key];
+                const hasGrainCards = Array.from(container.children).some((node) => node.classList.contains("orleans-demo-grain"));
+                const existingPlaceholder = container.querySelector("[data-empty-placeholder='true']");
+
+                if (hasGrainCards && existingPlaceholder) {
+                    existingPlaceholder.remove();
+                    return;
+                }
+
+                if (!hasGrainCards && !existingPlaceholder) {
+                    const placeholder = document.createElement("div");
+                    placeholder.setAttribute("data-empty-placeholder", "true");
+
+                    const icon = document.createElement("span");
+                    icon.className = "orleans-empty-state-icon";
+                    icon.setAttribute("aria-hidden", "true");
+                    icon.textContent = "S";
+
+                    const label = document.createElement("p");
+                    label.className = "orleans-empty-state-label";
+                    label.textContent = "No grains routed to this silo in this run.";
+
+                    placeholder.className = "orleans-empty-state";
+                    placeholder.appendChild(icon);
+                    placeholder.appendChild(label);
+                    container.appendChild(placeholder);
+                }
+            });
+        };
+
+        const paced = (ms) => Math.round(ms * runSpeedMultiplier);
+
+        const updateMetrics = () => {
+            metricTotal.textContent = String(totalMessages);
+            metricCompleted.textContent = String(completedMessages);
+            metricActive.textContent = String(activeWorkers);
+            const ratio = totalMessages > 0 ? (completedMessages / totalMessages) * 100 : 0;
+            progressBar.style.width = ratio.toFixed(1) + "%";
+        };
+
+        const resetSiloVisuals = () => {
+            silos.forEach((silo) => {
+                silo.element.classList.remove("active");
+                silo.meta.textContent = "Idle.";
+            });
+            topologyRouter.classList.remove("active");
+        };
+
+        const schedule = (callback, delay) => {
+            const timer = setTimeout(callback, delay);
+            timers.push(timer);
+            return timer;
+        };
+
+        const elapsedTag = () => {
+            if (!runStartedAt) {
+                return "t+0.0s";
+            }
+            const seconds = (Date.now() - runStartedAt) / 1000;
+            return "t+" + seconds.toFixed(1) + "s";
+        };
+
+        const addEvent = (text) => {
+            const item = document.createElement("li");
+            item.textContent = elapsedTag() + " " + text;
+            eventFeed.appendChild(item);
+
+            while (eventFeed.children.length > 6) {
+                eventFeed.removeChild(eventFeed.firstChild);
+            }
+        };
+
+        const pulseStage = (stageElement, metaElement, text) => {
+            metaElement.textContent = text;
+            stageElement.classList.add("active");
+            schedule(() => {
+                stageElement.classList.remove("active");
+            }, paced(340));
+        };
+
+        const pulseSilo = (silo, text) => {
+            silo.meta.textContent = text;
+            silo.element.classList.add("active");
+            schedule(() => {
+                silo.element.classList.remove("active");
+                silo.meta.textContent = "Idle.";
+            }, paced(720));
+        };
+
+        const spawnTransitToken = (item) => {
+            const token = document.createElement("span");
+            token.className = "orleans-transit-token";
+            token.textContent = item.command + " #" + item.orderId;
+            transitLayer.appendChild(token);
+
+            const removeToken = () => {
+                if (token.parentNode) {
+                    token.parentNode.removeChild(token);
+                }
+            };
+
+            token.addEventListener("animationend", removeToken, { once: true });
+            schedule(removeToken, paced(1450));
+        };
+
+        const animateRouting = (item) => {
+            const targetSilo = orderIdToSilo(item.orderId);
+            pulseStage(ingressStage, ingressMeta, "Accepted " + item.command + " for " + item.orderId + ".");
+            addEvent("Ingress accepted " + item.command + " for order " + item.orderId + ".");
+            spawnTransitToken(item);
+
+            schedule(() => {
+                pulseStage(routerStage, routerMeta, "Mapped order " + item.orderId + " to grain key.");
+                topologyRouter.classList.add("active");
+                addEvent("Router mapped order " + item.orderId + " to grain " + item.orderId + ".");
+                schedule(() => {
+                    topologyRouter.classList.remove("active");
+                }, paced(340));
+            }, paced(340));
+
+            schedule(() => {
+                pulseStage(laneStage, laneMeta, "Dispatching " + item.command + " to grain " + item.orderId + ".");
+                pulseSilo(targetSilo, "Processing order " + item.orderId + ".");
+                addEvent("Grain " + item.orderId + " executing " + item.command + ".");
+            }, paced(720));
+        };
+
+        const getMode = () => {
+            const selected = document.querySelector('input[name="orleansMode"]:checked');
+            return selected ? selected.value : "same";
+        };
+
+        const getMessages = () => {
+            if (getMode() === "different") {
+                return [
+                    { orderId: "12345", command: "MarkPaid", result: "Pending -> Paid" },
+                    { orderId: "22222", command: "ReserveSeat", result: "Open -> Reserved" },
+                    { orderId: "33333", command: "ApplyRefund", result: "Paid -> Refunded" },
+                    { orderId: "22222", command: "ConfirmSeat", result: "Reserved -> Confirmed" },
+                    { orderId: "12345", command: "ShipOrder", result: "Paid -> Shipped" },
+                    { orderId: "44444", command: "FraudReview", result: "Pending -> Cleared" },
+                    { orderId: "33333", command: "CloseRefund", result: "Refunded -> Closed" },
+                    { orderId: "12345", command: "SendReceipt", result: "Shipped -> ReceiptSent" }
+                ];
+            }
+
+            return [
+                { orderId: "12345", command: "MarkPaid", result: "Pending -> Paid" },
+                { orderId: "12345", command: "ShipOrder", result: "Paid -> Shipped" },
+                { orderId: "12345", command: "ReserveInventory", result: "Shipped -> InventoryHeld" },
+                { orderId: "12345", command: "AssignCarrier", result: "InventoryHeld -> CarrierAssigned" },
+                { orderId: "12345", command: "DispatchOrder", result: "CarrierAssigned -> Dispatched" },
+                { orderId: "12345", command: "SendReceipt", result: "Dispatched -> ReceiptSent" }
+            ];
+        };
+
+        const createLane = (orderId) => {
+            const lane = document.createElement("section");
+            lane.className = "orleans-demo-grain";
+            const hostSilo = orderIdToSilo(orderId);
+            lane.setAttribute("data-silo", hostSilo.key);
+
+            const head = document.createElement("div");
+            head.className = "orleans-demo-grain-head";
+
+            const title = document.createElement("strong");
+            title.textContent = "Grain for order " + orderId;
+
+            const badge = document.createElement("span");
+            badge.className = "orleans-demo-badge";
+            badge.textContent = "Idle";
+
+            const laneState = document.createElement("p");
+            laneState.className = "orleans-demo-grain-state";
+            laneState.textContent = "State: Pending";
+
+            const laneHost = document.createElement("p");
+            laneHost.className = "orleans-demo-grain-host";
+            laneHost.textContent = "Hosted on Silo " + hostSilo.key;
+
+            const queueTitle = document.createElement("strong");
+            queueTitle.textContent = "Queue";
+
+            const queue = document.createElement("ol");
+            queue.className = "orleans-demo-list";
+
+            const logTitle = document.createElement("strong");
+            logTitle.textContent = "Worker log";
+
+            const log = document.createElement("ol");
+            log.className = "orleans-demo-list";
+
+            head.appendChild(title);
+            head.appendChild(badge);
+            lane.appendChild(head);
+            lane.appendChild(laneState);
+            lane.appendChild(laneHost);
+            lane.appendChild(queueTitle);
+            lane.appendChild(queue);
+            lane.appendChild(logTitle);
+            lane.appendChild(log);
+            siloLaneContainers[hostSilo.key].appendChild(lane);
+
+            return { orderId, lane, badge, laneState, queue, log, items: [], isProcessing: false };
+        };
+
+        const buildLanes = (messages) => {
+            const laneMap = new Map();
+
+            messages.forEach((message) => {
+                if (!laneMap.has(message.orderId)) {
+                    laneMap.set(message.orderId, createLane(message.orderId));
+                }
+                laneMap.get(message.orderId).items.push(message);
+            });
+
+            laneMap.forEach((lane) => {
+                lane.items.forEach((item) => appendItem(lane.queue, item.command));
+            });
+
+            refreshSiloLanePlaceholders();
+
+            return Array.from(laneMap.values());
+        };
+
+        const updateLaneState = (lane, text) => {
+            lane.laneState.textContent = "State: " + text;
+        };
+
+        const setLaneActivity = (lane, isActive) => {
+            if (lane.isProcessing !== isActive) {
+                activeWorkers += isActive ? 1 : -1;
+                if (activeWorkers < 0) {
+                    activeWorkers = 0;
+                }
+                lane.isProcessing = isActive;
+                updateMetrics();
+            }
+
+            lane.lane.classList.toggle("active", isActive);
+            lane.badge.classList.toggle("active", isActive);
+            lane.badge.textContent = isActive ? "Processing" : "Idle";
+        };
+
+        const processLane = (lane, delay, onFinished) => {
+            const runNext = () => {
+                if (lane.items.length === 0) {
+                    setLaneActivity(lane, false);
+                    appendItem(lane.log, "Queue empty. Grain idle.");
+                    addEvent("Grain " + lane.orderId + " queue drained.");
+                    onFinished();
+                    return;
+                }
+
+                const next = lane.items.shift();
+                animateRouting(next);
+                setLaneActivity(lane, true);
+                if (lane.queue.firstChild) {
+                    lane.queue.removeChild(lane.queue.firstChild);
+                }
+
+                appendItem(lane.log, "Received " + next.command);
+                updateLaneState(lane, next.result.split(" -> ")[1]);
+                appendItem(lane.log, "Completed " + next.command + " (" + next.result + ")");
+                completedMessages += 1;
+                updateMetrics();
+                addEvent("Grain " + lane.orderId + " completed " + next.command + ".");
+
+                schedule(runNext, paced(delay));
+            };
+
+            schedule(runNext, paced(320));
+        };
+
+        const resetDemo = () => {
+            timers.forEach((t) => clearTimeout(t));
+            timers = [];
+            activeLanes = [];
+            runStartedAt = 0;
+            totalMessages = 0;
+            completedMessages = 0;
+            activeWorkers = 0;
+            runSpeedMultiplier = 1.9;
+
+            running = false;
+            tryBtn.disabled = false;
+            clearNode(siloLaneA);
+            clearNode(siloLaneB);
+            clearNode(siloLaneC);
+            refreshSiloLanePlaceholders();
+            clearNode(transitLayer);
+            clearNode(eventFeed);
+            resetSiloVisuals();
+            updateMetrics();
+            demoSurface.style.setProperty("--orleans-token-duration", String(paced(1500)) + "ms");
+            ingressMeta.textContent = "Waiting for requests.";
+            routerMeta.textContent = "Idle.";
+            laneMeta.textContent = "No message in flight.";
+            ingressStage.classList.remove("active");
+            routerStage.classList.remove("active");
+            laneStage.classList.remove("active");
+            setStatusText("Ready");
+        };
+
+        const runDemo = () => {
+            if (running) {
+                return;
+            }
+
+            resetDemo();
+            running = true;
+            tryBtn.disabled = true;
+            runSpeedMultiplier = 1.9;
+            demoSurface.style.setProperty("--orleans-token-duration", String(paced(1500)) + "ms");
+            runStartedAt = Date.now();
+            setStatusText("Running: each grain processes its own queue.");
+
+            const queue = getMessages();
+            totalMessages = queue.length;
+            updateMetrics();
+            addEvent("Run started with " + queue.length + " message(s).");
+            activeLanes = buildLanes(queue);
+            let remaining = activeLanes.length;
+
+            const onLaneFinished = () => {
+                remaining -= 1;
+                if (remaining === 0) {
+                    setStatusText("Complete: grains stayed isolated by order id.");
+                    routerMeta.textContent = "Idle.";
+                    laneMeta.textContent = "No message in flight.";
+                    resetSiloVisuals();
+                    addEvent("Run complete. All grain queues drained.");
+                    tryBtn.disabled = false;
+                    running = false;
+                }
+            };
+
+            activeLanes.forEach((lane) => {
+                processLane(lane, 1800, onLaneFinished);
+            });
+        };
+
+        tryBtn.addEventListener("click", runDemo);
+        resetBtn.addEventListener("click", resetDemo);
+        document.querySelectorAll('input[name="orleansMode"]').forEach((input) => {
+            input.addEventListener("change", () => {
+                if (!running) {
+                    resetDemo();
+                }
+            });
+        });
+        resetDemo();
+    })();
+</script>
+
+</body>
+</html>
