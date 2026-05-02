@@ -45,6 +45,24 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task OrleansPost_RendersEnhancedInteractiveDemoSkin()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog/orleans");
+
+        Assert.Contains("class=\"orleans-demo\"", html, StringComparison.Ordinal);
+        Assert.Contains("orleans-button-icon", html, StringComparison.Ordinal);
+        Assert.Contains("orleans-sheen", html, StringComparison.Ordinal);
+        Assert.Contains("orleans-empty-state", html, StringComparison.Ordinal);
+        Assert.Contains(":root[data-theme=\"dark\"] .orleans-demo", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"orleansSpeed\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Playback:", html, StringComparison.Ordinal);
+        Assert.Contains("prefers-reduced-motion: reduce", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"orleansTryBtn\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AddComment_EnforcesMaxThreadDepth()
     {
         var postId = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().First().Id;
