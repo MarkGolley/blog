@@ -48,8 +48,12 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     public async Task OrleansPost_RendersEnhancedInteractiveDemoSkin()
     {
         using var client = _factory.CreateClient();
+        var orleansPost = _factory.Services.GetRequiredService<BlogService>()
+            .GetAllPosts()
+            .FirstOrDefault(post => post.Id.Contains("orleans", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(orleansPost);
 
-        var html = await client.GetStringAsync("/blog/orleans");
+        var html = await client.GetStringAsync($"/blog/{Uri.EscapeDataString(orleansPost!.Id)}");
 
         Assert.Contains("class=\"orleans-demo\"", html, StringComparison.Ordinal);
         Assert.Contains("orleans-button-icon", html, StringComparison.Ordinal);
@@ -60,6 +64,15 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.DoesNotContain("Playback:", html, StringComparison.Ordinal);
         Assert.Contains("prefers-reduced-motion: reduce", html, StringComparison.Ordinal);
         Assert.Contains("id=\"orleansTryBtn\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BlogPosts_Slugs_DoNotContainCommas()
+    {
+        var posts = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().ToList();
+        Assert.DoesNotContain(
+            posts,
+            post => post.Id.Contains(',', StringComparison.Ordinal));
     }
 
     [Fact]
