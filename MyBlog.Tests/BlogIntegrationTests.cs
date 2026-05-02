@@ -67,6 +67,54 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task OrleansPost_RendersMobilePortraitLockAndLandscapeDemoRules()
+    {
+        using var client = _factory.CreateClient();
+        var orleansPost = _factory.Services.GetRequiredService<BlogService>()
+            .GetAllPosts()
+            .FirstOrDefault(post => post.Id.Contains("orleans", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(orleansPost);
+
+        var html = await client.GetStringAsync($"/blog/{Uri.EscapeDataString(orleansPost!.Id)}");
+
+        Assert.Contains("@media (max-width: 760px)", html, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 760px) and (orientation: landscape)", html, StringComparison.Ordinal);
+        Assert.Contains("Rotate to enable the live demo.", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-mobile-rotate-lock", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-demo-runtime", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-demo-runtime {", html, StringComparison.Ordinal);
+        Assert.Contains("display: none;", html, StringComparison.Ordinal);
+        Assert.Contains("display: block;", html, StringComparison.Ordinal);
+        Assert.Contains("body:has(.orleans-demo-collapsible[open]) .site-header", html, StringComparison.Ordinal);
+        Assert.Contains("body:has(.orleans-demo-collapsible[open]) .site-header .nav-controls", html, StringComparison.Ordinal);
+        Assert.Contains("body:has(.orleans-demo-collapsible[open]) .site-header .nav-capsule", html, StringComparison.Ordinal);
+        Assert.Contains("body:has(.orleans-demo-collapsible[open]) .site-header .nav-links", html, StringComparison.Ordinal);
+        Assert.Contains("display: none !important;", html, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: repeat(3, minmax(0, 1fr));", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-progress {", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-demo-status {", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-demo-intro", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-demo-helper", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-topology-silos {", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-track {", html, StringComparison.Ordinal);
+        Assert.Contains("grid-template-columns: 1fr;", html, StringComparison.Ordinal);
+        Assert.Contains("grid-auto-flow: column;", html, StringComparison.Ordinal);
+        Assert.Contains("grid-auto-columns: minmax(9rem, 1fr);", html, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: auto;", html, StringComparison.Ordinal);
+        Assert.Contains("scroll-snap-type: x proximity;", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-metric:last-child", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-event-feed {", html, StringComparison.Ordinal);
+        Assert.Contains("max-height: 4.7rem;", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-silo-lane-col {", html, StringComparison.Ordinal);
+        Assert.Contains("min-height: 7.5rem;", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-silo-lane-details", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-silo-lane-toggle", html, StringComparison.Ordinal);
+        Assert.Contains("Grain logs</summary>", html, StringComparison.Ordinal);
+        Assert.Contains(".orleans-silo-lane-details > .orleans-silo-lane-grid", html, StringComparison.Ordinal);
+        Assert.Contains("display: none !important;", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BlogPosts_Slugs_DoNotContainCommas()
     {
         var posts = _factory.Services.GetRequiredService<BlogService>().GetAllPosts().ToList();

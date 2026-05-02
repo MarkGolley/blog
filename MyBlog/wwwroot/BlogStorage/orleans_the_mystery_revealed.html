@@ -100,6 +100,14 @@
             line-height: 1.45;
         }
 
+        .orleans-mobile-rotate-lock {
+            display: none;
+        }
+
+        .orleans-demo-runtime {
+            display: block;
+        }
+
         .orleans-demo-collapsible {
             margin: 1rem 0 1.3rem;
         }
@@ -493,6 +501,18 @@
             transition: border-color 190ms ease, box-shadow 190ms ease;
         }
 
+        .orleans-silo-lane-details {
+            margin: 0;
+        }
+
+        .orleans-silo-lane-details > .orleans-silo-lane-grid {
+            display: grid !important;
+        }
+
+        .orleans-silo-lane-toggle {
+            display: none;
+        }
+
         .orleans-silo-lane-col h4 {
             margin: 0 0 0.52rem;
             font-size: 0.89rem;
@@ -765,6 +785,18 @@
             background: rgba(11, 27, 49, 0.86);
         }
 
+        :root[data-theme="dark"] .orleans-mobile-rotate-lock {
+            color: #c7daef;
+            background: rgba(9, 27, 50, 0.9);
+            border-color: rgba(125, 211, 252, 0.32);
+        }
+
+        :root[data-theme="dark"] .orleans-silo-lane-toggle {
+            color: #d7e9ff;
+            background: rgba(10, 28, 50, 0.9);
+            border-color: rgba(125, 211, 252, 0.34);
+        }
+
         .orleans-demo-status {
             margin-top: 0.82rem;
             font-size: 0.88rem;
@@ -826,11 +858,68 @@
 
         @media (max-width: 760px) {
             .orleans-demo {
-                padding: 1rem;
+                padding: 0.95rem;
+            }
+
+            .orleans-mobile-rotate-lock {
+                display: grid;
+                align-content: center;
+                justify-items: center;
+                gap: 0.45rem;
+                min-height: 12rem;
+                margin-top: 0.2rem;
+                border: 1px solid var(--orleans-border);
+                border-radius: 10px;
+                background: linear-gradient(180deg, var(--orleans-surface-elev-1) 0%, var(--orleans-surface-elev-2) 100%);
+                text-align: center;
+                padding: 0.9rem 0.8rem;
+                color: var(--orleans-text);
+            }
+
+            .orleans-mobile-rotate-lock::before {
+                content: "";
+                width: 0.55rem;
+                height: 0.55rem;
+                border-radius: 999px;
+                background: #22d3ee;
+                box-shadow: 0 0 10px rgba(34, 211, 238, 0.65);
+                flex: 0 0 auto;
+            }
+
+            .orleans-mobile-rotate-lock-title {
+                font-size: 0.95rem;
+                font-weight: 700;
+                line-height: 1.3;
+            }
+
+            .orleans-mobile-rotate-lock-copy {
+                font-size: 0.82rem;
+                color: var(--orleans-text-muted);
+                line-height: 1.45;
+                max-width: 26ch;
+                margin: 0;
+            }
+
+            .orleans-demo-runtime {
+                display: none;
+            }
+
+            .orleans-demo-controls {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .orleans-demo button {
+                width: 100%;
+                justify-content: center;
             }
 
             .orleans-metrics {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .orleans-metric:last-child {
+                grid-column: 1 / -1;
             }
 
             .orleans-topology-silos {
@@ -850,6 +939,290 @@
             }
 
             .orleans-transit-token {
+                display: none;
+            }
+        }
+
+        @media (max-width: 760px) and (orientation: landscape) {
+            .orleans-mobile-rotate-lock {
+                display: none;
+            }
+
+            .orleans-demo-runtime {
+                display: block;
+            }
+
+            body:has(.orleans-demo-collapsible[open]) .site-header {
+                display: none !important;
+            }
+
+            body:has(.orleans-demo-collapsible[open]) .site-header .nav-controls,
+            body:has(.orleans-demo-collapsible[open]) .site-header .nav-capsule,
+            body:has(.orleans-demo-collapsible[open]) .site-header .nav-links {
+                display: none !important;
+            }
+
+            .orleans-demo {
+                padding: 0.72rem;
+                margin-top: 0.25rem;
+                margin-bottom: 0.45rem;
+                border-radius: 10px;
+            }
+
+            .orleans-demo h3 {
+                font-size: 1.12rem;
+                margin-bottom: 0.42rem;
+                display: none;
+            }
+
+            .orleans-demo-intro {
+                margin-bottom: 0.42rem;
+                font-size: 0.84rem;
+                line-height: 1.4;
+                display: none;
+            }
+
+            .orleans-demo-helper {
+                margin-bottom: 0.62rem;
+                font-size: 0.75rem;
+                line-height: 1.35;
+                display: none;
+            }
+
+            .orleans-demo-mode {
+                gap: 0.42rem;
+                margin-bottom: 0.45rem;
+                font-size: 0.82rem;
+            }
+
+            .orleans-demo-mode label {
+                padding: 0.4rem 0.5rem;
+                min-height: 2.35rem;
+            }
+
+            .orleans-demo-controls {
+                margin-bottom: 0.72rem;
+            }
+
+            .orleans-demo button {
+                min-height: 2.2rem;
+                padding: 0.36rem 0.72rem;
+                font-size: 0.82rem;
+            }
+
+            .orleans-metrics {
+                gap: 0.45rem;
+                margin-bottom: 0.45rem;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .orleans-metric:last-child {
+                grid-column: auto;
+            }
+
+            .orleans-metric {
+                min-height: 3.15rem;
+                padding: 0.35rem 0.48rem;
+            }
+
+            .orleans-metric-label {
+                font-size: 0.66rem;
+                margin-bottom: 0.12rem;
+            }
+
+            .orleans-metric-value {
+                font-size: 1.12rem;
+            }
+
+            .orleans-progress {
+                display: none;
+            }
+
+            .orleans-topology {
+                padding: 0.5rem;
+                margin-bottom: 0.52rem;
+            }
+
+            .orleans-topology-silos,
+            .orleans-track {
+                grid-template-columns: none;
+                grid-auto-flow: column;
+                grid-auto-columns: minmax(9rem, 1fr);
+                overflow-x: auto;
+                overscroll-behavior-x: contain;
+                scrollbar-gutter: stable both-edges;
+                scroll-snap-type: x proximity;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .orleans-silo,
+            .orleans-track-stop {
+                scroll-snap-align: start;
+            }
+
+            .orleans-silo {
+                min-height: 2.7rem;
+                padding: 0.38rem 0.44rem;
+            }
+
+            .orleans-silo strong {
+                font-size: 0.73rem;
+                margin-bottom: 0.08rem;
+            }
+
+            .orleans-silo span {
+                font-size: 0.69rem;
+                line-height: 1.25;
+            }
+
+            .orleans-runtime-board {
+                padding: 0.5rem;
+                gap: 0.45rem;
+                margin-bottom: 0.52rem;
+            }
+
+            .orleans-activity-title {
+                font-size: 0.83rem;
+            }
+
+            .orleans-track {
+                gap: 0.45rem;
+                margin-bottom: 0.42rem;
+                padding: 0.36rem;
+            }
+
+            .orleans-track-stop {
+                min-height: 2.75rem;
+                padding: 0.35rem 0.42rem;
+                font-size: 0.73rem;
+            }
+
+            .orleans-track-stop strong {
+                font-size: 0.73rem;
+                margin-bottom: 0.12rem;
+            }
+
+            .orleans-track-stop span {
+                font-size: 0.69rem;
+                line-height: 1.25;
+            }
+
+            .orleans-event-feed {
+                min-height: 2.2rem;
+                max-height: 4.7rem;
+                padding: 0.42rem 0.5rem;
+                font-size: 0.72rem;
+                line-height: 1.35;
+            }
+
+            .orleans-event-feed li + li {
+                margin-top: 0.14rem;
+            }
+
+            .orleans-silo-lane-grid {
+                gap: 0.52rem;
+            }
+
+            .orleans-silo-lane-details {
+                margin-top: 0.05rem;
+            }
+
+            .orleans-silo-lane-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+                border: 1px solid var(--orleans-border);
+                border-radius: 999px;
+                padding: 0.2rem 0.52rem;
+                font-size: 0.72rem;
+                font-weight: 700;
+                color: var(--orleans-text);
+                background: rgba(255, 255, 255, 0.86);
+                margin-bottom: 0.45rem;
+                cursor: pointer;
+                user-select: none;
+            }
+
+            .orleans-silo-lane-toggle::before {
+                content: "";
+                width: 0.4rem;
+                height: 0.4rem;
+                border-radius: 999px;
+                background: #22d3ee;
+                box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
+                flex: 0 0 auto;
+            }
+
+            .orleans-silo-lane-toggle::after {
+                content: "Show";
+                margin-left: 0.2rem;
+                color: var(--orleans-text-muted);
+                font-weight: 600;
+            }
+
+            .orleans-silo-lane-details[open] .orleans-silo-lane-toggle::after {
+                content: "Hide";
+            }
+
+            .orleans-silo-lane-details > .orleans-silo-lane-grid {
+                display: none !important;
+            }
+
+            .orleans-silo-lane-details[open] > .orleans-silo-lane-grid {
+                display: grid !important;
+            }
+
+            .orleans-silo-lane-col {
+                min-height: 7.5rem;
+                padding: 0.5rem;
+            }
+
+            .orleans-silo-lane-col h4 {
+                margin-bottom: 0.38rem;
+                font-size: 0.74rem;
+            }
+
+            .orleans-silo-lane-stack {
+                gap: 0.45rem;
+            }
+
+            .orleans-demo-grain {
+                padding: 0.5rem;
+            }
+
+            .orleans-demo-grain strong {
+                font-size: 0.82rem;
+                margin-bottom: 0.22rem;
+            }
+
+            .orleans-demo-grain-state {
+                margin-bottom: 0.35rem;
+                font-size: 0.76rem;
+            }
+
+            .orleans-demo-grain-host {
+                margin-bottom: 0.35rem;
+                font-size: 0.69rem;
+            }
+
+            .orleans-demo-list {
+                font-size: 0.75rem;
+                line-height: 1.3;
+                padding-left: 0.88rem;
+            }
+
+            .orleans-empty-state {
+                min-height: 4.5rem;
+                padding: 0.42rem;
+            }
+
+            .orleans-empty-state-label {
+                font-size: 0.68rem;
+                line-height: 1.32;
+                max-width: 18ch;
+            }
+
+            .orleans-demo-status {
                 display: none;
             }
         }
@@ -925,6 +1298,11 @@
             <h3>Try Orleans</h3>
             <p class="orleans-demo-intro">Visual mental model: requests are routed by identity, then each grain processes one message at a time.</p>
             <p class="orleans-demo-helper">Each order id maps to one grain, and each grain handles its queue in order.</p>
+            <div class="orleans-mobile-rotate-lock" role="note" aria-live="polite">
+                <strong class="orleans-mobile-rotate-lock-title">Rotate to enable the live demo.</strong>
+                <p class="orleans-mobile-rotate-lock-copy">Portrait is intentionally locked so the routing board stays readable.</p>
+            </div>
+            <div class="orleans-demo-runtime">
 
     <div class="orleans-demo-mode">
         <label><input type="radio" name="orleansMode" value="same" checked> Same order id (single worker)</label>
@@ -989,21 +1367,25 @@
                 <ol id="orleansEventFeed" class="orleans-event-feed" aria-live="polite"></ol>
             </div>
 
-            <div id="orleansSiloLaneGrid" class="orleans-silo-lane-grid">
-                <section class="orleans-silo-lane-col" data-silo="A">
-                    <h4>Silo A Grain Logs</h4>
-                    <div id="orleansSiloLaneA" class="orleans-silo-lane-stack"></div>
-                </section>
-                <section class="orleans-silo-lane-col" data-silo="B">
-                    <h4>Silo B Grain Logs</h4>
-                    <div id="orleansSiloLaneB" class="orleans-silo-lane-stack"></div>
-                </section>
-                <section class="orleans-silo-lane-col" data-silo="C">
-                    <h4>Silo C Grain Logs</h4>
-                    <div id="orleansSiloLaneC" class="orleans-silo-lane-stack"></div>
-                </section>
-            </div>
+            <details class="orleans-silo-lane-details">
+                <summary class="orleans-silo-lane-toggle">Grain logs</summary>
+                <div id="orleansSiloLaneGrid" class="orleans-silo-lane-grid">
+                    <section class="orleans-silo-lane-col" data-silo="A">
+                        <h4>Silo A Grain Logs</h4>
+                        <div id="orleansSiloLaneA" class="orleans-silo-lane-stack"></div>
+                    </section>
+                    <section class="orleans-silo-lane-col" data-silo="B">
+                        <h4>Silo B Grain Logs</h4>
+                        <div id="orleansSiloLaneB" class="orleans-silo-lane-stack"></div>
+                    </section>
+                    <section class="orleans-silo-lane-col" data-silo="C">
+                        <h4>Silo C Grain Logs</h4>
+                        <div id="orleansSiloLaneC" class="orleans-silo-lane-stack"></div>
+                    </section>
+                </div>
+            </details>
             <p id="orleansStatus" class="orleans-demo-status">Ready</p>
+            </div>
         </section>
     </div>
 </details>
