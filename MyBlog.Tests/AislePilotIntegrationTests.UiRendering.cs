@@ -10,7 +10,6 @@ namespace MyBlog.Tests;
 
 public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicationFactory>
 {
-
     [Fact]
     public async Task Index_Get_RendersPlanDaysSlider()
     {
@@ -488,7 +487,8 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("carousel.classList.toggle(\"is-day-reorder-mode\", isStacked);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("carousel.dataset.dayStackedMode = isDayStackedMode ? \"true\" : \"false\";", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const setDropTargetIndicator = (targetCard, dropPosition) => {", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("const swapCards = (firstCard, secondCard) => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const swapCardMealPayloads = (firstCard, secondCard) => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("if (shouldEnable && !isDayStackedMode)", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("carousel.classList.toggle(\"is-day-reorder-dragging\", isDragging);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Drop to swap with", script, StringComparison.OrdinalIgnoreCase);
     }

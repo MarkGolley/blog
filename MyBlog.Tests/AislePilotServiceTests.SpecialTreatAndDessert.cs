@@ -786,7 +786,10 @@ public partial class AislePilotServiceTests
     [Theory]
     [InlineData("vegan-mushroom-stroganoff.png", "/images/aislepilot-meals/vegan-mushroom-stroganoff.png")]
     [InlineData("aislepilot-meals/chickpea-and-spinach-curry.png", "/images/aislepilot-meals/chickpea-and-spinach-curry.png")]
+    [InlineData("aislepilot-meals/chickpea-and-spinach-curry", "/images/aislepilot-meals/chickpea-and-spinach-curry.png")]
+    [InlineData("chickpea-and-spinach-curry", "/images/aislepilot-meals/chickpea-and-spinach-curry.png")]
     [InlineData("/projects/aisle-pilot/images/aislepilot-meals/quinoa-roasted-vegetable-salad.png", "/images/aislepilot-meals/quinoa-roasted-vegetable-salad.png")]
+    [InlineData("/projects/aisle-pilot/images/aislepilot-meals/quinoa-roasted-vegetable-salad", "/images/aislepilot-meals/quinoa-roasted-vegetable-salad.png")]
     public void NormalizeImageUrl_NormalizesRelativeAndProxyImagePaths(string input, string expected)
     {
         var normalized = InvokeNormalizeImageUrl(input);

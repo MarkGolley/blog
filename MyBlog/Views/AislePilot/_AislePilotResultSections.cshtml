@@ -723,25 +723,22 @@
                                         }
                                         @if (result.PlanDays > 1)
                                         {
-                                            var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0
-                                                ? $"{dayGroup.Day}: cook-extra x{dayGroup.LeftoverDaysCovered}"
-                                                : $"{dayGroup.Day}: no cook-extra";
-                                            var dayAllocationControlClass = dayGroup.LeftoverDaysCovered > 0
-                                                ? "aislepilot-day-card-leftover-controls is-leftover-source is-menu-only"
-                                                : "aislepilot-day-card-leftover-controls is-menu-only";
-                                            <div class="@dayAllocationControlClass"
-                                                 data-leftover-day-zone
-                                                 data-day-index="@dayWeekIndex"
-                                                 data-day-name="@dayGroup.Day"
-                                                 data-leftover-count="@dayGroup.LeftoverDaysCovered"
-                                                 aria-label="@dayAllocationAriaLabel">
-                                                @{
-                                                    var dayCountHiddenAttribute = dayGroup.LeftoverDaysCovered > 1 ? null : "hidden";
-                                                }
+                                            var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0 ? $"{dayGroup.Day}: cook-extra x{dayGroup.LeftoverDaysCovered}" : $"{dayGroup.Day}: no cook-extra";
+                                            var dayAllocationControlClass = dayGroup.LeftoverDaysCovered > 0 ? "aislepilot-day-card-leftover-controls is-leftover-source is-menu-only" : "aislepilot-day-card-leftover-controls is-menu-only";
+                                            <div class="@dayAllocationControlClass" data-leftover-day-zone data-day-index="@dayWeekIndex" data-day-name="@dayGroup.Day" data-leftover-count="@dayGroup.LeftoverDaysCovered" aria-label="@dayAllocationAriaLabel">
+                                                @{ var dayCountHiddenAttribute = dayGroup.LeftoverDaysCovered > 1 ? null : "hidden"; }
                                                 <span class="aislepilot-leftover-day-count" data-leftover-day-count @dayCountHiddenAttribute>x@dayGroup.LeftoverDaysCovered</span>
                                             </div>
                                         }
                                     </div>
+                                </div>
+                                <div class="aislepilot-day-reorder-meal-list" data-day-reorder-meal-list aria-hidden="true">
+                                    @foreach (var slotEntry in dayGroup.Entries)
+                                    {
+                                        var reorderMeal = slotEntry.meal;
+                                        var reorderMealIsIgnored = ignoredMealSlotIndexes.Contains(slotEntry.index) || reorderMeal.IsIgnored;
+                                        <div class="aislepilot-day-reorder-meal-item@(reorderMealIsIgnored ? " is-ignored" : string.Empty)" data-day-reorder-meal-item><img class="aislepilot-day-reorder-meal-thumbnail" data-day-reorder-meal-thumbnail src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(reorderMeal.MealImageUrl)" alt="" loading="lazy" decoding="async" /><span class="aislepilot-day-reorder-meal-type">@reorderMeal.MealType</span><span class="aislepilot-day-reorder-meal-name">@reorderMeal.MealName</span></div>
+                                    }
                                 </div>
                                 @if (dayGroup.Entries.Count > 1)
                                 {

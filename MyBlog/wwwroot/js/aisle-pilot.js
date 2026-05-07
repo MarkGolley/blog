@@ -1774,6 +1774,120 @@
         });
     };
 
+    const applyDayReorderPreviewSlotToCard = card => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
+        const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
+        if (panels.length === 0) {
+            return;
+        }
+
+        const track = card.querySelector("[data-day-meal-track]");
+        if (track instanceof HTMLElement) {
+            track.style.transform = "none";
+        }
+
+        const previewSlotIndex = 0;
+        const previewTab = tabs[previewSlotIndex];
+
+        tabs.forEach((tab, index) => {
+            if (!(tab instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            const isActive = index === previewSlotIndex;
+            tab.classList.toggle("is-active", isActive);
+            tab.setAttribute("aria-selected", isActive ? "true" : "false");
+            tab.setAttribute("tabindex", isActive ? "0" : "-1");
+        });
+
+        panels.forEach((panel, index) => {
+            if (!(panel instanceof HTMLElement)) {
+                return;
+            }
+
+            const isVisible = index === previewSlotIndex;
+            panel.setAttribute("aria-hidden", isVisible ? "false" : "true");
+            panel.setAttribute("tabindex", isVisible ? "0" : "-1");
+        });
+
+        const summaryLabel = card.querySelector("[data-day-card-summary]");
+        if (summaryLabel instanceof HTMLElement) {
+            const summaryValue = previewTab instanceof HTMLButtonElement
+                ? (previewTab.dataset.dayCardSummaryValue ?? "").trim()
+                : "";
+            const defaultSummaryValue = (summaryLabel.dataset.dayCardSummaryDefault ?? "").trim();
+            const nextSummaryValue = summaryValue.length > 0 ? summaryValue : defaultSummaryValue;
+            if (nextSummaryValue.length > 0) {
+                summaryLabel.textContent = nextSummaryValue;
+            }
+        }
+
+        const expanderMealLabel = card.querySelector("[data-day-card-expander-meal]");
+        if (expanderMealLabel instanceof HTMLElement) {
+            const mealValue = previewTab instanceof HTMLButtonElement
+                ? (previewTab.dataset.dayCardMealName ?? "").trim()
+                : "";
+            const defaultMealValue = (expanderMealLabel.dataset.dayCardExpanderMealDefault ?? "").trim();
+            const nextMealValue = mealValue.length > 0 ? mealValue : defaultMealValue;
+            if (nextMealValue.length > 0) {
+                expanderMealLabel.textContent = nextMealValue;
+            }
+        }
+
+        const expanderMetaLabel = card.querySelector("[data-day-card-expander-meta]");
+        if (expanderMetaLabel instanceof HTMLElement) {
+            const metaValue = previewTab instanceof HTMLButtonElement
+                ? (previewTab.dataset.dayCardSummaryValue ?? "").trim()
+                : "";
+            const defaultMetaValue = (expanderMetaLabel.dataset.dayCardExpanderMetaDefault ?? "").trim();
+            const nextMetaValue = metaValue.length > 0 ? metaValue : defaultMetaValue;
+            if (nextMetaValue.length > 0) {
+                expanderMetaLabel.textContent = nextMetaValue;
+            }
+        }
+
+        const expanderImage = card.querySelector("[data-day-card-expander-image]");
+        if (expanderImage instanceof HTMLImageElement) {
+            const imageValue = previewTab instanceof HTMLButtonElement
+                ? (previewTab.dataset.dayCardMealImageUrl ?? "").trim()
+                : "";
+            const defaultImageValue = (expanderImage.dataset.dayCardExpanderImageDefault ?? "").trim();
+            const nextImageValue = imageValue.length > 0 ? imageValue : defaultImageValue;
+            if (nextImageValue.length > 0) {
+                expanderImage.setAttribute("src", nextImageValue);
+            }
+        }
+
+        const headerActions = Array.from(card.querySelectorAll("[data-day-card-header-actions]"));
+        headerActions.forEach(actions => {
+            if (!(actions instanceof HTMLElement)) {
+                return;
+            }
+
+            const slotIndex = Number.parseInt(actions.dataset.slotIndex ?? "-1", 10);
+            const isActive = slotIndex === previewSlotIndex;
+            actions.classList.toggle("is-active", isActive);
+            actions.setAttribute("aria-hidden", isActive ? "false" : "true");
+        });
+    };
+
+    const applyDayReorderPreviewSlotsToScope = scope => {
+        if (!(scope instanceof Document || scope instanceof Element)) {
+            return;
+        }
+
+        const cards = Array.from(scope.querySelectorAll("[data-day-meal-card]"));
+        cards.forEach(card => {
+            if (card instanceof HTMLElement) {
+                applyDayReorderPreviewSlotToCard(card);
+            }
+        });
+    };
+
     const applyRememberedActiveDayCardSlideToScope = scope => {
         if (!(scope instanceof Document || scope instanceof Element) ||
             !Number.isInteger(rememberedActiveDayCardSlideOrder) ||
@@ -3165,7 +3279,21 @@
                 }, 240);
             };
 
-            const swapCards = (firstCard, secondCard) => {
+            const setCardDatasetValue = (card, key, value) => {
+                if (!(card instanceof HTMLElement) || typeof key !== "string" || key.length === 0) {
+                    return;
+                }
+
+                const normalizedValue = typeof value === "string" ? value : "";
+                if (normalizedValue.length > 0) {
+                    card.dataset[key] = normalizedValue;
+                    return;
+                }
+
+                delete card.dataset[key];
+            };
+
+            const swapCardMealPayloads = (firstCard, secondCard) => {
                 if (!(firstCard instanceof HTMLElement)
                     || !(secondCard instanceof HTMLElement)
                     || firstCard === secondCard) {
@@ -3177,24 +3305,26 @@
                     return false;
                 }
 
-                const firstNextSibling = firstCard.nextElementSibling;
-                const secondNextSibling = secondCard.nextElementSibling;
+                const payloadKeys = [
+                    "dayCardMealNames",
+                    "dayCardIgnoredFlags",
+                    "dayCardHasSpecialTreat"
+                ];
+                payloadKeys.forEach(key => {
+                    const firstValue = firstCard.dataset[key] ?? "";
+                    const secondValue = secondCard.dataset[key] ?? "";
+                    setCardDatasetValue(firstCard, key, secondValue);
+                    setCardDatasetValue(secondCard, key, firstValue);
+                });
 
-                if (firstNextSibling === secondCard) {
-                    parent.insertBefore(secondCard, firstCard);
-                    return true;
+                const firstMealList = firstCard.querySelector("[data-day-reorder-meal-list]");
+                const secondMealList = secondCard.querySelector("[data-day-reorder-meal-list]");
+                if (firstMealList instanceof HTMLElement && secondMealList instanceof HTMLElement) {
+                    const firstListMarkup = firstMealList.innerHTML;
+                    firstMealList.innerHTML = secondMealList.innerHTML;
+                    secondMealList.innerHTML = firstListMarkup;
                 }
 
-                if (secondNextSibling === firstCard) {
-                    parent.insertBefore(firstCard, secondCard);
-                    return true;
-                }
-
-                const placeholder = document.createElement("div");
-                placeholder.hidden = true;
-                parent.replaceChild(placeholder, firstCard);
-                parent.replaceChild(firstCard, secondCard);
-                parent.replaceChild(secondCard, placeholder);
                 return true;
             };
 
@@ -3342,13 +3472,13 @@
 
                     let moved = false;
                     if (event.key === "ArrowUp" && currentIndex > 0) {
-                        moved = swapCards(card, cards[currentIndex - 1]);
+                        moved = swapCardMealPayloads(card, cards[currentIndex - 1]);
                     } else if (event.key === "ArrowDown" && currentIndex < cards.length - 1) {
-                        moved = swapCards(card, cards[currentIndex + 1]);
+                        moved = swapCardMealPayloads(card, cards[currentIndex + 1]);
                     } else if (event.key === "Home" && currentIndex > 0) {
-                        moved = swapCards(card, cards[0]);
+                        moved = swapCardMealPayloads(card, cards[0]);
                     } else if (event.key === "End" && currentIndex < cards.length - 1) {
-                        moved = swapCards(card, cards[cards.length - 1]);
+                        moved = swapCardMealPayloads(card, cards[cards.length - 1]);
                     }
 
                     if (!moved) {
@@ -3454,7 +3584,7 @@
                         && activeDropTargetCard !== activeCard) {
                         const sourceDayName = getCardDayName(activeCard);
                         const targetDayName = getCardDayName(activeDropTargetCard);
-                        hasMoved = swapCards(activeCard, activeDropTargetCard);
+                        hasMoved = swapCardMealPayloads(activeCard, activeDropTargetCard);
                         if (hasMoved) {
                             pulseMovedCard(activeCard);
                             if (sourceDayName.length > 0 && targetDayName.length > 0) {
@@ -4190,6 +4320,9 @@
                     resetCompactStackedInlineDetailsTouchState(carousel);
                 }
                 applyRememberedDayMealSlotsToScope(carousel);
+                if (isDayReorderMode) {
+                    applyDayReorderPreviewSlotsToScope(carousel);
+                }
                 syncMealSectionExpansionStateForScope(carousel, isStacked);
 
                 if (isStacked) {
@@ -4238,11 +4371,6 @@
                 if (shouldEnable === isDayReorderMode && options.force !== true) {
                     syncReorderToggleState();
                     return;
-                }
-
-                if (shouldEnable && !isDayStackedMode) {
-                    isDayStackedMode = true;
-                    persistDayStackedMode(true);
                 }
 
                 isDayReorderMode = shouldEnable;
