@@ -45,8 +45,17 @@ function Invoke-External {
 }
 
 function Test-DockerReady {
-    & docker info *> $null
-    return $LASTEXITCODE -eq 0
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Docker may emit benign warnings on stderr even when the daemon is ready.
+        # We rely on exit code here and suppress stderr so warnings don't abort deploy.
+        $ErrorActionPreference = "Continue"
+        & docker info 2> $null > $null
+        return $LASTEXITCODE -eq 0
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
 }
 
 function Ensure-DockerRunning {

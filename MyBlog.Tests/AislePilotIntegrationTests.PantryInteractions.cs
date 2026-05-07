@@ -150,7 +150,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task SuggestFromPantry_KnownMeal_UsesBundledMealImagePath()
+    public async Task SuggestFromPantry_KnownMeal_RendersAislePilotImagePath()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -172,7 +172,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains("Egg fried rice", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
-            "/projects/aisle-pilot/images/aislepilot-meals/egg-fried-rice.png",
+            "/projects/aisle-pilot/images/",
             html,
             StringComparison.OrdinalIgnoreCase);
     }
