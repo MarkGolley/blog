@@ -388,6 +388,7 @@
     background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(21, 128, 61, 0.18)) !important;
     color: var(--ap-refresh-text) !important;
     border-color: rgba(17, 92, 78, 0.36) !important;
+    box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.18), 0 14px 28px -24px rgba(15, 23, 42, 0.56);
 }
 
 .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-title {
@@ -545,6 +546,7 @@
 .aislepilot-setup-mode-toggle:not(.is-active) {
     border-color: rgba(148, 163, 184, 0.22) !important;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent), var(--ap-refresh-surface) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.58);
 }
 
 .aislepilot-setup-mode-toggle:not(.is-active) .aislepilot-setup-mode-toggle-title {
@@ -554,6 +556,16 @@
 .aislepilot-setup-mode-toggle:not(.is-active) .aislepilot-setup-mode-toggle-note,
 .aislepilot-setup-mode-toggle:not(.is-active) .aislepilot-setup-mode-toggle-detail {
     color: color-mix(in srgb, var(--ap-refresh-text-muted) 72%, var(--ap-refresh-text) 28%);
+}
+
+:root:not([data-theme="dark"]) .aislepilot-setup-mode-toggle:not(.is-active) .aislepilot-setup-mode-toggle-kicker {
+    color: color-mix(in srgb, var(--ap-refresh-accent) 56%, var(--ap-refresh-text-muted) 44%);
+}
+
+:root:not([data-theme="dark"]) .aislepilot-setup-mode-toggle:not(.is-active) .aislepilot-setup-mode-toggle-icon {
+    border-color: color-mix(in srgb, var(--ap-refresh-border) 80%, #ffffff 20%);
+    background: rgba(148, 163, 184, 0.1);
+    color: color-mix(in srgb, var(--ap-refresh-accent) 48%, var(--ap-refresh-text-muted) 52%);
 }
 
 .aislepilot-field,

@@ -154,6 +154,11 @@ public partial class AislePilotIntegrationTests
             css);
         Assert.Matches(
             new Regex(
+                @"\.aislepilot-setup-mode-toggle\.is-active\s*\{[\s\S]*box-shadow:\s*0\s+0\s+0\s+2px\s+rgba\(20,\s*184,\s*166,\s*0\.18\)",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
                 @"\.aislepilot-setup-mode-toggle\.is-active\s+\.aislepilot-setup-mode-toggle-title\s*\{[\s\S]*color:\s*var\(--ap-refresh-text\)\s*!important;",
                 RegexOptions.IgnoreCase),
             css);
@@ -165,6 +170,16 @@ public partial class AislePilotIntegrationTests
         Assert.Matches(
             new Regex(
                 @":root\[data-theme=""dark""\]\s+\.aislepilot-setup-mode-toggle\.is-active\s*\{[\s\S]*color:\s*#f8fbff\s*!important;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"\.aislepilot-setup-mode-toggle:not\(\.is-active\)\s*\{[\s\S]*box-shadow:\s*inset\s+0\s+0\s+0\s+1px\s+rgba\(255,\s*255,\s*255,\s*0\.58\);",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @":root:not\(\[data-theme=""dark""\]\)\s+\.aislepilot-setup-mode-toggle:not\(\.is-active\)\s+\.aislepilot-setup-mode-toggle-icon\s*\{[\s\S]*background:\s*rgba\(148,\s*163,\s*184,\s*0\.1\);",
                 RegexOptions.IgnoreCase),
             css);
     }
