@@ -372,6 +372,11 @@
         column-gap: 0.5rem;
     }
 
+    .aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-day-meal-track > .aislepilot-day-meal-panel[data-day-panel-layout="details-only"] {
+        grid-template-areas:
+            "details details";
+    }
+
     .aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-day-meal-panel > h3 {
         font-size: 0.94rem;
         line-height: 1.15;
@@ -380,6 +385,10 @@
     .aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-meal-image-shell {
         min-height: 5.05rem;
         border-radius: 10px;
+    }
+
+    .aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-meal-details-image-toggle {
+        margin-top: 0;
     }
 
     .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-carousel-track {

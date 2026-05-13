@@ -1095,6 +1095,11 @@
     border-bottom-color: rgba(15, 23, 42, 0.62);
 }
 
+.aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-image {
+    transform: none;
+    object-position: center 42%;
+}
+
 .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-section-content {
     padding: 0.16rem 0.86rem 0.78rem;
     border-top-color: rgba(15, 23, 42, 0.1);
@@ -1872,6 +1877,11 @@
 }
 
 @media (min-width: 981px) {
+    .aislepilot-day-carousel:not([data-day-stacked-mode="true"]):not([data-day-reorder-mode="true"]) .aislepilot-meal-image-shell {
+        max-height: clamp(10.2rem, 20vw, 12.4rem);
+        aspect-ratio: 4 / 3;
+    }
+
     .aislepilot-day-carousel-header {
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;

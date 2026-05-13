@@ -3721,7 +3721,7 @@
                     if (preview && preview.targetCard instanceof HTMLElement) {
                         setDropTargetIndicator(preview.targetCard, preview.dropPosition);
                         if (activeDayName.length > 0 && preview.targetDayName.length > 0) {
-                            setReorderStatus(`Dragging ${activeDayName}. Drop to swap days with ${preview.targetDayName}.`);
+                            setReorderStatus(`Dragging ${activeDayName}. Drop to swap with ${preview.targetDayName}.`);
                         } else if (activeDayName.length > 0) {
                             setReorderStatus(`Dragging ${activeDayName}. Drop to swap days.`);
                         }
@@ -4520,7 +4520,8 @@
                     return;
                 }
 
-                if (shouldEnable && !isDayStackedMode) {
+                const wasDayStackedModeEnabled = isDayStackedMode;
+                if (shouldEnable && wasDayStackedModeEnabled !== true) {
                     resetRememberedDayMealExpandedState(carousel);
                 }
 
