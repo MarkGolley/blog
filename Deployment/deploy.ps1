@@ -271,7 +271,7 @@ try {
             "--project", $ProjectId,
             "--platform", "managed",
             "--allow-unauthenticated",
-            "--set-env-vars", $envVarsArgument,
+            "--update-env-vars", $envVarsArgument,
             "--labels", "environment=$($deploymentTarget.EnvironmentName.ToLowerInvariant())",
             "--memory=$Memory",
             "--cpu=$Cpu",
