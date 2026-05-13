@@ -255,6 +255,31 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public void SuggestMealsFromPantry_StrictCoreMode_WhenAiPoolContainsNearMatch_StillReturnsEmpty()
+    {
+        ClearAiPool();
+
+        var pooledMeal = CreateMealTemplateWithIngredients(
+            $"Chicken rice skillet {Guid.NewGuid():N}",
+            [
+                ("Chicken breast", "Meat & Fish", 0.35m, "kg", 2.60m),
+                ("Rice", "Tins & Dry Goods", 0.25m, "kg", 0.55m)
+            ]);
+        InvokeAddMealsToAiPool([pooledMeal]);
+
+        var request = new AislePilotRequestModel
+        {
+            PantryItems = "chicken, rice",
+            DietaryModes = ["Balanced"],
+            RequireCorePantryIngredients = true
+        };
+
+        var suggestions = _service.SuggestMealsFromPantry(request, 6);
+
+        Assert.Empty(suggestions);
+    }
+
+    [Fact]
     public void SwapMealForDay_ValidDay_ReplacesMealForThatDay()
     {
         var request = new AislePilotRequestModel

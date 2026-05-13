@@ -474,6 +474,9 @@ public sealed partial class AislePilotService : IAislePilotService
         }
 
         var templateCandidates = FilterMeals(dietaryModes, dislikesOrAllergens);
+        var templateCandidateNames = templateCandidates
+            .Select(candidate => candidate.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         EnsureAiMealPoolHydrated();
         var aiPoolCandidates = GetCompatibleAiPoolMeals(dietaryModes, dislikesOrAllergens);
         var candidates = aiGeneratedCandidates
@@ -535,6 +538,7 @@ public sealed partial class AislePilotService : IAislePilotService
         {
             var strictCoreSuggestions = _pantryRankingEngine.RankPantrySuggestionCandidates(
                     eligibleCandidates
+                        .Where(candidate => templateCandidateNames.Contains(candidate.Template.Name))
                         .Where(candidate => _pantryRankingEngine.TemplateUsesCoreIngredientsFromUserPantry(
                             candidate.Template,
                             userPantryTokens))
