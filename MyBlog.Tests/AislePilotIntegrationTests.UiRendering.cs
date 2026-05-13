@@ -122,7 +122,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("rel=\"preconnect\" href=\"https://fonts.googleapis.com\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("family=Plus+Jakarta+Sans", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("<meta name=\"theme-color\" content=\"#115C4E\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<meta name=\"theme-color\" content=\"#0F6D78\"", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

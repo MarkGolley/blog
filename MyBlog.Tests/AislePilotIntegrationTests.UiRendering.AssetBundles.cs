@@ -49,6 +49,24 @@ public partial class AislePilotIntegrationTests
     }
 
     [Fact]
+    public async Task AislePilotStylesheet_RefreshPalette_UsesLogoBrandTokensInsteadOfLegacyGreen()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var refreshCss = await client.GetStringAsync("/css/aisle-pilot-refresh.css");
+        Assert.Contains("--ap-refresh-primary: #0f6d78;", refreshCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-refresh-primary-strong: #103f65;", refreshCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-refresh-primary-rgb: 15 109 120;", refreshCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--ap-refresh-primary-strong-rgb: 16 63 101;", refreshCss, StringComparison.OrdinalIgnoreCase);
+
+        var css = await GetCombinedAislePilotCssAsync(client);
+        Assert.DoesNotContain("#15724f", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("#115c4e", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("21 114 79", css, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("17 92 78", css, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AislePilotStylesheet_StackedDayMode_UsesEditorialListWithSidePreview()
     {
         using var client = CreateClient(allowAutoRedirect: true);
@@ -209,7 +227,7 @@ public partial class AislePilotIntegrationTests
             css,
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
-            "background: linear-gradient(135deg, var(--ap-refresh-primary, #15724f) 0%, var(--ap-refresh-primary-strong, #115c4e) 100%);",
+            "background: linear-gradient(135deg, var(--ap-refresh-primary, #0f6d78) 0%, var(--ap-refresh-primary-strong, #103f65) 100%);",
             css,
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
@@ -217,7 +235,7 @@ public partial class AislePilotIntegrationTests
             css,
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
-            "background: linear-gradient(135deg, rgb(var(--ap-refresh-primary-rgb, 42 160 108) / 0.9), rgb(var(--ap-refresh-primary-strong-rgb, 24 122 90) / 0.96));",
+            "background: linear-gradient(135deg, rgb(var(--ap-refresh-primary-rgb, 46 141 171) / 0.9), rgb(var(--ap-refresh-primary-strong-rgb, 31 85 124) / 0.96));",
             css,
             StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
