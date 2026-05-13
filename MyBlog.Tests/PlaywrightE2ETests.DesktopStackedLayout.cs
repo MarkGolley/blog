@@ -565,4 +565,102 @@ public sealed partial class PlaywrightE2ETests
         Assert.Equal("1", inspectorStates[5]);
         Assert.Equal("method", inspectorStates[6]);
     }
+
+    [Fact]
+    public async Task Desktop_AislePilotStackedLayout_SingleMealDays_ShowVisibleMealPanelInStackedView()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        await page.EvaluateAsync(
+            """
+            () => {
+                const setMealType = (mealType, isChecked) => {
+                    const input = document.querySelector(`input[type="checkbox"][name="Request.SelectedMealTypes"][value="${mealType}"]`);
+                    if (!(input instanceof HTMLInputElement)) {
+                        return;
+                    }
+
+                    input.checked = isChecked;
+                    input.dispatchEvent(new Event("change", { bubbles: true }));
+                };
+
+                setMealType("Breakfast", false);
+                setMealType("Lunch", false);
+                setMealType("Dinner", true);
+            }
+            """);
+
+        var generateButton = page.Locator("form.aislepilot-form button[type='submit']:has-text('Generate weekly plan')");
+        await generateButton.ScrollIntoViewIfNeededAsync();
+        await generateButton.ClickAsync(new LocatorClickOptions { Force = true });
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var stackedToggle = page.Locator(".aislepilot-day-view-toggle").First;
+        await stackedToggle.ClickAsync();
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement &&
+                    carousel.getAttribute("data-day-stacked-mode") === "true" &&
+                    carousel.getAttribute("data-day-reorder-mode") !== "true";
+            }
+            """);
+
+        var singleMealMetrics = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const activeCard = document.querySelector("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])");
+                if (!(activeCard instanceof HTMLElement)) {
+                    return [-1, -1, -1, -1];
+                }
+
+                const activePanel = activeCard.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']");
+                const mealTitle = activePanel instanceof HTMLElement
+                    ? (activePanel.querySelector(".aislepilot-day-meal-title")?.textContent ?? "").trim()
+                    : "";
+                const detailsPanel = activePanel instanceof HTMLElement
+                    ? activePanel.querySelector("[data-inline-details-panel]")
+                    : null;
+                const slider = activeCard.querySelector(".aislepilot-day-meal-slider");
+                const sliderDisplay = slider instanceof HTMLElement
+                    ? window.getComputedStyle(slider).display
+                    : "";
+                const tabCount = activeCard.querySelectorAll("[data-day-meal-tab]").length;
+
+                return [
+                    tabCount,
+                    activeCard.getAttribute("data-day-card-expanded") === "true" ? 1 : 0,
+                    sliderDisplay !== "none" ? 1 : 0,
+                    mealTitle.length > 0 ? 1 : 0,
+                    detailsPanel instanceof HTMLElement
+                    && !detailsPanel.hasAttribute("hidden")
+                    && detailsPanel.getAttribute("aria-hidden") !== "true"
+                        ? 1
+                        : 0
+                ];
+            }
+            """);
+
+        Assert.Equal(5, singleMealMetrics.Length);
+        Assert.Equal(0, Convert.ToInt32(singleMealMetrics[0]));
+        Assert.Equal(1, Convert.ToInt32(singleMealMetrics[1]));
+        Assert.Equal(1, Convert.ToInt32(singleMealMetrics[2]));
+        Assert.Equal(1, Convert.ToInt32(singleMealMetrics[3]));
+        Assert.Equal(1, Convert.ToInt32(singleMealMetrics[4]));
+    }
 }

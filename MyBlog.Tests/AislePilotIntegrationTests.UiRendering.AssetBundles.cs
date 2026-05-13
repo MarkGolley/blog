@@ -78,6 +78,18 @@ public partial class AislePilotIntegrationTests
                 @"\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-meal-tabs\s*\{[\s\S]*display:\s*grid;",
                 RegexOptions.IgnoreCase),
             css);
+        Assert.Contains(
+            ".aislepilot-day-carousel[data-day-stacked-mode=\"true\"]:not([data-day-reorder-mode=\"true\"]) .aislepilot-day-meal-tabs[data-day-meal-tab-count=\"1\"]",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-day-carousel[data-day-stacked-mode=\"true\"]:not([data-day-reorder-mode=\"true\"]) .aislepilot-day-meal-tabs[data-day-meal-tab-count=\"2\"]",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-day-carousel[data-day-stacked-mode=\"true\"]:not([data-day-reorder-mode=\"true\"]) .aislepilot-day-meal-tabs[data-day-meal-tab-count=\"3\"]",
+            css,
+            StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
                 @"\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-meal-tabs\s*\{[\s\S]*max-width:\s*calc\(100%\s*-\s*clamp\(12\.5rem,\s*26vw,\s*16rem\)\);",
@@ -357,6 +369,11 @@ public partial class AislePilotIntegrationTests
 
         var script = await GetCombinedAislePilotScriptAsync(client);
         Assert.Contains("const ensureStackedInspectorTabs = detailsPanel => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const syncDayMealTabCountForCard = card => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("tabsRoot.dataset.dayMealTabCount = `${normalizedCount}`;", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (tabs.length <= 1 || panels.length <= 1) {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("card.dataset.dayCardExpanded = \"true\";", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("singlePanel.setAttribute(\"aria-hidden\", \"false\");", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const stackedInspectorTabInteractionState = new WeakSet();", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const wireStackedInspectorTabInteractions = (detailsPanel, tabButtons, tabPanels) => {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("if (detailsPanel.dataset.inspectorTabsWired === \"true\") {", script, StringComparison.OrdinalIgnoreCase);

@@ -2516,6 +2516,18 @@
         margin-top: 0.1rem;
     }
 
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tabs[data-day-meal-tab-count="1"] {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tabs[data-day-meal-tab-count="2"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tabs[data-day-meal-tab-count="3"] {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab {
         min-height: 3rem !important;
         padding: 0.42rem 0.56rem !important;

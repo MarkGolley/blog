@@ -1350,6 +1350,23 @@
         return activeIndex >= 0 ? activeIndex : 0;
     };
 
+    const syncDayMealTabCountForCard = card => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const tabsRoot = card.querySelector(".aislepilot-day-meal-tabs");
+        if (!(tabsRoot instanceof HTMLElement)) {
+            return;
+        }
+
+        const tabCount = Array.from(card.querySelectorAll("[data-day-meal-tab]"))
+            .filter(tab => tab instanceof HTMLElement)
+            .length;
+        const normalizedCount = tabCount <= 1 ? 1 : (tabCount >= 3 ? 3 : 2);
+        tabsRoot.dataset.dayMealTabCount = `${normalizedCount}`;
+    };
+
     const rememberDayMealSlots = scope => {
         const cards = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-day-meal-card]"))
@@ -1765,11 +1782,40 @@
         const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
         const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
         const track = card.querySelector("[data-day-meal-track]");
-        if (!(track instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
+        if (!(track instanceof HTMLElement) || panels.length <= 0) {
             return;
         }
 
         const isStackedCardPresentation = isStackedInspectorModeForCard(card);
+        if (tabs.length <= 1 || panels.length <= 1) {
+            if (isStackedCardPresentation && panels.length === 1) {
+                const singlePanel = panels[0];
+                card.dataset.dayCardExpanded = "true";
+                if (singlePanel instanceof HTMLElement) {
+                    singlePanel.setAttribute("aria-hidden", "false");
+                    singlePanel.setAttribute("tabindex", "0");
+                    const inlineDetailsPanel = singlePanel.querySelector("[data-inline-details-panel]");
+                    if (inlineDetailsPanel instanceof HTMLElement) {
+                        ensureStackedInspectorTabs(inlineDetailsPanel);
+                        inlineDetailsPanel.removeAttribute("hidden");
+                        inlineDetailsPanel.setAttribute("aria-hidden", "false");
+                    }
+
+                    const inlineToggle = singlePanel.querySelector("[data-inline-details-toggle]");
+                    if (inlineToggle instanceof HTMLDetailsElement) {
+                        inlineToggle.open = false;
+                    }
+                }
+            } else if (isStackedCardPresentation) {
+                card.dataset.dayCardExpanded = "false";
+            } else {
+                delete card.dataset.dayCardExpanded;
+            }
+
+            track.style.transform = "none";
+            return;
+        }
+
         const dayKey = readCardDayKey(card);
         let isStackedCardExpanded = readRememberedDayMealExpanded(card);
         if (isStackedCardPresentation
@@ -2940,6 +2986,7 @@
             const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
             const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
             const track = card.querySelector("[data-day-meal-track]");
+            syncDayMealTabCountForCard(card);
             if (!(track instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
                 return;
             }
