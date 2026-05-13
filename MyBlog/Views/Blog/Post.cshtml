@@ -39,6 +39,12 @@
             }
         </div>
     }
+    @if (!string.IsNullOrWhiteSpace(Model.Post.CoverImageUrl))
+    {
+        <figure class="post-hero-media">
+            <img src="@Model.Post.CoverImageUrl" alt="" loading="eager" decoding="async" />
+        </figure>
+    }
     <div class="post-content">
         @Html.Raw(Model.Post.Content)
     </div>
@@ -67,23 +73,37 @@
             {
                 <article class="blog-post">
                     <div class="blog-post-main">
-                        <h3>
-                            <a asp-controller="Blog" asp-action="Post" asp-route-slug="@related.Id">@related.Title</a>
-                        </h3>
-                        <div class="post-meta">
-                            @related.DatePosted.ToString("dd MMMM yyyy")
-                            <span class="meta-dot">•</span>
-                            @related.ReadingTimeMinutes min read
-                        </div>
-                        @if (related.Tags.Any())
-                        {
-                            <div class="tag-list">
-                                @foreach (var tag in related.Tags.Take(4))
+                        <div class="blog-post-content-shell">
+                            @if (!string.IsNullOrWhiteSpace(related.CoverImageUrl))
+                            {
+                                <a class="blog-post-cover-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@related.Id" aria-hidden="true" tabindex="-1">
+                                    <img class="blog-post-cover" src="@related.CoverImageUrl" alt="" loading="lazy" decoding="async" />
+                                </a>
+                            }
+                            <div class="blog-post-content">
+                                <h3>
+                                    <a asp-controller="Blog" asp-action="Post" asp-route-slug="@related.Id">@related.Title</a>
+                                </h3>
+                                <div class="post-meta">
+                                    @related.DatePosted.ToString("dd MMMM yyyy")
+                                    <span class="meta-dot">•</span>
+                                    @related.ReadingTimeMinutes min read
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(related.Summary))
                                 {
-                                    <span class="tag-chip">@tag</span>
+                                    <p class="blog-post-summary">@related.Summary</p>
+                                }
+                                @if (related.Tags.Any())
+                                {
+                                    <div class="tag-list">
+                                        @foreach (var tag in related.Tags.Take(4))
+                                        {
+                                            <span class="tag-chip">@tag</span>
+                                        }
+                                    </div>
                                 }
                             </div>
-                        }
+                        </div>
                     </div>
                 </article>
             }

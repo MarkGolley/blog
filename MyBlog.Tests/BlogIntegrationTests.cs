@@ -45,6 +45,44 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task BlogIndex_RendersEditorialShellAndPostSummaries()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog");
+
+        Assert.Contains("class=\"route-blog route-blog-index\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"blog-post-content-shell\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"blog-post-summary\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SiteCss_ContainsBlogDarkContrastAndExcerptClampRules()
+    {
+        using var client = _factory.CreateClient();
+
+        var css = await client.GetStringAsync("/css/site.css");
+
+        Assert.Contains(":root[data-theme=\"dark\"] body.route-blog .blog-hero", css, StringComparison.Ordinal);
+        Assert.Contains("background: rgba(14, 23, 37, 0.95);", css, StringComparison.Ordinal);
+        Assert.Contains("body.route-blog .site-header", css, StringComparison.Ordinal);
+        Assert.Contains("-webkit-line-clamp: 2;", css, StringComparison.Ordinal);
+        Assert.Contains("-webkit-line-clamp: 3;", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BlogIndex_SubscribeSection_RendersTrustCopyAndSubscribeButtonClass()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog");
+
+        Assert.Contains("class=\"subscribe-button\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"subscribe-trust\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("No spam. Unsubscribe anytime.", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OrleansPost_RendersEnhancedInteractiveDemoSkin()
     {
         using var client = _factory.CreateClient();

@@ -76,6 +76,24 @@ body::before {
     background-image: linear-gradient(transparent 0%, rgba(20, 32, 51, 0.11) 100%);
 }
 
+body.route-blog {
+    background: #f3efe7;
+}
+
+body.route-blog::before {
+    display: none;
+}
+
+body.route-blog .page-aurora {
+    display: none;
+}
+
+body.route-blog .scroll-progress {
+    height: 3px;
+    background: #162033;
+    box-shadow: none;
+}
+
 .page-aurora {
     position: fixed;
     inset: 0;
@@ -167,6 +185,11 @@ body::before {
     padding: 0.9rem 0;
 }
 
+body.route-blog .site-header {
+    top: 0;
+    padding: 0.6rem 0 0.45rem;
+}
+
 .app-shell-header {
     position: sticky;
     top: 0.4rem;
@@ -204,6 +227,14 @@ body::before {
     box-shadow: var(--shadow-soft);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+}
+
+body.route-blog .nav-shell {
+    border-radius: 10px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 10px 20px rgba(13, 19, 30, 0.08);
+    background: rgba(255, 255, 255, 0.82);
 }
 
 .nav-brand {
@@ -607,6 +638,10 @@ body::before {
     padding: 0.9rem 0 2.4rem;
 }
 
+body.route-blog .page-main {
+    padding-top: 1.05rem;
+}
+
 a {
     color: var(--brand-deep);
     text-decoration: none;
@@ -625,6 +660,13 @@ h3 {
     letter-spacing: -0.018em;
     color: var(--ink);
     font-family: "Fraunces", "Georgia", serif;
+}
+
+body.route-blog h1,
+body.route-blog h2,
+body.route-blog h3 {
+    font-family: "Space Grotesk", "Segoe UI", sans-serif;
+    letter-spacing: 0;
 }
 
 h1 {
@@ -1153,6 +1195,17 @@ main > section.blog-page {
     margin-bottom: 1rem;
 }
 
+body.route-blog .blog-hero {
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: none;
+}
+
+body.route-blog .blog-hero h1 {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    line-height: 1;
+}
+
 .blog-stat-inline {
     display: none;
     margin: 0.45rem 0 0.2rem;
@@ -1173,6 +1226,15 @@ main > section.blog-page {
     border-radius: var(--radius-md);
     border: 1px solid var(--line);
     background: var(--panel);
+}
+
+body.route-blog .blog-filter-form,
+body.route-blog .pinned-posts-block,
+body.route-blog .blog-post {
+    border-radius: 10px;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .blog-filter-row {
@@ -1295,6 +1357,32 @@ main > section.blog-page {
     min-width: 0;
 }
 
+.blog-post-content-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.62rem;
+}
+
+.blog-post-content {
+    min-width: 0;
+}
+
+.blog-post-cover-link {
+    display: inline-block;
+    border-bottom: none;
+}
+
+.blog-post-cover {
+    width: min(100%, 320px);
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    background: rgba(16, 63, 101, 0.08);
+    display: block;
+}
+
 .post-title-link {
     border-bottom: none;
     color: var(--ink);
@@ -1308,6 +1396,17 @@ main > section.blog-page {
 .post-meta {
     color: var(--ink-soft);
     font-size: 0.87rem;
+}
+
+.blog-post-summary {
+    margin: 0.42rem 0 0;
+    color: var(--ink-soft);
+    max-width: 72ch;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .meta-dot {
@@ -1415,19 +1514,50 @@ main > section.blog-page {
     margin-top: 1rem;
     border: 1px solid rgba(15, 109, 120, 0.27);
     border-radius: var(--radius-md);
-    padding: 1rem;
-    background: linear-gradient(136deg, rgba(15, 109, 120, 0.09), rgba(255, 255, 255, 0.9));
+    padding: 1.05rem;
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 10px 20px rgba(10, 24, 42, 0.08);
+}
+
+.subscribe-card h3 {
+    margin-bottom: 0.35rem;
+    font-size: clamp(1.18rem, 1.9vw, 1.45rem);
+}
+
+.subscribe-intro {
+    margin-bottom: 0.72rem;
+}
+
+body.route-blog .subscribe-card {
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: none;
 }
 
 .subscribe-row {
     display: flex;
     gap: 0.65rem;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .subscribe-row input {
-    flex: 1 1 250px;
+    flex: 1 1 auto;
+    min-height: 2.75rem;
+    padding: 0.64rem 0.82rem;
+}
+
+.subscribe-button {
+    flex: 0 0 auto;
+    min-width: 7.1rem;
+    min-height: 2.75rem;
+    padding-inline: 1rem;
+}
+
+.subscribe-trust {
+    margin: 0.52rem 0 0;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
 }
 
 .subscribe-feedback,
@@ -1450,6 +1580,21 @@ main > section.blog-page {
 
 .post-content {
     margin-top: 0.85rem;
+}
+
+.post-hero-media {
+    margin: 0.4rem 0 1rem;
+}
+
+.post-hero-media img {
+    display: block;
+    width: 100%;
+    max-width: 920px;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: rgba(16, 63, 101, 0.08);
 }
 
 .post-content h2,
@@ -2134,6 +2279,20 @@ thead th {
         align-items: flex-start;
     }
 
+    .blog-post-summary {
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+    }
+
+    .subscribe-row {
+        flex-wrap: wrap;
+    }
+
+    .subscribe-row input,
+    .subscribe-button {
+        width: 100%;
+    }
+
     .like-form-inline {
         margin-left: 0;
     }
@@ -2174,6 +2333,23 @@ thead th {
 :root[data-theme="dark"] body::before {
     opacity: 0.42;
     background-image: linear-gradient(transparent 0%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+:root[data-theme="dark"] body.route-blog {
+    background: #0d1522;
+}
+
+:root[data-theme="dark"] body.route-blog::before {
+    display: none;
+}
+
+:root[data-theme="dark"] body.route-blog .blog-hero {
+    background: rgba(14, 23, 37, 0.95);
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] body.route-blog .nav-shell {
+    background: rgba(14, 23, 37, 0.97);
 }
 
 :root[data-theme="dark"] .orb-a {
@@ -2273,6 +2449,21 @@ thead th {
 
 :root[data-theme="dark"] .comment-item.unapproved {
     background: rgba(42, 48, 58, 0.74);
+}
+
+:root[data-theme="dark"] .subscribe-card {
+    border-color: var(--line);
+    background: rgba(14, 23, 37, 0.95);
+    box-shadow: 0 10px 22px rgba(4, 10, 18, 0.5);
+}
+
+:root[data-theme="dark"] .subscribe-trust {
+    color: rgba(168, 183, 205, 0.92);
+}
+
+:root[data-theme="dark"] .subscribe-button {
+    border-color: rgba(125, 211, 252, 0.34);
+    background: linear-gradient(100deg, #2e8dab 0%, #1f557c 100%);
 }
 
 :root[data-theme="dark"] .post-capsule {
