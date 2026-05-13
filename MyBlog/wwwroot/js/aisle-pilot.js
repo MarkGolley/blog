@@ -1604,8 +1604,89 @@
         });
     };
 
+    const stackedInspectorTabInteractionState = new WeakSet();
+
+    const wireStackedInspectorTabInteractions = (detailsPanel, tabButtons, tabPanels) => {
+        if (!(detailsPanel instanceof HTMLElement)
+            || stackedInspectorTabInteractionState.has(detailsPanel)
+            || tabButtons.length === 0
+            || tabPanels.length === 0) {
+            return;
+        }
+
+        const activateInspectorTab = nextKey => {
+            tabButtons.forEach(button => {
+                const isActive = button.dataset.inspectorTab === nextKey;
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-selected", isActive ? "true" : "false");
+                button.setAttribute("tabindex", isActive ? "0" : "-1");
+            });
+
+            tabPanels.forEach(panel => {
+                const isActive = panel.dataset.inspectorPanel === nextKey;
+                panel.classList.toggle("is-active", isActive);
+                panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+            });
+        };
+
+        tabButtons.forEach((button, index) => {
+            button.addEventListener("click", () => {
+                activateInspectorTab(button.dataset.inspectorTab ?? "overview");
+            });
+
+            button.addEventListener("keydown", event => {
+                if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") {
+                    return;
+                }
+
+                event.preventDefault();
+                let nextIndex = index;
+                if (event.key === "ArrowRight") {
+                    nextIndex = (index + 1) % tabButtons.length;
+                } else if (event.key === "ArrowLeft") {
+                    nextIndex = (index - 1 + tabButtons.length) % tabButtons.length;
+                } else if (event.key === "Home") {
+                    nextIndex = 0;
+                } else if (event.key === "End") {
+                    nextIndex = tabButtons.length - 1;
+                }
+
+                const nextButton = tabButtons[nextIndex];
+                if (!(nextButton instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                activateInspectorTab(nextButton.dataset.inspectorTab ?? "overview");
+                nextButton.focus();
+            });
+        });
+
+        const selectedButton = tabButtons.find(button => button.getAttribute("aria-selected") === "true");
+        const visiblePanel = tabPanels.find(panel => panel.getAttribute("aria-hidden") !== "true");
+        const initialKey =
+            selectedButton?.dataset.inspectorTab
+            ?? visiblePanel?.dataset.inspectorPanel
+            ?? tabButtons[0]?.dataset.inspectorTab
+            ?? "overview";
+        activateInspectorTab(initialKey);
+        stackedInspectorTabInteractionState.add(detailsPanel);
+    };
+
     const ensureStackedInspectorTabs = detailsPanel => {
-        if (!(detailsPanel instanceof HTMLElement) || detailsPanel.dataset.inspectorTabsWired === "true") {
+        if (!(detailsPanel instanceof HTMLElement)) {
+            return;
+        }
+
+        if (detailsPanel.dataset.inspectorTabsWired === "true") {
+            const existingButtons = Array.from(
+                detailsPanel.querySelectorAll(".aislepilot-inspector-tabs > .aislepilot-inspector-tab"))
+                .filter(button => button instanceof HTMLButtonElement);
+            const existingPanels = Array.from(
+                detailsPanel.querySelectorAll(".aislepilot-inspector-panels > .aislepilot-inspector-panel"))
+                .filter(panel => panel instanceof HTMLElement);
+            if (existingButtons.length > 0 && existingPanels.length > 0) {
+                wireStackedInspectorTabInteractions(detailsPanel, existingButtons, existingPanels);
+            }
             return;
         }
 
@@ -1672,56 +1753,8 @@
 
         detailsPanel.prepend(tabsRoot);
         detailsPanel.appendChild(panelsRoot);
-
-        const activateInspectorTab = nextKey => {
-            tabButtons.forEach(button => {
-                const isActive = button.dataset.inspectorTab === nextKey;
-                button.classList.toggle("is-active", isActive);
-                button.setAttribute("aria-selected", isActive ? "true" : "false");
-                button.setAttribute("tabindex", isActive ? "0" : "-1");
-            });
-
-            tabPanels.forEach(panel => {
-                const isActive = panel.dataset.inspectorPanel === nextKey;
-                panel.classList.toggle("is-active", isActive);
-                panel.setAttribute("aria-hidden", isActive ? "false" : "true");
-            });
-        };
-
-        tabButtons.forEach((button, index) => {
-            button.addEventListener("click", () => {
-                activateInspectorTab(button.dataset.inspectorTab ?? "overview");
-            });
-
-            button.addEventListener("keydown", event => {
-                if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") {
-                    return;
-                }
-
-                event.preventDefault();
-                let nextIndex = index;
-                if (event.key === "ArrowRight") {
-                    nextIndex = (index + 1) % tabButtons.length;
-                } else if (event.key === "ArrowLeft") {
-                    nextIndex = (index - 1 + tabButtons.length) % tabButtons.length;
-                } else if (event.key === "Home") {
-                    nextIndex = 0;
-                } else if (event.key === "End") {
-                    nextIndex = tabButtons.length - 1;
-                }
-
-                const nextButton = tabButtons[nextIndex];
-                if (!(nextButton instanceof HTMLButtonElement)) {
-                    return;
-                }
-
-                activateInspectorTab(nextButton.dataset.inspectorTab ?? "overview");
-                nextButton.focus();
-            });
-        });
-
-        activateInspectorTab("overview");
         detailsPanel.dataset.inspectorTabsWired = "true";
+        wireStackedInspectorTabInteractions(detailsPanel, tabButtons, tabPanels);
     };
 
     const applyRememberedDayMealSlotToCard = card => {

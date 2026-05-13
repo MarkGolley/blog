@@ -421,4 +421,148 @@ public sealed partial class PlaywrightE2ETests
             metrics[2] >= 1,
             $"Expected expanded stacked inspector content to use one clear surface border. Border={metrics[2]:F1}px.");
     }
+
+    [Fact]
+    public async Task Desktop_AislePilotStackedLayout_InspectorTabsStayInteractiveAfterSwap()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var stackedToggle = page.Locator(".aislepilot-day-view-toggle").First;
+        await stackedToggle.ClickAsync();
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement &&
+                    carousel.getAttribute("data-day-stacked-mode") === "true" &&
+                    carousel.getAttribute("data-day-reorder-mode") !== "true";
+            }
+            """);
+
+        var firstMealTab = page.Locator("[data-day-card-slide]:not([data-day-carousel-ghost='true'])").First
+            .Locator("[data-day-meal-tab]").First;
+        var detailsVisible = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                return detailsPanel instanceof HTMLElement &&
+                    !detailsPanel.hasAttribute("hidden") &&
+                    detailsPanel.getAttribute("aria-hidden") !== "true";
+            }
+            """);
+
+        if (!detailsVisible)
+        {
+            await firstMealTab.ClickAsync();
+        }
+
+        var activeCard = page.Locator("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])").First;
+        var moreActionsSummary = activeCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
+        await moreActionsSummary.ScrollIntoViewIfNeededAsync();
+        await moreActionsSummary.ClickAsync();
+
+        var swapButton = activeCard
+            .Locator("[data-day-card-header-actions].is-active .aislepilot-card-more-actions-menu .aislepilot-swap-form button[type='submit']")
+            .First;
+        await swapButton.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var swapResponseTask = page.WaitForResponseAsync(response =>
+            response.Ok &&
+            response.Url.Contains("/projects/aisle-pilot/swap-meal", StringComparison.OrdinalIgnoreCase));
+        await swapButton.ClickAsync();
+        _ = await swapResponseTask;
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const activeCard = document.querySelector("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])");
+                if (!(activeCard instanceof HTMLElement) || activeCard.getAttribute("aria-busy") === "true") {
+                    return false;
+                }
+
+                const activePanel = activeCard.querySelector("[data-day-meal-panel][aria-hidden='false']");
+                const detailsPanel = activePanel instanceof HTMLElement
+                    ? activePanel.querySelector("[data-inline-details-panel]")
+                    : null;
+                if (!(detailsPanel instanceof HTMLElement)) {
+                    return false;
+                }
+
+                return !detailsPanel.hasAttribute("hidden")
+                    && detailsPanel.getAttribute("aria-hidden") !== "true"
+                    && detailsPanel.querySelectorAll(".aislepilot-inspector-tab").length >= 4;
+            }
+            """);
+
+        var inspectorStates = await page.EvaluateAsync<string[]>(
+            """
+            () => {
+                const activeCard = document.querySelector("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])");
+                if (!(activeCard instanceof HTMLElement)) {
+                    return [];
+                }
+
+                const activeKey = () => {
+                    const activePanel = activeCard.querySelector(".aislepilot-inspector-panel.is-active");
+                    return activePanel instanceof HTMLElement
+                        ? (activePanel.dataset.inspectorPanel ?? "")
+                        : "";
+                };
+
+                const clickTab = key => {
+                    const button = activeCard.querySelector(`.aislepilot-inspector-tab[data-inspector-tab='${key}']`);
+                    if (!(button instanceof HTMLButtonElement)) {
+                        return false;
+                    }
+
+                    button.click();
+                    return true;
+                };
+
+                const before = activeKey();
+                const clickedMacros = clickTab("nutrition");
+                const afterMacros = activeKey();
+                const clickedIngredients = clickTab("ingredients");
+                const afterIngredients = activeKey();
+                const clickedMethod = clickTab("method");
+                const afterMethod = activeKey();
+
+                return [
+                    before,
+                    clickedMacros ? "1" : "0",
+                    afterMacros,
+                    clickedIngredients ? "1" : "0",
+                    afterIngredients,
+                    clickedMethod ? "1" : "0",
+                    afterMethod
+                ];
+            }
+            """);
+
+        Assert.Equal(7, inspectorStates.Length);
+        Assert.Equal("1", inspectorStates[1]);
+        Assert.Equal("nutrition", inspectorStates[2]);
+        Assert.Equal("1", inspectorStates[3]);
+        Assert.Equal("ingredients", inspectorStates[4]);
+        Assert.Equal("1", inspectorStates[5]);
+        Assert.Equal("method", inspectorStates[6]);
+    }
 }
