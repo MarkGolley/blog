@@ -204,6 +204,8 @@
     const panels = Array.from(root.querySelectorAll(".aislepilot-window-panel"));
     const tabHint = root.querySelector("[data-window-hint]");
     const tabHintSeenStorageKey = "aislepilot:tab-hint-seen";
+    const dayStackedModeStorageKey = "aislepilot:day-stacked-mode";
+    const dayReorderModeStorageKey = "aislepilot:day-reorder-mode";
     const shoppingItemStateStorageKey = "aislepilot:shopping-item-state";
     const customShoppingItemsStorageKey = "aislepilot:custom-shopping-items";
     let shoppingItemStateCache = null;
@@ -1315,6 +1317,8 @@
     };
 
     const dayMealSlotState = new Map();
+    const dayMealExpandedState = new Map();
+    let expandedStackedDayKey = "";
     let rememberedActiveDayCardSlideOrder = null;
 
     const readCardDayKey = card => {
@@ -1344,6 +1348,23 @@
         });
 
         return activeIndex >= 0 ? activeIndex : 0;
+    };
+
+    const syncDayMealTabCountForCard = card => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const tabsRoot = card.querySelector(".aislepilot-day-meal-tabs");
+        if (!(tabsRoot instanceof HTMLElement)) {
+            return;
+        }
+
+        const tabCount = Array.from(card.querySelectorAll("[data-day-meal-tab]"))
+            .filter(tab => tab instanceof HTMLElement)
+            .length;
+        const normalizedCount = tabCount <= 1 ? 1 : (tabCount >= 3 ? 3 : 2);
+        tabsRoot.dataset.dayMealTabCount = `${normalizedCount}`;
     };
 
     const rememberDayMealSlots = scope => {
@@ -1436,6 +1457,323 @@
         return Number.isInteger(stored) ? stored : 0;
     };
 
+    const readRememberedDayMealExpanded = card => {
+        const dayKey = readCardDayKey(card);
+        if (!dayKey || !dayMealExpandedState.has(dayKey)) {
+            return false;
+        }
+
+        return dayMealExpandedState.get(dayKey) === true;
+    };
+
+    const setRememberedDayMealExpanded = (card, shouldExpand) => {
+        const dayKey = readCardDayKey(card);
+        if (!dayKey) {
+            return;
+        }
+
+        const isExpanded = shouldExpand === true;
+        dayMealExpandedState.set(dayKey, isExpanded);
+        if (isExpanded) {
+            expandedStackedDayKey = dayKey;
+        } else if (expandedStackedDayKey === dayKey) {
+            expandedStackedDayKey = "";
+        }
+    };
+
+    const resetRememberedDayMealExpandedState = scope => {
+        const cards = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-meal-card]"))
+            : Array.from(document.querySelectorAll("[data-day-meal-card]"));
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+
+            const dayKey = readCardDayKey(card);
+            if (!dayKey) {
+                return;
+            }
+
+            dayMealExpandedState.set(dayKey, false);
+        });
+        expandedStackedDayKey = "";
+    };
+
+    const collapseOtherStackedDayCards = activeCard => {
+        if (!(activeCard instanceof HTMLElement)) {
+            return;
+        }
+
+        const carousel = activeCard.closest("[data-day-card-carousel]");
+        const scope = carousel instanceof HTMLElement ? carousel : document;
+        const cards = Array.from(scope.querySelectorAll("[data-day-meal-card]"));
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement) || card === activeCard) {
+                return;
+            }
+
+            if (!isStackedInspectorModeForCard(card)) {
+                return;
+            }
+
+            setRememberedDayMealExpanded(card, false);
+            applyRememberedDayMealSlotToCard(card);
+        });
+    };
+
+    const rememberDayMealExpandedState = scope => {
+        const cards = scope instanceof Element
+            ? Array.from(scope.querySelectorAll("[data-day-meal-card]"))
+            : Array.from(document.querySelectorAll("[data-day-meal-card]"));
+        let rememberedExpandedKey = "";
+
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement)) {
+                return;
+            }
+
+            const dayKey = readCardDayKey(card);
+            if (!dayKey) {
+                return;
+            }
+
+            const activePanel = card.querySelector("[data-day-meal-panel][aria-hidden='false']");
+            const detailsPanel = activePanel instanceof HTMLElement
+                ? activePanel.querySelector("[data-inline-details-panel]")
+                : null;
+            const isExpanded = detailsPanel instanceof HTMLElement
+                && !detailsPanel.hasAttribute("hidden")
+                && detailsPanel.getAttribute("aria-hidden") !== "true";
+
+            dayMealExpandedState.set(dayKey, isExpanded);
+            if (!rememberedExpandedKey && isExpanded) {
+                rememberedExpandedKey = dayKey;
+            }
+        });
+
+        expandedStackedDayKey = rememberedExpandedKey;
+    };
+
+    const isStackedInspectorModeForCard = card => {
+        if (!(card instanceof HTMLElement)) {
+            return false;
+        }
+
+        const carousel = card.closest("[data-day-card-carousel]");
+        return carousel instanceof HTMLElement
+            && carousel.dataset.dayStackedMode === "true"
+            && carousel.dataset.dayReorderMode !== "true";
+    };
+
+    const compactStackedInspectorQuery = "(max-width: 980px), (pointer: coarse)";
+    const isCompactStackedInspectorViewport = () => {
+        if (typeof window.matchMedia === "function"
+            && window.matchMedia(compactStackedInspectorQuery).matches) {
+            return true;
+        }
+
+        if (typeof window.innerWidth === "number" && window.innerWidth > 0 && window.innerWidth <= 980) {
+            return true;
+        }
+
+        return false;
+    };
+    const isCompactStackedInspectorModeForCard = card =>
+        isStackedInspectorModeForCard(card)
+        && isCompactStackedInspectorViewport();
+
+    const resetCompactStackedInlineDetailsTouchState = scope => {
+        if (!(scope instanceof Document || scope instanceof Element)) {
+            return;
+        }
+
+        const cards = Array.from(scope.querySelectorAll("[data-day-meal-card]"));
+        cards.forEach(card => {
+            if (!(card instanceof HTMLElement) || !isCompactStackedInspectorModeForCard(card)) {
+                return;
+            }
+
+            const toggles = Array.from(card.querySelectorAll("[data-inline-details-toggle]"));
+            toggles.forEach(toggle => {
+                if (!(toggle instanceof HTMLDetailsElement)) {
+                    return;
+                }
+
+                toggle.dataset.inlineDetailsTouched = "false";
+                toggle.open = false;
+            });
+        });
+    };
+
+    const syncMealSectionExpansionStateForScope = (scope, shouldExpand) => {
+        if (!(scope instanceof Document || scope instanceof Element)) {
+            return;
+        }
+
+        const sections = Array.from(scope.querySelectorAll("[data-day-meal-panel] [data-meal-section]"));
+        sections.forEach(section => {
+            if (!(section instanceof HTMLDetailsElement)) {
+                return;
+            }
+
+            section.open = shouldExpand;
+        });
+    };
+
+    const stackedInspectorTabInteractionState = new WeakSet();
+
+    const wireStackedInspectorTabInteractions = (detailsPanel, tabButtons, tabPanels) => {
+        if (!(detailsPanel instanceof HTMLElement)
+            || stackedInspectorTabInteractionState.has(detailsPanel)
+            || tabButtons.length === 0
+            || tabPanels.length === 0) {
+            return;
+        }
+
+        const activateInspectorTab = nextKey => {
+            tabButtons.forEach(button => {
+                const isActive = button.dataset.inspectorTab === nextKey;
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-selected", isActive ? "true" : "false");
+                button.setAttribute("tabindex", isActive ? "0" : "-1");
+            });
+
+            tabPanels.forEach(panel => {
+                const isActive = panel.dataset.inspectorPanel === nextKey;
+                panel.classList.toggle("is-active", isActive);
+                panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+            });
+        };
+
+        tabButtons.forEach((button, index) => {
+            button.addEventListener("click", () => {
+                activateInspectorTab(button.dataset.inspectorTab ?? "overview");
+            });
+
+            button.addEventListener("keydown", event => {
+                if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") {
+                    return;
+                }
+
+                event.preventDefault();
+                let nextIndex = index;
+                if (event.key === "ArrowRight") {
+                    nextIndex = (index + 1) % tabButtons.length;
+                } else if (event.key === "ArrowLeft") {
+                    nextIndex = (index - 1 + tabButtons.length) % tabButtons.length;
+                } else if (event.key === "Home") {
+                    nextIndex = 0;
+                } else if (event.key === "End") {
+                    nextIndex = tabButtons.length - 1;
+                }
+
+                const nextButton = tabButtons[nextIndex];
+                if (!(nextButton instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                activateInspectorTab(nextButton.dataset.inspectorTab ?? "overview");
+                nextButton.focus();
+            });
+        });
+
+        const selectedButton = tabButtons.find(button => button.getAttribute("aria-selected") === "true");
+        const visiblePanel = tabPanels.find(panel => panel.getAttribute("aria-hidden") !== "true");
+        const initialKey =
+            selectedButton?.dataset.inspectorTab
+            ?? visiblePanel?.dataset.inspectorPanel
+            ?? tabButtons[0]?.dataset.inspectorTab
+            ?? "overview";
+        activateInspectorTab(initialKey);
+        stackedInspectorTabInteractionState.add(detailsPanel);
+    };
+
+    const ensureStackedInspectorTabs = detailsPanel => {
+        if (!(detailsPanel instanceof HTMLElement)) {
+            return;
+        }
+
+        if (detailsPanel.dataset.inspectorTabsWired === "true") {
+            const existingButtons = Array.from(
+                detailsPanel.querySelectorAll(".aislepilot-inspector-tabs > .aislepilot-inspector-tab"))
+                .filter(button => button instanceof HTMLButtonElement);
+            const existingPanels = Array.from(
+                detailsPanel.querySelectorAll(".aislepilot-inspector-panels > .aislepilot-inspector-panel"))
+                .filter(panel => panel instanceof HTMLElement);
+            if (existingButtons.length > 0 && existingPanels.length > 0) {
+                wireStackedInspectorTabInteractions(detailsPanel, existingButtons, existingPanels);
+            }
+            return;
+        }
+
+        const owningCard = detailsPanel.closest("[data-day-meal-card]");
+        const shouldExpandMealSections = isStackedInspectorModeForCard(owningCard);
+
+        const reasonBlock = detailsPanel.querySelector(".aislepilot-card-reason");
+        const nutritionSection = detailsPanel.querySelector("[data-meal-section='nutrition']");
+        const ingredientsSection = detailsPanel.querySelector("[data-meal-section='ingredients']");
+        const methodSection = detailsPanel.querySelector("[data-meal-section='method']");
+        if (!(reasonBlock instanceof HTMLElement)
+            || !(nutritionSection instanceof HTMLElement)
+            || !(ingredientsSection instanceof HTMLElement)
+            || !(methodSection instanceof HTMLElement)) {
+            detailsPanel.dataset.inspectorTabsWired = "true";
+            return;
+        }
+
+        const tabsRoot = document.createElement("div");
+        tabsRoot.className = "aislepilot-inspector-tabs";
+        tabsRoot.setAttribute("role", "tablist");
+        tabsRoot.setAttribute("aria-label", "Meal detail sections");
+
+        const panelsRoot = document.createElement("div");
+        panelsRoot.className = "aislepilot-inspector-panels";
+
+        const sections = [
+            { key: "overview", label: "Overview", node: reasonBlock },
+            { key: "nutrition", label: "Macros", node: nutritionSection },
+            { key: "ingredients", label: "Ingredients", node: ingredientsSection },
+            { key: "method", label: "Method", node: methodSection }
+        ];
+
+        const tabButtons = [];
+        const tabPanels = [];
+
+        sections.forEach((section, index) => {
+            const tabButton = document.createElement("button");
+            tabButton.type = "button";
+            tabButton.className = "aislepilot-inspector-tab";
+            tabButton.dataset.inspectorTab = section.key;
+            tabButton.setAttribute("role", "tab");
+            tabButton.setAttribute("aria-selected", index === 0 ? "true" : "false");
+            tabButton.setAttribute("tabindex", index === 0 ? "0" : "-1");
+            tabButton.textContent = section.label;
+            tabsRoot.appendChild(tabButton);
+            tabButtons.push(tabButton);
+
+            const panel = document.createElement("section");
+            panel.className = "aislepilot-inspector-panel";
+            panel.dataset.inspectorPanel = section.key;
+            panel.setAttribute("role", "tabpanel");
+            panel.setAttribute("aria-hidden", index === 0 ? "false" : "true");
+            if (section.node instanceof HTMLDetailsElement) {
+                section.node.open = shouldExpandMealSections;
+                panel.appendChild(section.node);
+            } else {
+                panel.appendChild(section.node);
+            }
+
+            panelsRoot.appendChild(panel);
+            tabPanels.push(panel);
+        });
+
+        detailsPanel.prepend(tabsRoot);
+        detailsPanel.appendChild(panelsRoot);
+        detailsPanel.dataset.inspectorTabsWired = "true";
+        wireStackedInspectorTabInteractions(detailsPanel, tabButtons, tabPanels);
+    };
+
     const applyRememberedDayMealSlotToCard = card => {
         if (!(card instanceof HTMLElement)) {
             return;
@@ -1443,13 +1781,61 @@
 
         const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
         const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
-        if (tabs.length <= 1 || panels.length <= 1) {
+        const track = card.querySelector("[data-day-meal-track]");
+        if (!(track instanceof HTMLElement) || panels.length <= 0) {
             return;
         }
 
+        const isStackedCardPresentation = isStackedInspectorModeForCard(card);
+        if (tabs.length <= 1 || panels.length <= 1) {
+            if (isStackedCardPresentation && panels.length === 1) {
+                const singlePanel = panels[0];
+                card.dataset.dayCardExpanded = "true";
+                if (singlePanel instanceof HTMLElement) {
+                    singlePanel.setAttribute("aria-hidden", "false");
+                    singlePanel.setAttribute("tabindex", "0");
+                    const inlineDetailsPanel = singlePanel.querySelector("[data-inline-details-panel]");
+                    if (inlineDetailsPanel instanceof HTMLElement) {
+                        ensureStackedInspectorTabs(inlineDetailsPanel);
+                        inlineDetailsPanel.removeAttribute("hidden");
+                        inlineDetailsPanel.setAttribute("aria-hidden", "false");
+                    }
+
+                    const inlineToggle = singlePanel.querySelector("[data-inline-details-toggle]");
+                    if (inlineToggle instanceof HTMLDetailsElement) {
+                        inlineToggle.open = false;
+                    }
+                }
+            } else if (isStackedCardPresentation) {
+                card.dataset.dayCardExpanded = "false";
+            } else {
+                delete card.dataset.dayCardExpanded;
+            }
+
+            track.style.transform = "none";
+            return;
+        }
+
+        const dayKey = readCardDayKey(card);
+        let isStackedCardExpanded = readRememberedDayMealExpanded(card);
+        if (isStackedCardPresentation
+            && dayKey.length > 0
+            && expandedStackedDayKey.length > 0
+            && expandedStackedDayKey !== dayKey) {
+            isStackedCardExpanded = false;
+            setRememberedDayMealExpanded(card, false);
+        }
+        if (isStackedCardPresentation) {
+            card.dataset.dayCardExpanded = isStackedCardExpanded ? "true" : "false";
+        } else {
+            delete card.dataset.dayCardExpanded;
+        }
         const slotCount = Math.min(tabs.length, panels.length);
         const activeSlotIndex = Math.max(0, Math.min(slotCount - 1, readRememberedDayMealSlot(card)));
         const activeTab = tabs[activeSlotIndex];
+        track.style.transform = isStackedCardPresentation
+            ? "none"
+            : `translateX(-${activeSlotIndex * 100}%)`;
 
         tabs.forEach((tab, index) => {
             if (!(tab instanceof HTMLButtonElement)) {
@@ -1467,9 +1853,36 @@
                 return;
             }
 
-            const isActive = index === activeSlotIndex;
-            panel.setAttribute("aria-hidden", isActive ? "false" : "true");
-            panel.setAttribute("tabindex", isActive ? "0" : "-1");
+            const isVisible = index === activeSlotIndex;
+            panel.setAttribute("aria-hidden", isVisible ? "false" : "true");
+            panel.setAttribute("tabindex", isVisible ? "0" : "-1");
+
+            const inlineToggle = panel.querySelector("[data-inline-details-toggle]");
+            const inlineDetailsPanel = panel.querySelector("[data-inline-details-panel]");
+            if (isStackedCardPresentation) {
+                if (inlineDetailsPanel instanceof HTMLElement) {
+                    if (isVisible) {
+                        ensureStackedInspectorTabs(inlineDetailsPanel);
+                        const shouldShowInlineDetails = isStackedCardExpanded;
+                        if (shouldShowInlineDetails) {
+                            inlineDetailsPanel.removeAttribute("hidden");
+                            inlineDetailsPanel.setAttribute("aria-hidden", "false");
+                        } else {
+                            inlineDetailsPanel.setAttribute("hidden", "hidden");
+                            inlineDetailsPanel.setAttribute("aria-hidden", "true");
+                        }
+                    } else {
+                        inlineDetailsPanel.setAttribute("hidden", "hidden");
+                        inlineDetailsPanel.setAttribute("aria-hidden", "true");
+                    }
+                }
+
+                if (inlineToggle instanceof HTMLDetailsElement) {
+                    inlineToggle.open = false;
+                }
+            } else if (isVisible && inlineDetailsPanel instanceof HTMLElement) {
+                ensureStackedInspectorTabs(inlineDetailsPanel);
+            }
         });
 
         const summaryLabel = card.querySelector("[data-day-card-summary]");
@@ -1542,6 +1955,120 @@
         cards.forEach(card => {
             if (card instanceof HTMLElement) {
                 applyRememberedDayMealSlotToCard(card);
+            }
+        });
+    };
+
+    const applyDayReorderPreviewSlotToCard = card => {
+        if (!(card instanceof HTMLElement)) {
+            return;
+        }
+
+        const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
+        const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
+        if (panels.length === 0) {
+            return;
+        }
+
+        const track = card.querySelector("[data-day-meal-track]");
+        if (track instanceof HTMLElement) {
+            track.style.transform = "none";
+        }
+
+        const previewSlotIndex = 0;
+        const previewTab = tabs[previewSlotIndex];
+
+        tabs.forEach((tab, index) => {
+            if (!(tab instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            const isActive = index === previewSlotIndex;
+            tab.classList.toggle("is-active", isActive);
+            tab.setAttribute("aria-selected", isActive ? "true" : "false");
+            tab.setAttribute("tabindex", isActive ? "0" : "-1");
+        });
+
+        panels.forEach((panel, index) => {
+            if (!(panel instanceof HTMLElement)) {
+                return;
+            }
+
+            const isVisible = index === previewSlotIndex;
+            panel.setAttribute("aria-hidden", isVisible ? "false" : "true");
+            panel.setAttribute("tabindex", isVisible ? "0" : "-1");
+        });
+
+        const summaryLabel = card.querySelector("[data-day-card-summary]");
+        if (summaryLabel instanceof HTMLElement) {
+            const summaryValue = previewTab instanceof HTMLButtonElement
+                ? (previewTab.dataset.dayCardSummaryValue ?? "").trim()
+                : "";
+            const defaultSummaryValue = (summaryLabel.dataset.dayCardSummaryDefault ?? "").trim();
+            const nextSummaryValue = summaryValue.length > 0 ? summaryValue : defaultSummaryValue;
+            if (nextSummaryValue.length > 0) {
+                summaryLabel.textContent = nextSummaryValue;
+            }
+        }
+
+        const expanderMealLabel = card.querySelector("[data-day-card-expander-meal]");
+        if (expanderMealLabel instanceof HTMLElement) {
+            const mealValue = previewTab instanceof HTMLButtonElement
+                ? (previewTab.dataset.dayCardMealName ?? "").trim()
+                : "";
+            const defaultMealValue = (expanderMealLabel.dataset.dayCardExpanderMealDefault ?? "").trim();
+            const nextMealValue = mealValue.length > 0 ? mealValue : defaultMealValue;
+            if (nextMealValue.length > 0) {
+                expanderMealLabel.textContent = nextMealValue;
+            }
+        }
+
+        const expanderMetaLabel = card.querySelector("[data-day-card-expander-meta]");
+        if (expanderMetaLabel instanceof HTMLElement) {
+            const metaValue = previewTab instanceof HTMLButtonElement
+                ? (previewTab.dataset.dayCardSummaryValue ?? "").trim()
+                : "";
+            const defaultMetaValue = (expanderMetaLabel.dataset.dayCardExpanderMetaDefault ?? "").trim();
+            const nextMetaValue = metaValue.length > 0 ? metaValue : defaultMetaValue;
+            if (nextMetaValue.length > 0) {
+                expanderMetaLabel.textContent = nextMetaValue;
+            }
+        }
+
+        const expanderImage = card.querySelector("[data-day-card-expander-image]");
+        if (expanderImage instanceof HTMLImageElement) {
+            const imageValue = previewTab instanceof HTMLButtonElement
+                ? (previewTab.dataset.dayCardMealImageUrl ?? "").trim()
+                : "";
+            const defaultImageValue = (expanderImage.dataset.dayCardExpanderImageDefault ?? "").trim();
+            const nextImageValue = imageValue.length > 0 ? imageValue : defaultImageValue;
+            if (nextImageValue.length > 0) {
+                expanderImage.setAttribute("src", nextImageValue);
+            }
+        }
+
+        const headerActions = Array.from(card.querySelectorAll("[data-day-card-header-actions]"));
+        headerActions.forEach(actions => {
+            if (!(actions instanceof HTMLElement)) {
+                return;
+            }
+
+            const slotIndex = Number.parseInt(actions.dataset.slotIndex ?? "-1", 10);
+            const isActive = slotIndex === previewSlotIndex;
+            actions.classList.toggle("is-active", isActive);
+            actions.setAttribute("aria-hidden", isActive ? "false" : "true");
+        });
+    };
+
+    const applyDayReorderPreviewSlotsToScope = scope => {
+        if (!(scope instanceof Document || scope instanceof Element)) {
+            return;
+        }
+
+        const cards = Array.from(scope.querySelectorAll("[data-day-meal-card]"));
+        cards.forEach(card => {
+            if (card instanceof HTMLElement) {
+                applyDayReorderPreviewSlotToCard(card);
             }
         });
     };
@@ -2401,9 +2928,9 @@
             }
 
             toggle.dataset.inlineDetailsWired = "true";
+            const summary = toggle.querySelector("summary");
 
             const syncDetailsPanel = () => {
-                const summary = toggle.querySelector("summary");
                 const isExpanded = toggle.open;
                 if (summary instanceof HTMLElement) {
                     summary.setAttribute("aria-expanded", isExpanded ? "true" : "false");
@@ -2419,6 +2946,27 @@
 
                 updateViewportHeight(true);
             };
+
+            if (summary instanceof HTMLElement) {
+                summary.addEventListener("click", event => {
+                    const card = mealPanel.closest("[data-day-meal-card]");
+                    if (!isStackedInspectorModeForCard(card)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const isHidden = detailsPanel.hasAttribute("hidden")
+                        || detailsPanel.getAttribute("aria-hidden") === "true";
+                    toggle.dataset.inlineDetailsTouched = "true";
+                    setRememberedDayMealExpanded(card, isHidden);
+                    if (isHidden) {
+                        collapseOtherStackedDayCards(card);
+                    }
+
+                    toggle.open = false;
+                    applyRememberedDayMealSlotToCard(card);
+                });
+            }
 
             toggle.addEventListener("toggle", syncDetailsPanel);
             syncDetailsPanel();
@@ -2438,6 +2986,7 @@
             const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
             const panels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
             const track = card.querySelector("[data-day-meal-track]");
+            syncDayMealTabCountForCard(card);
             if (!(track instanceof HTMLElement) || tabs.length <= 1 || panels.length <= 1) {
                 return;
             }
@@ -2445,14 +2994,35 @@
             card.dataset.dayMealCardWired = "true";
             let currentSlotIndex = 0;
 
-            const syncSlot = nextIndex => {
+            const syncSlot = (nextIndex, options = {}) => {
                 const slotCount = Math.min(tabs.length, panels.length);
                 if (slotCount <= 0) {
                     return;
                 }
 
                 currentSlotIndex = ((nextIndex % slotCount) + slotCount) % slotCount;
-                track.style.transform = `translateX(-${currentSlotIndex * 100}%)`;
+                const isStackedCardPresentation = isStackedInspectorModeForCard(card);
+                const dayKey = readCardDayKey(card);
+                let isStackedCardExpanded = isStackedCardPresentation
+                    ? readRememberedDayMealExpanded(card)
+                    : false;
+                if (isStackedCardPresentation) {
+                    if (typeof options.shouldExpandStacked === "boolean") {
+                        isStackedCardExpanded = options.shouldExpandStacked;
+                    } else if (dayKey.length > 0
+                        && expandedStackedDayKey.length > 0
+                        && expandedStackedDayKey !== dayKey) {
+                        isStackedCardExpanded = false;
+                    }
+
+                    setRememberedDayMealExpanded(card, isStackedCardExpanded);
+                    card.dataset.dayCardExpanded = isStackedCardExpanded ? "true" : "false";
+                } else {
+                    delete card.dataset.dayCardExpanded;
+                }
+                track.style.transform = isStackedCardPresentation
+                    ? "none"
+                    : `translateX(-${currentSlotIndex * 100}%)`;
 
                 tabs.forEach((tab, index) => {
                     if (!(tab instanceof HTMLButtonElement)) {
@@ -2473,7 +3043,38 @@
                     const isActive = index === currentSlotIndex;
                     panel.setAttribute("aria-hidden", isActive ? "false" : "true");
                     panel.setAttribute("tabindex", isActive ? "0" : "-1");
+
+                    const inlineToggle = panel.querySelector("[data-inline-details-toggle]");
+                    const inlineDetailsPanel = panel.querySelector("[data-inline-details-panel]");
+                    if (isStackedCardPresentation) {
+                        if (inlineDetailsPanel instanceof HTMLElement) {
+                            if (isActive) {
+                                ensureStackedInspectorTabs(inlineDetailsPanel);
+                                const shouldShowInlineDetails = isStackedCardExpanded;
+                                if (shouldShowInlineDetails) {
+                                    inlineDetailsPanel.removeAttribute("hidden");
+                                    inlineDetailsPanel.setAttribute("aria-hidden", "false");
+                                } else {
+                                    inlineDetailsPanel.setAttribute("hidden", "hidden");
+                                    inlineDetailsPanel.setAttribute("aria-hidden", "true");
+                                }
+                            } else {
+                                inlineDetailsPanel.setAttribute("hidden", "hidden");
+                                inlineDetailsPanel.setAttribute("aria-hidden", "true");
+                            }
+                        }
+
+                        if (inlineToggle instanceof HTMLDetailsElement) {
+                            inlineToggle.open = false;
+                        }
+                    } else if (isActive && inlineDetailsPanel instanceof HTMLElement) {
+                        ensureStackedInspectorTabs(inlineDetailsPanel);
+                    }
                 });
+
+                if (isStackedCardPresentation && isStackedCardExpanded && options.collapseOtherStackedCards === true) {
+                    collapseOtherStackedDayCards(card);
+                }
 
                 const summaryLabel = card.querySelector("[data-day-card-summary]");
                 if (summaryLabel instanceof HTMLElement) {
@@ -2545,7 +3146,6 @@
                     }
                 });
 
-                const dayKey = readCardDayKey(card);
                 if (dayKey) {
                     dayMealSlotState.set(dayKey, currentSlotIndex);
                 }
@@ -2559,7 +3159,18 @@
                 }
 
                 tab.addEventListener("click", () => {
-                    syncSlot(index);
+                    if (!isStackedInspectorModeForCard(card)) {
+                        syncSlot(index);
+                        return;
+                    }
+
+                    const isSameSlot = index === currentSlotIndex;
+                    const isExpanded = readRememberedDayMealExpanded(card);
+                    const shouldExpand = !(isSameSlot && isExpanded);
+                    syncSlot(index, {
+                        shouldExpandStacked: shouldExpand,
+                        collapseOtherStackedCards: shouldExpand
+                    });
                 });
 
                 tab.addEventListener("keydown", event => {
@@ -2773,6 +3384,19 @@
             if (!(root instanceof Element)) {
                 return;
             }
+            const carousel = root.querySelector("[data-day-card-carousel]");
+            const reorderStatus = carousel instanceof HTMLElement
+                ? carousel.querySelector("[data-day-carousel-status]")
+                : null;
+            const reorderModeStatusLabel = carousel instanceof HTMLElement
+                ? ((carousel.dataset.dayReorderStatus ?? "").trim().length > 0
+                    ? (carousel.dataset.dayReorderStatus ?? "").trim()
+                    : "Reorder mode: drag a day card onto another day to swap days.")
+                : "Reorder mode: drag a day card onto another day to swap days.";
+
+            const isReorderModeEnabled = () => {
+                return carousel instanceof HTMLElement && carousel.dataset.dayReorderMode === "true";
+            };
 
             const handles = Array.from(root.querySelectorAll("[data-day-reorder-handle]"));
             if (handles.length === 0) {
@@ -2784,10 +3408,140 @@
             let activeHandle = null;
             let activeCard = null;
             let pointerStartY = 0;
-            let lastSwapY = 0;
             let hasMoved = false;
             let activationTimerId = null;
             let reorderActivated = false;
+            let activeDropTargetCard = null;
+            let movementPulseTimerId = null;
+
+            const getCardDayName = card => {
+                if (!(card instanceof HTMLElement)) {
+                    return "";
+                }
+
+                return (card.dataset.dayCardDayName ?? "").trim();
+            };
+
+            const setReorderStatus = message => {
+                if (!(reorderStatus instanceof HTMLElement)) {
+                    return;
+                }
+
+                const nextMessage = typeof message === "string" && message.trim().length > 0
+                    ? message.trim()
+                    : reorderModeStatusLabel;
+                reorderStatus.textContent = nextMessage;
+            };
+
+            const setDraggingState = isDragging => {
+                if (!(carousel instanceof HTMLElement)) {
+                    return;
+                }
+
+                carousel.classList.toggle("is-day-reorder-dragging", isDragging);
+            };
+
+            const clearDropTargetIndicator = () => {
+                if (activeDropTargetCard instanceof HTMLElement) {
+                    activeDropTargetCard.classList.remove("is-reorder-drop-target");
+                    activeDropTargetCard.removeAttribute("data-reorder-drop-position");
+                }
+
+                activeDropTargetCard = null;
+            };
+
+            const setDropTargetIndicator = (targetCard, dropPosition) => {
+                if (!(targetCard instanceof HTMLElement)
+                    || (dropPosition !== "before" && dropPosition !== "after" && dropPosition !== "swap")) {
+                    clearDropTargetIndicator();
+                    return;
+                }
+
+                if (activeDropTargetCard === targetCard
+                    && targetCard.dataset.reorderDropPosition === dropPosition) {
+                    return;
+                }
+
+                clearDropTargetIndicator();
+                targetCard.classList.add("is-reorder-drop-target");
+                targetCard.dataset.reorderDropPosition = dropPosition;
+                activeDropTargetCard = targetCard;
+            };
+
+            const clearMovementPulse = () => {
+                if (typeof movementPulseTimerId === "number") {
+                    window.clearTimeout(movementPulseTimerId);
+                }
+
+                movementPulseTimerId = null;
+                getReorderableDayCards(root).forEach(card => {
+                    if (card instanceof HTMLElement) {
+                        card.classList.remove("is-reorder-just-moved");
+                    }
+                });
+            };
+
+            const pulseMovedCard = card => {
+                if (!(card instanceof HTMLElement)) {
+                    return;
+                }
+
+                clearMovementPulse();
+                card.classList.add("is-reorder-just-moved");
+                movementPulseTimerId = window.setTimeout(() => {
+                    card.classList.remove("is-reorder-just-moved");
+                    movementPulseTimerId = null;
+                }, 240);
+            };
+
+            const setCardDatasetValue = (card, key, value) => {
+                if (!(card instanceof HTMLElement) || typeof key !== "string" || key.length === 0) {
+                    return;
+                }
+
+                const normalizedValue = typeof value === "string" ? value : "";
+                if (normalizedValue.length > 0) {
+                    card.dataset[key] = normalizedValue;
+                    return;
+                }
+
+                delete card.dataset[key];
+            };
+
+            const swapCardMealPayloads = (firstCard, secondCard) => {
+                if (!(firstCard instanceof HTMLElement)
+                    || !(secondCard instanceof HTMLElement)
+                    || firstCard === secondCard) {
+                    return false;
+                }
+
+                const parent = firstCard.parentElement;
+                if (!(parent instanceof HTMLElement) || secondCard.parentElement !== parent) {
+                    return false;
+                }
+
+                const payloadKeys = [
+                    "dayCardMealNames",
+                    "dayCardIgnoredFlags",
+                    "dayCardHasSpecialTreat"
+                ];
+                payloadKeys.forEach(key => {
+                    const firstValue = firstCard.dataset[key] ?? "";
+                    const secondValue = secondCard.dataset[key] ?? "";
+                    setCardDatasetValue(firstCard, key, secondValue);
+                    setCardDatasetValue(secondCard, key, firstValue);
+                });
+
+                const firstMealList = firstCard.querySelector("[data-day-reorder-meal-list]");
+                const secondMealList = secondCard.querySelector("[data-day-reorder-meal-list]");
+                if (firstMealList instanceof HTMLElement && secondMealList instanceof HTMLElement) {
+                    const firstListMarkup = firstMealList.innerHTML;
+                    firstMealList.innerHTML = secondMealList.innerHTML;
+                    secondMealList.innerHTML = firstListMarkup;
+                }
+
+                return true;
+            };
 
             const clearActivationTimer = () => {
                 if (typeof activationTimerId === "number") {
@@ -2805,16 +3559,27 @@
                 reorderActivated = true;
                 activeCard.classList.add("is-reorder-active");
                 activeHandle.classList.add("is-reorder-active");
+                activeHandle.setAttribute("aria-grabbed", "true");
+                setDraggingState(true);
+                const dayName = getCardDayName(activeCard);
+                setReorderStatus(dayName.length > 0
+                    ? `Dragging ${dayName}. Drop on another day to swap days.`
+                    : "Dragging day card. Drop on another day to swap days.");
             };
 
             const cleanupReorder = shouldSubmit => {
                 clearActivationTimer();
+                clearDropTargetIndicator();
+                clearMovementPulse();
+                setDraggingState(false);
+                setReorderStatus("");
                 if (activeCard instanceof HTMLElement) {
                     activeCard.classList.remove("is-reorder-active");
                 }
 
                 if (activeHandle instanceof HTMLElement) {
                     activeHandle.classList.remove("is-reorder-active");
+                    activeHandle.removeAttribute("aria-grabbed");
                 }
 
                 const reorderChanged = hasMoved;
@@ -2832,32 +3597,65 @@
                     return;
                 }
 
+                try {
+                    sessionStorage.setItem(dayReorderModeStorageKey, "true");
+                } catch {
+                    // Ignore storage failures in private modes.
+                }
                 persistSwapScrollPosition(form);
                 form.requestSubmit();
             };
 
-            const moveCardInDirection = direction => {
+            const getSwapTargetForDirection = direction => {
                 if (!(activeCard instanceof HTMLElement)) {
-                    return false;
+                    return null;
                 }
 
                 const cards = getReorderableDayCards(root);
                 const currentIndex = cards.indexOf(activeCard);
                 if (currentIndex < 0) {
-                    return false;
+                    return null;
                 }
 
                 if (direction < 0 && currentIndex > 0) {
-                    cards[currentIndex - 1].before(activeCard);
-                    return true;
+                    const targetCard = cards[currentIndex - 1];
+                    const targetDayName = getCardDayName(targetCard);
+                    return { targetCard, targetDayName, dropPosition: "swap" };
                 }
 
                 if (direction > 0 && currentIndex < cards.length - 1) {
-                    cards[currentIndex + 1].after(activeCard);
-                    return true;
+                    const targetCard = cards[currentIndex + 1];
+                    const targetDayName = getCardDayName(targetCard);
+                    return { targetCard, targetDayName, dropPosition: "swap" };
                 }
 
-                return false;
+                return null;
+            };
+
+            const getSwapTargetFromPointer = (clientX, clientY) => {
+                if (!(activeCard instanceof HTMLElement)) {
+                    return null;
+                }
+
+                const elementUnderPointer = document.elementFromPoint(clientX, clientY);
+                const pointerCard = elementUnderPointer instanceof Element
+                    ? elementUnderPointer.closest("[data-day-meal-card][data-day-card-meal-names]")
+                    : null;
+                if (pointerCard instanceof HTMLElement && pointerCard !== activeCard) {
+                    return {
+                        targetCard: pointerCard,
+                        targetDayName: getCardDayName(pointerCard),
+                        dropPosition: "swap"
+                    };
+                }
+
+                const activeRect = activeCard.getBoundingClientRect();
+                const deltaY = clientY - (activeRect.top + (activeRect.height / 2));
+                if (Math.abs(deltaY) < 8) {
+                    return null;
+                }
+
+                return getSwapTargetForDirection(deltaY < 0 ? -1 : 1);
             };
 
             handles.forEach(handle => {
@@ -2871,8 +3669,58 @@
                     event.stopPropagation();
                 });
 
+                handle.addEventListener("keydown", event => {
+                    if (form.dataset.ajaxSwapSubmitting === "true" || !isReorderModeEnabled()) {
+                        return;
+                    }
+
+                    const card = handle.closest("[data-day-meal-card][data-day-card-meal-names]");
+                    if (!(card instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const cards = getReorderableDayCards(root);
+                    const currentIndex = cards.indexOf(card);
+                    if (currentIndex < 0) {
+                        return;
+                    }
+
+                    let moved = false;
+                    if (event.key === "ArrowUp" && currentIndex > 0) {
+                        moved = swapCardMealPayloads(card, cards[currentIndex - 1]);
+                    } else if (event.key === "ArrowDown" && currentIndex < cards.length - 1) {
+                        moved = swapCardMealPayloads(card, cards[currentIndex + 1]);
+                    } else if (event.key === "Home" && currentIndex > 0) {
+                        moved = swapCardMealPayloads(card, cards[0]);
+                    } else if (event.key === "End" && currentIndex < cards.length - 1) {
+                        moved = swapCardMealPayloads(card, cards[cards.length - 1]);
+                    }
+
+                    if (!moved) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const dayName = getCardDayName(card);
+                    setReorderStatus(dayName.length > 0
+                        ? `${dayName} swapped. Saving day order...`
+                        : "Days swapped. Saving day order...");
+                    pulseMovedCard(card);
+                    if (!syncDayReorderFormState(form)) {
+                        return;
+                    }
+
+                    try {
+                        sessionStorage.setItem(dayReorderModeStorageKey, "true");
+                    } catch {
+                        // Ignore storage failures in private modes.
+                    }
+                    persistSwapScrollPosition(form);
+                    form.requestSubmit();
+                });
+
                 handle.addEventListener("pointerdown", event => {
-                    if (form.dataset.ajaxSwapSubmitting === "true") {
+                    if (form.dataset.ajaxSwapSubmitting === "true" || !isReorderModeEnabled()) {
                         return;
                     }
 
@@ -2889,9 +3737,9 @@
                     activeHandle = handle;
                     activeCard = card;
                     pointerStartY = event.clientY;
-                    lastSwapY = event.clientY;
                     hasMoved = false;
                     reorderActivated = false;
+                    clearDropTargetIndicator();
                     clearActivationTimer();
                     activationTimerId = window.setTimeout(() => {
                         activateReorder();
@@ -2915,19 +3763,20 @@
                         return;
                     }
 
-                    const movementThreshold = Math.max(
-                        32,
-                        activeCard instanceof HTMLElement ? Math.round(activeCard.getBoundingClientRect().height * 0.22) : 32);
-                    const deltaY = event.clientY - lastSwapY;
-                    if (Math.abs(deltaY) < movementThreshold) {
-                        event.preventDefault();
-                        return;
-                    }
-
-                    const moved = moveCardInDirection(deltaY < 0 ? -1 : 1);
-                    if (moved) {
-                        hasMoved = true;
-                        lastSwapY = event.clientY;
+                    const activeDayName = getCardDayName(activeCard);
+                    const preview = getSwapTargetFromPointer(event.clientX, event.clientY);
+                    if (preview && preview.targetCard instanceof HTMLElement) {
+                        setDropTargetIndicator(preview.targetCard, preview.dropPosition);
+                        if (activeDayName.length > 0 && preview.targetDayName.length > 0) {
+                            setReorderStatus(`Dragging ${activeDayName}. Drop to swap with ${preview.targetDayName}.`);
+                        } else if (activeDayName.length > 0) {
+                            setReorderStatus(`Dragging ${activeDayName}. Drop to swap days.`);
+                        }
+                    } else {
+                        clearDropTargetIndicator();
+                        if (activeDayName.length > 0) {
+                            setReorderStatus(`Dragging ${activeDayName}. Drop on another day to swap days.`);
+                        }
                     }
 
                     event.preventDefault();
@@ -2943,6 +3792,22 @@
                     } catch {
                         // Pointer capture can already be released if the browser cancels the gesture.
                     }
+
+                    if (reorderActivated
+                        && activeCard instanceof HTMLElement
+                        && activeDropTargetCard instanceof HTMLElement
+                        && activeDropTargetCard !== activeCard) {
+                        const sourceDayName = getCardDayName(activeCard);
+                        const targetDayName = getCardDayName(activeDropTargetCard);
+                        hasMoved = swapCardMealPayloads(activeCard, activeDropTargetCard);
+                        if (hasMoved) {
+                            pulseMovedCard(activeCard);
+                            if (sourceDayName.length > 0 && targetDayName.length > 0) {
+                                setReorderStatus(`${sourceDayName} swapped with ${targetDayName}.`);
+                            }
+                        }
+                    }
+
                     event.preventDefault();
                     cleanupReorder(true);
                 });
@@ -2980,6 +3845,14 @@
             const nextButton = carousel.querySelector("[data-day-carousel-next]");
             const pagination = carousel.querySelector("[data-day-carousel-pagination]");
             const dots = Array.from(carousel.querySelectorAll("[data-day-carousel-dot]"));
+            const viewToggle = carousel.querySelector("[data-day-view-toggle]");
+            const viewToggleLabel = viewToggle instanceof HTMLButtonElement
+                ? viewToggle.querySelector("[data-day-view-toggle-label]")
+                : null;
+            const reorderToggle = carousel.querySelector("[data-day-reorder-toggle]");
+            const reorderToggleLabel = reorderToggle instanceof HTMLButtonElement
+                ? reorderToggle.querySelector("[data-day-reorder-toggle-label]")
+                : null;
             if (!(viewport instanceof HTMLElement) || !(track instanceof HTMLElement)) {
                 return;
             }
@@ -2990,8 +3863,105 @@
             let motionTimer = 0;
             let scrollSettleTimer = 0;
             let suppressScrollChromeSync = false;
+            let isDayStackedMode = false;
+            let isDayReorderMode = false;
+            let reorderModeStartActiveIndex = 0;
             const prefersReducedMotion = typeof window.matchMedia === "function"
                 && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const defaultViewToggleLabel = viewToggle instanceof HTMLButtonElement
+                ? (viewToggle.dataset.dayViewDefaultLabel ?? "Stacked view").trim()
+                : "Stacked view";
+            const activeViewToggleLabel = viewToggle instanceof HTMLButtonElement
+                ? (viewToggle.dataset.dayViewActiveLabel ?? "Carousel view").trim()
+                : "Carousel view";
+            const defaultReorderToggleLabel = reorderToggle instanceof HTMLButtonElement
+                ? (reorderToggle.dataset.dayReorderDefaultLabel ?? "Swap days").trim()
+                : "Swap days";
+            const activeReorderToggleLabel = reorderToggle instanceof HTMLButtonElement
+                ? (reorderToggle.dataset.dayReorderActiveLabel ?? "Done").trim()
+                : "Done";
+            const stackedModeStatusLabel = (carousel.dataset.dayStackedStatus ?? "").trim().length > 0
+                ? (carousel.dataset.dayStackedStatus ?? "").trim()
+                : "Stacked view: all days visible.";
+            const reorderModeStatusLabel = (carousel.dataset.dayReorderStatus ?? "").trim().length > 0
+                ? (carousel.dataset.dayReorderStatus ?? "").trim()
+                : "Reorder mode: drag a day card onto another day to swap days.";
+
+            const isStackedPresentationMode = () => isDayStackedMode || isDayReorderMode;
+
+            const readPersistedDayStackedMode = () => {
+                try {
+                    return sessionStorage.getItem(dayStackedModeStorageKey) === "true";
+                } catch {
+                    return false;
+                }
+            };
+
+            const readPersistedDayReorderMode = () => {
+                try {
+                    return sessionStorage.getItem(dayReorderModeStorageKey) === "true";
+                } catch {
+                    return false;
+                }
+            };
+
+            const persistDayStackedMode = isEnabled => {
+                try {
+                    if (isEnabled) {
+                        sessionStorage.setItem(dayStackedModeStorageKey, "true");
+                        return;
+                    }
+
+                    sessionStorage.removeItem(dayStackedModeStorageKey);
+                } catch {
+                    // Ignore storage failures in private modes.
+                }
+            };
+
+            const persistDayReorderMode = isEnabled => {
+                try {
+                    if (isEnabled) {
+                        sessionStorage.setItem(dayReorderModeStorageKey, "true");
+                        return;
+                    }
+
+                    sessionStorage.removeItem(dayReorderModeStorageKey);
+                } catch {
+                    // Ignore storage failures in private modes.
+                }
+            };
+
+            const syncViewToggleState = () => {
+                if (!(viewToggle instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                const nextLabel = isDayStackedMode ? activeViewToggleLabel : defaultViewToggleLabel;
+                viewToggle.setAttribute("aria-pressed", isDayStackedMode ? "true" : "false");
+                viewToggle.setAttribute("aria-label", nextLabel);
+                viewToggle.setAttribute("title", nextLabel);
+                if (viewToggleLabel instanceof HTMLElement) {
+                    viewToggleLabel.textContent = nextLabel;
+                } else {
+                    viewToggle.textContent = nextLabel;
+                }
+            };
+
+            const syncReorderToggleState = () => {
+                if (!(reorderToggle instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                const nextLabel = isDayReorderMode ? activeReorderToggleLabel : defaultReorderToggleLabel;
+                reorderToggle.setAttribute("aria-pressed", isDayReorderMode ? "true" : "false");
+                reorderToggle.setAttribute("aria-label", nextLabel);
+                reorderToggle.setAttribute("title", nextLabel);
+                if (reorderToggleLabel instanceof HTMLElement) {
+                    reorderToggleLabel.textContent = nextLabel;
+                } else {
+                    reorderToggle.textContent = nextLabel;
+                }
+            };
 
             const getSlides = () => Array.from(track.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"))
                 .filter(slide => slide instanceof HTMLElement);
@@ -3027,6 +3997,10 @@
                 Array.from(track.querySelectorAll("[data-day-carousel-ghost='true']")).forEach(ghost => {
                     ghost.remove();
                 });
+
+                if (isStackedPresentationMode()) {
+                    return;
+                }
 
                 const slides = getSlides();
                 if (slides.length <= 1) {
@@ -3152,6 +4126,44 @@
 
                 const previousActiveIndex = activeIndex;
                 activeIndex = clampIndex(nextIndex);
+                if (isStackedPresentationMode()) {
+                    slides.forEach(slide => {
+                        if (!(slide instanceof HTMLElement)) {
+                            return;
+                        }
+
+                        slide.setAttribute("aria-hidden", "false");
+                        slide.dataset.dayCarouselPosition = "active";
+                    });
+
+                    dots.forEach(dot => {
+                        if (!(dot instanceof HTMLButtonElement)) {
+                            return;
+                        }
+
+                        dot.classList.remove("is-active");
+                        dot.setAttribute("aria-selected", "false");
+                        dot.setAttribute("tabindex", "-1");
+                        dot.setAttribute("aria-current", "false");
+                    });
+
+                    if (previousButton instanceof HTMLButtonElement) {
+                        previousButton.disabled = true;
+                    }
+
+                    if (nextButton instanceof HTMLButtonElement) {
+                        nextButton.disabled = true;
+                    }
+
+                    if (status instanceof HTMLElement) {
+                        status.textContent = isDayReorderMode
+                            ? reorderModeStatusLabel
+                            : stackedModeStatusLabel;
+                    }
+
+                    return;
+                }
+
                 slides.forEach((slide, index) => {
                     if (!(slide instanceof HTMLElement)) {
                         return;
@@ -3253,6 +4265,12 @@
                 }
 
                 activeIndex = clampIndex(nextIndex);
+                if (isStackedPresentationMode()) {
+                    updateChrome(activeIndex, { forcePaginationSync: true });
+                    updateViewportHeight(true);
+                    return;
+                }
+
                 const resolvedBehavior = prefersReducedMotion ? "auto" : behavior;
                 if (scrollSyncFrame > 0) {
                     window.cancelAnimationFrame(scrollSyncFrame);
@@ -3293,7 +4311,7 @@
 
             const navigateBySwipeDelta = deltaX => {
                 const slides = getSlides();
-                if (slides.length <= 1 || Math.abs(deltaX) < 48) {
+                if (isStackedPresentationMode() || slides.length <= 1 || Math.abs(deltaX) < 48) {
                     return false;
                 }
 
@@ -3412,6 +4430,10 @@
             };
 
             viewport.addEventListener("scroll", () => {
+                if (isStackedPresentationMode()) {
+                    return;
+                }
+
                 if (suppressScrollChromeSync) {
                     clearScrollSettleTimer();
                     scrollSettleTimer = window.setTimeout(() => {
@@ -3432,6 +4454,10 @@
 
             if (previousButton instanceof HTMLButtonElement) {
                 previousButton.addEventListener("click", () => {
+                    if (isStackedPresentationMode()) {
+                        return;
+                    }
+
                     const slides = getSlides();
                     if (slides.length <= 1) {
                         return;
@@ -3445,6 +4471,10 @@
 
             if (nextButton instanceof HTMLButtonElement) {
                 nextButton.addEventListener("click", () => {
+                    if (isStackedPresentationMode()) {
+                        return;
+                    }
+
                     const slides = getSlides();
                     if (slides.length <= 1) {
                         return;
@@ -3463,6 +4493,10 @@
 
                 dot.dataset.dayCarouselDotWired = "true";
                 dot.addEventListener("click", () => {
+                    if (isStackedPresentationMode()) {
+                        return;
+                    }
+
                     const targetIndex = Number.parseInt(dot.dataset.dayCarouselTarget ?? "-1", 10);
                     if (!Number.isInteger(targetIndex) || targetIndex < 0) {
                         return;
@@ -3472,6 +4506,134 @@
                 });
             });
 
+            const setElementHidden = (element, shouldHide) => {
+                if (!(element instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (shouldHide) {
+                    element.setAttribute("hidden", "hidden");
+                    return;
+                }
+
+                element.removeAttribute("hidden");
+            };
+
+            const applyDayViewModes = options => {
+                clearMotionState();
+                clearScrollSettleTimer();
+                suppressScrollChromeSync = false;
+                const isStacked = isStackedPresentationMode();
+                carousel.classList.toggle("is-day-reorder-mode", isStacked);
+                carousel.classList.toggle("is-day-stacked-mode", isDayStackedMode);
+                carousel.dataset.dayStackedMode = isDayStackedMode ? "true" : "false";
+                carousel.dataset.dayReorderMode = isDayReorderMode ? "true" : "false";
+                setElementHidden(previousButton, isStacked);
+                setElementHidden(nextButton, isStacked);
+                setElementHidden(pagination, isStacked);
+                if (isStacked) {
+                    resetCompactStackedInlineDetailsTouchState(carousel);
+                }
+                applyRememberedDayMealSlotsToScope(carousel);
+                if (isDayReorderMode) {
+                    applyDayReorderPreviewSlotsToScope(carousel);
+                }
+                syncMealSectionExpansionStateForScope(carousel, isStacked);
+
+                if (isStacked) {
+                    reorderModeStartActiveIndex = activeIndex;
+                    closeOpenCardMoreActions(null);
+                    ensureGhostSlides();
+                    viewport.scrollTo({ left: 0, behavior: "auto" });
+                    updateChrome(activeIndex, { forcePaginationSync: true });
+                    updateViewportHeight(true);
+                } else {
+                    ensureGhostSlides();
+                    const restoredIndex = Number.isInteger(options.restoreIndex)
+                        ? options.restoreIndex
+                        : reorderModeStartActiveIndex;
+                    scrollToIndex(clampIndex(restoredIndex), options.behavior === "smooth" ? "smooth" : "auto");
+                }
+
+                syncViewToggleState();
+                syncReorderToggleState();
+            };
+
+            const setDayStackedMode = (nextValue, options = {}) => {
+                const slides = getSlides();
+                const shouldEnable = nextValue === true && slides.length > 1;
+                if (shouldEnable === isDayStackedMode && options.force !== true) {
+                    syncViewToggleState();
+                    return;
+                }
+
+                const wasDayStackedModeEnabled = isDayStackedMode;
+                if (shouldEnable && wasDayStackedModeEnabled !== true) {
+                    resetRememberedDayMealExpandedState(carousel);
+                }
+
+                isDayStackedMode = shouldEnable;
+                persistDayStackedMode(isDayStackedMode);
+                if (!isDayStackedMode && isDayReorderMode) {
+                    isDayReorderMode = false;
+                    persistDayReorderMode(false);
+                }
+
+                applyDayViewModes(options);
+                if (options.focusToggle === true && viewToggle instanceof HTMLButtonElement) {
+                    viewToggle.focus({ preventScroll: true });
+                }
+            };
+
+            const setDayReorderMode = (nextValue, options = {}) => {
+                const slides = getSlides();
+                const shouldEnable = nextValue === true && slides.length > 1;
+                if (shouldEnable === isDayReorderMode && options.force !== true) {
+                    syncReorderToggleState();
+                    return;
+                }
+
+                isDayReorderMode = shouldEnable;
+                persistDayReorderMode(isDayReorderMode);
+                applyDayViewModes(options);
+                if (options.focusToggle === true && reorderToggle instanceof HTMLButtonElement) {
+                    reorderToggle.focus({ preventScroll: true });
+                }
+            };
+
+            if (viewToggle instanceof HTMLButtonElement) {
+                viewToggle.addEventListener("click", () => {
+                    setDayStackedMode(!isDayStackedMode, { focusToggle: true });
+                });
+            } else {
+                persistDayStackedMode(false);
+            }
+
+            if (reorderToggle instanceof HTMLButtonElement) {
+                reorderToggle.addEventListener("click", () => {
+                    setDayReorderMode(!isDayReorderMode, { focusToggle: true });
+                });
+            } else {
+                persistDayReorderMode(false);
+            }
+
+            carousel.addEventListener("keydown", event => {
+                if (event.key !== "Escape") {
+                    return;
+                }
+
+                if (isDayReorderMode) {
+                    event.preventDefault();
+                    setDayReorderMode(false, { focusToggle: true });
+                    return;
+                }
+
+                if (isDayStackedMode) {
+                    event.preventDefault();
+                    setDayStackedMode(false, { focusToggle: true });
+                }
+            });
+
             Array.from(carousel.querySelectorAll("[data-day-meal-swipe-surface]")).forEach(wireMealImageSwipeSurface);
 
             ensureGhostSlides();
@@ -3479,6 +4641,21 @@
             const initialActiveIndex = initialSlides.findIndex(slide =>
                 slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
             updateChrome(initialActiveIndex >= 0 ? initialActiveIndex : 0, { forcePaginationSync: true });
+            syncViewToggleState();
+            syncReorderToggleState();
+
+            const shouldRestoreStackedMode = readPersistedDayStackedMode();
+            if (viewToggle instanceof HTMLButtonElement && shouldRestoreStackedMode) {
+                setDayStackedMode(true, { force: true });
+            } else if (!isDayStackedMode) {
+                persistDayStackedMode(false);
+            }
+
+            if (reorderToggle instanceof HTMLButtonElement && readPersistedDayReorderMode()) {
+                setDayReorderMode(true, { force: true });
+            } else if (!isDayReorderMode) {
+                persistDayReorderMode(false);
+            }
 
             const alignAfterLayout = () => {
                 window.requestAnimationFrame(() => {
@@ -3897,6 +5074,7 @@
         }
 
         rememberDayMealSlots(document);
+        rememberDayMealExpandedState(document);
         rememberActiveDayCardSlide(document);
         restoreAllCardMoreActionsPanelsToMenus();
         const preservedMealImageSources = captureRenderedMealImageSources(document);

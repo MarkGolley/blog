@@ -129,7 +129,7 @@ public sealed class AislePilotShoppingItemViewModel
     public decimal Quantity { get; set; }
     public string Unit { get; set; } = string.Empty;
     public decimal EstimatedCost { get; set; }
-    public string QuantityDisplay => QuantityDisplayFormatter.Format(Quantity, Unit);
+    public string QuantityDisplay => QuantityDisplayFormatter.Format(Quantity, Unit, Name);
 }
 
 public sealed class AislePilotPantrySuggestionViewModel

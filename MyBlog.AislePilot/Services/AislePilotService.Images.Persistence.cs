@@ -291,21 +291,44 @@ public sealed partial class AislePilotService
 
         if (normalized.StartsWith("/projects/aisle-pilot/images/", StringComparison.OrdinalIgnoreCase))
         {
-            return $"/images/{normalized["/projects/aisle-pilot/images/".Length..]}";
+            var relativeFromImagesRoot = normalized["/projects/aisle-pilot/images/".Length..];
+            if (TryNormalizeLegacyMealImageSlugPath(relativeFromImagesRoot, out var resolvedLegacyImagesPath))
+            {
+                return $"/images/{resolvedLegacyImagesPath}";
+            }
+
+            return $"/images/{relativeFromImagesRoot}";
         }
 
         if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
         {
+            var relativeFromImagesRoot = normalized["/images/".Length..];
+            if (TryNormalizeLegacyMealImageSlugPath(relativeFromImagesRoot, out var resolvedLegacyImagesPath))
+            {
+                return $"/images/{resolvedLegacyImagesPath}";
+            }
+
             return normalized;
         }
 
         if (normalized.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
         {
-            return $"/{normalized}";
+            var relativeFromImagesRoot = normalized["images/".Length..];
+            if (TryNormalizeLegacyMealImageSlugPath(relativeFromImagesRoot, out var resolvedLegacyImagesPath))
+            {
+                return $"/images/{resolvedLegacyImagesPath}";
+            }
+
+            return $"/images/{relativeFromImagesRoot}";
         }
 
         if (normalized.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
         {
+            if (TryNormalizeLegacyMealImageSlugPath(normalized, out var resolvedLegacyMealPath))
+            {
+                return $"/images/{resolvedLegacyMealPath}";
+            }
+
             return $"/images/{normalized}";
         }
 
@@ -321,6 +344,11 @@ public sealed partial class AislePilotService
             return $"/images/aislepilot-meals/{trimmed}";
         }
 
+        if (IsLegacyMealImageSlug(trimmed))
+        {
+            return $"/images/aislepilot-meals/{trimmed}.png";
+        }
+
         if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
             (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
              absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
@@ -329,6 +357,56 @@ public sealed partial class AislePilotService
         }
 
         return normalized;
+    }
+
+    private static bool TryNormalizeLegacyMealImageSlugPath(string path, out string resolvedPath)
+    {
+        resolvedPath = path;
+        var normalizedPath = path.Trim();
+        if (!normalizedPath.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var relativeMealPath = normalizedPath["aislepilot-meals/".Length..];
+        if (relativeMealPath.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var hasImageExtension =
+            relativeMealPath.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+            relativeMealPath.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+            relativeMealPath.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+            relativeMealPath.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+            relativeMealPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+        if (hasImageExtension)
+        {
+            return false;
+        }
+
+        if (!IsLegacyMealImageSlug(relativeMealPath))
+        {
+            return false;
+        }
+
+        resolvedPath = $"aislepilot-meals/{relativeMealPath}.png";
+        return true;
+    }
+
+    private static bool IsLegacyMealImageSlug(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (value.Contains('/') || value.Contains('\\') || value.Contains(' '))
+        {
+            return false;
+        }
+
+        return value.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_');
     }
 
     private static IReadOnlyList<string> SplitBase64IntoChunks(string base64, int chunkLength)

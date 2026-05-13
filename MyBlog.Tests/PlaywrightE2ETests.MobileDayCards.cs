@@ -112,6 +112,164 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task NarrowMobile_AislePilotStackedDayView_StartsCollapsedAndExpandsFromImageTap()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateNarrowMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var viewToggle = page.Locator("[data-day-view-toggle]").First;
+        await viewToggle.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var stackedModeEnabled = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
+            }
+            """);
+        if (!stackedModeEnabled)
+        {
+            await viewToggle.ClickAsync();
+        }
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
+            }
+            """,
+            null,
+            new PageWaitForFunctionOptions { Timeout = 10000 });
+
+        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var viewDetailsSummary = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
+        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
+
+        await viewDetailsSummary.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+
+        var detailsCollapsedByDefault = await detailsPanel.EvaluateAsync<bool>(
+            """
+            panel => panel instanceof HTMLElement
+                && (panel.hasAttribute("hidden") || panel.getAttribute("aria-hidden") === "true")
+            """);
+        Assert.True(detailsCollapsedByDefault, "Expected stacked mobile view to start collapsed so one day fits before expansion.");
+        Assert.Equal("false", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
+
+        await viewDetailsSummary.ScrollIntoViewIfNeededAsync();
+        await viewDetailsSummary.ClickAsync();
+
+        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+        Assert.Equal("true", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotStackedDayView_StartsCollapsedUntilImageTap()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var viewToggle = page.Locator("[data-day-view-toggle]").First;
+        await viewToggle.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var stackedModeEnabled = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
+            }
+            """);
+        if (!stackedModeEnabled)
+        {
+            await viewToggle.ClickAsync();
+        }
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
+            }
+            """,
+            null,
+            new PageWaitForFunctionOptions { Timeout = 10000 });
+
+        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 15000
+        });
+
+        var viewDetailsSummary = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
+        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
+
+        var detailsCollapsedByDefault = await detailsPanel.EvaluateAsync<bool>(
+            """
+            panel => panel instanceof HTMLElement
+                && (panel.hasAttribute("hidden") || panel.getAttribute("aria-hidden") === "true")
+            """);
+
+        Assert.True(
+            detailsCollapsedByDefault,
+            "Expected stacked mobile day cards to keep macros/ingredients hidden until image tap.");
+        Assert.Equal("false", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
+
+        await viewDetailsSummary.ScrollIntoViewIfNeededAsync();
+        await viewDetailsSummary.ClickAsync();
+        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+        Assert.Equal("true", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
+
+        await viewDetailsSummary.ClickAsync();
+        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Hidden,
+            Timeout = 10000
+        });
+        Assert.Equal("false", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotMealActionsSheet_ClosesOnBackdropTapAndActionTap()
     {
         if (!IsE2EEnabled())

@@ -48,6 +48,7 @@ public sealed partial class AislePilotService : IAislePilotService
     private const string OpenAiImageGenerationsEndpoint = "https://api.openai.com/v1/images/generations";
     private const int OpenAiMaxAttempts = 2;
     private const int OpenAiImageMaxAttempts = 2;
+    private const int MealImageGenerationMaxConcurrency = 3;
     private const int MaxMealImageBytesForFirestore = 700_000;
     private const int MealImageChunkCharLength = 180_000;
     private const string MealImageChunksSubcollection = "chunks";
@@ -67,9 +68,11 @@ public sealed partial class AislePilotService : IAislePilotService
     private static readonly TimeSpan OpenAiImageRequestTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan OpenAiImageDownloadTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
+    private static readonly TimeSpan AiMealPersistenceBackgroundBudget = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan AiMealPoolEntryTtl = TimeSpan.FromHours(24);
     private static readonly TimeSpan MealImageLookupMissTtl = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan MealImageLookupRefreshInterval = TimeSpan.FromMilliseconds(900);
     private static readonly TimeSpan DessertAddOnPoolRefreshInterval = TimeSpan.FromMinutes(30);
 
     private static readonly ConcurrentDictionary<string, MealTemplate> AiMealPool = new(StringComparer.OrdinalIgnoreCase);
@@ -80,7 +83,10 @@ public sealed partial class AislePilotService : IAislePilotService
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> MealImageLookupMissesUtc =
         new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, DateTime> MealImageLookupChecksUtc =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> MealImageGenerationInFlight = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, byte> AiMealPersistenceInFlight = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> SpecialTreatGenerationInFlight =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> DessertAddOnRecoveryInFlight =
@@ -96,12 +102,12 @@ public sealed partial class AislePilotService : IAislePilotService
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImagePoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim DessertAddOnPoolRefreshLock = new(1, 1);
-    private static readonly SemaphoreSlim MealImageGenerationThrottle = new(1, 1);
+    private static readonly SemaphoreSlim MealImageGenerationThrottle =
+        new(MealImageGenerationMaxConcurrency, MealImageGenerationMaxConcurrency);
     private static readonly SemaphoreSlim SupermarketLayoutRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim SupermarketPriceFileLoadLock = new(1, 1);
     private static readonly SemaphoreSlim AiMealWarmupLock = new(1, 1);
     private static DateTime? _lastAiMealPoolRefreshUtc;
-    private static DateTime? _lastMealImagePoolRefreshUtc;
     private static DateTime? _lastDessertAddOnPoolRefreshUtc;
     private static DateTime? _lastSupermarketLayoutCacheRefreshUtc;
 
@@ -1099,7 +1105,7 @@ public sealed partial class AislePilotService : IAislePilotService
         _pantryRankingEngine = pantryRankingEngine ?? new AislePilotPantryRankingEngine();
         _apiKey = configuration?["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         _model = configuration?["AislePilot:Model"] ?? "gpt-4.1-mini";
-        _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-1";
+        _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-1-mini";
         _enableAiGeneration = !bool.TryParse(configuration?["AislePilot:EnableAiGeneration"], out var parsed) || parsed;
         _enableAiImageGeneration = !bool.TryParse(
             configuration?["AislePilot:EnableAiImageGeneration"],

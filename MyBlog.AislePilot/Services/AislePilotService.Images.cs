@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
@@ -19,45 +20,66 @@ public sealed partial class AislePilotService
 {
     private IReadOnlyDictionary<string, string> ResolveMealImageUrls(IReadOnlyList<MealTemplate> selectedMeals)
     {
-        return ResolveMealImageUrlsAsync(selectedMeals).GetAwaiter().GetResult();
-    }
-
-    private async Task<IReadOnlyDictionary<string, string>> ResolveMealImageUrlsAsync(
-        IReadOnlyList<MealTemplate> selectedMeals,
-        CancellationToken cancellationToken = default)
-    {
-        await EnsureMealImagePoolHydratedAsync(
-            selectedMeals.Select(meal => meal.Name).ToList(),
-            cancellationToken);
+        var stopwatch = Stopwatch.StartNew();
 
         var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var fallbackCount = 0;
         foreach (var meal in selectedMeals)
         {
-            var normalizedEmbeddedUrl = NormalizeImageUrl(meal.ImageUrl);
-            if (!string.IsNullOrWhiteSpace(normalizedEmbeddedUrl) && IsMealImageUrlUsable(normalizedEmbeddedUrl))
+            if (TryResolveImmediateMealImageUrl(meal, out var resolvedImageUrl))
             {
-                MealImagePool[meal.Name] = normalizedEmbeddedUrl;
-                resolved[meal.Name] = normalizedEmbeddedUrl;
-                continue;
-            }
-
-            if (TryGetCachedMealImageUrl(meal.Name, out var cachedUrl))
-            {
-                resolved[meal.Name] = cachedUrl;
-                continue;
-            }
-
-            if (TryGetBundledMealImageUrl(meal.Name, out var bundledUrl))
-            {
-                resolved[meal.Name] = bundledUrl;
+                resolved[meal.Name] = resolvedImageUrl;
                 continue;
             }
 
             resolved[meal.Name] = GetFallbackMealImageUrl();
+            fallbackCount++;
             QueueMealImageGeneration(meal);
         }
 
+        if (fallbackCount > 0 || stopwatch.ElapsedMilliseconds >= 150)
+        {
+            _logger?.LogInformation(
+                "AislePilot immediate meal image resolution completed in {ElapsedMs}ms. MealCount={MealCount}, FallbackCount={FallbackCount}",
+                stopwatch.ElapsedMilliseconds,
+                selectedMeals.Count,
+                fallbackCount);
+        }
+
         return resolved;
+    }
+
+    private bool TryResolveImmediateMealImageUrl(MealTemplate meal, out string imageUrl)
+    {
+        return TryResolveImmediateMealImageUrl(meal.Name, meal.ImageUrl, out imageUrl);
+    }
+
+    private bool TryResolveImmediateMealImageUrl(string mealName, string? embeddedImageUrl, out string imageUrl)
+    {
+        imageUrl = string.Empty;
+        var normalizedEmbeddedUrl = NormalizeImageUrl(embeddedImageUrl);
+        if (!string.IsNullOrWhiteSpace(normalizedEmbeddedUrl) && IsMealImageUrlUsable(normalizedEmbeddedUrl))
+        {
+            MealImagePool[mealName] = normalizedEmbeddedUrl;
+            ClearMealImageLookupMiss(mealName);
+            ClearMealImageLookupCheck(mealName);
+            imageUrl = normalizedEmbeddedUrl;
+            return true;
+        }
+
+        if (TryGetCachedMealImageUrl(mealName, out var cachedUrl))
+        {
+            imageUrl = cachedUrl;
+            return true;
+        }
+
+        if (TryGetBundledMealImageUrl(mealName, out var bundledUrl))
+        {
+            imageUrl = bundledUrl;
+            return true;
+        }
+
+        return false;
     }
 
     private bool TryGetCachedMealImageUrl(string mealName, out string imageUrl)
@@ -77,6 +99,7 @@ public sealed partial class AislePilotService
 
         imageUrl = normalized;
         ClearMealImageLookupMiss(mealName);
+        ClearMealImageLookupCheck(mealName);
         return true;
     }
 
@@ -96,6 +119,7 @@ public sealed partial class AislePilotService
 
         MealImagePool[mealName] = candidateUrl;
         ClearMealImageLookupMiss(mealName);
+        ClearMealImageLookupCheck(mealName);
         imageUrl = candidateUrl;
         return true;
     }
@@ -130,6 +154,75 @@ public sealed partial class AislePilotService
 
         MealImageLookupMissesUtc[mealName] = nowUtc + MealImageLookupMissTtl;
         PruneMealImageLookupMisses(nowUtc);
+    }
+
+    private static bool ShouldSkipMealImageLookupCheck(string mealName, DateTime nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            return false;
+        }
+
+        if (!MealImageLookupChecksUtc.TryGetValue(mealName, out var lastCheckedUtc))
+        {
+            return false;
+        }
+
+        if (nowUtc - lastCheckedUtc >= MealImageLookupRefreshInterval)
+        {
+            MealImageLookupChecksUtc.TryRemove(mealName, out _);
+            return false;
+        }
+
+        return true;
+    }
+
+    private static void MarkMealImageLookupCheck(string mealName, DateTime nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            return;
+        }
+
+        MealImageLookupChecksUtc[mealName] = nowUtc;
+        PruneMealImageLookupChecks(nowUtc);
+    }
+
+    private static void ClearMealImageLookupCheck(string mealName)
+    {
+        if (string.IsNullOrWhiteSpace(mealName))
+        {
+            return;
+        }
+
+        MealImageLookupChecksUtc.TryRemove(mealName, out _);
+    }
+
+    private static void PruneMealImageLookupChecks(DateTime nowUtc)
+    {
+        foreach (var entry in MealImageLookupChecksUtc)
+        {
+            if (nowUtc - entry.Value >= MealImageLookupRefreshInterval)
+            {
+                MealImageLookupChecksUtc.TryRemove(entry.Key, out _);
+            }
+        }
+
+        var overflowCount = MealImageLookupChecksUtc.Count - MaxMealImageMissCacheEntries;
+        if (overflowCount <= 0)
+        {
+            return;
+        }
+
+        var evictionCandidates = MealImageLookupChecksUtc
+            .OrderBy(entry => entry.Value)
+            .Take(overflowCount)
+            .Select(entry => entry.Key)
+            .ToList();
+        foreach (var mealName in evictionCandidates)
+        {
+            MealImageLookupChecksUtc.TryRemove(mealName, out _);
+        }
     }
 
     private static void ClearMealImageLookupMiss(string mealName)
@@ -233,6 +326,35 @@ public sealed partial class AislePilotService
         }
     }
 
+    private IReadOnlyList<string> GetMealNamesRequiringHydration(
+        IReadOnlyList<string> mealNames,
+        DateTime nowUtc)
+    {
+        var unresolvedMealNames = new List<string>(mealNames.Count);
+        foreach (var mealName in mealNames)
+        {
+            if (TryGetCachedMealImageUrl(mealName, out _))
+            {
+                continue;
+            }
+
+            if (TryGetBundledMealImageUrl(mealName, out _))
+            {
+                continue;
+            }
+
+            if (ShouldSkipMealImageLookup(mealName, nowUtc) ||
+                ShouldSkipMealImageLookupCheck(mealName, nowUtc))
+            {
+                continue;
+            }
+
+            unresolvedMealNames.Add(mealName);
+        }
+
+        return unresolvedMealNames;
+    }
+
     private async Task EnsureMealImagePoolHydratedAsync(
         IReadOnlyList<string> mealNames,
         CancellationToken cancellationToken = default)
@@ -252,27 +374,29 @@ public sealed partial class AislePilotService
             return;
         }
 
+        var lookupCandidates = GetMealNamesRequiringHydration(distinctMealNames, DateTime.UtcNow);
+        if (lookupCandidates.Count == 0)
+        {
+            return;
+        }
+
+        var stopwatch = Stopwatch.StartNew();
         await MealImagePoolRefreshLock.WaitAsync(cancellationToken);
         try
         {
             var nowUtc = DateTime.UtcNow;
-            foreach (var mealName in distinctMealNames)
+            var hydrationMealNames = GetMealNamesRequiringHydration(lookupCandidates, nowUtc);
+            if (hydrationMealNames.Count == 0)
             {
-                if (TryGetCachedMealImageUrl(mealName, out _))
-                {
-                    continue;
-                }
+                return;
+            }
 
-                if (TryGetBundledMealImageUrl(mealName, out _))
-                {
-                    continue;
-                }
-
-                if (ShouldSkipMealImageLookup(mealName, nowUtc))
-                {
-                    continue;
-                }
-
+            var lookupCount = 0;
+            var hydratedCount = 0;
+            foreach (var mealName in hydrationMealNames)
+            {
+                MarkMealImageLookupCheck(mealName, nowUtc);
+                lookupCount++;
                 var docId = ToAiMealDocumentId(mealName);
                 var doc = await _db.Collection(MealImagesCollection).Document(docId).GetSnapshotAsync(cancellationToken);
                 if (!doc.Exists)
@@ -320,6 +444,9 @@ public sealed partial class AislePilotService
                 MealImagePool[normalizedName] = normalizedUrl;
                 ClearMealImageLookupMiss(mealName);
                 ClearMealImageLookupMiss(normalizedName);
+                ClearMealImageLookupCheck(mealName);
+                ClearMealImageLookupCheck(normalizedName);
+                hydratedCount++;
 
                 if (string.IsNullOrWhiteSpace(mapped.ImageBase64) && mapped.ImageChunkCount <= 0)
                 {
@@ -331,7 +458,15 @@ public sealed partial class AislePilotService
                 }
             }
 
-            _lastMealImagePoolRefreshUtc = nowUtc;
+            if (lookupCount > 0 || stopwatch.ElapsedMilliseconds >= 150)
+            {
+                _logger?.LogInformation(
+                    "AislePilot meal image hydration completed in {ElapsedMs}ms. RequestedMealCount={RequestedMealCount}, LookedUpCount={LookedUpCount}, HydratedCount={HydratedCount}",
+                    stopwatch.ElapsedMilliseconds,
+                    distinctMealNames.Count,
+                    lookupCount,
+                    hydratedCount);
+            }
         }
         finally
         {

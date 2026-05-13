@@ -1,4 +1,4 @@
-﻿:root[data-theme="dark"] .aislepilot-app-head,
+:root[data-theme="dark"] .aislepilot-app-head,
 :root[data-theme="dark"] .aislepilot-shell,
 :root[data-theme="dark"] .aislepilot-card,
 :root[data-theme="dark"] .aislepilot-field,
@@ -195,14 +195,14 @@
 }
 
 :root[data-theme="dark"] .aislepilot-budget-precision-trigger {
-    background: rgba(10, 17, 27, 0.95) !important;
-    border-color: var(--line) !important;
-    color: var(--ink-soft) !important;
+    background: rgba(10, 17, 27, 0.95);
+    border-color: var(--line);
+    color: var(--ink-soft);
 }
 
 :root[data-theme="dark"] .aislepilot-budget-precision-trigger:hover {
-    background: rgba(18, 30, 46, 0.95) !important;
-    color: var(--ink) !important;
+    background: rgba(18, 30, 46, 0.95);
+    color: var(--ink);
 }
 
 :root[data-theme="dark"] .aislepilot-budget-precision-currency {
@@ -237,7 +237,7 @@
 :root[data-theme="dark"] .aislepilot-special-treat-day-select {
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23b7d7ef' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    color: var(--ink) !important;
+    color: var(--ink);
 }
 
 :root[data-theme="dark"] .aislepilot-special-treat-day-select option {
@@ -278,14 +278,14 @@
 :root[data-theme="dark"] .aislepilot-swap-btn:not(.is-secondary),
 :root[data-theme="dark"] .aislepilot-export-btn,
 :root[data-theme="dark"] .aislepilot-alert-btn:not(.is-secondary) {
-    background: linear-gradient(98deg, #2e8dab 0%, #1f557c 100%) !important;
-    color: #f4faff !important;
+    background: linear-gradient(98deg, #2e8dab 0%, #1f557c 100%);
+    color: #f4faff;
 }
 
 :root[data-theme="dark"] .aislepilot-overview-toggle-btn {
-    background: transparent !important;
-    color: var(--ink-soft) !important;
-    box-shadow: none !important;
+    background: transparent;
+    color: var(--ink-soft);
+    box-shadow: none;
 }
 
 :root[data-theme="dark"] .aislepilot-overview-toggle-btn .aislepilot-symbol-glyph {
@@ -372,15 +372,15 @@
 }
 
 :root[data-theme="dark"] .aislepilot-overview-regenerate-btn.is-secondary {
-    background: rgba(21, 34, 52, 0.96) !important;
-    border-color: var(--line) !important;
-    color: #deefff !important;
+    background: rgba(21, 34, 52, 0.96);
+    border-color: var(--line);
+    color: #deefff;
 }
 
 :root[data-theme="dark"] .aislepilot-overview-regenerate-btn.is-secondary.is-danger {
-    background: linear-gradient(118deg, #da5b56 0%, #b0302b 100%) !important;
-    border-color: rgba(125, 25, 22, 0.55) !important;
-    color: #fff !important;
+    background: linear-gradient(118deg, #da5b56 0%, #b0302b 100%);
+    border-color: rgba(125, 25, 22, 0.55);
+    color: #fff;
 }
 
 :root[data-theme="dark"] .aislepilot-overview-regenerate-btn.is-secondary .aislepilot-symbol-glyph {
@@ -396,10 +396,10 @@
 }
 
 :root[data-theme="dark"] .aislepilot-setup-mode-toggle:not(.is-active) {
-    background: rgba(21, 34, 52, 0.96) !important;
-    border-color: var(--line) !important;
-    color: var(--ink) !important;
-    box-shadow: none !important;
+    background: rgba(21, 34, 52, 0.96);
+    border-color: var(--line);
+    color: var(--ink);
+    box-shadow: none;
 }
 
 :root[data-theme="dark"] .aislepilot-window-tab,
@@ -411,25 +411,25 @@
 :root[data-theme="dark"] .aislepilot-card-more-actions-menu,
 :root[data-theme="dark"] .aislepilot-alert-btn.is-secondary,
 :root[data-theme="dark"] .aislepilot-setup-mode-toggle {
-    background: rgba(21, 34, 52, 0.96) !important;
-    border-color: var(--line) !important;
-    color: var(--ink) !important;
+    background: rgba(21, 34, 52, 0.96);
+    border-color: var(--line);
+    color: var(--ink);
 }
 
 :root[data-theme="dark"] .aislepilot-window-tab:hover,
 :root[data-theme="dark"] .aislepilot-mobile-context-jump:hover,
 :root[data-theme="dark"] .aislepilot-leftover-day-chip:hover,
 :root[data-theme="dark"] .aislepilot-more-actions-trigger:hover {
-    background: rgba(29, 45, 67, 0.96) !important;
+    background: rgba(29, 45, 67, 0.96);
 }
 
 :root[data-theme="dark"] .aislepilot-window-tab[aria-selected="true"],
 :root[data-theme="dark"] .aislepilot-window-tab[aria-current="page"],
 :root[data-theme="dark"] .aislepilot-mobile-context-jump[aria-selected="true"],
 :root[data-theme="dark"] .aislepilot-mobile-context-jump[aria-current="page"] {
-    border-color: transparent !important;
-    background: linear-gradient(98deg, #2e8dab 0%, #1f557c 100%) !important;
-    color: #f4faff !important;
+    border-color: transparent;
+    background: linear-gradient(98deg, #2e8dab 0%, #1f557c 100%);
+    color: #f4faff;
 }
 
 :root[data-theme="dark"] .aislepilot-window-tab[aria-selected="true"] .aislepilot-symbol-glyph,
@@ -468,6 +468,26 @@
 
 :root[data-theme="dark"] .aislepilot-day-carousel-status {
     color: rgba(222, 239, 255, 0.78);
+}
+
+:root[data-theme="dark"] .aislepilot-day-reorder-toggle {
+    border-color: rgba(125, 167, 213, 0.22);
+    background: rgba(10, 18, 29, 0.62);
+    color: #deefff;
+    box-shadow: 0 10px 18px rgba(2, 7, 14, 0.2);
+}
+
+:root[data-theme="dark"] .aislepilot-day-reorder-toggle:hover {
+    border-color: rgba(125, 167, 213, 0.38);
+    background: rgba(14, 25, 39, 0.86);
+}
+
+:root[data-theme="dark"] .aislepilot-day-reorder-toggle[aria-pressed="true"] {
+    border-color: rgb(var(--ap-refresh-primary-rgb, 46 141 171) / 0.42);
+    background: linear-gradient(135deg, rgb(var(--ap-refresh-primary-rgb, 46 141 171) / 0.9), rgb(var(--ap-refresh-primary-strong-rgb, 31 85 124) / 0.96));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        0 12px 18px rgb(var(--ap-refresh-primary-rgb, 46 141 171) / 0.3);
 }
 
 :root[data-theme="dark"] .aislepilot-day-carousel::before {
@@ -598,27 +618,66 @@
 }
 
 :root[data-theme="dark"] .aislepilot-day-meal-tab {
-    background: transparent !important;
-    border-color: transparent !important;
-    color: rgba(222, 239, 255, 0.68) !important;
+    background: transparent;
+    border-color: transparent;
+    color: rgba(222, 239, 255, 0.68);
 }
 
 :root[data-theme="dark"] .aislepilot-day-meal-tab:hover:not(.is-active):not(.is-ignored) {
-    background: rgba(255, 255, 255, 0.08) !important;
-    color: #f4faff !important;
+    background: rgba(255, 255, 255, 0.08);
+    color: #f4faff;
 }
 
 :root[data-theme="dark"] .aislepilot-day-meal-tab.is-active {
-    border-color: rgba(125, 167, 213, 0.16) !important;
-    background: linear-gradient(135deg, rgba(95, 159, 198, 0.28), rgba(34, 73, 105, 0.9)) !important;
-    color: #f4faff !important;
+    border-color: rgba(125, 167, 213, 0.16);
+    background: linear-gradient(135deg, rgba(95, 159, 198, 0.28), rgba(34, 73, 105, 0.9));
+    color: #f4faff;
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 10px 16px rgba(2, 7, 14, 0.2) !important;
+        0 10px 16px rgba(2, 7, 14, 0.2);
 }
 
 :root[data-theme="dark"] .aislepilot-day-meal-summary-item {
     color: rgba(222, 239, 255, 0.7);
+}
+
+@media (max-width: 980px) {
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-summary-item {
+        border-color: rgba(125, 167, 213, 0.22);
+        background: rgba(29, 47, 68, 0.62);
+        color: rgba(231, 244, 255, 0.92);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab {
+        border-color: rgba(125, 167, 213, 0.22);
+        background: rgba(16, 29, 44, 0.48);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab.is-active {
+        border-color: rgba(125, 167, 213, 0.36);
+        background: linear-gradient(145deg, rgba(36, 66, 94, 0.72), rgba(20, 39, 59, 0.88));
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-eyebrow {
+        color: rgba(191, 219, 247, 0.76);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-title {
+        color: #f4faff;
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-meta {
+        color: rgba(214, 234, 253, 0.76);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-tab-caret {
+        color: rgba(191, 219, 247, 0.84);
+    }
+
+    :root[data-theme="dark"] .aislepilot-day-carousel[data-day-stacked-mode="true"]:not([data-day-reorder-mode="true"]) .aislepilot-day-meal-track > .aislepilot-day-meal-panel {
+        border: none;
+        background: transparent;
+    }
 }
 
 :root[data-theme="dark"] .aislepilot-day-meal-summary-separator {
@@ -886,7 +945,7 @@
     .aislepilot-export-actions,
     .aislepilot-window-nav-hint,
     .aislepilot-window-tabs {
-        display: none !important;
+        display: none;
     }
 
     .aislepilot-window-viewport {
@@ -895,7 +954,7 @@
 
     .aislepilot-window-track {
         display: block;
-        transform: none !important;
+        transform: none;
     }
 
     .aislepilot-window-panel {
@@ -904,10 +963,10 @@
     }
 
     .aislepilot-shopping-grid {
-        display: grid !important;
-        grid-template-columns: 1fr !important;
-        column-count: initial !important;
-        column-gap: 0 !important;
+        display: grid;
+        grid-template-columns: 1fr;
+        column-count: initial;
+        column-gap: 0;
     }
 
     .aislepilot-shopping-grid > .aislepilot-card {

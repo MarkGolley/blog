@@ -46,15 +46,15 @@ function initializeQueryLab() {
         },
         {
             title: "Writing useful technical explanations",
-            summary: "Shows how to tailor explanations for recruiter, junior, and senior audiences.",
-            keywords: ["communication", "audience", "recruiter", "learning", "clarity"]
+            summary: "Shows how to tailor explanations for stakeholder, junior, and senior audiences.",
+            keywords: ["communication", "audience", "stakeholder", "learning", "clarity"]
         }
     ];
 
     const surprisePrompts = [
         "How should I structure a deploy gate for my portfolio app?",
         "What is a simple way to evaluate a RAG system?",
-        "How do I explain testing strategy to a recruiter?",
+        "How do I explain testing strategy to a non-technical stakeholder?",
         "What tradeoffs matter most for retrieval quality?"
     ];
 
@@ -168,7 +168,7 @@ function initializePromptRemixLab() {
     }
 
     const openers = {
-        recruiter: "Frame the impact and measurable outcomes.",
+        stakeholder: "Frame the impact and measurable outcomes.",
         junior: "Teach this with plain language and one concrete example.",
         lead: "Describe tradeoffs, failure modes, and rollout considerations."
     };

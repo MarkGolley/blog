@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
@@ -56,6 +57,7 @@ public sealed partial class AislePilotService : IAislePilotService
         IReadOnlyList<string> mealNames,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         if (mealNames.Count == 0)
         {
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -73,34 +75,41 @@ public sealed partial class AislePilotService : IAislePilotService
         }
 
         await EnsureMealImagePoolHydratedAsync(normalizedMealNames, cancellationToken);
-        await EnsureDessertAddOnPoolHydratedAsync(cancellationToken);
 
         var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var fallbackCount = 0;
+        var queuedGenerationCount = 0;
         foreach (var mealName in normalizedMealNames)
         {
-            if (TryGetCachedMealImageUrl(mealName, out var cachedUrl))
-            {
-                resolved[mealName] = cachedUrl;
-                continue;
-            }
-
-            if (TryGetBundledMealImageUrl(mealName, out var bundledUrl))
-            {
-                resolved[mealName] = bundledUrl;
-                continue;
-            }
-
             var template = AiMealPool.TryGetValue(mealName, out var aiMeal)
                 ? aiMeal
                 : MealTemplates.FirstOrDefault(template =>
                     template.Name.Equals(mealName, StringComparison.OrdinalIgnoreCase));
             template ??= TryBuildDessertAddOnImageMealTemplate(mealName);
+            if (TryResolveImmediateMealImageUrl(mealName, template?.ImageUrl, out var resolvedImageUrl))
+            {
+                resolved[mealName] = resolvedImageUrl;
+                continue;
+            }
+
             if (template is not null)
             {
                 QueueMealImageGeneration(template);
+                queuedGenerationCount++;
             }
 
             resolved[mealName] = GetFallbackMealImageUrl();
+            fallbackCount++;
+        }
+
+        if (queuedGenerationCount > 0 || fallbackCount > 0 || stopwatch.ElapsedMilliseconds >= 150)
+        {
+            _logger?.LogInformation(
+                "AislePilot meal image lookup completed in {ElapsedMs}ms. RequestedMealCount={RequestedMealCount}, FallbackCount={FallbackCount}, QueuedGenerationCount={QueuedGenerationCount}",
+                stopwatch.ElapsedMilliseconds,
+                normalizedMealNames.Count,
+                fallbackCount,
+                queuedGenerationCount);
         }
 
         return resolved;

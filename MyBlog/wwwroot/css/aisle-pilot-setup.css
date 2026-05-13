@@ -1,4 +1,4 @@
-﻿.aislepilot-form {
+.aislepilot-form {
     display: grid;
     gap: 0.58rem;
 }
@@ -116,30 +116,30 @@
 }
 
 .aislepilot-setup-mode-toggle {
-    min-height: var(--ap-control-height-lg) !important;
+    min-height: var(--ap-control-height-lg);
     display: grid;
     gap: 0.06rem;
     align-content: center;
     justify-items: start;
     text-align: left;
-    border: 1px solid rgba(16, 63, 101, 0.16) !important;
-    border-radius: 10px !important;
-    background: rgba(255, 255, 255, 0.97) !important;
-    color: var(--ink) !important;
-    box-shadow: none !important;
-    padding: 0.42rem 0.72rem !important;
-    font-size: 0.9rem !important;
-    font-weight: 700 !important;
+    border: 1px solid rgba(16, 63, 101, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.97);
+    color: var(--ink);
+    box-shadow: none;
+    padding: 0.42rem 0.72rem;
+    font-size: 0.9rem;
+    font-weight: 700;
     transition: background 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
 .aislepilot-setup-mode-toggle:hover {
-    border-color: rgba(16, 63, 101, 0.28) !important;
+    border-color: rgba(16, 63, 101, 0.28);
 }
 
 .aislepilot-setup-mode-toggle:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.16) !important;
+    box-shadow: 0 0 0 3px rgba(15, 109, 120, 0.16);
 }
 
 .aislepilot-setup-mode-toggle-title {
@@ -160,10 +160,10 @@
 }
 
 .aislepilot-setup-mode-toggle.is-active {
-    border: none !important;
-    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%) !important;
-    color: #fff !important;
-    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14) !important;
+    border: none;
+    background: linear-gradient(98deg, var(--brand) 0%, var(--brand-deep) 100%);
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(11, 24, 42, 0.14);
 }
 
 .aislepilot-setup-mode-toggle.is-active .aislepilot-setup-mode-toggle-note {
@@ -493,7 +493,7 @@
 
 .aislepilot-plan-basic-item {
     display: block;
-    border-radius: 12px !important;
+    border-radius: 12px;
     padding: 0.14rem 0.34rem 0.18rem;
 }
 
@@ -780,13 +780,13 @@
 
 .aislepilot-slider-input {
     width: 100%;
-    height: 1.28rem !important;
-    min-height: 1.28rem !important;
+    height: 1.28rem;
+    min-height: 1.28rem;
     margin: 0;
     padding: 0;
-    border: none !important;
+    border: none;
     border-radius: 999px;
-    background: transparent !important;
+    background: transparent;
     appearance: none;
     -webkit-appearance: none;
     cursor: grab;
@@ -888,21 +888,21 @@
 }
 
 .aislepilot-budget-precision-trigger {
-    min-height: 2.05rem !important;
-    border: 1px solid rgba(16, 63, 101, 0.24) !important;
-    border-radius: 999px !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-    color: var(--ink-soft) !important;
-    box-shadow: none !important;
-    padding: 0.2rem 0.6rem !important;
-    font-size: 0.84rem !important;
-    font-weight: 700 !important;
+    min-height: 2.05rem;
+    border: 1px solid rgba(16, 63, 101, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--ink-soft);
+    box-shadow: none;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.84rem;
+    font-weight: 700;
     letter-spacing: 0.01em;
 }
 
 .aislepilot-budget-precision-trigger:hover {
-    border-color: rgba(16, 63, 101, 0.38) !important;
-    color: var(--ink) !important;
+    border-color: rgba(16, 63, 101, 0.38);
+    color: var(--ink);
 }
 
 .aislepilot-budget-precision {
@@ -925,21 +925,21 @@
 }
 
 .aislepilot-budget-precision-input {
-    width: 5rem !important;
-    min-height: 2.05rem !important;
-    border: none !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    padding: 0 !important;
-    font-size: 0.84rem !important;
+    width: 5rem;
+    min-height: 2.05rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 0.84rem;
     line-height: 1.2;
     font-weight: 700;
     text-align: right;
-    color: var(--ink) !important;
+    color: var(--ink);
 }
 
 .aislepilot-budget-precision-input:focus {
-    box-shadow: none !important;
+    box-shadow: none;
     outline: none;
 }
 
@@ -1034,21 +1034,21 @@
 .aislepilot-supermarket-select {
     appearance: none;
     -webkit-appearance: none;
-    border: none !important;
-    border-radius: 0 !important;
-    min-height: 1.52rem !important;
-    line-height: 1.2 !important;
-    background-color: transparent !important;
+    border: none;
+    border-radius: 0;
+    min-height: 1.52rem;
+    line-height: 1.2;
+    background-color: transparent;
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23103F65' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.06rem center;
     background-size: 0.84rem;
-    color: var(--ink) !important;
-    font-weight: 700 !important;
-    text-align: right !important;
-    text-align-last: right !important;
-    padding: 0.04rem 1.1rem 0.04rem 0 !important;
+    color: var(--ink);
+    font-weight: 700;
+    text-align: right;
+    text-align-last: right;
+    padding: 0.04rem 1.1rem 0.04rem 0;
     box-shadow: none;
     transition: color 0.15s ease;
     white-space: nowrap;
@@ -1057,15 +1057,15 @@
 }
 
 .aislepilot-supermarket-select:hover {
-    background-color: transparent !important;
-    border: none !important;
-    color: var(--brand-deep) !important;
+    background-color: transparent;
+    border: none;
+    color: var(--brand-deep);
 }
 
 .aislepilot-supermarket-select:focus {
     outline: none;
-    background-color: transparent !important;
-    border: none !important;
+    background-color: transparent;
+    border: none;
     box-shadow: none;
 }
 
@@ -1220,34 +1220,34 @@
 .aislepilot-special-treat-day-select {
     appearance: none;
     -webkit-appearance: none;
-    min-height: 2.06rem !important;
-    border: none !important;
-    border-radius: 0 !important;
-    background: transparent !important;
+    min-height: 2.06rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23103F65' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.02rem center;
     background-size: 0.82rem;
-    padding: 0 1.04rem 0 0 !important;
-    font-size: 0.8rem !important;
-    line-height: 1.2 !important;
-    font-weight: 600 !important;
+    padding: 0 1.04rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    font-weight: 600;
     letter-spacing: 0.01em;
-    color: var(--ink) !important;
-    text-align: left !important;
-    text-align-last: left !important;
+    color: var(--ink);
+    text-align: left;
+    text-align-last: left;
 }
 
 .aislepilot-special-treat-day-select:hover {
-    border: none !important;
-    background-color: transparent !important;
+    border: none;
+    background-color: transparent;
 }
 
 .aislepilot-special-treat-day-select:focus {
-    border: none !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
+    border: none;
+    background-color: transparent;
+    box-shadow: none;
 }
 
 .aislepilot-special-treat-day-select option {

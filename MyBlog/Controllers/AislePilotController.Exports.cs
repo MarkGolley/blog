@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MyBlog.Models;
+using MyBlog.Services;
 
 namespace MyBlog.Controllers;
 
@@ -33,7 +34,7 @@ public partial class AislePilotController
             .Select(name => new
             {
                 mealName = name,
-                imageUrl = ResolveClientMealImageUrl(imageUrls.GetValueOrDefault(name, string.Empty))
+                imageUrl = AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(imageUrls.GetValueOrDefault(name, string.Empty))
             })
             .ToList();
 
@@ -131,59 +132,5 @@ public partial class AislePilotController
 
         logger.LogWarning("AislePilot export request did not include currentPlanMealNames; regenerating plan.");
         return await aislePilotService.BuildPlanAsync(request, cancellationToken);
-    }
-
-    private static string ResolveClientMealImageUrl(string? imageUrl)
-    {
-        var normalized = imageUrl?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return $"{AislePilotImagePathPrefix}/aislepilot-icon.svg";
-        }
-
-        if (normalized.StartsWith($"{AislePilotImagePathPrefix}/", StringComparison.OrdinalIgnoreCase))
-        {
-            return normalized;
-        }
-
-        if (normalized.StartsWith("/images/", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"{AislePilotImagePathPrefix}/{normalized["/images/".Length..]}";
-        }
-
-        normalized = normalized.Replace('\\', '/');
-        if (!normalized.StartsWith("/", StringComparison.Ordinal))
-        {
-            var trimmed = normalized.TrimStart('/');
-            if (trimmed.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"{AislePilotImagePathPrefix}/{trimmed["images/".Length..]}";
-            }
-
-            if (trimmed.StartsWith("aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"{AislePilotImagePathPrefix}/{trimmed}";
-            }
-
-            var hasImageExtension =
-                trimmed.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
-            if (hasImageExtension)
-            {
-                return $"{AislePilotImagePathPrefix}/aislepilot-meals/{trimmed}";
-            }
-        }
-
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out var absoluteUri) &&
-            (absoluteUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
-             absoluteUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
-        {
-            return normalized;
-        }
-
-        return normalized;
     }
 }

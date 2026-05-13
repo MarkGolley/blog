@@ -2,6 +2,10 @@ namespace MyBlog.Utilities;
 
 public static class QuantityDisplayFormatter
 {
+    private const decimal GenericSeasoningGramsPerTeaspoon = 2m;
+    private const decimal SaltGramsPerTeaspoon = 6m;
+    private const decimal OilGramsPerTeaspoon = 4.5m;
+    private const decimal MaxSeasoningTeaspoonsToDisplayAsSpoons = 6m;
     private static readonly HashSet<string> FractionalContainerUnits = new(StringComparer.OrdinalIgnoreCase)
     {
         "bottle",
@@ -77,7 +81,17 @@ public static class QuantityDisplayFormatter
         return FormatForShoppingList(quantity, unit);
     }
 
+    public static string Format(decimal quantity, string? unit, string? ingredientName)
+    {
+        return FormatForShoppingList(quantity, unit, ingredientName);
+    }
+
     public static string FormatForShoppingList(decimal quantity, string? unit)
+    {
+        return FormatForShoppingList(quantity, unit, ingredientName: null);
+    }
+
+    public static string FormatForShoppingList(decimal quantity, string? unit, string? ingredientName)
     {
         if (quantity <= 0)
         {
@@ -89,6 +103,11 @@ public static class QuantityDisplayFormatter
         if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
         {
             return FormatKg(quantity);
+        }
+
+        if (TryFormatIngredientSpecificGramQuantity(quantity, normalizedUnit, ingredientName, preferTeaspoonsOnly: false, out var ingredientSpecificQuantityDisplay))
+        {
+            return ingredientSpecificQuantityDisplay;
         }
 
         if (string.Equals(normalizedUnit, "g", StringComparison.OrdinalIgnoreCase))
@@ -130,6 +149,11 @@ public static class QuantityDisplayFormatter
 
     public static string FormatForRecipe(decimal quantity, string? unit)
     {
+        return FormatForRecipe(quantity, unit, ingredientName: null);
+    }
+
+    public static string FormatForRecipe(decimal quantity, string? unit, string? ingredientName)
+    {
         if (quantity <= 0)
         {
             return "-";
@@ -140,6 +164,16 @@ public static class QuantityDisplayFormatter
         if (string.Equals(normalizedUnit, "kg", StringComparison.OrdinalIgnoreCase))
         {
             return FormatKg(quantity);
+        }
+
+        if (TryFormatIngredientSpecificGramQuantity(quantity, normalizedUnit, ingredientName, preferTeaspoonsOnly: true, out var ingredientSpecificQuantityDisplay))
+        {
+            return ingredientSpecificQuantityDisplay;
+        }
+
+        if (string.Equals(normalizedUnit, "g", StringComparison.OrdinalIgnoreCase))
+        {
+            return FormatRecipeWeight(quantity);
         }
 
         if (TryFormatSpoonQuantity(quantity, normalizedUnit, out var spoonQuantityDisplay))
@@ -226,6 +260,19 @@ public static class QuantityDisplayFormatter
         if (quantityInGrams >= 1000m)
         {
             return FormatKg(quantityInGrams / 1000m);
+        }
+
+        var roundedUpGrams = RoundUpToNearest(
+            decimal.Round(quantityInGrams, 0, MidpointRounding.AwayFromZero),
+            5m);
+        return $"{roundedUpGrams:0} g";
+    }
+
+    private static string FormatRecipeWeight(decimal quantityInGrams)
+    {
+        if (quantityInGrams <= 0m)
+        {
+            return "-";
         }
 
         var roundedUpGrams = RoundUpToNearest(
@@ -338,6 +385,32 @@ public static class QuantityDisplayFormatter
         return decimal.Ceiling(value / step) * step;
     }
 
+    private static bool TryFormatIngredientSpecificGramQuantity(
+        decimal quantity,
+        string normalizedUnit,
+        string? ingredientName,
+        bool preferTeaspoonsOnly,
+        out string formattedQuantity)
+    {
+        formattedQuantity = string.Empty;
+
+        if (!string.Equals(normalizedUnit, "g", StringComparison.OrdinalIgnoreCase) ||
+            !TryResolveIngredientSpecificGramsPerTeaspoon(ingredientName, out var gramsPerTeaspoon) ||
+            gramsPerTeaspoon <= 0m)
+        {
+            return false;
+        }
+
+        var teaspoons = RoundToNearestQuarter(quantity / gramsPerTeaspoon);
+        if (teaspoons <= 0m || teaspoons > MaxSeasoningTeaspoonsToDisplayAsSpoons)
+        {
+            return false;
+        }
+
+        formattedQuantity = FormatTeaspoonDerivedQuantity(teaspoons, preferTeaspoonsOnly);
+        return true;
+    }
+
     private static bool TryFormatSpoonQuantity(decimal quantity, string normalizedUnit, out string formattedQuantity)
     {
         formattedQuantity = string.Empty;
@@ -363,6 +436,76 @@ public static class QuantityDisplayFormatter
 
         formattedQuantity = FormatFractionalAmount(roundedTablespoons, "tbsp", "tbsp");
         return true;
+    }
+
+    private static bool TryResolveIngredientSpecificGramsPerTeaspoon(string? ingredientName, out decimal gramsPerTeaspoon)
+    {
+        gramsPerTeaspoon = 0m;
+        var normalizedIngredientName = NormalizeIngredientNameForMatching(ingredientName);
+        if (normalizedIngredientName.Length == 0)
+        {
+            return false;
+        }
+
+        if (normalizedIngredientName.Contains("salt", StringComparison.OrdinalIgnoreCase))
+        {
+            gramsPerTeaspoon = SaltGramsPerTeaspoon;
+            return true;
+        }
+
+        if (normalizedIngredientName.Contains(" oil", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.EndsWith("oil", StringComparison.OrdinalIgnoreCase))
+        {
+            gramsPerTeaspoon = OilGramsPerTeaspoon;
+            return true;
+        }
+
+        if (normalizedIngredientName.Contains("paprika", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("pepper", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("turmeric", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("cumin", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("coriander", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("chilli", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("chili", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("garlic powder", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("onion powder", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("cinnamon", StringComparison.OrdinalIgnoreCase) ||
+            normalizedIngredientName.Contains("ginger", StringComparison.OrdinalIgnoreCase))
+        {
+            gramsPerTeaspoon = GenericSeasoningGramsPerTeaspoon;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeIngredientNameForMatching(string? ingredientName)
+    {
+        if (string.IsNullOrWhiteSpace(ingredientName))
+        {
+            return string.Empty;
+        }
+
+        var chars = ingredientName
+            .Trim()
+            .ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : ' ')
+            .ToArray();
+        return string.Join(
+            ' ',
+            new string(chars)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static string FormatTeaspoonDerivedQuantity(decimal teaspoons, bool preferTeaspoonsOnly)
+    {
+        if (!preferTeaspoonsOnly && teaspoons >= 3m)
+        {
+            var tablespoons = RoundToNearestQuarter(teaspoons / 3m);
+            return FormatFractionalAmount(tablespoons, "tbsp", "tbsp");
+        }
+
+        return FormatFractionalAmount(teaspoons, "tsp", "tsp");
     }
 
     private static string FormatShoppingLiquidVolume(decimal totalMillilitres)

@@ -633,6 +633,77 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WhenAiGeneratesMealsWithoutFirestore_AddsMealsToRuntimePool()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var payloadContent = """
+{
+  "meals": [
+    {
+      "name": "Runtime pool test meal",
+      "baseCostForTwo": 6.4,
+      "isQuick": true,
+      "tags": ["Balanced"],
+      "recipeSteps": [
+        "Heat a non-stick pan over medium heat for two minutes.",
+        "Cook the onions gently for five minutes until softened.",
+        "Add the main ingredients and stir until fully cooked.",
+        "Fold through the sauce and simmer briefly until glossy.",
+        "Serve straight away while hot."
+      ],
+      "ingredients": [
+        { "name": "Chicken breast", "department": "Meat & Fish", "quantityForTwo": 0.35, "unit": "kg", "estimatedCostForTwo": 2.7 },
+        { "name": "Rice", "department": "Tins & Dry Goods", "quantityForTwo": 0.4, "unit": "kg", "estimatedCostForTwo": 0.95 },
+        { "name": "Bell peppers", "department": "Produce", "quantityForTwo": 2, "unit": "pcs", "estimatedCostForTwo": 1.2 }
+      ]
+    }
+  ]
+}
+""";
+        var responseBody = JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        content = payloadContent
+                    }
+                }
+            }
+        });
+
+        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            CookDays = 1,
+            WeeklyBudget = 65m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.True(handler.CallCount >= 1);
+        Assert.True(result.UsedAiGeneratedMeals);
+        Assert.True(AiPoolContains("Runtime pool test meal"));
+    }
+
+    [Fact]
     public void BuildPlan_EggFriedRiceCalories_AreWithinReasonableServingRange()
     {
         var request = new AislePilotRequestModel

@@ -12,7 +12,10 @@ public class AislePilotMealImageUrlResolverTests
     [InlineData("/images/aislepilot-icon.svg", "/projects/aisle-pilot/images/aislepilot-icon.svg")]
     [InlineData("images/aislepilot-icon.svg", "/projects/aisle-pilot/images/aislepilot-icon.svg")]
     [InlineData("aislepilot-meals/chilli.png", "/projects/aisle-pilot/images/aislepilot-meals/chilli.png")]
+    [InlineData("aislepilot-meals/chilli", "/projects/aisle-pilot/images/aislepilot-meals/chilli.png")]
     [InlineData("chilli.png", "/projects/aisle-pilot/images/aislepilot-meals/chilli.png")]
+    [InlineData("greek-style-omelette-with-cherry-tomato", "/projects/aisle-pilot/images/aislepilot-meals/greek-style-omelette-with-cherry-tomato.png")]
+    [InlineData("/projects/aisle-pilot/images/aislepilot-meals/red-lentil-and-tomato-dahl-with-brown-rice", "/projects/aisle-pilot/images/aislepilot-meals/red-lentil-and-tomato-dahl-with-brown-rice.png")]
     [InlineData("https://cdn.example.com/chilli.png", "https://cdn.example.com/chilli.png")]
     [InlineData("/custom/path/chilli.png", "/custom/path/chilli.png")]
     public void ResolveClientMealImageUrl_NormalizesKnownImagePaths(string? input, string expected)

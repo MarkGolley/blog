@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
@@ -31,6 +32,7 @@ public sealed partial class AislePilotService
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
+            var requestStopwatch = Stopwatch.StartNew();
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(OpenAiRequestTimeout);
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, OpenAiChatCompletionsEndpoint)
@@ -45,14 +47,20 @@ public sealed partial class AislePilotService
                 var responseContent = await response.Content.ReadAsStringAsync(timeoutCts.Token);
                 if (response.IsSuccessStatusCode)
                 {
+                    _logger?.LogInformation(
+                        "AislePilot OpenAI call completed in {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}",
+                        requestStopwatch.ElapsedMilliseconds,
+                        attempt,
+                        maxAttempts);
                     return responseContent;
                 }
 
                 var shouldRetry = attempt < maxAttempts && IsTransientOpenAiStatus(response.StatusCode);
                 var errorSample = responseContent.Length <= 220 ? responseContent : responseContent[..220];
                 _logger?.LogWarning(
-                    "AislePilot OpenAI call failed with status {StatusCode}. Attempt={Attempt}/{MaxAttempts}. ResponseSample={ResponseSample}",
+                    "AislePilot OpenAI call failed with status {StatusCode} after {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}. ResponseSample={ResponseSample}",
                     (int)response.StatusCode,
+                    requestStopwatch.ElapsedMilliseconds,
                     attempt,
                     maxAttempts,
                     errorSample);
@@ -68,10 +76,11 @@ public sealed partial class AislePilotService
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 _logger?.LogWarning(
-                    "AislePilot OpenAI call timed out after {TimeoutSeconds}s. Attempt={Attempt}/{MaxAttempts}.",
+                    "AislePilot OpenAI call timed out after {TimeoutSeconds}s. Attempt={Attempt}/{MaxAttempts}. ElapsedMs={ElapsedMs}",
                     OpenAiRequestTimeout.TotalSeconds,
                     attempt,
-                    maxAttempts);
+                    maxAttempts,
+                    requestStopwatch.ElapsedMilliseconds);
 
                 if (attempt >= maxAttempts)
                 {
@@ -82,7 +91,8 @@ public sealed partial class AislePilotService
             {
                 _logger?.LogWarning(
                     ex,
-                    "AislePilot OpenAI HTTP request failed. Attempt={Attempt}/{MaxAttempts}.",
+                    "AislePilot OpenAI HTTP request failed after {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}.",
+                    requestStopwatch.ElapsedMilliseconds,
                     attempt,
                     maxAttempts);
 

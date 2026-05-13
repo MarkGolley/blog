@@ -74,7 +74,7 @@ Rules:
 - Respect dietary requirements and dislikes/allergens strictly.
 - Every meal must include 3-7 ingredients only.
 - Department must be one of: Produce, Bakery, Meat & Fish, Dairy & Eggs, Frozen, Tins & Dry Goods, Spices & Sauces, Snacks, Drinks, Household, Other
-- Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
+- Unit should be short plain text such as kg, g, ml, pcs, tins, jar, bottle, pack, head, fillets; small seasonings may use tsp or tbsp.
 - `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
 - `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
 - Use realistic prices and keep all monetary values to 2 decimal places.
@@ -210,7 +210,7 @@ Rules:
 - Do not include dessert-only meals in the meal slots unless a meal slot is explicitly dessert.
 - Every meal must include 3-7 ingredients only.
 - Department must be one of: Produce, Bakery, Meat & Fish, Dairy & Eggs, Frozen, Tins & Dry Goods, Spices & Sauces, Snacks, Drinks, Household, Other
-- Unit should be short plain text such as kg, g, pcs, tins, jar, bottle, pack, head, fillets.
+- Unit should be short plain text such as kg, g, ml, pcs, tins, jar, bottle, pack, head, fillets; small seasonings may use tsp or tbsp.
 - `baseCostForTwo` is an estimated GBP cost for serving 2 people once.
 - `estimatedCostForTwo` is the portion of the meal cost attributable to that ingredient for serving 2 people once.
 - Use realistic prices, avoid placeholder values, and keep all monetary values to 2 decimal places.

@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
@@ -257,6 +258,7 @@ public sealed partial class AislePilotService
         string? planSourceLabel = null,
         CancellationToken cancellationToken = default)
     {
+        var planAssemblyStopwatch = Stopwatch.StartNew();
         var planDays = NormalizePlanDays(request.PlanDays);
         var normalizedCookDays = NormalizeCookDays(cookDays, planDays);
         var mealTypeSlots = BuildMealTypeSlots(request);
@@ -278,7 +280,9 @@ public sealed partial class AislePilotService
             request.IgnoredMealSlotIndexesCsv,
             expectedMealCount);
         var mealPortionMultipliers = BuildPerMealPortionMultipliers(dayMultipliers, mealsPerDay);
-        var mealImageUrls = await ResolveMealImageUrlsAsync(normalizedSelectedMeals, cancellationToken);
+        var imageResolutionStopwatch = Stopwatch.StartNew();
+        var mealImageUrls = ResolveMealImageUrls(normalizedSelectedMeals);
+        var imageResolutionElapsedMs = imageResolutionStopwatch.ElapsedMilliseconds;
         var portionSizeFactor = ResolvePortionSizeFactor(context.PortionSize);
         var specialTreatMealSlotIndex = request.IncludeSpecialTreatMeal
             ? ResolveSpecialTreatDisplayMealIndex(
@@ -299,9 +303,14 @@ public sealed partial class AislePilotService
             context.DietaryModes,
             context.DislikesOrAllergens,
             specialTreatMealSlotIndex);
-        var dessertAddOnTemplate = request.IncludeDessertAddOn
-            ? await TryResolveDessertAddOnTemplateForPlanAsync(request.SelectedDessertAddOnName, cancellationToken)
-            : null;
+        DessertAddOnTemplate? dessertAddOnTemplate = null;
+        long dessertResolutionElapsedMs = 0;
+        if (request.IncludeDessertAddOn)
+        {
+            var dessertResolutionStopwatch = Stopwatch.StartNew();
+            dessertAddOnTemplate = await TryResolveDessertAddOnTemplateForPlanAsync(request.SelectedDessertAddOnName, cancellationToken);
+            dessertResolutionElapsedMs = dessertResolutionStopwatch.ElapsedMilliseconds;
+        }
         var hasSpecialTreatMealInPlan = request.IncludeSpecialTreatMeal &&
                                         dailyPlans.Any(meal => meal.IsSpecialTreat);
         var hasDessertAddOnInPlan = dessertAddOnTemplate is not null;
@@ -342,6 +351,17 @@ public sealed partial class AislePilotService
             budgetTips.Add(hasDessertAddOnInPlan
                 ? "Includes a cake/dessert add-on in your shopping list."
                 : "Dessert add-on is still being prepared in the background.");
+        }
+
+        if (planAssemblyStopwatch.ElapsedMilliseconds >= 150 || imageResolutionElapsedMs >= 50 || dessertResolutionElapsedMs >= 50)
+        {
+            _logger?.LogInformation(
+                "AislePilot plan assembly completed in {ElapsedMs}ms. MealCount={MealCount}, ImageResolutionMs={ImageResolutionMs}, DessertResolutionMs={DessertResolutionMs}, ShoppingItemCount={ShoppingItemCount}",
+                planAssemblyStopwatch.ElapsedMilliseconds,
+                normalizedSelectedMeals.Count,
+                imageResolutionElapsedMs,
+                dessertResolutionElapsedMs,
+                shoppingItems.Count);
         }
 
         return new AislePilotPlanResultViewModel

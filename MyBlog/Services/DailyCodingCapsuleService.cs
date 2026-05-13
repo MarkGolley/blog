@@ -63,6 +63,7 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
     private static readonly SemaphoreSlim RefreshLock = new(1, 1);
     private static readonly ConcurrentDictionary<DateOnly, CapsuleCacheEntry> CacheByDate = new();
     private static readonly object OperationalStateLock = new();
+    private static DateTimeOffset? _aiRateLimitBackoffUntilUtc;
     private static DateTime? _lastGenerationAttemptUtc;
     private static DateTime? _lastGenerationSuccessUtc;
     private static DateTime? _lastGenerationFailureUtc;
@@ -209,6 +210,14 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
             return null;
         }
 
+        if (IsRateLimitBackoffActive(out var rateLimitBackoff))
+        {
+            _logger.LogInformation(
+                "Skipping daily capsule AI generation while OpenAI rate-limit backoff is active for another {RemainingSeconds}s.",
+                Math.Max(1, (int)Math.Ceiling(rateLimitBackoff.TotalSeconds)));
+            return null;
+        }
+
         try
         {
             RecordGenerationAttempt();
@@ -255,13 +264,41 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
                     break;
                 }
 
+                if (response.StatusCode == HttpStatusCode.TooManyRequests &&
+                    TryGetRetryAfterDelay(response.Headers, out var retryAfterDelay))
+                {
+                    var clampedDelay = ClampRateLimitBackoffDelay(retryAfterDelay);
+                    RecordRateLimitBackoff(clampedDelay);
+                    RecordGenerationFailure(
+                        $"OpenAI rate limited daily capsule generation (429). Retry after {Math.Max(1, (int)Math.Ceiling(clampedDelay.TotalSeconds))}s.");
+                    _logger.LogWarning(
+                        "Daily capsule AI generation hit OpenAI rate limits (429). Using fallback and backing off AI attempts for {RetryAfterSeconds}s.",
+                        Math.Max(1, (int)Math.Ceiling(clampedDelay.TotalSeconds)));
+                    response.Dispose();
+                    return null;
+                }
+
                 if (attempt >= OpenAiMaxAttempts || !IsTransientStatus(response.StatusCode))
                 {
-                    response.EnsureSuccessStatusCode();
+                    RecordGenerationFailure(
+                        $"OpenAI returned HTTP {(int)response.StatusCode} ({response.ReasonPhrase ?? "Unknown"}).");
+                    _logger.LogWarning(
+                        "Daily capsule AI generation returned non-success status {StatusCode} ({ReasonPhrase}). Using fallback.",
+                        (int)response.StatusCode,
+                        response.ReasonPhrase ?? "Unknown");
+                    response.Dispose();
+                    return null;
                 }
 
                 response.Dispose();
                 await Task.Delay(TimeSpan.FromMilliseconds(350 * attempt), cancellationToken);
+                response = null;
+            }
+
+            if (response is null)
+            {
+                RecordGenerationFailure("OpenAI response unavailable after retries.");
+                return null;
             }
 
             using (response)
@@ -625,6 +662,78 @@ Return JSON only with this schema:
                (int)statusCode >= 500;
     }
 
+    private static bool TryGetRetryAfterDelay(HttpResponseHeaders headers, out TimeSpan retryAfterDelay)
+    {
+        retryAfterDelay = TimeSpan.Zero;
+        var retryAfter = headers.RetryAfter;
+        if (retryAfter is null)
+        {
+            return false;
+        }
+
+        if (retryAfter.Delta.HasValue && retryAfter.Delta.Value > TimeSpan.Zero)
+        {
+            retryAfterDelay = retryAfter.Delta.Value;
+            return true;
+        }
+
+        if (!retryAfter.Date.HasValue)
+        {
+            return false;
+        }
+
+        var calculatedDelay = retryAfter.Date.Value - DateTimeOffset.UtcNow;
+        if (calculatedDelay <= TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        retryAfterDelay = calculatedDelay;
+        return true;
+    }
+
+    private static TimeSpan ClampRateLimitBackoffDelay(TimeSpan requestedDelay)
+    {
+        if (requestedDelay <= TimeSpan.Zero)
+        {
+            return TimeSpan.FromSeconds(30);
+        }
+
+        var maxDelay = TimeSpan.FromMinutes(15);
+        return requestedDelay > maxDelay ? maxDelay : requestedDelay;
+    }
+
+    private static void RecordRateLimitBackoff(TimeSpan backoffDelay)
+    {
+        lock (OperationalStateLock)
+        {
+            _aiRateLimitBackoffUntilUtc = DateTimeOffset.UtcNow + backoffDelay;
+        }
+    }
+
+    private static bool IsRateLimitBackoffActive(out TimeSpan remainingDelay)
+    {
+        lock (OperationalStateLock)
+        {
+            if (!_aiRateLimitBackoffUntilUtc.HasValue)
+            {
+                remainingDelay = TimeSpan.Zero;
+                return false;
+            }
+
+            var remaining = _aiRateLimitBackoffUntilUtc.Value - DateTimeOffset.UtcNow;
+            if (remaining > TimeSpan.Zero)
+            {
+                remainingDelay = remaining;
+                return true;
+            }
+
+            _aiRateLimitBackoffUntilUtc = null;
+            remainingDelay = TimeSpan.Zero;
+            return false;
+        }
+    }
+
     private static void RecordGenerationAttempt()
     {
         lock (OperationalStateLock)
@@ -639,6 +748,7 @@ Return JSON only with this schema:
         {
             _lastGenerationSuccessUtc = DateTime.UtcNow;
             _lastGenerationFailureReason = null;
+            _aiRateLimitBackoffUntilUtc = null;
         }
     }
 
