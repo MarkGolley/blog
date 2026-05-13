@@ -81,4 +81,344 @@ public sealed partial class PlaywrightE2ETests
             collapsedMetrics[3] <= collapsedMetrics[2] + 32,
             $"Expected collapsed stacked panel to stay compact without a stretched empty details column. Panel={collapsedMetrics[3]:F1}px Image={collapsedMetrics[2]:F1}px.");
     }
+
+    [Fact]
+    public async Task Desktop_AislePilotStackedLayout_AlignsTabsWithDetailsColumn()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var stackedToggle = page.Locator(".aislepilot-day-view-toggle").First;
+        await stackedToggle.ClickAsync();
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement &&
+                    carousel.getAttribute("data-day-stacked-mode") === "true" &&
+                    carousel.getAttribute("data-day-reorder-mode") !== "true";
+            }
+            """);
+
+        var firstMealTab = page.Locator("[data-day-card-slide]:not([data-day-carousel-ghost='true'])").First
+            .Locator("[data-day-meal-tab]").First;
+        var detailsPanelInitiallyHidden = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                return !(detailsPanel instanceof HTMLElement)
+                    || detailsPanel.hasAttribute("hidden")
+                    || detailsPanel.getAttribute("aria-hidden") === "true";
+            }
+            """);
+
+        if (detailsPanelInitiallyHidden)
+        {
+            await firstMealTab.ClickAsync();
+        }
+        else
+        {
+            await firstMealTab.ClickAsync();
+            await firstMealTab.ClickAsync();
+        }
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                return detailsPanel instanceof HTMLElement
+                    && !detailsPanel.hasAttribute("hidden")
+                    && detailsPanel.getAttribute("aria-hidden") !== "true";
+            }
+            """);
+
+        var metrics = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const tabs = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-tabs")
+                    : null;
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                const imageShell = panel instanceof HTMLElement
+                    ? panel.querySelector(".aislepilot-meal-image-shell")
+                    : null;
+                if (!(card instanceof HTMLElement) ||
+                    !(tabs instanceof HTMLElement) ||
+                    !(detailsPanel instanceof HTMLElement) ||
+                    !(imageShell instanceof HTMLElement))
+                {
+                    return [-1, -1, -1, -1];
+                }
+
+                const cardRect = card.getBoundingClientRect();
+                const tabsRect = tabs.getBoundingClientRect();
+                const detailsRect = detailsPanel.getBoundingClientRect();
+                const imageRect = imageShell.getBoundingClientRect();
+
+                return [
+                    imageRect.left - detailsRect.right,
+                    tabsRect.right - detailsRect.right,
+                    imageRect.left - tabsRect.right,
+                    cardRect.bottom - imageRect.bottom
+                ];
+            }
+            """);
+
+        Assert.Equal(4, metrics.Length);
+        Assert.True(
+            metrics[0] >= 6,
+            $"Expected stacked detail and image columns to keep a clear gutter. Gap={metrics[0]:F1}px.");
+        Assert.True(
+            metrics[1] <= 6,
+            $"Expected stacked meal tabs to align with the details column edge. Overflow={metrics[1]:F1}px.");
+        Assert.True(
+            metrics[2] >= 6,
+            $"Expected stacked meal tabs to stop before the desktop image column. Separation={metrics[2]:F1}px.");
+        Assert.True(
+            metrics[3] <= 28,
+            $"Expected stacked card body to avoid excess desktop whitespace under the image. Gap={metrics[3]:F1}px.");
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotStackedLayout_CollapsedCards_UseFullWidthTabs()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var stackedToggle = page.Locator(".aislepilot-day-view-toggle").First;
+        await stackedToggle.ClickAsync();
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement &&
+                    carousel.getAttribute("data-day-stacked-mode") === "true" &&
+                    carousel.getAttribute("data-day-reorder-mode") !== "true";
+            }
+            """);
+
+        var firstMealTab = page.Locator("[data-day-card-slide]:not([data-day-carousel-ghost='true'])").First
+            .Locator("[data-day-meal-tab]").First;
+        var detailsVisible = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                return detailsPanel instanceof HTMLElement &&
+                    !detailsPanel.hasAttribute("hidden") &&
+                    detailsPanel.getAttribute("aria-hidden") !== "true";
+            }
+            """);
+
+        if (detailsVisible)
+        {
+            await firstMealTab.ClickAsync();
+        }
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                return card instanceof HTMLElement &&
+                    card.getAttribute("data-day-card-expanded") !== "true" &&
+                    (!(detailsPanel instanceof HTMLElement) ||
+                        detailsPanel.hasAttribute("hidden") ||
+                        detailsPanel.getAttribute("aria-hidden") === "true");
+            }
+            """);
+
+        var metrics = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const body = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-card-body")
+                    : null;
+                const tabs = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-tabs")
+                    : null;
+                if (!(card instanceof HTMLElement) || !(tabs instanceof HTMLElement))
+                {
+                    return [-1, -1, -1];
+                }
+
+                const containerRect = body instanceof HTMLElement
+                    ? body.getBoundingClientRect()
+                    : card.getBoundingClientRect();
+                const tabsRect = tabs.getBoundingClientRect();
+
+                return [
+                    containerRect.right - tabsRect.right,
+                    tabsRect.left - containerRect.left,
+                    tabsRect.width / Math.max(containerRect.width, 1)
+                ];
+            }
+            """);
+
+        Assert.Equal(3, metrics.Length);
+        Assert.True(
+            metrics[0] <= 26,
+            $"Expected collapsed stacked tabs to align close to the card body right edge on desktop. Right gap={metrics[0]:F1}px.");
+        Assert.True(
+            metrics[1] <= 26,
+            $"Expected collapsed stacked tabs to align close to the card body left edge on desktop. Left gap={metrics[1]:F1}px.");
+        Assert.True(
+            metrics[2] >= 0.9,
+            $"Expected collapsed stacked tabs to use most of the available desktop width. Coverage={metrics[2]:F2}.");
+    }
+
+    [Fact]
+    public async Task Desktop_AislePilotStackedLayout_UsesSingleInspectorSurfaceWhenExpanded()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateDesktopContextAsync();
+        var page = await context.NewPageAsync();
+
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var stackedToggle = page.Locator(".aislepilot-day-view-toggle").First;
+        await stackedToggle.ClickAsync();
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const carousel = document.querySelector("[data-day-card-carousel]");
+                return carousel instanceof HTMLElement &&
+                    carousel.getAttribute("data-day-stacked-mode") === "true" &&
+                    carousel.getAttribute("data-day-reorder-mode") !== "true";
+            }
+            """);
+
+        var firstMealTab = page.Locator("[data-day-card-slide]:not([data-day-carousel-ghost='true'])").First
+            .Locator("[data-day-meal-tab]").First;
+        var detailsVisible = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                return detailsPanel instanceof HTMLElement &&
+                    !detailsPanel.hasAttribute("hidden") &&
+                    detailsPanel.getAttribute("aria-hidden") !== "true";
+            }
+            """);
+
+        if (!detailsVisible)
+        {
+            await firstMealTab.ClickAsync();
+        }
+
+        await page.WaitForFunctionAsync(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                return detailsPanel instanceof HTMLElement &&
+                    !detailsPanel.hasAttribute("hidden") &&
+                    detailsPanel.getAttribute("aria-hidden") !== "true";
+            }
+            """);
+
+        var metrics = await page.EvaluateAsync<double[]>(
+            """
+            () => {
+                const card = document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true'])");
+                const tabs = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-tabs")
+                    : null;
+                const panel = card instanceof HTMLElement
+                    ? card.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']")
+                    : null;
+                const detailsPanel = panel instanceof HTMLElement
+                    ? panel.querySelector("[data-inline-details-panel]")
+                    : null;
+                const inspectorPanels = detailsPanel instanceof HTMLElement
+                    ? detailsPanel.querySelector(".aislepilot-inspector-panels")
+                    : null;
+
+                if (!(tabs instanceof HTMLElement) ||
+                    !(detailsPanel instanceof HTMLElement) ||
+                    !(inspectorPanels instanceof HTMLElement))
+                {
+                    return [-1, -1, -1];
+                }
+
+                const tabsStyles = window.getComputedStyle(tabs);
+                const detailsStyles = window.getComputedStyle(detailsPanel);
+                const inspectorStyles = window.getComputedStyle(inspectorPanels);
+
+                return [
+                    parseFloat(tabsStyles.borderTopWidth || "0"),
+                    parseFloat(detailsStyles.borderTopWidth || "0"),
+                    parseFloat(inspectorStyles.borderTopWidth || "0")
+                ];
+            }
+            """);
+
+        Assert.Equal(3, metrics.Length);
+        Assert.True(
+            metrics[0] <= 0.5,
+            $"Expected expanded stacked meal-strip container to be unframed. Border={metrics[0]:F1}px.");
+        Assert.True(
+            metrics[1] <= 0.5,
+            $"Expected expanded stacked details wrapper to avoid a second frame. Border={metrics[1]:F1}px.");
+        Assert.True(
+            metrics[2] >= 1,
+            $"Expected expanded stacked inspector content to use one clear surface border. Border={metrics[2]:F1}px.");
+    }
 }

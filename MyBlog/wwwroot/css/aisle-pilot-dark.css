@@ -483,11 +483,11 @@
 }
 
 :root[data-theme="dark"] .aislepilot-day-reorder-toggle[aria-pressed="true"] {
-    border-color: rgba(125, 167, 213, 0.34);
-    background: linear-gradient(135deg, rgba(93, 154, 191, 0.7), rgba(30, 65, 95, 0.92));
+    border-color: rgb(var(--ap-refresh-primary-rgb, 42 160 108) / 0.42);
+    background: linear-gradient(135deg, rgb(var(--ap-refresh-primary-rgb, 42 160 108) / 0.9), rgb(var(--ap-refresh-primary-strong-rgb, 24 122 90) / 0.96));
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.16),
-        0 12px 18px rgba(2, 7, 14, 0.22);
+        0 12px 18px rgb(var(--ap-refresh-primary-rgb, 42 160 108) / 0.3);
 }
 
 :root[data-theme="dark"] .aislepilot-day-carousel::before {

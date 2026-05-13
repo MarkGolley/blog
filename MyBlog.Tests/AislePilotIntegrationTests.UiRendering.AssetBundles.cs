@@ -204,9 +204,35 @@ public partial class AislePilotIntegrationTests
                 @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-reorder-toggle,\s*\.aislepilot-day-view-toggle\s*\{[\s\S]*min-height:\s*2\.2rem;",
                 RegexOptions.IgnoreCase),
             css);
+        Assert.Contains(
+            ".aislepilot-day-reorder-toggle[aria-pressed=\"true\"]",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "background: linear-gradient(135deg, var(--ap-refresh-primary, #15724f) 0%, var(--ap-refresh-primary-strong, #115c4e) 100%);",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ":root[data-theme=\"dark\"] .aislepilot-day-reorder-toggle[aria-pressed=\"true\"]",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "background: linear-gradient(135deg, rgb(var(--ap-refresh-primary-rgb, 42 160 108) / 0.9), rgb(var(--ap-refresh-primary-strong-rgb, 24 122 90) / 0.96));",
+            css,
+            StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
-                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-meal-track\s*>\s*\.aislepilot-day-meal-panel\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*clamp\(10\.5rem,\s*22vw,\s*13rem\);",
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s*\{[\s\S]*--ap-stacked-media-column-width:\s*clamp\(11rem,\s*20vw,\s*12\.4rem\);",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-meal-tabs\s*\{[\s\S]*max-width:\s*calc\(100%\s*-\s*clamp\(11rem,\s*20vw,\s*12\.4rem\)\s*-\s*0\.8rem\);",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-meal-track\s*>\s*\.aislepilot-day-meal-panel\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*var\(--ap-stacked-media-column-width\);",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(
@@ -216,7 +242,7 @@ public partial class AislePilotIntegrationTests
             css);
         Assert.Matches(
             new Regex(
-                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-meal-image-shell\s*\{[\s\S]*min-height:\s*9\.8rem;",
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-meal-image-shell\s*\{[\s\S]*min-height:\s*8\.8rem;",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(
@@ -244,9 +270,42 @@ public partial class AislePilotIntegrationTests
             css,
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains(
+            ".aislepilot-day-card:not([data-day-card-expanded=\"true\"]) .aislepilot-day-meal-slider",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            ".aislepilot-day-card[data-day-card-expanded=\"true\"] .aislepilot-day-meal-slider",
+            css,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-card:not\(\[data-day-card-expanded=""true""\]\)\s+\.aislepilot-day-meal-tabs\s*\{[\s\S]*max-width:\s*100%;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-card:not\(\[data-day-card-expanded=""true""\]\)\s+\.aislepilot-day-meal-tab-meta\s*\{[\s\S]*display:\s*none;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Contains(
             "grid-template-areas: \"image\";",
             css,
             StringComparison.OrdinalIgnoreCase);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-meal-tabs\s*\{[\s\S]*border:\s*none;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-day-meal-panel\s*>\s*\.aislepilot-meal-details-panel\s*\{[\s\S]*border:\s*none;",
+                RegexOptions.IgnoreCase),
+            css);
+        Assert.Matches(
+            new Regex(
+                @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-inspector-panels\s*\{[\s\S]*border:\s*1px\s*solid\s*rgba\(15,\s*23,\s*42,\s*0\.11\);",
+                RegexOptions.IgnoreCase),
+            css);
         Assert.Matches(
             new Regex(
                 @"@media\s*\(min-width:\s*981px\)\s*\{[\s\S]*\.aislepilot-day-carousel\[data-day-stacked-mode=""true""\]:not\(\[data-day-reorder-mode=""true""\]\)\s+\.aislepilot-meal-details-image-toggle\s*>\s*\.aislepilot-meal-image-summary\s*\{[\s\S]*pointer-events:\s*none;",
@@ -263,16 +322,24 @@ public partial class AislePilotIntegrationTests
         Assert.Contains("const syncMealSectionExpansionStateForScope = (scope, shouldExpand) => {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("resetCompactStackedInlineDetailsTouchState(carousel);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("syncMealSectionExpansionStateForScope(carousel, isStacked);", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("const shouldShowInlineDetails = isCompactStackedCardPresentation", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const dayMealExpandedState = new Map();", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("let expandedStackedDayKey = \"\";", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const resetRememberedDayMealExpandedState = scope => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const collapseOtherStackedDayCards = activeCard => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const rememberDayMealExpandedState = scope => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const shouldShowInlineDetails = isStackedCardExpanded", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const shouldExpandMealSections = isStackedInspectorModeForCard(owningCard);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("section.node.open = shouldExpandMealSections;", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("} else if (isVisible && inlineDetailsPanel instanceof HTMLElement) {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("} else if (isActive && inlineDetailsPanel instanceof HTMLElement) {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("summary.addEventListener(\"click\", event => {", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("if (!isCompactStackedInspectorModeForCard(card))", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("if (!isStackedInspectorModeForCard(card))", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const isHidden = detailsPanel.hasAttribute(\"hidden\")", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("toggle.open = isHidden;", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("inlineToggle.dataset.inlineDetailsTouched !== \"true\"", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("setRememberedDayMealExpanded(card, isHidden);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("collapseOtherStackedDayCards(card);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const shouldExpand = !(isSameSlot && isExpanded);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("shouldExpandStacked: shouldExpand", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("collapseOtherStackedCards: shouldExpand", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("toggle.dataset.inlineDetailsTouched = \"true\";", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("sections = [", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("{ key: \"overview\", label: \"Overview\"", script, StringComparison.OrdinalIgnoreCase);
