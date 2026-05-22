@@ -84,9 +84,9 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("Policy files in source control", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("A central policy service", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("The runtime enforcement point", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("I do not have a full policy-test pipeline in my current workplace setup yet.", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Where software developers usually get involved", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Most software developers are usually most involved in the first two layers.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("I do not have a full policy-test pipeline in my current setup yet.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Where developers can get involved", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("day-to-day work seems to sit mostly in the first two layers.", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Control flow when some parts are missing", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("tighten what you do control and fail safe on risky actions", html, StringComparison.OrdinalIgnoreCase);
     }
@@ -145,7 +145,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("/workspace/project/policies/tests/", html, StringComparison.Ordinal);
         Assert.DoesNotContain("C:\\Users\\markg\\RiderProjects\\blog", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Delete commands can only target files inside the approved workspace.", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("these checks run as policy tests (locally or in CI)", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("these checks often start as policy tests (locally or in CI)", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
