@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,145 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         {
             Assert.Contains($"id=\"featured-post-{post.Id}\"", html, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public async Task BlogIndex_RendersEditorialShellAndPostSummaries()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog");
+
+        Assert.Contains("class=\"route-blog route-blog-index\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"blog-post-content-shell\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"blog-post-summary\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task WhyAiPermissionPopupsPost_RendersByronLinkedInAndPodcastLinks()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog/Why_AI_Permission_Popups_Matter");
+
+        Assert.Contains("https://www.linkedin.com/in/byron-cook-8765205", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://softwareengineeringdaily.com/2026/05/19/formal-methods-as-agent-guardrails/", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task WhyAiPermissionPopupsPost_RendersArchitectureAndChecklistSections()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog/Why_AI_Permission_Popups_Matter");
+
+        Assert.Contains("Agent -> Tool call -> Policy engine -> Approval gate -> Executor -> Audit log", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Common failure modes", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("I stopped running the agent with full access by default.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Next boundaries I am working toward", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("I can answer what ran, which path it touched, who approved it, and when it happened", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Where these policies actually live", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Policy files in source control", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("A central policy service", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("The runtime enforcement point", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("I do not have a full policy-test pipeline in my current workplace setup yet.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Where software developers usually get involved", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Most software developers are usually most involved in the first two layers.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Control flow when some parts are missing", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("tighten what you do control and fail safe on risky actions", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task WhyAiPermissionPopupsPost_UsesMetadataTitleForListingAndPostHeader()
+    {
+        using var client = _factory.CreateClient();
+
+        var blogIndexHtml = await client.GetStringAsync("/blog");
+        Assert.Contains("Agent Guardrails in Practice: From Permission Popups to Policy Verification", blogIndexHtml, StringComparison.OrdinalIgnoreCase);
+
+        var postHtml = await client.GetStringAsync("/blog/Why_AI_Permission_Popups_Matter");
+        Assert.Contains("<h2 id=\"post-title\">Agent Guardrails in Practice: From Permission Popups to Policy Verification</h2>", postHtml, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task WhyAiPermissionPopupsPost_RendersInteractiveQuizSection()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog/Why_AI_Permission_Popups_Matter");
+
+        Assert.Contains("data-post-quiz", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-post-quiz-collapsible", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("post-capsule post-capsule-details post-quiz-details", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-post-quiz-form", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-quiz-check", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-quiz-reset", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-quiz-score", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Optional quiz", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("what is a permission popup primarily described as?", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task WhyAiPermissionPopupsPost_RendersJargonSectionWithOptionalExamples()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog/Why_AI_Permission_Popups_Matter");
+
+        Assert.Contains("I am not a formal methods expert.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("The model can generate text freely", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("The agent should not act freely", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Jargon cheat sheet", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("map to the architecture path above", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("the runtime system checks, constrains, and proves those actions are safe", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("agent runtime, tool execution layer, policy engine, approval gate, executor, and audit log", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("the agent plans, calls tools, executes steps", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Formal methods", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Optional: Policy examples", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Examples at prompt, rule, and verification layers.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Prompt-level rule (weakest)", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/workspace/project", html, StringComparison.Ordinal);
+        Assert.Contains("/workspace/project/policies/agent-policy.rego", html, StringComparison.Ordinal);
+        Assert.Contains("/workspace/project/policies/tests/", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("C:\\Users\\markg\\RiderProjects\\blog", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Delete commands can only target files inside the approved workspace.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("these checks run as policy tests (locally or in CI)", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PostWithoutQuizSidecar_DoesNotRenderQuizSection()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog/Deploying_My_First_Blog_Site");
+
+        Assert.DoesNotContain("data-post-quiz", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SiteCss_ContainsBlogDarkContrastAndExcerptClampRules()
+    {
+        using var client = _factory.CreateClient();
+
+        var css = await client.GetStringAsync("/css/site.css");
+
+        Assert.Contains(":root[data-theme=\"dark\"] body.route-blog .blog-hero", css, StringComparison.Ordinal);
+        Assert.Contains("background: rgba(14, 23, 37, 0.95);", css, StringComparison.Ordinal);
+        Assert.Contains("body.route-blog .site-header", css, StringComparison.Ordinal);
+        Assert.Contains("-webkit-line-clamp: 2;", css, StringComparison.Ordinal);
+        Assert.Contains("-webkit-line-clamp: 3;", css, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BlogIndex_SubscribeSection_RendersTrustCopyAndSubscribeButtonClass()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog");
+
+        Assert.Contains("class=\"subscribe-button\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"subscribe-trust\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("No spam. Unsubscribe anytime.", html, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -424,6 +564,53 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         using var response = await client.GetAsync("/blog/%2e%2e%5c%2e%2e%5cappsettings");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public void BlogService_InDevelopment_RefreshesEditedHtmlWithoutWaitingForCacheTtl()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+        var blogService = scope.ServiceProvider.GetRequiredService<BlogService>();
+        var postsPath = Path.Combine(env.WebRootPath, "BlogStorage");
+        Directory.CreateDirectory(postsPath);
+
+        var slug = $"dev-refresh-{Guid.NewGuid():N}";
+        var postPath = Path.Combine(postsPath, $"{slug}.html");
+
+        try
+        {
+            File.WriteAllText(
+                postPath,
+                """
+                <!-- Title: Initial development refresh title -->
+                <html><body><p>Initial development refresh body.</p></body></html>
+                """);
+
+            var initialPost = blogService.GetPostBySlug(slug);
+            Assert.NotNull(initialPost);
+            Assert.Equal("Initial development refresh title", initialPost!.Title);
+
+            File.WriteAllText(
+                postPath,
+                """
+                <!-- Title: Updated development refresh title -->
+                <html><body><p>Updated development refresh body.</p></body></html>
+                """);
+            File.SetLastWriteTimeUtc(postPath, DateTime.UtcNow.AddSeconds(2));
+
+            var updatedPost = blogService.GetPostBySlug(slug);
+            Assert.NotNull(updatedPost);
+            Assert.Equal("Updated development refresh title", updatedPost!.Title);
+            Assert.Contains("Updated development refresh body.", updatedPost.Content, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (File.Exists(postPath))
+            {
+                File.Delete(postPath);
+            }
+        }
     }
 
     [Fact]

@@ -112,7 +112,24 @@
     <link rel="stylesheet" href="~/MyBlog.styles.css" asp-append-version="true"/>
     @await RenderSectionAsync("Head", required: false)
 </head>
-<body>
+@{
+    var routeController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var routeAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    var bodyClassParts = new List<string>();
+
+    if (!string.IsNullOrWhiteSpace(routeController))
+    {
+        bodyClassParts.Add($"route-{routeController.ToLowerInvariant()}");
+    }
+
+    if (!string.IsNullOrWhiteSpace(routeAction))
+    {
+        bodyClassParts.Add($"route-{routeController.ToLowerInvariant()}-{routeAction.ToLowerInvariant()}");
+    }
+
+    var bodyClass = string.Join(" ", bodyClassParts);
+}
+<body class="@bodyClass">
 @{
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
@@ -157,7 +174,7 @@
             <span class="brand-subtitle">C#/.NET Engineer</span>
         </a>
 
-        @if (navCapsule is not null)
+        @if (navCapsule is not null && !IsController("Blog"))
         {
             <details class="nav-capsule" data-nav-capsule>
                 <summary class="nav-capsule-summary">

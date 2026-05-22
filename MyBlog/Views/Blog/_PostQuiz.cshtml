@@ -1,0 +1,51 @@
+@model MyBlog.Models.BlogPostQuiz
+
+<section aria-labelledby="post-quiz-title" data-reveal data-post-quiz>
+    <details class="post-capsule post-capsule-details post-quiz-details" data-post-quiz-collapsible>
+        <summary id="post-quiz-title">
+            <span class="post-capsule-label">Optional quiz</span>
+            <span class="post-capsule-text">@Model.Title</span>
+        </summary>
+
+        <div class="post-capsule-details-body post-quiz-body">
+            <p class="post-quiz-intro">Answer each question, then check your score.</p>
+
+            <form class="post-quiz-form" data-post-quiz-form>
+                @for (var questionIndex = 0; questionIndex < Model.Questions.Count; questionIndex++)
+                {
+                    var question = Model.Questions[questionIndex];
+                    var fieldName = $"quiz-{question.Id}";
+                    var questionId = $"post-quiz-question-{questionIndex}";
+                    <fieldset
+                        class="post-quiz-question"
+                        data-quiz-question
+                        data-correct-option-index="@question.CorrectOptionIndex"
+                        data-explanation="@question.Explanation">
+                        <legend id="@questionId">
+                            <span class="post-quiz-question-number">Question @(questionIndex + 1)</span>
+                            <span class="post-quiz-question-text">@question.Prompt</span>
+                        </legend>
+                        <div class="post-quiz-options" role="radiogroup" aria-labelledby="@questionId">
+                            @for (var optionIndex = 0; optionIndex < question.Options.Count; optionIndex++)
+                            {
+                                var optionId = $"{fieldName}-{optionIndex}";
+                                <label class="post-quiz-option" for="@optionId">
+                                    <input type="radio" id="@optionId" name="@fieldName" value="@optionIndex" />
+                                    <span>@question.Options[optionIndex]</span>
+                                </label>
+                            }
+                        </div>
+                        <p class="post-quiz-feedback" data-quiz-feedback aria-live="polite"></p>
+                    </fieldset>
+                }
+
+                <div class="post-quiz-actions">
+                    <button type="button" class="btn btn-primary post-quiz-action" data-quiz-check>Check answers</button>
+                    <button type="button" class="btn btn-secondary post-quiz-action" data-quiz-reset>Reset</button>
+                </div>
+
+                <p class="post-quiz-score" data-quiz-score aria-live="polite"></p>
+            </form>
+        </div>
+    </details>
+</section>

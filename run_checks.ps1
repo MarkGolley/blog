@@ -26,6 +26,25 @@ function Invoke-Step {
     }
 }
 
+function Stop-LocalMyBlogHosts {
+    $myBlogHostProcesses = Get-CimInstance Win32_Process |
+        Where-Object {
+            $_.Name -eq "dotnet.exe" -and
+            (
+                ($_.CommandLine -match "\\MyBlog\\bin\\(Debug|Release)\\net\\d+\\.\\d+\\MyBlog\\.dll") -or
+                ($_.CommandLine -match "run --project\\s+.*MyBlog[\\\\/]MyBlog\\.csproj")
+            )
+        }
+
+    if (-not $myBlogHostProcesses) {
+        return
+    }
+
+    $processIds = $myBlogHostProcesses | Select-Object -ExpandProperty ProcessId
+    Write-Host "Stopping local MyBlog host process(es): $($processIds -join ', ')"
+    $processIds | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+}
+
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $root
 
@@ -40,6 +59,8 @@ try {
     }
 
     if ($Mode -eq "Tests" -or $Mode -eq "PreDeploy") {
+        Stop-LocalMyBlogHosts
+
         $testArgs = @("test", $testProject)
         if (-not $hasOpenAiKey) {
             Write-Host "OPENAI_API_KEY is not set. Skipping live moderation test (AIModerationServiceLiveTests)."
@@ -52,6 +73,8 @@ try {
     }
 
     if ($Mode -eq "E2E" -or $Mode -eq "PreDeploy") {
+        Stop-LocalMyBlogHosts
+
         Invoke-Step -Name "Building test project for Playwright tooling" -Action {
             dotnet build $testProject
         }

@@ -80,26 +80,40 @@
                     <article class="blog-post pinned-blog-post" id="featured-post-@item.Post.Id" data-reveal>
                         <div class="blog-post-row">
                             <div class="blog-post-main">
-                                <h3>
-                                    <a class="post-title-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
-                                        @item.Post.Title
-                                    </a>
-                                </h3>
-                                <div class="post-meta">
-                                    <span class="pinned-badge">Featured</span>
-                                    @item.Post.DatePosted.ToString("dd MMMM yyyy")
-                                    <span class="meta-dot">•</span>
-                                    @item.Post.ReadingTimeMinutes min read
-                                </div>
-                                @if (item.Post.Tags.Any())
-                                {
-                                    <div class="tag-list">
-                                        @foreach (var tag in item.Post.Tags.Take(4))
+                                <div class="blog-post-content-shell">
+                                    @if (!string.IsNullOrWhiteSpace(item.Post.CoverImageUrl))
+                                    {
+                                        <a class="blog-post-cover-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id" aria-hidden="true" tabindex="-1">
+                                            <img class="blog-post-cover" src="@item.Post.CoverImageUrl" alt="" loading="lazy" decoding="async" />
+                                        </a>
+                                    }
+                                    <div class="blog-post-content">
+                                        <h3>
+                                            <a class="post-title-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
+                                                @item.Post.Title
+                                            </a>
+                                        </h3>
+                                        <div class="post-meta">
+                                            <span class="pinned-badge">Featured</span>
+                                            @item.Post.DatePosted.ToString("dd MMMM yyyy")
+                                            <span class="meta-dot">•</span>
+                                            @item.Post.ReadingTimeMinutes min read
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(item.Post.Summary))
                                         {
-                                            <span class="tag-chip">@tag</span>
+                                            <p class="blog-post-summary">@item.Post.Summary</p>
+                                        }
+                                        @if (item.Post.Tags.Any())
+                                        {
+                                            <div class="tag-list">
+                                                @foreach (var tag in item.Post.Tags.Take(4))
+                                                {
+                                                    <span class="tag-chip">@tag</span>
+                                                }
+                                            </div>
                                         }
                                     </div>
-                                }
+                                </div>
                             </div>
                             <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
                                 <input type="hidden" name="postId" value="@item.Post.Id" />
@@ -134,25 +148,39 @@
                 <article class="blog-post" id="post-@item.Post.Id" data-reveal>
                     <div class="blog-post-row">
                         <div class="blog-post-main">
-                            <h3>
-                                <a class="post-title-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
-                                    @item.Post.Title
-                                </a>
-                            </h3>
-                            <div class="post-meta">
-                                @item.Post.DatePosted.ToString("dd MMMM yyyy")
-                                <span class="meta-dot">•</span>
-                                @item.Post.ReadingTimeMinutes min read
-                            </div>
-                            @if (item.Post.Tags.Any())
-                            {
-                                <div class="tag-list">
-                                    @foreach (var tag in item.Post.Tags.Take(4))
+                            <div class="blog-post-content-shell">
+                                @if (!string.IsNullOrWhiteSpace(item.Post.CoverImageUrl))
+                                {
+                                    <a class="blog-post-cover-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id" aria-hidden="true" tabindex="-1">
+                                        <img class="blog-post-cover" src="@item.Post.CoverImageUrl" alt="" loading="lazy" decoding="async" />
+                                    </a>
+                                }
+                                <div class="blog-post-content">
+                                    <h3>
+                                        <a class="post-title-link" asp-controller="Blog" asp-action="Post" asp-route-slug="@item.Post.Id">
+                                            @item.Post.Title
+                                        </a>
+                                    </h3>
+                                    <div class="post-meta">
+                                        @item.Post.DatePosted.ToString("dd MMMM yyyy")
+                                        <span class="meta-dot">•</span>
+                                        @item.Post.ReadingTimeMinutes min read
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(item.Post.Summary))
                                     {
-                                        <span class="tag-chip">@tag</span>
+                                        <p class="blog-post-summary">@item.Post.Summary</p>
+                                    }
+                                    @if (item.Post.Tags.Any())
+                                    {
+                                        <div class="tag-list">
+                                            @foreach (var tag in item.Post.Tags.Take(4))
+                                            {
+                                                <span class="tag-chip">@tag</span>
+                                            }
+                                        </div>
                                     }
                                 </div>
-                            }
+                            </div>
                         </div>
                         <form asp-controller="Blog" asp-action="TogglePostLike" method="post" class="like-form like-form-inline" data-like-async="true">
                             <input type="hidden" name="postId" value="@item.Post.Id" />

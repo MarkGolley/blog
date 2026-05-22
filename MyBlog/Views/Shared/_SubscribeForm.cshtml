@@ -7,7 +7,7 @@
 
 <aside id="subscribe" class="subscribe-card" aria-labelledby="subscribe-title" data-reveal>
     <h3 id="subscribe-title">Subscribe for new articles</h3>
-    <p class="section-intro">Get the next engineering write-up by email.</p>
+    <p class="section-intro subscribe-intro">Get the next engineering write-up by email.</p>
 
     @if (!string.IsNullOrWhiteSpace(subscribeMessage))
     {
@@ -30,7 +30,8 @@
                 maxlength="320"
                 placeholder="you@example.com"
                 required />
-            <button type="submit">Subscribe</button>
+            <button type="submit" class="subscribe-button">Subscribe</button>
         </div>
+        <p class="subscribe-trust">No spam. Unsubscribe anytime.</p>
     </form>
 </aside>
