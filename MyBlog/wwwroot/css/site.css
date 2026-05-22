@@ -1670,6 +1670,102 @@ body.route-blog .subscribe-card {
     border: 1px solid var(--line);
 }
 
+.post-quiz-intro {
+    margin-bottom: 0.8rem;
+}
+
+.post-quiz-body {
+    padding-top: 0.1rem;
+}
+
+.post-quiz-form {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.post-quiz-question {
+    margin: 0;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.post-quiz-question legend {
+    width: 100%;
+    margin: 0 0 0.55rem;
+    padding: 0;
+}
+
+.post-quiz-question-number {
+    display: block;
+    font-size: 0.73rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--brand-deep);
+}
+
+.post-quiz-question-text {
+    display: block;
+    margin-top: 0.18rem;
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.post-quiz-options {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.post-quiz-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    cursor: pointer;
+    color: var(--ink-soft);
+}
+
+.post-quiz-option input {
+    margin-top: 0.17rem;
+}
+
+.post-quiz-feedback {
+    margin: 0.55rem 0 0;
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+}
+
+.post-quiz-question.is-correct {
+    border-color: rgba(22, 114, 77, 0.4);
+    background: linear-gradient(138deg, rgba(228, 249, 236, 0.82), rgba(255, 255, 255, 0.95));
+}
+
+.post-quiz-question.is-incorrect {
+    border-color: rgba(181, 60, 60, 0.4);
+    background: linear-gradient(138deg, rgba(255, 236, 236, 0.82), rgba(255, 255, 255, 0.95));
+}
+
+.post-quiz-question.is-unanswered {
+    border-color: rgba(227, 156, 65, 0.45);
+    background: linear-gradient(138deg, rgba(255, 246, 230, 0.84), rgba(255, 255, 255, 0.95));
+}
+
+.post-quiz-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.post-quiz-action {
+    min-width: 9rem;
+}
+
+.post-quiz-score {
+    margin: 0.1rem 0 0;
+    font-weight: 700;
+    color: var(--ink);
+}
+
 .table-wrap {
     overflow-x: auto;
     border-radius: var(--radius-md);
@@ -2470,6 +2566,34 @@ thead th {
     border-color: rgba(95, 163, 214, 0.36);
     background: linear-gradient(132deg, rgba(37, 74, 112, 0.72), rgba(14, 23, 37, 0.96));
     box-shadow: 0 10px 20px rgba(2, 6, 12, 0.4);
+}
+
+:root[data-theme="dark"] .post-quiz-question {
+    background: rgba(14, 23, 37, 0.86);
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .post-quiz-option {
+    color: var(--ink);
+}
+
+:root[data-theme="dark"] .post-quiz-feedback {
+    color: var(--ink-soft);
+}
+
+:root[data-theme="dark"] .post-quiz-question.is-correct {
+    border-color: rgba(95, 215, 165, 0.45);
+    background: linear-gradient(138deg, rgba(15, 63, 44, 0.56), rgba(14, 23, 37, 0.94));
+}
+
+:root[data-theme="dark"] .post-quiz-question.is-incorrect {
+    border-color: rgba(255, 138, 138, 0.42);
+    background: linear-gradient(138deg, rgba(86, 28, 28, 0.58), rgba(14, 23, 37, 0.94));
+}
+
+:root[data-theme="dark"] .post-quiz-question.is-unanswered {
+    border-color: rgba(238, 180, 95, 0.44);
+    background: linear-gradient(138deg, rgba(75, 52, 24, 0.58), rgba(14, 23, 37, 0.94));
 }
 
 :root[data-theme="dark"] .post-capsule-details > summary {

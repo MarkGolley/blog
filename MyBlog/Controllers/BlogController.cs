@@ -277,6 +277,7 @@ public class BlogController : Controller
         return new BlogPostViewModel
         {
             Post = post,
+            Quiz = _blogService.GetQuizBySlug(post.Id),
             Comments = comments,
             RelatedPosts = relatedPosts,
             PostLikeCount = postLikeSummary.Count,

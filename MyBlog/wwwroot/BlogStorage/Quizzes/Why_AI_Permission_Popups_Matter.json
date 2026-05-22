@@ -1,0 +1,53 @@
+{
+  "title": "Quick understanding quiz",
+  "questions": [
+    {
+      "id": "popup-layer",
+      "prompt": "In the post, what is a permission popup primarily described as?",
+      "options": [
+        "A replacement for formal policy rules",
+        "A UI checkpoint for actions that cross risk boundaries",
+        "A way to improve model creativity",
+        "A logging format for audit storage"
+      ],
+      "correctOptionIndex": 1,
+      "explanation": "The post frames popups as runtime checkpoints in a broader safety system."
+    },
+    {
+      "id": "safety-stack",
+      "prompt": "Which sequence matches the architecture path discussed in the post?",
+      "options": [
+        "Model -> Executor -> Policy engine -> Audit log",
+        "Prompt -> UI -> Database -> Deployment",
+        "Model -> Tool call -> Policy engine -> Approval gate -> Executor -> Audit log",
+        "Agent -> Browser -> Prompt cache -> Rules"
+      ],
+      "correctOptionIndex": 2,
+      "explanation": "The post presents that exact path to explain where safety controls belong."
+    },
+    {
+      "id": "verification-purpose",
+      "prompt": "What does automated reasoning add beyond prompt instructions?",
+      "options": [
+        "It proves whether key safety properties can always hold",
+        "It removes the need for user approvals",
+        "It makes all actions faster",
+        "It guarantees the model never hallucinates"
+      ],
+      "correctOptionIndex": 0,
+      "explanation": "Verification is used to prove properties such as approval-before-delete or to find counterexamples."
+    },
+    {
+      "id": "operational-baseline",
+      "prompt": "Which control is part of the post's operational baseline?",
+      "options": [
+        "Allow all destructive actions in dev by default",
+        "Turn off logs once confidence is high",
+        "Use least privilege and explicit approval for high-risk categories",
+        "Use prompt warnings instead of policy checks"
+      ],
+      "correctOptionIndex": 2,
+      "explanation": "The baseline section calls for least privilege, explicit high-risk approvals, and auditability."
+    }
+  ]
+}

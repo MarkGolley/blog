@@ -262,6 +262,104 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    const postQuiz = document.querySelector("[data-post-quiz]");
+    if (postQuiz instanceof HTMLElement) {
+        const quizForm = postQuiz.querySelector("[data-post-quiz-form]");
+        const checkButton = postQuiz.querySelector("[data-quiz-check]");
+        const resetButton = postQuiz.querySelector("[data-quiz-reset]");
+        const scoreOutput = postQuiz.querySelector("[data-quiz-score]");
+
+        if (
+            quizForm instanceof HTMLFormElement
+            && checkButton instanceof HTMLButtonElement
+            && resetButton instanceof HTMLButtonElement
+            && scoreOutput instanceof HTMLElement
+        ) {
+            const questions = Array.from(quizForm.querySelectorAll("[data-quiz-question]"));
+
+            const resetQuizState = () => {
+                questions.forEach((question) => {
+                    if (!(question instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    question.classList.remove("is-correct", "is-incorrect", "is-unanswered");
+
+                    const feedback = question.querySelector("[data-quiz-feedback]");
+                    if (feedback instanceof HTMLElement) {
+                        feedback.textContent = "";
+                    }
+                });
+
+                scoreOutput.textContent = "";
+            };
+
+            checkButton.addEventListener("click", () => {
+                let correctCount = 0;
+                let answeredCount = 0;
+
+                questions.forEach((question) => {
+                    if (!(question instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const correctOptionIndex = Number.parseInt(question.dataset.correctOptionIndex ?? "-1", 10);
+                    const explanation = (question.dataset.explanation ?? "").trim();
+                    const selected = question.querySelector("input[type='radio']:checked");
+                    const feedback = question.querySelector("[data-quiz-feedback]");
+
+                    question.classList.remove("is-correct", "is-incorrect", "is-unanswered");
+
+                    if (!(feedback instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    if (!(selected instanceof HTMLInputElement)) {
+                        question.classList.add("is-unanswered");
+                        feedback.textContent = "Select an answer before scoring this question.";
+                        return;
+                    }
+
+                    answeredCount += 1;
+                    const selectedIndex = Number.parseInt(selected.value, 10);
+                    const isCorrect = selectedIndex === correctOptionIndex;
+
+                    if (isCorrect) {
+                        correctCount += 1;
+                        question.classList.add("is-correct");
+                        feedback.textContent = explanation.length > 0
+                            ? `Correct. ${explanation}`
+                            : "Correct.";
+                    } else {
+                        question.classList.add("is-incorrect");
+                        feedback.textContent = explanation.length > 0
+                            ? `Not quite. ${explanation}`
+                            : "Not quite. Re-read the post section tied to this topic and try again.";
+                    }
+                });
+
+                if (questions.length === 0) {
+                    scoreOutput.textContent = "";
+                    return;
+                }
+
+                if (answeredCount < questions.length) {
+                    scoreOutput.textContent = `You answered ${answeredCount} of ${questions.length}. Complete all questions to get a final score.`;
+                    return;
+                }
+
+                scoreOutput.textContent = `Score: ${correctCount} / ${questions.length}`;
+            });
+
+            resetButton.addEventListener("click", () => {
+                quizForm.reset();
+                resetQuizState();
+            });
+
+            resetQuizState();
+        }
+    }
+
     const revealItems = Array.from(document.querySelectorAll("[data-reveal]"));
     if (revealItems.length > 0) {
         const reducedMotion =

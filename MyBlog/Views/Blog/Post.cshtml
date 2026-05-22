@@ -64,6 +64,11 @@
     <partial name="_SubscribeForm" model="(Context.Request.Path + Context.Request.QueryString).ToString()" />
 </section>
 
+@if (Model.Quiz is { Questions.Count: > 0 })
+{
+    <partial name="_PostQuiz" model="Model.Quiz" />
+}
+
 @if (Model.RelatedPosts.Any())
 {
     <section aria-labelledby="related-posts-title" data-reveal>

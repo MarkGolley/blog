@@ -3,6 +3,7 @@ namespace MyBlog.Models;
 public class BlogPostViewModel
 {
     public BlogPost Post { get; set; } = null!;
+    public BlogPostQuiz? Quiz { get; set; }
     public List<CommentThreadViewModel> Comments { get; set; } = new();
     public List<BlogPost> RelatedPosts { get; set; } = new();
     public int PostLikeCount { get; set; }

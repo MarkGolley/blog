@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using MyBlog.Models;
 
@@ -51,12 +52,14 @@ public class BlogService
     };
 
     private readonly IWebHostEnvironment _env;
+    private readonly bool _isDevelopment;
     private readonly object _snapshotLock = new();
     private BlogSnapshot? _cachedSnapshot;
 
     public BlogService(IWebHostEnvironment env)
     {
         _env = env;
+        _isDevelopment = env.IsDevelopment();
     }
 
     public IEnumerable<BlogPost> GetAllPosts()
@@ -124,6 +127,63 @@ public class BlogService
         return snapshot.PostBySlug.GetValueOrDefault(normalizedSlug);
     }
 
+    public BlogPostQuiz? GetQuizBySlug(string? slug)
+    {
+        var decodedSlug = Uri.UnescapeDataString(slug ?? string.Empty);
+        var normalizedSlug = NormalizeSlug(decodedSlug);
+        if (normalizedSlug == null)
+        {
+            return null;
+        }
+
+        var quizzesPath = Path.Combine(_env.WebRootPath, "BlogStorage", "Quizzes");
+        if (!Directory.Exists(quizzesPath))
+        {
+            return null;
+        }
+
+        var quizPath = Path.Combine(quizzesPath, $"{normalizedSlug}.json");
+        if (!File.Exists(quizPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var json = File.ReadAllText(quizPath);
+            var payload = JsonSerializer.Deserialize<BlogPostQuizPayload>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (payload?.Questions == null || payload.Questions.Count == 0)
+            {
+                return null;
+            }
+
+            var questions = payload.Questions
+                .Select(MapQuizQuestion)
+                .Where(question => question != null)
+                .Cast<BlogPostQuizQuestion>()
+                .ToList();
+
+            if (questions.Count == 0)
+            {
+                return null;
+            }
+
+            return new BlogPostQuiz
+            {
+                Title = string.IsNullOrWhiteSpace(payload.Title) ? "Quick quiz" : payload.Title.Trim(),
+                Questions = questions
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private BlogSnapshot GetOrBuildSnapshot()
     {
         var postsPath = Path.Combine(_env.WebRootPath, "BlogStorage");
@@ -138,6 +198,10 @@ public class BlogService
             if (_cachedSnapshot is null)
             {
                 // Build outside lock.
+            }
+            else if (_isDevelopment && HasPostStorageChanged(postsPath, _cachedSnapshot.FileWriteTimesUtc))
+            {
+                // In local development we want HTML edits to appear on the next refresh.
             }
             else if (nowUtc - _cachedSnapshot.BuiltAtUtc < CacheTtl)
             {
@@ -187,8 +251,8 @@ public class BlogService
         var posts = (from file in Directory.GetFiles(postsPath, "*.html")
                      let fileName = Path.GetFileName(file)
                      let id = Path.GetFileNameWithoutExtension(file)
-                     let title = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(id.Replace("_", " "))
                      let content = File.ReadAllText(file)
+                     let title = ParseTitle(content, id)
                      let summary = ParseSummary(content)
                      let coverImageUrl = ParseCoverImageUrl(content)
                      let published = ParsePublishedDate(content)
@@ -288,6 +352,17 @@ public class BlogService
         }
 
         return DateTime.TryParse(dateString, out var date) ? date : DateTime.MinValue;
+    }
+
+    private static string ParseTitle(string content, string fallbackId)
+    {
+        var metadataTitle = ParseMetadataValue(content, "Title");
+        if (!string.IsNullOrWhiteSpace(metadataTitle))
+        {
+            return metadataTitle.Trim();
+        }
+
+        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(fallbackId.Replace("_", " "));
     }
 
     private static string ParseSummary(string content)
@@ -495,6 +570,39 @@ public class BlogService
         return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(tag.Trim().ToLowerInvariant());
     }
 
+    private static BlogPostQuizQuestion? MapQuizQuestion(BlogPostQuizQuestionPayload payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload.Prompt) ||
+            payload.Options == null ||
+            payload.Options.Count < 2 ||
+            payload.CorrectOptionIndex < 0 ||
+            payload.CorrectOptionIndex >= payload.Options.Count)
+        {
+            return null;
+        }
+
+        var normalizedOptions = payload.Options
+            .Select(option => option?.Trim() ?? string.Empty)
+            .Where(option => !string.IsNullOrWhiteSpace(option))
+            .ToList();
+
+        if (normalizedOptions.Count != payload.Options.Count)
+        {
+            return null;
+        }
+
+        return new BlogPostQuizQuestion
+        {
+            Id = string.IsNullOrWhiteSpace(payload.Id) ? Guid.NewGuid().ToString("N") : payload.Id.Trim(),
+            Prompt = payload.Prompt.Trim(),
+            Options = normalizedOptions,
+            CorrectOptionIndex = payload.CorrectOptionIndex,
+            Explanation = string.IsNullOrWhiteSpace(payload.Explanation)
+                ? "Review the post section related to this question and try again."
+                : payload.Explanation.Trim()
+        };
+    }
+
     private sealed record BlogSnapshot(
         IReadOnlyList<BlogPost> Posts,
         IReadOnlyDictionary<string, BlogPost> PostBySlug,
@@ -506,5 +614,20 @@ public class BlogService
             new Dictionary<string, BlogPost>(StringComparer.OrdinalIgnoreCase),
             new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase),
             DateTime.MinValue);
+    }
+
+    private sealed class BlogPostQuizPayload
+    {
+        public string? Title { get; set; }
+        public List<BlogPostQuizQuestionPayload> Questions { get; set; } = new();
+    }
+
+    private sealed class BlogPostQuizQuestionPayload
+    {
+        public string? Id { get; set; }
+        public string? Prompt { get; set; }
+        public List<string?> Options { get; set; } = new();
+        public int CorrectOptionIndex { get; set; }
+        public string? Explanation { get; set; }
     }
 }
