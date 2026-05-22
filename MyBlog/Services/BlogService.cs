@@ -23,7 +23,7 @@ public class BlogService
     [
         "orleans_the_mystery_revealed",
         "Balancing_Quality_And_Value_Delivery",
-        "early_thoughts_on_agentic_systems"
+        "Why_AI_Permission_Popups_Matter"
     ];
 
     private static readonly (string Keyword, string Tag)[] TagKeywords =
