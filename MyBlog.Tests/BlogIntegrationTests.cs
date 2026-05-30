@@ -58,6 +58,17 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task HomeIndex_DoesNotReferenceMissingScopedStylesheetAsset()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("/css/site.css", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("/MyBlog.styles.css", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task WhyAiPermissionPopupsPost_RendersByronLinkedInAndPodcastLinks()
     {
         using var client = _factory.CreateClient();
