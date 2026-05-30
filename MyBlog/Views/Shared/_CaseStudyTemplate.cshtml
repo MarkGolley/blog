@@ -88,29 +88,50 @@
         </div>
     }
 
-    @if (!string.IsNullOrWhiteSpace(Model.CtaText))
+    @if (!string.IsNullOrWhiteSpace(Model.CtaText)
+         || !string.IsNullOrWhiteSpace(Model.SecondaryCtaText))
     {
         <div class="case-template-actions">
-            @if (!string.IsNullOrWhiteSpace(Model.CtaUrl))
+            @if (!string.IsNullOrWhiteSpace(Model.CtaText))
             {
-                <a class="btn btn-primary" href="@Model.CtaUrl">
-                    @if (!string.IsNullOrWhiteSpace(Model.CtaIconPath))
-                    {
-                        <img class="btn-logo-icon" src="@Url.Content(Model.CtaIconPath)" alt="" aria-hidden="true" />
-                    }
-                    <span>@Model.CtaText</span>
-                </a>
+                @if (!string.IsNullOrWhiteSpace(Model.CtaUrl))
+                {
+                    <a class="btn btn-primary" href="@Model.CtaUrl">
+                        @if (!string.IsNullOrWhiteSpace(Model.CtaIconPath))
+                        {
+                            <img class="btn-logo-icon" src="@Url.Content(Model.CtaIconPath)" alt="" aria-hidden="true" />
+                        }
+                        <span>@Model.CtaText</span>
+                    </a>
+                }
+                else if (!string.IsNullOrWhiteSpace(Model.CtaController))
+                {
+                    var currentPathAndQuery = $"{Context.Request.Path}{Context.Request.QueryString}";
+                    <a class="btn btn-primary" asp-controller="@Model.CtaController" asp-action="@Model.CtaAction" asp-route-returnUrl="@currentPathAndQuery">
+                        @if (!string.IsNullOrWhiteSpace(Model.CtaIconPath))
+                        {
+                            <img class="btn-logo-icon" src="@Url.Content(Model.CtaIconPath)" alt="" aria-hidden="true" />
+                        }
+                        <span>@Model.CtaText</span>
+                    </a>
+                }
             }
-            else if (!string.IsNullOrWhiteSpace(Model.CtaController))
+
+            @if (!string.IsNullOrWhiteSpace(Model.SecondaryCtaText))
             {
-                var currentPathAndQuery = $"{Context.Request.Path}{Context.Request.QueryString}";
-                <a class="btn btn-primary" asp-controller="@Model.CtaController" asp-action="@Model.CtaAction" asp-route-returnUrl="@currentPathAndQuery">
-                    @if (!string.IsNullOrWhiteSpace(Model.CtaIconPath))
-                    {
-                        <img class="btn-logo-icon" src="@Url.Content(Model.CtaIconPath)" alt="" aria-hidden="true" />
-                    }
-                    <span>@Model.CtaText</span>
-                </a>
+                @if (!string.IsNullOrWhiteSpace(Model.SecondaryCtaUrl))
+                {
+                    <a class="btn btn-secondary" href="@Model.SecondaryCtaUrl">
+                        <span>@Model.SecondaryCtaText</span>
+                    </a>
+                }
+                else if (!string.IsNullOrWhiteSpace(Model.SecondaryCtaController))
+                {
+                    var currentPathAndQuery = $"{Context.Request.Path}{Context.Request.QueryString}";
+                    <a class="btn btn-secondary" asp-controller="@Model.SecondaryCtaController" asp-action="@Model.SecondaryCtaAction" asp-route-returnUrl="@currentPathAndQuery">
+                        <span>@Model.SecondaryCtaText</span>
+                    </a>
+                }
             }
         </div>
     }

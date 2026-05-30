@@ -1,9 +1,13 @@
 using Google.Cloud.Firestore;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
 using MyBlog.Services;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MyBlog.Startup;
 
@@ -46,6 +50,41 @@ internal static class ServiceCollectionStartupExtensions
                 options.Cookie.SameSite = SameSiteMode.Lax;
                 options.Cookie.SecurePolicy = secureCookiePolicy;
                 options.SlidingExpiration = true;
+                options.Events = new CookieAuthenticationEvents
+                {
+                    OnSignedIn = async context =>
+                    {
+                        await RecordAuthEventAsync(
+                            context.HttpContext,
+                            eventName: "cookie_signed_in",
+                            success: true);
+                    },
+                    OnSigningOut = async context =>
+                    {
+                        await RecordAuthEventAsync(
+                            context.HttpContext,
+                            eventName: "cookie_signing_out",
+                            success: true);
+                    },
+                    OnRedirectToLogin = async context =>
+                    {
+                        await RecordAuthEventAsync(
+                            context.HttpContext,
+                            eventName: "cookie_redirect_to_login",
+                            success: false,
+                            reason: "authentication_required");
+                        context.Response.Redirect(context.RedirectUri);
+                    },
+                    OnRedirectToAccessDenied = async context =>
+                    {
+                        await RecordAuthEventAsync(
+                            context.HttpContext,
+                            eventName: "cookie_redirect_to_access_denied",
+                            success: false,
+                            reason: "access_denied");
+                        context.Response.Redirect(context.RedirectUri);
+                    }
+                };
             });
 
         ConfigureFirestore(builder);
@@ -157,5 +196,41 @@ internal static class ServiceCollectionStartupExtensions
 
         builder.Services.AddRouting(options => options.LowercaseUrls = true);
         builder.Services.AddMyBlogRateLimiting();
+    }
+
+    private static Task RecordAuthEventAsync(
+        HttpContext httpContext,
+        string eventName,
+        bool success,
+        string? reason = null)
+    {
+        MyBlogTelemetry.RecordAuthEvent(eventName, success);
+        var logger = httpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("MyBlog.Authentication");
+
+        var userIdHash = HashIdentifier(httpContext.User?.Identity?.Name);
+        var path = httpContext.Request.Path.Value ?? string.Empty;
+        var traceId = Activity.Current?.TraceId.ToString() ?? string.Empty;
+        logger.LogInformation(
+            "Authentication event. EventName={EventName} Success={Success} Reason={Reason} UserIdHash={UserIdHash} Path={Path} TraceId={TraceId}",
+            eventName,
+            success,
+            reason ?? string.Empty,
+            userIdHash,
+            path,
+            traceId);
+        return Task.CompletedTask;
+    }
+
+    private static string HashIdentifier(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return string.Empty;
+        }
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(rawValue.Trim()));
+        return Convert.ToHexString(hash)[..16].ToLowerInvariant();
     }
 }

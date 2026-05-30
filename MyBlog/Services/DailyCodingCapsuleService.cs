@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Collections.Concurrent;
 using System.Net;
+using System.Diagnostics;
 using Google.Cloud.Firestore;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -197,6 +198,13 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
 
     private async Task<CapsuleCacheEntry?> TryGenerateCapsuleWithAiAsync(DateOnly ukDate, CancellationToken cancellationToken)
     {
+        using var activity = MyBlogTelemetry.StartActivity(
+            "ai.daily_capsule.generate",
+            ActivityKind.Client);
+        activity?.SetTag("ai.provider", "openai");
+        activity?.SetTag("ai.operation", "daily_capsule");
+        activity?.SetTag("ai.model", _model);
+
         if (!_enableAiGeneration)
         {
             _logger.LogInformation("Daily capsule AI generation is disabled by configuration.");
@@ -247,8 +255,10 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
             var serializedRequestBody = JsonSerializer.Serialize(requestBody);
 
             HttpResponseMessage? response = null;
+            var successfulRequestDuration = TimeSpan.Zero;
             for (var attempt = 1; attempt <= OpenAiMaxAttempts; attempt++)
             {
+                var requestStopwatch = Stopwatch.StartNew();
                 using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
                 {
                     Content = new StringContent(
@@ -261,12 +271,20 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
                 response = await _httpClient.SendAsync(request, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
+                    successfulRequestDuration = requestStopwatch.Elapsed;
                     break;
                 }
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests &&
                     TryGetRetryAfterDelay(response.Headers, out var retryAfterDelay))
                 {
+                    MyBlogTelemetry.RecordAiRequest(
+                        provider: "openai",
+                        operation: "daily_capsule",
+                        model: _model,
+                        duration: requestStopwatch.Elapsed,
+                        success: false,
+                        errorType: "http_429");
                     var clampedDelay = ClampRateLimitBackoffDelay(retryAfterDelay);
                     RecordRateLimitBackoff(clampedDelay);
                     RecordGenerationFailure(
@@ -280,6 +298,13 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
 
                 if (attempt >= OpenAiMaxAttempts || !IsTransientStatus(response.StatusCode))
                 {
+                    MyBlogTelemetry.RecordAiRequest(
+                        provider: "openai",
+                        operation: "daily_capsule",
+                        model: _model,
+                        duration: requestStopwatch.Elapsed,
+                        success: false,
+                        errorType: $"http_{(int)response.StatusCode}");
                     RecordGenerationFailure(
                         $"OpenAI returned HTTP {(int)response.StatusCode} ({response.ReasonPhrase ?? "Unknown"}).");
                     _logger.LogWarning(
@@ -308,6 +333,13 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
                 var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
                 if (string.IsNullOrWhiteSpace(rawJson))
                 {
+                    MyBlogTelemetry.RecordAiRequest(
+                        provider: "openai",
+                        operation: "daily_capsule",
+                        model: _model,
+                        duration: successfulRequestDuration,
+                        success: false,
+                        errorType: "empty_content");
                     _logger.LogWarning("Daily capsule generation returned an empty response body.");
                     RecordGenerationFailure("AI response was empty.");
                     return null;
@@ -316,6 +348,13 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
                 var capsulePayload = JsonSerializer.Deserialize<CapsulePayload>(rawJson, JsonOptions);
                 if (capsulePayload is null)
                 {
+                    MyBlogTelemetry.RecordAiRequest(
+                        provider: "openai",
+                        operation: "daily_capsule",
+                        model: _model,
+                        duration: successfulRequestDuration,
+                        success: false,
+                        errorType: "invalid_json");
                     _logger.LogWarning("Daily capsule generation returned unparsable JSON content.");
                     RecordGenerationFailure("AI response JSON was invalid.");
                     return null;
@@ -324,6 +363,13 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
                 var capsule = CreateValidatedCapsule(ukDate, capsulePayload);
                 if (capsule is null)
                 {
+                    MyBlogTelemetry.RecordAiRequest(
+                        provider: "openai",
+                        operation: "daily_capsule",
+                        model: _model,
+                        duration: successfulRequestDuration,
+                        success: false,
+                        errorType: "validation_failed");
                     _logger.LogWarning("Daily capsule generation returned content that did not pass validation.");
                     RecordGenerationFailure("AI response did not pass validation.");
                     return null;
@@ -332,6 +378,21 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
                 var requestId = response.Headers.TryGetValues("x-request-id", out var values)
                     ? values.FirstOrDefault()
                     : null;
+                TryExtractTokenUsage(responseContent, out var promptTokens, out var completionTokens);
+                var estimatedCostUsd = EstimateTokenCostUsd(_model, promptTokens, completionTokens);
+                MyBlogTelemetry.RecordAiRequest(
+                    provider: "openai",
+                    operation: "daily_capsule",
+                    model: _model,
+                    duration: successfulRequestDuration,
+                    success: true,
+                    promptTokens: promptTokens,
+                    completionTokens: completionTokens,
+                    estimatedCostUsd: estimatedCostUsd);
+                activity?.SetTag("ai.request_id", requestId ?? string.Empty);
+                activity?.SetTag("ai.prompt_tokens", promptTokens ?? 0);
+                activity?.SetTag("ai.completion_tokens", completionTokens ?? 0);
+                activity?.SetTag("ai.estimated_cost_usd", estimatedCostUsd ?? 0d);
 
                 _logger.LogInformation(
                     "Daily capsule generated via AI for UK date {UkDate}. OpenAIRequestId={OpenAIRequestId}",
@@ -344,6 +405,13 @@ public sealed class DailyCodingCapsuleService : IDailyCodingCapsuleProvider
         }
         catch (Exception ex)
         {
+            MyBlogTelemetry.RecordAiRequest(
+                provider: "openai",
+                operation: "daily_capsule",
+                model: _model,
+                duration: TimeSpan.Zero,
+                success: false,
+                errorType: ex.GetType().Name);
             _logger.LogError(ex, "Daily capsule AI generation failed.");
             RecordGenerationFailure(ex.Message);
             return null;
@@ -660,6 +728,68 @@ Return JSON only with this schema:
                statusCode == HttpStatusCode.ServiceUnavailable ||
                statusCode == HttpStatusCode.GatewayTimeout ||
                (int)statusCode >= 500;
+    }
+
+    private static void TryExtractTokenUsage(
+        string responseContent,
+        out int? promptTokens,
+        out int? completionTokens)
+    {
+        promptTokens = null;
+        completionTokens = null;
+        if (string.IsNullOrWhiteSpace(responseContent))
+        {
+            return;
+        }
+
+        try
+        {
+            using var payload = JsonDocument.Parse(responseContent);
+            if (!payload.RootElement.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+            {
+                return;
+            }
+
+            if (usage.TryGetProperty("prompt_tokens", out var promptTokenElement) &&
+                promptTokenElement.TryGetInt32(out var parsedPromptTokens))
+            {
+                promptTokens = parsedPromptTokens;
+            }
+
+            if (usage.TryGetProperty("completion_tokens", out var completionTokenElement) &&
+                completionTokenElement.TryGetInt32(out var parsedCompletionTokens))
+            {
+                completionTokens = parsedCompletionTokens;
+            }
+        }
+        catch (JsonException)
+        {
+            // Ignore usage parsing failures and continue without usage metrics.
+        }
+    }
+
+    private static double? EstimateTokenCostUsd(
+        string? model,
+        int? promptTokens,
+        int? completionTokens)
+    {
+        if ((!promptTokens.HasValue || promptTokens.Value <= 0) &&
+            (!completionTokens.HasValue || completionTokens.Value <= 0))
+        {
+            return null;
+        }
+
+        var normalizedModel = (model ?? string.Empty).Trim().ToLowerInvariant();
+        var rates = normalizedModel switch
+        {
+            "gpt-4.1-mini" => (inputUsdPerMillion: 0.40d, outputUsdPerMillion: 1.60d),
+            "gpt-4.1" => (inputUsdPerMillion: 2.00d, outputUsdPerMillion: 8.00d),
+            _ => (inputUsdPerMillion: 0.40d, outputUsdPerMillion: 1.60d)
+        };
+
+        var inputCost = ((double)(promptTokens ?? 0) / 1_000_000d) * rates.inputUsdPerMillion;
+        var outputCost = ((double)(completionTokens ?? 0) / 1_000_000d) * rates.outputUsdPerMillion;
+        return Math.Round(inputCost + outputCost, 8, MidpointRounding.AwayFromZero);
     }
 
     private static bool TryGetRetryAfterDelay(HttpResponseHeaders headers, out TimeSpan retryAfterDelay)

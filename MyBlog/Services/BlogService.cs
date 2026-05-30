@@ -21,9 +21,10 @@ public class BlogService
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
     private static readonly string[] FeaturedPostIds =
     [
+        "AI_Agents_Can_Do_The_Work_But_Dont_Skip_The_Learning",
+        "Why_AI_Permission_Popups_Matter",
         "orleans_the_mystery_revealed",
-        "Balancing_Quality_And_Value_Delivery",
-        "Why_AI_Permission_Popups_Matter"
+        "Balancing_Quality_And_Value_Delivery"
     ];
 
     private static readonly (string Keyword, string Tag)[] TagKeywords =

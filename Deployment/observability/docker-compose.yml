@@ -1,0 +1,153 @@
+name: myblog-observability
+
+services:
+  myblog-app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: myblog-observability-app:local
+    container_name: myblog-app
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      APP_MODE: Combined
+      APP_VERSION: observability-local-demo
+      OBSERVABILITY__ENABLE_OTLP: "true"
+      OBSERVABILITY__EXPORT_TRACES: "true"
+      OBSERVABILITY__EXPORT_METRICS: "true"
+      OBSERVABILITY__EXPORT_LOGS: "true"
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OPENAI_API_KEY: ${OBSERVABILITY_OPENAI_API_KEY:-invalid-observability-demo-key}
+      DAILY_CAPSULE_WARMUP_KEY: ${DAILY_CAPSULE_WARMUP_KEY:-local-daily-capsule-warmup}
+      AISLEPILOT_WARMUP_KEY: ${AISLEPILOT_WARMUP_KEY:-local-aislepilot-warmup}
+      FIRESTORE__PROJECTID: ${FIRESTORE__PROJECTID:-my-blog-website-470819}
+      SITE__PUBLICBASEURL: http://localhost:5207
+    ports:
+      - "5207:8080"
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - observability
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.152.0
+    container_name: otel-collector
+    command:
+      - --config=/etc/otelcol-contrib/config.yaml
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "9464:9464"
+      - "13133:13133"
+    healthcheck:
+      test:
+        - CMD
+        - /otelcol-contrib
+        - --version
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+      - --web.enable-admin-api
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - observability
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: loki
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+    networks:
+      - observability
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: tempo
+    command:
+      - -config.file=/etc/tempo.yaml
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"
+      - "4319:4317"
+      - "4320:4318"
+    restart: unless-stopped
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS_ENABLED:-true}
+      GF_AUTH_ANONYMOUS_ORG_ROLE: ${GRAFANA_ANONYMOUS_ORG_ROLE:-Viewer}
+      GF_AUTH_ANONYMOUS_ORG_NAME: "${GRAFANA_ANONYMOUS_ORG_NAME:-Main Org.}"
+      GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/myblog-operational-overview.json
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+    volumes:
+      - ./grafana/provisioning/datasources/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./grafana/provisioning/dashboards/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - observability
+
+volumes:
+  prometheus-data:
+  loki-data:
+  tempo-data:
+  grafana-data:
+
+networks:
+  observability:
+    driver: bridge

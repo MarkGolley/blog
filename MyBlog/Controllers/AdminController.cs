@@ -34,6 +34,7 @@ public class AdminController : Controller
         if (string.Equals(normalizedUsername, adminUsername, StringComparison.OrdinalIgnoreCase) &&
             password == adminPassword)
         {
+            MyBlogTelemetry.RecordAuthEvent("admin_login_success", true);
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, normalizedUsername),
@@ -53,6 +54,7 @@ public class AdminController : Controller
             return await RenderDashboardAsync();
         }
 
+        MyBlogTelemetry.RecordAuthEvent("admin_login_failed", false);
         ModelState.AddModelError(string.Empty, "Invalid login attempt.");
         return View();
     }

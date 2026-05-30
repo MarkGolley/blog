@@ -1,0 +1,61 @@
+# Learning Ledger - Mark
+
+This file tracks concepts, patterns, APIs, and language features I've demonstrated understanding of, so the agent can narrow its teaching over time and I can see my progress over the year.
+
+**Owned by:** the agent (auto-updated). I can hand-edit too (e.g. demote something I've forgotten, or add a concept I learned outside a session).
+
+**How statuses work:**
+- **Mastered** - I explained it back correctly, on more than one occasion, and I'm confident I could defend it in PR review without help. Agent should not re-explain unless I ask. May still mention by name.
+- **Proficient** - Explained correctly at least once, recently. Agent can skip the long definition but should still drop a one-line refresher when used.
+- **Learning** - Introduced and partially understood. Agent must still explain in full when it appears.
+- **Parked** - Came up once, deferred (TODO / out of scope). Not on the active learning path.
+- **Stale** - Was Mastered/Proficient but I've recently struggled with it. Agent should re-teach as if Learning.
+
+**How the agent updates this file:**
+- After a passed Gate 1 or Gate 2 on a concept, promote it (Learning -> Proficient -> Mastered).
+- After a "I don't understand" or a wrong gate answer on a previously promoted concept, demote it to Stale.
+- After honouring a `SHIP IT NOW` override, do NOT promote anything in the ledger - overrides are understanding-debt, not understanding.
+- New entries: append with today's date and a one-line "evidence" note (what I demonstrated).
+- Never silently delete entries. Demote, don't drop.
+
+---
+
+## Mastered
+
+_(empty - nothing tracked yet)_
+
+## Proficient
+
+_(empty - nothing tracked yet)_
+
+## Learning
+
+- **egress-boundary transform** | first seen 2026-05-05 | last confirmed 2026-05-05 | evidence: correctly argued that customer-authored HTML in entity fields must be preserved as-is in storage and only converted at the Slack output point, rejecting both ingest-time mutation and opt-in DotLiquid filter as the wrong layer.
+- **Slack mrkdwn vs HTML/Markdown** | first seen 2026-05-05 | last confirmed 2026-05-05 | evidence: identified that Slack rendering of `<strong>`/`<ul>`/`<br>` was the failure mode and that mrkdwn (`*bold*`, `• `, `\n`, `<url|text>`) is the target dialect.
+- **AlertsSenderHelper / IAlertsMatchHelper / AuditRuleBase chain** | first seen 2026-05-05 | last confirmed 2026-05-05 | evidence: traced ConfigurationEntityChanged -> EmitConfigurationEntityAudits -> AuditRuleBase.ProcessMessageAudits -> SendAlertsAsync end-to-end and used it to reason about the right place to fix.
+- **`[GeneratedRegex]` source generator (SYSLIB1045)** | first seen 2026-05-05 | last confirmed 2026-05-05 | evidence: spotted the analyzer warning unprompted and asked to switch from `new Regex(..., Compiled)` to source-generated partial-method regexes; understood the resulting class needed to be `partial`.
+
+## Parked / Deferred
+
+- **Observability on the HTML->mrkdwn converter** | noted 2026-05-05 | deferred because: out of scope for this fix. Worth a follow-up: log at debug when the converter actually changed the body, warn if the output still contains `<` (likely malformed input the regex didn't catch). Detection today is "a human sees ugly Slack text".
+- **Email/Teams alert providers** | noted 2026-05-05 | deferred because: only Slack exists today. When a second provider lands, generalise the converter into a per-Provider strategy keyed off `AlertConfiguration.Provider`.
+- **Slack rich_text blocks for underline (and richer styling)** | noted 2026-05-05 | deferred because: `SendSlackMessage` currently sends mrkdwn via `SectionBlock` + `MarkdownTextElement`, and mrkdwn has no underline. Slack supports underline only via Block Kit `rich_text` blocks with `style.underline = true`. Migrating would let us preserve `<u>`, plus give us proper nested styling, but it touches the Slack sender, the SDK model surface, and probably wants a feature flag.
+
+## Stale (needs re-teaching)
+
+_(empty - nothing tracked yet)_
+
+---
+
+## Entry format
+
+```
+- **<concept name>** | first seen YYYY-MM-DD | last confirmed YYYY-MM-DD | evidence: <one line on what I demonstrated, e.g. "explained why we chose ConfigureAwait(false) over default capture in library code">
+```
+
+## Year-end review prompt
+
+Ask the agent: *"Summarise my learning ledger - what did I move into Mastered this year, what's still Learning, and what should I revisit?"*
+
+
+This email is confidential and subject to important disclaimers and conditions, including those regarding confidentiality, legal privilege and certain legal entity disclaimers, available at https://www.kroll.com/disclosure. Our Privacy Policy is available at https://www.kroll.com/en/privacy-policy.

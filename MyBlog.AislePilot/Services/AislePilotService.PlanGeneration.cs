@@ -684,7 +684,11 @@ public sealed partial class AislePilotService
             }
         };
 
-        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+        var responseContent = await SendOpenAiRequestWithRetryAsync(
+            requestBody,
+            cancellationToken,
+            operation: "meal_plan_generation",
+            model: _model);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return null;

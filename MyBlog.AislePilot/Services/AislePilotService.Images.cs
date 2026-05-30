@@ -28,10 +28,12 @@ public sealed partial class AislePilotService
         {
             if (TryResolveImmediateMealImageUrl(meal, out var resolvedImageUrl))
             {
+                AislePilotTelemetry.RecordCacheLookup("meal_image", hit: true);
                 resolved[meal.Name] = resolvedImageUrl;
                 continue;
             }
 
+            AislePilotTelemetry.RecordCacheLookup("meal_image", hit: false);
             resolved[meal.Name] = GetFallbackMealImageUrl();
             fallbackCount++;
             QueueMealImageGeneration(meal);

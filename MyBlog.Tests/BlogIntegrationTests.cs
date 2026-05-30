@@ -170,6 +170,12 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("body.route-blog .site-header", css, StringComparison.Ordinal);
         Assert.Contains("-webkit-line-clamp: 2;", css, StringComparison.Ordinal);
         Assert.Contains("-webkit-line-clamp: 3;", css, StringComparison.Ordinal);
+        Assert.Contains(".post-content pre {", css, StringComparison.Ordinal);
+        Assert.Contains("-webkit-overflow-scrolling: touch;", css, StringComparison.Ordinal);
+        Assert.Contains("-webkit-text-size-adjust: 100%;", css, StringComparison.Ordinal);
+        Assert.Contains("text-size-adjust: 100%;", css, StringComparison.Ordinal);
+        Assert.Contains(".post-content :not(pre) > code {", css, StringComparison.Ordinal);
+        Assert.Contains(":root[data-theme=\"dark\"] .post-content pre {", css, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -899,6 +905,35 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("/images/portfolio/aislepilot-home.png", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/images/portfolio/projects-overview.png", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Planner setup focused on weekly constraints and a low-friction path to generation.", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProjectsIndex_RendersObservabilityDashboardLink_WhenConfigured()
+    {
+        var factory = CreateFactoryWithConfiguration(new Dictionary<string, string?>
+        {
+            ["Observability:PublicDashboardUrl"] = "https://grafana.example.com/d/myblog/myblog-operational-overview"
+        });
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/projects");
+
+        Assert.Contains("View observability dashboard", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://grafana.example.com/d/myblog/myblog-operational-overview", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProjectsIndex_DoesNotRenderObservabilityDashboardLink_WhenUrlIsInvalid()
+    {
+        var factory = CreateFactoryWithConfiguration(new Dictionary<string, string?>
+        {
+            ["Observability:PublicDashboardUrl"] = "grafana-dashboard"
+        });
+        using var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/projects");
+
+        Assert.DoesNotContain("View observability dashboard", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

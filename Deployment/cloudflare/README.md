@@ -44,7 +44,8 @@ Deploy blog service so CTA remains on `markgolley.dev`:
 .\Deployment\deploy-blog.ps1 `
   -EnvironmentName Production `
   -PublicBaseUrl "https://markgolley.dev" `
-  -AislePilotPublicBaseUrl "https://markgolley.dev"
+  -AislePilotPublicBaseUrl "https://markgolley.dev" `
+  -ObservabilityPublicDashboardUrl "https://grafana.example.com/d/myblog-ops-overview/myblog-operational-overview?orgId=1"
 ```
 
 ## 4) Verify

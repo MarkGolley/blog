@@ -20,6 +20,7 @@ internal static class ApplicationBuilderStartupExtensions
         }
 
         app.UseForwardedHeaders();
+        app.UseRequestDiagnostics();
         app.Use(async (context, next) =>
         {
             context.Response.OnStarting(() =>

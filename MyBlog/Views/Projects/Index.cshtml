@@ -4,6 +4,7 @@
         "Selected software engineering work from Mark Golley, covering product flows, platform features, and reliability improvements.";
     ViewData["CanonicalPath"] = "/projects";
     var aislePilotPublicUrl = ViewData["AislePilotPublicUrl"]?.ToString() ?? string.Empty;
+    var observabilityPublicDashboardUrl = ViewData["ObservabilityPublicDashboardUrl"]?.ToString() ?? string.Empty;
     var aislePilotLocalEnabled = ViewData["AislePilotLocalEnabled"] as bool? ?? true;
     var aislePilotStatus = !string.IsNullOrWhiteSpace(aislePilotPublicUrl)
         ? "Live beta"
@@ -28,14 +29,16 @@
                 "Collect plan constraints: supermarket, budget, dietary mode, and dislikes/allergens.",
                 "Generate weekly meals with convenience-aware heuristics and budget checks.",
                 "Consolidate ingredients and sort shopping items by supermarket aisle order.",
-                "Provide a mobile-friendly shop mode, saved state, and export flow."
+                "Provide a mobile-friendly shop mode, saved state, and export flow.",
+                "Emit OpenTelemetry traces, metrics, and structured logs to support operational diagnostics."
             },
             ProofChecklist = new[]
             {
                 "Live end-to-end planner with generated meals, swaps, shopping, and exports.",
                 "Automated integration and Playwright coverage around key AislePilot flows.",
                 "Supermarket-specific layout and pricing metadata surfaced in the UI.",
-                "Saved week and saved meal flows that keep the product usable across sessions."
+                "Saved week and saved meal flows that keep the product usable across sessions.",
+                "Grafana dashboards covering health, failures, latency, trace drill-down, and AI cost signals."
             },
             BuildNotes = new[]
             {
@@ -67,7 +70,11 @@
                 ? "AislePilot"
                 : string.Empty,
             CtaAction = "Index",
-            CtaIconPath = "~/images/aislepilot-icon.svg"
+            CtaIconPath = "~/images/aislepilot-icon.svg",
+            SecondaryCtaText = string.IsNullOrWhiteSpace(observabilityPublicDashboardUrl)
+                ? string.Empty
+                : "View observability dashboard",
+            SecondaryCtaUrl = observabilityPublicDashboardUrl
         }' />
 
         <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel

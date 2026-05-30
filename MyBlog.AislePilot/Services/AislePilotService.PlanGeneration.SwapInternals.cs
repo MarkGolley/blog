@@ -105,7 +105,11 @@ public sealed partial class AislePilotService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+            var responseContent = await SendOpenAiRequestWithRetryAsync(
+                requestBody,
+                cancellationToken,
+                operation: "meal_swap_generation",
+                model: _model);
             if (string.IsNullOrWhiteSpace(responseContent))
             {
                 continue;

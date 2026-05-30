@@ -20,7 +20,9 @@ public sealed partial class AislePilotService
 {
     private async Task<string?> SendOpenAiRequestWithRetryAsync(
         object requestBody,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string operation = "chat_completions",
+        string? model = null)
     {
         if (_httpClient is null || string.IsNullOrWhiteSpace(_apiKey))
         {
@@ -28,7 +30,13 @@ public sealed partial class AislePilotService
         }
 
         var serializedBody = JsonSerializer.Serialize(requestBody);
+        var resolvedModel = string.IsNullOrWhiteSpace(model) ? _model : model!;
         var maxAttempts = OpenAiMaxAttempts;
+        using var activity = AislePilotTelemetry.StartActivity("ai.aislepilot.request", ActivityKind.Client);
+        activity?.SetTag("ai.provider", "openai");
+        activity?.SetTag("ai.operation", operation);
+        activity?.SetTag("ai.model", resolvedModel);
+        activity?.SetTag("ai.max_attempts", maxAttempts);
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -47,26 +55,49 @@ public sealed partial class AislePilotService
                 var responseContent = await response.Content.ReadAsStringAsync(timeoutCts.Token);
                 if (response.IsSuccessStatusCode)
                 {
+                    RecordAislePilotAiRequest(
+                        operation,
+                        resolvedModel,
+                        requestStopwatch.Elapsed,
+                        success: true,
+                        responseContent: responseContent,
+                        promptText: serializedBody);
+                    activity?.SetTag("ai.success", true);
+                    activity?.SetTag("ai.attempt", attempt);
                     _logger?.LogInformation(
-                        "AislePilot OpenAI call completed in {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}",
+                        "AislePilot OpenAI call completed in {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}. Operation={Operation}, Model={Model}",
                         requestStopwatch.ElapsedMilliseconds,
                         attempt,
-                        maxAttempts);
+                        maxAttempts,
+                        operation,
+                        resolvedModel);
                     return responseContent;
                 }
 
                 var shouldRetry = attempt < maxAttempts && IsTransientOpenAiStatus(response.StatusCode);
                 var errorSample = responseContent.Length <= 220 ? responseContent : responseContent[..220];
+                RecordAislePilotAiRequest(
+                    operation,
+                    resolvedModel,
+                    requestStopwatch.Elapsed,
+                    success: false,
+                    responseContent: responseContent,
+                    promptText: serializedBody,
+                    errorType: $"http_{(int)response.StatusCode}");
                 _logger?.LogWarning(
-                    "AislePilot OpenAI call failed with status {StatusCode} after {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}. ResponseSample={ResponseSample}",
+                    "AislePilot OpenAI call failed with status {StatusCode} after {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}. Operation={Operation}, Model={Model}, ResponseSample={ResponseSample}",
                     (int)response.StatusCode,
                     requestStopwatch.ElapsedMilliseconds,
                     attempt,
                     maxAttempts,
+                    operation,
+                    resolvedModel,
                     errorSample);
 
                 if (!shouldRetry)
                 {
+                    activity?.SetTag("ai.success", false);
+                    activity?.SetTag("ai.error_type", $"http_{(int)response.StatusCode}");
                     return null;
                 }
 
@@ -75,34 +106,58 @@ public sealed partial class AislePilotService
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
+                RecordAislePilotAiRequest(
+                    operation,
+                    resolvedModel,
+                    requestStopwatch.Elapsed,
+                    success: false,
+                    promptText: serializedBody,
+                    errorType: "timeout");
                 _logger?.LogWarning(
-                    "AislePilot OpenAI call timed out after {TimeoutSeconds}s. Attempt={Attempt}/{MaxAttempts}. ElapsedMs={ElapsedMs}",
+                    "AislePilot OpenAI call timed out after {TimeoutSeconds}s. Attempt={Attempt}/{MaxAttempts}. Operation={Operation}, Model={Model}, ElapsedMs={ElapsedMs}",
                     OpenAiRequestTimeout.TotalSeconds,
                     attempt,
                     maxAttempts,
+                    operation,
+                    resolvedModel,
                     requestStopwatch.ElapsedMilliseconds);
 
                 if (attempt >= maxAttempts)
                 {
+                    activity?.SetTag("ai.success", false);
+                    activity?.SetTag("ai.error_type", "timeout");
                     return null;
                 }
             }
             catch (HttpRequestException ex)
             {
+                RecordAislePilotAiRequest(
+                    operation,
+                    resolvedModel,
+                    requestStopwatch.Elapsed,
+                    success: false,
+                    promptText: serializedBody,
+                    errorType: ex.GetType().Name);
                 _logger?.LogWarning(
                     ex,
-                    "AislePilot OpenAI HTTP request failed after {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}.",
+                    "AislePilot OpenAI HTTP request failed after {ElapsedMs}ms. Attempt={Attempt}/{MaxAttempts}. Operation={Operation}, Model={Model}.",
                     requestStopwatch.ElapsedMilliseconds,
                     attempt,
-                    maxAttempts);
+                    maxAttempts,
+                    operation,
+                    resolvedModel);
 
                 if (attempt >= maxAttempts)
                 {
+                    activity?.SetTag("ai.success", false);
+                    activity?.SetTag("ai.error_type", ex.GetType().Name);
                     return null;
                 }
             }
         }
 
+        activity?.SetTag("ai.success", false);
+        activity?.SetTag("ai.error_type", "exhausted_retries");
         return null;
     }
 

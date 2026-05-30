@@ -1,0 +1,71 @@
+groups:
+  - name: myblog-slo-recording-rules
+    interval: 30s
+    rules:
+      - record: myblog:http_requests:rate5m
+        expr: sum by (service_name) (rate({__name__=~"myblog_http_request_duration.*_count"}[5m]))
+      - record: myblog:http_5xx_requests:rate5m
+        expr: sum by (service_name) (rate({__name__=~"myblog_http_request_duration.*_count",status_code=~"5.."}[5m]))
+      - record: myblog:http_5xx_error_ratio:rate5m
+        expr: myblog:http_5xx_requests:rate5m / clamp_min(myblog:http_requests:rate5m, 0.0001)
+      - record: myblog:http_5xx_error_ratio:rate30m
+        expr: sum by (service_name) (rate({__name__=~"myblog_http_request_duration.*_count",status_code=~"5.."}[30m])) / clamp_min(sum by (service_name) (rate({__name__=~"myblog_http_request_duration.*_count"}[30m])), 0.0001)
+      - record: myblog:http_5xx_error_ratio:rate1h
+        expr: sum by (service_name) (rate({__name__=~"myblog_http_request_duration.*_count",status_code=~"5.."}[1h])) / clamp_min(sum by (service_name) (rate({__name__=~"myblog_http_request_duration.*_count"}[1h])), 0.0001)
+      - record: myblog:http_5xx_error_ratio:rate6h
+        expr: sum by (service_name) (rate({__name__=~"myblog_http_request_duration.*_count",status_code=~"5.."}[6h])) / clamp_min(sum by (service_name) (rate({__name__=~"myblog_http_request_duration.*_count"}[6h])), 0.0001)
+      - record: myblog:slo_error_budget_burn_rate:5m
+        expr: myblog:http_5xx_error_ratio:rate5m / 0.005
+      - record: myblog:slo_error_budget_burn_rate:30m
+        expr: myblog:http_5xx_error_ratio:rate30m / 0.005
+      - record: myblog:slo_error_budget_burn_rate:1h
+        expr: myblog:http_5xx_error_ratio:rate1h / 0.005
+      - record: myblog:slo_error_budget_burn_rate:6h
+        expr: myblog:http_5xx_error_ratio:rate6h / 0.005
+      - record: myblog:slo_success_ratio:30d
+        expr: 1 - (sum by (service_name) (increase({__name__=~"myblog_http_request_duration.*_count",status_code=~"5.."}[30d])) / clamp_min(sum by (service_name) (increase({__name__=~"myblog_http_request_duration.*_count"}[30d])), 1))
+      - record: myblog:slo_error_budget_remaining_percent:30d
+        expr: 100 * (1 - ((1 - myblog:slo_success_ratio:30d) / 0.005))
+
+  - name: myblog-operational-alerts
+    interval: 30s
+    rules:
+      - alert: MyBlogSloFastBurn
+        expr: myblog:slo_error_budget_burn_rate:5m > 14.4 and myblog:slo_error_budget_burn_rate:1h > 14.4
+        for: 10m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "MyBlog error budget is burning too fast (critical)."
+          description: "5m and 1h burn rates are both above 14.4x for a 99.5% availability SLO."
+
+      - alert: MyBlogSloSlowBurn
+        expr: myblog:slo_error_budget_burn_rate:30m > 6 and myblog:slo_error_budget_burn_rate:6h > 6
+        for: 30m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "MyBlog error budget burn is elevated (warning)."
+          description: "30m and 6h burn rates are both above 6x for a 99.5% availability SLO."
+
+      - alert: MyBlogHighP95Latency
+        expr: histogram_quantile(0.95, sum by (service_name, le) (rate({__name__=~"myblog_http_request_duration.*_bucket"}[5m]))) > 1200
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "MyBlog request latency is elevated."
+          description: "P95 request latency has stayed above 1.2 seconds for at least 10 minutes."
+
+      - alert: MyBlogBackgroundJobFailures
+        expr: sum by (service_name) (increase({__name__=~"myblog_aislepilot_background_jobs.*",success="false"}[15m])) >= 3
+        for: 0m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "AislePilot background jobs are failing."
+          description: "At least 3 background jobs failed in the last 15 minutes."

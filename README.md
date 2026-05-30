@@ -105,6 +105,41 @@ Useful routes:
 - `/projects/aisle-pilot`
 - `/blog`
 
+## Local Observability Demo
+
+This repo now includes a local production-style telemetry stack under [`Deployment/observability`](./Deployment/observability):
+
+- OpenTelemetry Collector
+- Prometheus
+- Loki
+- Tempo
+- Grafana
+
+Start it from repo root:
+
+```powershell
+docker compose -f .\Deployment\observability\docker-compose.yml up --build -d
+```
+
+Then open:
+
+- App: `http://localhost:5207`
+- Grafana dashboard (anonymous Viewer): `http://localhost:3000/d/myblog-ops-overview`
+- Grafana admin login: `http://localhost:3000/login` (`admin` / `admin`)
+- Public projects card dashboard link: `/projects` (driven by `Observability:PublicDashboardUrl` or `OBSERVABILITY_PUBLIC_DASHBOARD_URL`)
+
+Run the intentional diagnostic scenario:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Deployment\observability\scripts\run-diagnostic-scenario.ps1
+```
+
+Supporting observability docs:
+
+- [`docs/observability/README.md`](./docs/observability/README.md)
+- [`docs/observability/telemetry-architecture.md`](./docs/observability/telemetry-architecture.md)
+- [`docs/observability/debugging-walkthrough.md`](./docs/observability/debugging-walkthrough.md)
+
 ## Verification
 
 Targeted AislePilot integration tests:

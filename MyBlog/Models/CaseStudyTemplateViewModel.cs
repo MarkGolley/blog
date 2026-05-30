@@ -17,6 +17,10 @@ public class CaseStudyTemplateViewModel
     public string CtaController { get; init; } = string.Empty;
     public string CtaAction { get; init; } = "Index";
     public string CtaIconPath { get; init; } = string.Empty;
+    public string SecondaryCtaText { get; init; } = string.Empty;
+    public string SecondaryCtaUrl { get; init; } = string.Empty;
+    public string SecondaryCtaController { get; init; } = string.Empty;
+    public string SecondaryCtaAction { get; init; } = "Index";
 }
 
 public sealed class CaseStudyScreenshotViewModel

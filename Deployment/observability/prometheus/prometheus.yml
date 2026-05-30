@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    stack: myblog-observability
+
+rule_files:
+  - /etc/prometheus/rules/myblog-alerts.yml
+
+scrape_configs:
+  - job_name: "otel-collector-metrics"
+    static_configs:
+      - targets: ["otel-collector:9464"]
+        labels:
+          telemetry_source: otel_pipeline
+
+  - job_name: "otel-collector-internal"
+    static_configs:
+      - targets: ["otel-collector:8888"]
+        labels:
+          telemetry_source: collector_internal

@@ -97,7 +97,11 @@ public sealed partial class AislePilotService
             }
         };
 
-        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+        var responseContent = await SendOpenAiRequestWithRetryAsync(
+            requestBody,
+            cancellationToken,
+            operation: "special_treat_generation",
+            model: _model);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return null;
@@ -180,7 +184,11 @@ public sealed partial class AislePilotService
             }
         };
 
-        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+        var responseContent = await SendOpenAiRequestWithRetryAsync(
+            requestBody,
+            cancellationToken,
+            operation: "warmup_meal_generation",
+            model: _model);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return null;

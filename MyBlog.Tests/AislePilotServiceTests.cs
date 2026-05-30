@@ -63,29 +63,37 @@ public partial class AislePilotServiceTests
     [Fact]
     public async Task BuildPlanFromCurrentMealsAsync_ShoppingList_ConvertsFractionalBottleUnitsToSpoonMeasures()
     {
-        var request = new AislePilotRequestModel
+        ClearAiPool();
+        try
         {
-            WeeklyBudget = 80m,
-            HouseholdSize = 2,
-            PlanDays = 2,
-            CookDays = 2,
-            MealsPerDay = 1,
-            SelectedMealTypes = ["Dinner"],
-            DietaryModes = ["Balanced"]
-        };
-        var currentPlanMealNames = new List<string>
+            var request = new AislePilotRequestModel
+            {
+                WeeklyBudget = 80m,
+                HouseholdSize = 2,
+                PlanDays = 2,
+                CookDays = 2,
+                MealsPerDay = 1,
+                SelectedMealTypes = ["Dinner"],
+                DietaryModes = ["Balanced"]
+            };
+            var currentPlanMealNames = new List<string>
+            {
+                "Chicken stir fry with rice",
+                "Egg fried rice"
+            };
+
+            var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
+            var soySauce = Assert.Single(
+                result.ShoppingItems,
+                item => item.Name.Equals("Soy sauce", StringComparison.OrdinalIgnoreCase));
+
+            Assert.Equal("7 1/4 tbsp", soySauce.QuantityDisplay);
+            Assert.DoesNotContain("bottle", soySauce.QuantityDisplay, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
         {
-            "Chicken stir fry with rice",
-            "Egg fried rice"
-        };
-
-        var result = await _service.BuildPlanFromCurrentMealsAsync(request, currentPlanMealNames);
-        var soySauce = Assert.Single(
-            result.ShoppingItems,
-            item => item.Name.Equals("Soy sauce", StringComparison.OrdinalIgnoreCase));
-
-        Assert.Equal("7 1/4 tbsp", soySauce.QuantityDisplay);
-        Assert.DoesNotContain("bottle", soySauce.QuantityDisplay, StringComparison.OrdinalIgnoreCase);
+            ClearAiPool();
+        }
     }
 
     [Fact]
