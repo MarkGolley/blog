@@ -8,6 +8,7 @@ param(
     [string]$AislePilotService = "",
     [string]$PublicBaseUrl = "",
     [string]$AislePilotPublicBaseUrl = "",
+    [string]$ObservabilityPublicDashboardUrl = "",
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
     [switch]$FullPreDeployE2E,
@@ -156,6 +157,9 @@ if (-not [string]::IsNullOrWhiteSpace($PublicBaseUrl)) {
 
 if (-not [string]::IsNullOrWhiteSpace($AislePilotPublicBaseUrl)) {
     $blogDeployArgs += @("-AislePilotPublicBaseUrl", $AislePilotPublicBaseUrl.Trim())
+}
+if (-not [string]::IsNullOrWhiteSpace($ObservabilityPublicDashboardUrl)) {
+    $blogDeployArgs += @("-ObservabilityPublicDashboardUrl", $ObservabilityPublicDashboardUrl.Trim())
 }
 
 if ($SkipPreDeployChecks) {

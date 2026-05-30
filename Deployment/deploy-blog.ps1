@@ -7,6 +7,7 @@ param(
     [string]$Service = "",
     [string]$PublicBaseUrl = "",
     [string]$AislePilotPublicBaseUrl = "",
+    [string]$ObservabilityPublicDashboardUrl = "",
     [switch]$SkipPreDeployChecks,
     [switch]$SkipBrowserInstall,
     [switch]$SkipProductionSmokeCheck,
@@ -53,6 +54,9 @@ if (-not [string]::IsNullOrWhiteSpace($PublicBaseUrl)) {
 
 if (-not [string]::IsNullOrWhiteSpace($AislePilotPublicBaseUrl)) {
     $args += @("-AislePilotPublicBaseUrl", $AislePilotPublicBaseUrl.Trim())
+}
+if (-not [string]::IsNullOrWhiteSpace($ObservabilityPublicDashboardUrl)) {
+    $args += @("-ObservabilityPublicDashboardUrl", $ObservabilityPublicDashboardUrl.Trim())
 }
 
 if ($SkipPreDeployChecks) {

@@ -1,5 +1,6 @@
 using Google.Cloud.Firestore;
 using MyBlog.Models;
+using System.Diagnostics;
 
 namespace MyBlog.Services;
 
@@ -27,9 +28,13 @@ public class CommentService
 
     public async Task AddCommentAsync(Comment comment)
     {
+        using var activity = MyBlogTelemetry.StartActivity("comment.add");
+        activity?.SetTag("comment.post_id", comment.PostId);
+        activity?.SetTag("comment.has_parent", comment.ParentCommentId.HasValue);
+
         if (_db == null)
         {
-            await AddCommentInMemory(comment, _aiModerationService);
+            await AddCommentInMemory(comment);
             return;
         }
 
@@ -65,8 +70,7 @@ public class CommentService
         comment.PostedAt = DateTime.UtcNow;
 
         // AI moderation: approve only explicit Allow decisions.
-        var moderation = await _aiModerationService.EvaluateCommentAsync(comment.Content);
-        comment.IsApproved = moderation.Decision == ModerationDecision.Allow;
+        await EvaluateCommentModerationWithTelemetryAsync(comment);
 
         var countersRef = _db.Collection(MetaCollection).Document(CountersDocument);
         var assignedId = await _db.RunTransactionAsync(async transaction =>
@@ -225,11 +229,10 @@ public class CommentService
             .ToList();
     }
 
-    private async Task AddCommentInMemory(Comment comment, AIModerationService aiModerationService)
+    private async Task AddCommentInMemory(Comment comment)
     {
         // AI check outside lock
-        var moderation = await aiModerationService.EvaluateCommentAsync(comment.Content);
-        comment.IsApproved = moderation.Decision == ModerationDecision.Allow;
+        await EvaluateCommentModerationWithTelemetryAsync(comment);
 
         lock (LocalStateLock)
         {
@@ -460,6 +463,32 @@ public class CommentService
             LocalComments.RemoveAll(c => idsToDelete.Contains(c.Id));
             return true;
         }
+    }
+
+    private async Task EvaluateCommentModerationWithTelemetryAsync(Comment comment)
+    {
+        using var moderationActivity = MyBlogTelemetry.StartActivity("comment.moderate");
+        moderationActivity?.SetTag("comment.post_id", comment.PostId);
+        moderationActivity?.SetTag("comment.has_parent", comment.ParentCommentId.HasValue);
+
+        var moderation = await _aiModerationService.EvaluateCommentAsync(comment.Content);
+        comment.IsApproved = moderation.Decision == ModerationDecision.Allow;
+
+        var moderationOutcome = moderation.Decision switch
+        {
+            ModerationDecision.Allow => "allow",
+            ModerationDecision.Block => "block",
+            _ => "manual_review"
+        };
+
+        MyBlogTelemetry.RecordCommentSubmission(
+            moderationOutcome,
+            approved: comment.IsApproved,
+            hasParentComment: comment.ParentCommentId.HasValue);
+
+        moderationActivity?.SetTag("moderation.decision", moderation.Decision.ToString());
+        moderationActivity?.SetTag("moderation.reason_code", moderation.ReasonCode);
+        moderationActivity?.SetTag("moderation.openai_request_id", moderation.OpenAiRequestId ?? string.Empty);
     }
 
     [FirestoreData]

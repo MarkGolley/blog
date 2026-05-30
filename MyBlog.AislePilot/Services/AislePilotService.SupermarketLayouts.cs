@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace MyBlog.Services;
 
@@ -448,16 +449,26 @@ public sealed partial class AislePilotService
 
         _ = Task.Run(async () =>
         {
+            var jobStopwatch = Stopwatch.StartNew();
             try
             {
-                await TryRefreshSupermarketLayoutAsync(
+                var refreshedLayout = await TryRefreshSupermarketLayoutAsync(
                     normalizedSupermarket,
                     force: false,
                     CancellationToken.None);
+                RecordAislePilotBackgroundJob(
+                    "supermarket_layout_refresh",
+                    jobStopwatch,
+                    success: refreshedLayout is not null);
             }
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Failed to refresh supermarket layout for '{Supermarket}'.", normalizedSupermarket);
+                RecordAislePilotBackgroundJob(
+                    "supermarket_layout_refresh",
+                    jobStopwatch,
+                    success: false,
+                    ex);
             }
         });
     }
@@ -506,6 +517,7 @@ public sealed partial class AislePilotService
             Content = new StringContent(serializedBody, Encoding.UTF8, "application/json")
         };
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        var requestStopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -513,6 +525,14 @@ public sealed partial class AislePilotService
             var responseContent = await response.Content.ReadAsStringAsync(timeoutCts.Token);
             if (!response.IsSuccessStatusCode)
             {
+                RecordAislePilotAiRequest(
+                    operation: "supermarket_layout_discovery",
+                    model: _model,
+                    duration: requestStopwatch.Elapsed,
+                    success: false,
+                    responseContent: responseContent,
+                    promptText: inputPrompt,
+                    errorType: $"http_{(int)response.StatusCode}");
                 var errorSample = responseContent.Length <= 240 ? responseContent : responseContent[..240];
                 _logger?.LogWarning(
                     "Supermarket layout lookup failed for '{Supermarket}' with status {StatusCode}. ResponseSample={ResponseSample}",
@@ -522,10 +542,25 @@ public sealed partial class AislePilotService
                 return null;
             }
 
+            RecordAislePilotAiRequest(
+                operation: "supermarket_layout_discovery",
+                model: _model,
+                duration: requestStopwatch.Elapsed,
+                success: true,
+                responseContent: responseContent,
+                promptText: inputPrompt);
+
             return ParseSupermarketLayoutResearchResponse(responseContent, supermarket);
         }
         catch (Exception ex)
         {
+            RecordAislePilotAiRequest(
+                operation: "supermarket_layout_discovery",
+                model: _model,
+                duration: requestStopwatch.Elapsed,
+                success: false,
+                promptText: inputPrompt,
+                errorType: ex.GetType().Name);
             _logger?.LogWarning(ex, "Supermarket layout lookup failed for '{Supermarket}'.", supermarket);
             return null;
         }

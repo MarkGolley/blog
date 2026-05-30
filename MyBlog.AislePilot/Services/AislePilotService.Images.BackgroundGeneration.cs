@@ -49,6 +49,7 @@ public sealed partial class AislePilotService
 
         _ = Task.Run(async () =>
         {
+            var jobStopwatch = Stopwatch.StartNew();
             try
             {
                 using var generationBudgetCts = new CancellationTokenSource(OpenAiGenerationBudget);
@@ -59,6 +60,7 @@ public sealed partial class AislePilotService
                     generationBudgetCts.Token);
                 if (generatedTreat is null)
                 {
+                    RecordAislePilotBackgroundJob("special_treat_generation", jobStopwatch, success: false);
                     return;
                 }
 
@@ -76,10 +78,12 @@ public sealed partial class AislePilotService
                 _logger?.LogInformation(
                     "AislePilot generated a deferred special treat meal in the background: {MealName}",
                     generatedTreat.Name);
+                RecordAislePilotBackgroundJob("special_treat_generation", jobStopwatch, success: true);
             }
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "AislePilot deferred special treat generation failed.");
+                RecordAislePilotBackgroundJob("special_treat_generation", jobStopwatch, success: false, ex);
             }
             finally
             {
@@ -101,16 +105,19 @@ public sealed partial class AislePilotService
         var selectedDessertNameSnapshot = selectedDessertAddOnName;
         _ = Task.Run(async () =>
         {
+            var jobStopwatch = Stopwatch.StartNew();
             try
             {
                 var resolvedTemplate = await ResolveDessertAddOnTemplateAsync(
                     selectedDessertNameSnapshot,
                     CancellationToken.None);
                 await PersistDessertAddOnTemplateAsync(resolvedTemplate, CancellationToken.None);
+                RecordAislePilotBackgroundJob("dessert_addon_recovery", jobStopwatch, success: true);
             }
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "AislePilot deferred dessert add-on recovery failed.");
+                RecordAislePilotBackgroundJob("dessert_addon_recovery", jobStopwatch, success: false, ex);
             }
             finally
             {
@@ -204,10 +211,12 @@ public sealed partial class AislePilotService
                     meal.Name,
                     queueWaitElapsedMs,
                     concurrencyCapacity);
+                RecordAislePilotBackgroundJob("meal_image_generation", totalStopwatch, success: true);
             }
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "AislePilot meal image generation failed for '{MealName}'.", meal.Name);
+                RecordAislePilotBackgroundJob("meal_image_generation", totalStopwatch, success: false, ex);
             }
             finally
             {
@@ -242,6 +251,7 @@ public sealed partial class AislePilotService
 
         for (var attempt = 1; attempt <= OpenAiImageMaxAttempts; attempt++)
         {
+            var requestStopwatch = Stopwatch.StartNew();
             using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             requestCts.CancelAfter(OpenAiImageRequestTimeout);
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, OpenAiImageGenerationsEndpoint)
@@ -259,6 +269,14 @@ public sealed partial class AislePilotService
                 var responseContent = await response.Content.ReadAsStringAsync(CancellationToken.None);
                 if (!response.IsSuccessStatusCode)
                 {
+                    RecordAislePilotAiRequest(
+                        operation: "image_generation",
+                        model: _imageModel,
+                        duration: requestStopwatch.Elapsed,
+                        success: false,
+                        responseContent: responseContent,
+                        promptText: requestBody.prompt,
+                        errorType: $"http_{(int)response.StatusCode}");
                     var errorSample = responseContent.Length <= 220 ? responseContent : responseContent[..220];
                     _logger?.LogWarning(
                         "AislePilot meal image request failed with status {StatusCode}. Attempt={Attempt}/{MaxAttempts}. ResponseSample={ResponseSample}",
@@ -275,6 +293,13 @@ public sealed partial class AislePilotService
                 {
                     try
                     {
+                        RecordAislePilotAiRequest(
+                            operation: "image_generation",
+                            model: _imageModel,
+                            duration: requestStopwatch.Elapsed,
+                            success: true,
+                            responseContent: responseContent,
+                            promptText: requestBody.prompt);
                         return Convert.FromBase64String(imageData.B64Json);
                     }
                     catch (FormatException)
@@ -295,6 +320,13 @@ public sealed partial class AislePilotService
                             downloadCts.Token);
                         if (imageResponse.IsSuccessStatusCode)
                         {
+                            RecordAislePilotAiRequest(
+                                operation: "image_generation",
+                                model: _imageModel,
+                                duration: requestStopwatch.Elapsed,
+                                success: true,
+                                responseContent: responseContent,
+                                promptText: requestBody.prompt);
                             return await imageResponse.Content.ReadAsByteArrayAsync(CancellationToken.None);
                         }
                     }
@@ -314,6 +346,13 @@ public sealed partial class AislePilotService
             }
             catch (OperationCanceledException) when (requestCts.IsCancellationRequested)
             {
+                RecordAislePilotAiRequest(
+                    operation: "image_generation",
+                    model: _imageModel,
+                    duration: requestStopwatch.Elapsed,
+                    success: false,
+                    promptText: requestBody.prompt,
+                    errorType: "timeout");
                 _logger?.LogInformation(
                     "AislePilot meal image request timed out for '{MealName}'. Attempt={Attempt}/{MaxAttempts}.",
                     meal.Name,
@@ -322,6 +361,13 @@ public sealed partial class AislePilotService
             }
             catch (Exception ex)
             {
+                RecordAislePilotAiRequest(
+                    operation: "image_generation",
+                    model: _imageModel,
+                    duration: requestStopwatch.Elapsed,
+                    success: false,
+                    promptText: requestBody.prompt,
+                    errorType: ex.GetType().Name);
                 _logger?.LogWarning(ex, "AislePilot meal image request failed for '{MealName}'.", meal.Name);
             }
         }

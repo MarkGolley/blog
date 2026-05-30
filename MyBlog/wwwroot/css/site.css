@@ -53,6 +53,8 @@ body {
 
 html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 body {
@@ -1608,6 +1610,49 @@ body.route-blog .subscribe-card {
     color: var(--ink-soft);
 }
 
+.post-content pre {
+    max-width: 100%;
+    margin: 0.95rem 0;
+    padding: 0.82rem 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(16, 63, 101, 0.05);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+.post-content pre code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+    white-space: pre;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    color: var(--ink);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+.post-content :not(pre) > code {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0.1rem 0.34rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 6px;
+    background: rgba(16, 63, 101, 0.08);
+    color: var(--ink);
+    font-size: 0.93em;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
 .post-capsule {
     margin: 1rem 0 1.1rem;
     padding: 0.85rem 0.95rem;
@@ -2215,6 +2260,9 @@ thead th {
 
 .case-template-actions {
     margin-top: 0.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
 }
 
 @media (max-width: 980px) {
@@ -2398,6 +2446,14 @@ thead th {
         flex-direction: column;
     }
 
+    .post-content pre {
+        padding: 0.72rem 0.78rem;
+    }
+
+    .post-content pre code {
+        font-size: 0.84rem;
+    }
+
     .daily-capsule-meta {
         align-items: flex-start;
     }
@@ -2442,6 +2498,16 @@ thead th {
 :root[data-theme="dark"] body.route-blog .blog-hero {
     background: rgba(14, 23, 37, 0.95);
     border-color: var(--line);
+}
+
+:root[data-theme="dark"] .post-content pre {
+    background: rgba(14, 23, 37, 0.92);
+    border-color: var(--line);
+}
+
+:root[data-theme="dark"] .post-content :not(pre) > code {
+    background: rgba(72, 148, 211, 0.2);
+    border-color: rgba(72, 148, 211, 0.34);
 }
 
 :root[data-theme="dark"] body.route-blog .nav-shell {

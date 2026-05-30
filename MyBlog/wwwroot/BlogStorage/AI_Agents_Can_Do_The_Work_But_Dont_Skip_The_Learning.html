@@ -1,0 +1,213 @@
+<!-- PublishedDate: 2026-05-30 -->
+<!-- Title: AI Agents Can Do the Work, But Don't Skip the Learning -->
+<!-- Summary: A practical reflection on using AI agents at work: great for small tasks, useful for medium tasks, and still fragile on complex, context-heavy work. Includes the settings-plus-ledger workflow I use to keep shipping and learning together. -->
+<!-- Tags: AI, Agentic AI, Engineering Career, Learning, Developer Productivity -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>AI Agents Can Do the Work, But Don't Skip the Learning</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+
+<h1>AI Agents Can Do the Work, But Don't Skip the Learning</h1>
+
+<p>I use AI agents a lot now, both for this blog project and at work. They are genuinely useful. They save me time every week. But I have also noticed a pattern that feels important to say out loud: AI can help you ship faster while quietly reducing your understanding if you are not deliberate about how you use it.</p>
+
+<p>The issue is not bad output every time. The issue is that the output is often good enough that you can click Proceed, merge, and move on before you have really understood what happened. This post is the practical approach I now use to avoid that trap.</p>
+
+<h2>What I See in Practice</h2>
+
+<p>From my own day-to-day use, this is the rough pattern:</p>
+
+<ul>
+    <li><strong>Small tasks:</strong> usually very good. Boilerplate, formatting, repetitive transformations, and straightforward tests are often quick wins.</li>
+    <li><strong>Medium tasks:</strong> often decent with supervision. The output is useful, but I still need to review assumptions and tighten the final shape.</li>
+    <li><strong>Complex tasks:</strong> still weaker when there is heavy nuance, hidden context, and trade-offs.</li>
+</ul>
+
+<p>So for me, AI is an accelerator, not a substitute for engineering judgement.</p>
+<p>There is a second risk that sits next to learning: coding fluency. Even when I understand the design, heavy delegation can reduce how often I write core logic myself. Over time that can affect speed at the keyboard and confidence when AI is unavailable. I treat this as a separate discipline and something I still need to spend more deliberate time on.</p>
+
+<h2>The Temptation Is Real</h2>
+
+<p>Most of us have seen this flow:</p>
+
+<ul>
+    <li>The agent gives a plausible plan.</li>
+    <li>It writes code that compiles.</li>
+    <li>Tests pass.</li>
+    <li>You get an approval prompt.</li>
+    <li>You click Proceed and keep moving.</li>
+</ul>
+
+<p>In the moment, that feels productive but over time it can become understanding debt. You are still the person expected to explain that change in code review, defend it in a production incident, and maintain it six months later. If you cannot explain it, you borrowed speed at the cost of confidence.</p>
+
+<h2>Why This Hits Newer Engineers Harder</h2>
+
+<p>If you are relatively early in your career, your main compounding advantage is how quickly you can build strong mental models. AI can help that but it can also block that, depending on how you use it.</p>
+
+<p>If the agent becomes your memory, your debugger, your reviewer, and your architect all at once, your output can grow faster than your judgement. That gap is usually invisible until someone asks:</p>
+
+<ul>
+    <li>Why this approach over the alternative?</li>
+    <li>What is the failure mode if this is wrong?</li>
+    <li>What is the blast radius outside this diff?</li>
+</ul>
+
+<p>You still need to answer those in your own words.</p>
+
+<h2>The Setup I Actually Use: Settings + Ledger</h2>
+
+<p>To keep speed and learning linked, I keep two files in my workflow:</p>
+
+<ul>
+    <li><strong>Settings:</strong> a working agreement for how the agent and I collaborate.</li>
+    <li><strong>Ledger:</strong> a running record the agent updates as I demonstrate concepts, so progress is tracked by evidence rather than memory.</li>
+</ul>
+
+<h3>1) Settings: make expectations explicit</h3>
+
+<p>My settings file enforces behaviour that keeps learning in the loop while still shipping:</p>
+
+<ul>
+    <li><strong>Agent responsibility:</strong> explain recommendations in plain language first, then add precise terms so I can build vocabulary without losing the thread.</li>
+    <li><strong>Before non-trivial changes:</strong> the agent must provide a short plan (3-5 lines), and I should confirm I understand the approach before code is written.</li>
+    <li><strong>After changes:</strong> the agent must provide a short "what changed and why" summary, and I should be able to restate it in my own words.</li>
+    <li><strong>Two understanding checks:</strong> one before coding (do I understand the plan?) and one before commit (can I explain what/why/failure mode/blast radius?).</li>
+    <li><strong>Urgent override:</strong> keep one strict token (for me this is <code>SHIP IT NOW</code>) to skip checks when time-critical, but record that as understanding debt to revisit later.</li>
+</ul>
+
+<p>This turns "I should probably understand this" into a concrete operating rule.</p>
+
+<h3>2) Ledger: track evidence, not confidence</h3>
+
+<p>The ledger tracks concepts by status with dates and evidence:</p>
+
+<ul>
+    <li><strong>Learning:</strong> introduced and partially understood.</li>
+    <li><strong>Proficient:</strong> explained correctly at least once.</li>
+    <li><strong>Mastered:</strong> defended correctly multiple times.</li>
+    <li><strong>Stale:</strong> previously known, recently shaky, needs re-teaching.</li>
+</ul>
+
+<p>Promotions happen after demonstrated understanding. Wrong answers or "I do not understand" can demote a concept to Stale. Nothing gets silently deleted. That stops me mistaking familiarity for mastery.</p>
+<p>In my workflow, the agent owns these updates by default, and I can still edit the ledger manually when needed.</p>
+<p>One practical note: if your ledger starts empty, expect the agent to explain some basics early on. That settles down as entries build up, and you can manually edit or seed the ledger if you prefer a faster start.</p>
+
+<h2>The Day-to-Day Loop</h2>
+
+<p>This is the loop I try to stick to:</p>
+
+<ol>
+    <li>Ask the agent for a plan and proposed change.</li>
+    <li>Before coding, answer one focused comprehension question in my own words.</li>
+    <li>After the change, explain what changed, why this route was chosen, and what could fail.</li>
+    <li>The agent updates the ledger when a concept is genuinely demonstrated, and I can make manual adjustments if I need to correct or demote something.</li>
+</ol>
+
+<p>It is still fast. The difference is that speed now compounds my capability instead of bypassing it.</p>
+
+<h2>What I Recommend If You Are Early Career</h2>
+
+<p>A simple delegation policy helps:</p>
+
+<ul>
+    <li><strong>Green zone (delegate heavily):</strong> boilerplate, formatting, repetitive edits, straightforward test scaffolding.</li>
+    <li><strong>Amber zone (delegate with checkpoints):</strong> feature logic, refactors, non-trivial tests.</li>
+    <li><strong>Red zone (do not click Proceed blindly):</strong> security boundaries, data deletion, auth changes, incident fixes, and contract changes.</li>
+    <li><strong>Black zone (manual-first):</strong> high-context platform code (for example Orleans-heavy distributed system internals) where hidden coupling is high and AI can disappear into plausible rabbit holes.</li>
+</ul>
+
+<p>If you want a deeper security walkthrough, I cover this in <a href="Why_AI_Permission_Popups_Matter.html">Agent Guardrails in Practice: From Permission Popups to Policy Verification</a>, including approval gates, policy checks, and audit logging.</p>
+
+<p>In my experience, Black-zone work is where I can lose days fastest if I let the agent run too far without tight constraints. For Amber, Red, and Black work, force this check:</p>
+
+<pre><code>What does this change do?
+Why this approach over the obvious alternative?
+If this is wrong in production, what is the failure mode?
+What else could this affect outside the diff?</code></pre>
+
+<p>If you cannot answer those, the blocker is not tooling. The blocker is understanding, and that is the next piece of work.</p>
+
+<div class="post-capsule">
+    <span class="post-capsule-label">Key takeaway</span>
+    <p class="post-capsule-text">If you are looping for more than an hour, stop and bring in a domain expert.</p>
+</div>
+
+<p>That handover point is easy to miss. A short conversation with someone deep in that domain can close key gaps quickly, introduce unfamiliar concepts properly, and save days of blind iteration.</p>
+
+<h2>A Starter Template You Can Copy</h2>
+
+<p>If you want to try this approach, start small:</p>
+
+<pre><code>Settings:
+- Require a short plan before non-trivial code.
+- Require a plain-English explanation after code changes.
+- Require a pre-commit defence check.
+- Keep one emergency override token for urgent shipping.
+
+Ledger entry format:
+- Concept
+- Status (Learning / Proficient / Mastered / Stale)
+- First seen date
+- Last confirmed date
+- One-line evidence</code></pre>
+
+<p>You do not need to replicate every rule on day one. Start with the minimum version you will actually use.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Copy-paste setup prompt</span>
+        <span class="post-capsule-text">Use this if you want an AI to scaffold your settings and learning ledger.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <p>Copy this prompt and replace the bracketed placeholders:</p>
+
+<pre><code>You are helping me set up an AI learning-guardrail workflow for software engineering.
+
+Context:
+- Experience level: [junior / mid / senior]
+- Main stack: [your stack]
+- Current goals for the next 90 days: [goals]
+- Team constraints: [code review expectations, branch policy, release pace]
+- Risk tolerance for AI autonomy: [low / medium / high]
+
+Task:
+1) Ask me up to 7 focused questions before generating anything.
+2) Generate two files:
+   - settings.md
+   - learning-ledger.md
+3) settings.md must include:
+   - plain-language-first explanations
+   - a short pre-change plan requirement for non-trivial tasks
+   - a post-change "what changed and why" requirement
+   - one pre-change comprehension check
+   - one pre-commit defence check
+   - an emergency override token named SHIP IT NOW
+4) learning-ledger.md must include:
+   - headings: Mastered, Proficient, Learning, Parked, Stale
+   - one-entry-per-concept format with first seen date, last confirmed date, and one-line evidence
+   - promotion and demotion rules based on demonstrated understanding
+5) Keep the workflow practical and lightweight so it can be used daily.
+6) Add a 10-minute weekly review checklist.
+
+Output format:
+- Show settings.md in a code block.
+- Show learning-ledger.md in a code block.
+- Show a "Daily use" section in 5 bullets.</code></pre>
+
+        <p>If the first draft feels heavy, ask for a "v2-lite" version with fewer rules but the same core checks.</p>
+    </div>
+</details>
+
+<h2>Final Thought</h2>
+
+<p>I am not anti-AI. I am using it every day, and I am shipping faster because of it. I just do not want to confuse output velocity with actual growth. If my understanding does not keep pace, I have not really improved.</p>
+
+<p>For me, explicit settings plus a learning ledger is the most practical way I have found so far to keep both moving in the right direction.</p>
+
+</body>
+</html>

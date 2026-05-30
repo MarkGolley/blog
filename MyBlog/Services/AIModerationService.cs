@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Net.Http.Headers;
 using System.Net;
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MyBlog.Models;
@@ -53,6 +54,15 @@ public class AIModerationService
         {
             for (var attempt = 1; attempt <= MaxModerationAttempts; attempt++)
             {
+                using var activity = MyBlogTelemetry.StartActivity(
+                    "ai.moderation.evaluate",
+                    ActivityKind.Client);
+                activity?.SetTag("ai.provider", "openai");
+                activity?.SetTag("ai.operation", "moderation");
+                activity?.SetTag("ai.model", "omni-moderation-latest");
+                activity?.SetTag("ai.attempt", attempt);
+                var requestStopwatch = Stopwatch.StartNew();
+
                 var requestBody = new
                 {
                     model = "omni-moderation-latest",
@@ -71,6 +81,13 @@ public class AIModerationService
                 using var response = await _httpClient.SendAsync(request, cancellationToken);
                 if (!response.IsSuccessStatusCode)
                 {
+                    MyBlogTelemetry.RecordAiRequest(
+                        provider: "openai",
+                        operation: "moderation",
+                        model: "omni-moderation-latest",
+                        duration: requestStopwatch.Elapsed,
+                        success: false,
+                        errorType: $"http_{(int)response.StatusCode}");
                     if (attempt < MaxModerationAttempts && IsTransientStatus(response.StatusCode))
                     {
                         await Task.Delay(TimeSpan.FromMilliseconds(350 * attempt), cancellationToken);
@@ -85,6 +102,13 @@ public class AIModerationService
                 var firstResult = moderationResult?.Results?.FirstOrDefault();
                 if (firstResult?.Flagged is not bool flagged)
                 {
+                    MyBlogTelemetry.RecordAiRequest(
+                        provider: "openai",
+                        operation: "moderation",
+                        model: "omni-moderation-latest",
+                        duration: requestStopwatch.Elapsed,
+                        success: false,
+                        errorType: "invalid_payload");
                     _logger.LogWarning(
                         "OpenAI moderation response did not include a usable flagged decision. Comment will require manual review.");
                     return new ModerationEvaluationResult
@@ -97,6 +121,21 @@ public class AIModerationService
                 var requestId = response.Headers.TryGetValues("x-request-id", out var values)
                     ? values.FirstOrDefault()
                     : null;
+                TryExtractTokenUsage(responseContent, out var promptTokens, out var completionTokens);
+
+                MyBlogTelemetry.RecordAiRequest(
+                    provider: "openai",
+                    operation: "moderation",
+                    model: "omni-moderation-latest",
+                    duration: requestStopwatch.Elapsed,
+                    success: true,
+                    promptTokens: promptTokens,
+                    completionTokens: completionTokens,
+                    estimatedCostUsd: 0d);
+                activity?.SetTag("ai.request_id", requestId ?? string.Empty);
+                activity?.SetTag("ai.success", true);
+                activity?.SetTag("ai.prompt_tokens", promptTokens ?? 0);
+                activity?.SetTag("ai.completion_tokens", completionTokens ?? 0);
 
                 _logger.LogInformation(
                     "OpenAI moderation completed. Flagged={Flagged}. OpenAIRequestId={OpenAIRequestId}",
@@ -120,6 +159,13 @@ public class AIModerationService
         }
         catch (Exception ex)
         {
+            MyBlogTelemetry.RecordAiRequest(
+                provider: "openai",
+                operation: "moderation",
+                model: "omni-moderation-latest",
+                duration: TimeSpan.Zero,
+                success: false,
+                errorType: ex.GetType().Name);
             _logger.LogError(ex, "AI moderation request failed. Comment will require manual review.");
             return new ModerationEvaluationResult
             {
@@ -143,6 +189,44 @@ public class AIModerationService
                statusCode == HttpStatusCode.ServiceUnavailable ||
                statusCode == HttpStatusCode.GatewayTimeout ||
                (int)statusCode >= 500;
+    }
+
+    private static void TryExtractTokenUsage(
+        string responseContent,
+        out int? promptTokens,
+        out int? completionTokens)
+    {
+        promptTokens = null;
+        completionTokens = null;
+        if (string.IsNullOrWhiteSpace(responseContent))
+        {
+            return;
+        }
+
+        try
+        {
+            using var payload = JsonDocument.Parse(responseContent);
+            if (!payload.RootElement.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+            {
+                return;
+            }
+
+            if (usage.TryGetProperty("prompt_tokens", out var promptTokenElement) &&
+                promptTokenElement.TryGetInt32(out var parsedPromptTokens))
+            {
+                promptTokens = parsedPromptTokens;
+            }
+
+            if (usage.TryGetProperty("completion_tokens", out var completionTokenElement) &&
+                completionTokenElement.TryGetInt32(out var parsedCompletionTokens))
+            {
+                completionTokens = parsedCompletionTokens;
+            }
+        }
+        catch (JsonException)
+        {
+            // Ignore usage parsing failures and proceed without usage metrics.
+        }
     }
 
     private class OpenAIModerationResponse

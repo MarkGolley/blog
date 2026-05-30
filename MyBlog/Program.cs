@@ -19,6 +19,7 @@ if (!AppRequestPolicies.TryParseAppMode(
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
+builder.AddMyBlogObservability(appVersion, appMode);
 
 // Services
 builder.AddMyBlogApplicationServices(secureCookiePolicy);

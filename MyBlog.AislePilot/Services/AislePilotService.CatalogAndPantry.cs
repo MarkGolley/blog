@@ -88,10 +88,12 @@ public sealed partial class AislePilotService : IAislePilotService
             template ??= TryBuildDessertAddOnImageMealTemplate(mealName);
             if (TryResolveImmediateMealImageUrl(mealName, template?.ImageUrl, out var resolvedImageUrl))
             {
+                AislePilotTelemetry.RecordCacheLookup("meal_image", hit: true);
                 resolved[mealName] = resolvedImageUrl;
                 continue;
             }
 
+            AislePilotTelemetry.RecordCacheLookup("meal_image", hit: false);
             if (template is not null)
             {
                 QueueMealImageGeneration(template);
@@ -721,7 +723,11 @@ public sealed partial class AislePilotService : IAislePilotService
             }
         };
 
-        var responseContent = await SendOpenAiRequestWithRetryAsync(requestBody, cancellationToken);
+        var responseContent = await SendOpenAiRequestWithRetryAsync(
+            requestBody,
+            cancellationToken,
+            operation: "pantry_suggestions",
+            model: _model);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return [];

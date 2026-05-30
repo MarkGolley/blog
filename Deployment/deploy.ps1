@@ -9,6 +9,7 @@ param(
     [string]$Service = "",
     [string]$PublicBaseUrl = "",
     [string]$AislePilotPublicBaseUrl = "",
+    [string]$ObservabilityPublicDashboardUrl = "",
     [string]$Memory = "256Mi",
     [string]$Cpu = "0.25",
     [int]$Concurrency = 1,
@@ -257,6 +258,9 @@ try {
     }
     if (-not [string]::IsNullOrWhiteSpace($AislePilotPublicBaseUrl)) {
         $envVars += "AislePilot__PublicBaseUrl=$($AislePilotPublicBaseUrl.Trim())"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ObservabilityPublicDashboardUrl)) {
+        $envVars += "Observability__PublicDashboardUrl=$($ObservabilityPublicDashboardUrl.Trim())"
     }
 
     $envVarsArgument = [string]::Join(",", $envVars)

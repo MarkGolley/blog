@@ -28,6 +28,18 @@ public class ProjectsController(IConfiguration configuration) : Controller
             ViewData["AislePilotPublicUrl"] = $"{normalizedBaseUrl}/projects/aisle-pilot";
         }
 
+        var configuredObservabilityDashboardUrl =
+            Environment.GetEnvironmentVariable("OBSERVABILITY_PUBLIC_DASHBOARD_URL")
+            ?? configuration["Observability:PublicDashboardUrl"];
+
+        if (!string.IsNullOrWhiteSpace(configuredObservabilityDashboardUrl)
+            && Uri.TryCreate(configuredObservabilityDashboardUrl.Trim(), UriKind.Absolute, out var observabilityDashboardUri)
+            && (string.Equals(observabilityDashboardUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(observabilityDashboardUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)))
+        {
+            ViewData["ObservabilityPublicDashboardUrl"] = observabilityDashboardUri.ToString();
+        }
+
         return View();
     }
 }

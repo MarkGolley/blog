@@ -25,6 +25,28 @@ For Aisle Pilot cache visibility in release checks:
 - `checks.aislePilotMealCache.minimumExpected` comes from `AislePilot:MinCacheCountForHealth` (or env `AISLEPILOT_MIN_CACHE_COUNT`).
 - Set `AislePilot:FailHealthOnLowCache=true` (or env `AISLEPILOT_FAIL_HEALTH_ON_LOW_CACHE=true`) only if you want `/health` to return degraded when cache is below minimum.
 
+## Local Observability Stack
+
+For local diagnostics workflows (traces + logs + metrics correlation), use:
+
+- `Deployment/observability/docker-compose.yml`
+- `Deployment/observability/otel-collector/config.yaml`
+- Grafana dashboards under `Deployment/observability/grafana/dashboards`
+
+Start:
+
+```powershell
+docker compose -f .\Deployment\observability\docker-compose.yml up --build -d
+```
+
+Run diagnosable incident scenario:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Deployment\observability\scripts\run-diagnostic-scenario.ps1
+```
+
+The default local compose configuration intentionally uses an invalid `OPENAI_API_KEY` when none is provided, so AI-dependency failures can be diagnosed end to end without consuming live API credits.
+
 ## Pre-Deploy Checks
 
 Run from repo root:
@@ -57,6 +79,7 @@ Optional overrides for either target:
 - `-PublicBaseUrl` (defaults to `https://markgolley.dev` for Production; blank for Staging unless provided)
 - `-AppMode` (`Combined`, `BlogOnly`, `AislePilotOnly`)
 - `-AislePilotPublicBaseUrl` (sets `AislePilot__PublicBaseUrl` so blog CTA points to external AislePilot service)
+- `-ObservabilityPublicDashboardUrl` (sets `Observability__PublicDashboardUrl` so `/projects` exposes a public dashboard link)
 - `-Memory`, `-Cpu`, `-Concurrency`, `-MinInstances`, `-MaxInstances`, `-RequestTimeout`
 
 Optional deploy flags:
@@ -70,6 +93,7 @@ Notes for split deployment:
 
 - `AppMode=AislePilotOnly` automatically skips `verify-production-auth.ps1` because that smoke check targets blog/admin routes.
 - Set `AislePilot__PublicBaseUrl` (or `AISLEPILOT_PUBLIC_BASE_URL`) on the blog service to route "Try AislePilot" CTA to the dedicated service.
+- Set `Observability__PublicDashboardUrl` (or `OBSERVABILITY_PUBLIC_DASHBOARD_URL`) on the blog service to show a public "View observability dashboard" CTA on `/projects`.
 - If you want AislePilot under `markgolley.dev/projects/aisle-pilot` while keeping split services, use the Cloudflare path proxy guide at `Deployment/cloudflare/README.md`.
 - `deploy-all.ps1` deploys `myblog-app` first, then deploys `myblog-aislepilot` using the exact same image digest and APP_VERSION to prevent drift.
 

@@ -1,0 +1,80 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  pprof:
+    endpoint: 0.0.0.0:1777
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 2s
+    limit_mib: 512
+    spike_limit_mib: 128
+  resource/environment:
+    attributes:
+      - key: deployment.environment.name
+        action: upsert
+        value: local-observability
+      - key: service.namespace
+        action: insert
+        value: markgolley.dev
+  batch:
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+    timeout: 2s
+
+connectors:
+  span_metrics:
+    aggregation_temporality: AGGREGATION_TEMPORALITY_CUMULATIVE
+    metrics_flush_interval: 30s
+    dimensions:
+      - name: http.request.method
+      - name: http.response.status_code
+      - name: ai.operation
+      - name: ai.model
+    resource_metrics_key_attributes:
+      - service.name
+      - service.namespace
+      - deployment.environment.name
+
+exporters:
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    resource_to_telemetry_conversion:
+      enabled: true
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check, pprof, zpages]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/environment, batch]
+      exporters: [span_metrics, otlp_grpc/tempo, debug]
+    metrics:
+      receivers: [otlp, span_metrics]
+      processors: [memory_limiter, resource/environment, batch]
+      exporters: [prometheus, debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/environment, batch]
+      exporters: [otlp_http/loki, debug]
