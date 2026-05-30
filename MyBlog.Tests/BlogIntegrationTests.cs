@@ -170,6 +170,18 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task PostRendering_NormalizesLegacyWwwrootStylesheetPath()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog/Deploying_My_First_Blog_Site");
+
+        Assert.DoesNotContain("../wwwroot/css/blogs.css", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("/wwwroot/css/blogs.css", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("href=\"/css/blogs.css\"", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task SiteCss_ContainsBlogDarkContrastAndExcerptClampRules()
     {
         using var client = _factory.CreateClient();

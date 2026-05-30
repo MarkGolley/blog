@@ -18,6 +18,9 @@ public class BlogService
     private static readonly Regex FirstImageSrcRegex = new(
         "<img[^>]*\\ssrc\\s*=\\s*[\"'](?<src>[^\"']+)[\"'][^>]*>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex LegacyStaticAssetPathRegex = new(
+        "(?<prefix>\\b(?:href|src)\\s*=\\s*[\"'])(?<path>(?:\\.\\./)+wwwroot/|/wwwroot/|wwwroot/)(?<rest>[^\"']+)(?<suffix>[\"'])",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
     private static readonly string[] FeaturedPostIds =
     [
@@ -252,7 +255,7 @@ public class BlogService
         var posts = (from file in Directory.GetFiles(postsPath, "*.html")
                      let fileName = Path.GetFileName(file)
                      let id = Path.GetFileNameWithoutExtension(file)
-                     let content = File.ReadAllText(file)
+                     let content = NormalizeLegacyStaticAssetPaths(File.ReadAllText(file))
                      let title = ParseTitle(content, id)
                      let summary = ParseSummary(content)
                      let coverImageUrl = ParseCoverImageUrl(content)
@@ -432,6 +435,24 @@ public class BlogService
         }
 
         return "/" + value.TrimStart('.', '/');
+    }
+
+    private static string NormalizeLegacyStaticAssetPaths(string htmlContent)
+    {
+        if (string.IsNullOrWhiteSpace(htmlContent))
+        {
+            return htmlContent;
+        }
+
+        return LegacyStaticAssetPathRegex.Replace(
+            htmlContent,
+            static match =>
+            {
+                var prefix = match.Groups["prefix"].Value;
+                var suffix = match.Groups["suffix"].Value;
+                var normalizedPath = match.Groups["rest"].Value.TrimStart('/');
+                return $"{prefix}/{normalizedPath}{suffix}";
+            });
     }
 
     private static List<string> ParseTags(string content, string title)
