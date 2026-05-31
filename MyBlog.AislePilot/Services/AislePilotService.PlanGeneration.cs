@@ -298,20 +298,25 @@ public sealed partial class AislePilotService
         using var generationBudgetCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         generationBudgetCts.CancelAfter(OpenAiGenerationBudget);
         var generationToken = generationBudgetCts.Token;
+        var mealTypeSlots = BuildMealTypeSlots(request);
+        var compactFirstAttempt = ShouldUseCompactPayloadFirstAttempt(totalMealCount, mealTypeSlots);
+        var requestedMealCount = compactFirstAttempt
+            ? totalMealCount
+            : GetRequestedAiMealCount(totalMealCount);
+        var maxTokens = compactFirstAttempt ? RetryAiMealPlanMaxTokens : PrimaryAiMealPlanMaxTokens;
 
-        var requestedMealCount = GetRequestedAiMealCount(totalMealCount);
         var aiBatch = await TryRequestAiMealBatchAsync(
             request,
             context,
             cookDays,
             totalMealCount,
             requestedMealCount,
-            PrimaryAiMealPlanMaxTokens,
-            compactJson: false,
+            maxTokens,
+            compactJson: compactFirstAttempt,
             excludedMealNames,
             generationToken);
 
-        if (aiBatch is null && ShouldRetryWithCompactPayload(totalMealCount))
+        if (aiBatch is null && !compactFirstAttempt && ShouldRetryWithCompactPayload(totalMealCount))
         {
             _logger?.LogWarning(
                 "AislePilot AI generation returned invalid or truncated JSON. Retrying with a compact {MealCount}-meal payload.",
@@ -336,7 +341,6 @@ public sealed partial class AislePilotService
         }
 
         var aiMeals = aiBatch.Meals.ToList();
-        var mealTypeSlots = BuildMealTypeSlots(request);
         var savedEnjoyedMealNames = ParseSavedEnjoyedMealNamesState(request.SavedEnjoyedMealNamesState);
         var selectionCandidates = aiMeals.ToList();
         if (request.EnableSavedMealRepeats && savedEnjoyedMealNames.Count > 0)

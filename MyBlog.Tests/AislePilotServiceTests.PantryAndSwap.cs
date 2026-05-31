@@ -610,6 +610,36 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public void BuildPlan_WhenFirestoreHydrationIsUnavailable_FallsBackWithoutThrowing()
+    {
+        ClearAiPool();
+
+        var request = new AislePilotRequestModel
+        {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            PlanDays = 1,
+            CookDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"]
+        };
+
+        var service = new AislePilotService(
+            configuration: BuildFastPathConfiguration(),
+            db: CreateUnreachableFirestoreDb(),
+            webHostEnvironment: CreateTestWebHostEnvironment());
+
+        var plan = service.BuildPlan(request);
+
+        Assert.Single(plan.MealPlan);
+        Assert.False(plan.UsedAiGeneratedMeals);
+        Assert.Equal("Template fallback", plan.PlanSourceLabel);
+    }
+
+    [Fact]
     public void SwapMealForDay_BeforeThirdAttempt_DoesNotGenerateFreshAiMeal()
     {
         ClearAiPool();

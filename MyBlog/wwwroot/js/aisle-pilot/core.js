@@ -12,11 +12,155 @@
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
     const supermarketSelectionStorageKey = "aislepilot:setup-supermarket";
     const submitLoadingDelayTimers = new WeakMap();
+    const submitPlanSkeletonDelayTimers = new WeakMap();
+    const planLoadingShellDelayMs = 0;
     const appRoot = document.querySelector(".aislepilot-app");
     const shellHeader = document.querySelector(".app-shell-header");
     const planLoadingShell = appRoot instanceof HTMLElement
         ? appRoot.querySelector("[data-plan-loading-shell]")
         : null;
+    const isLocalSetupDebugEnabled = (() => {
+        try {
+            const host = (window.location.hostname ?? "").trim().toLowerCase();
+            return host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
+        } catch {
+            return false;
+        }
+    })();
+    const setupDebugEndpoint = "/projects/aisle-pilot/debug-client-log";
+
+    const sendSetupDebugToServer = payload => {
+        if (!isLocalSetupDebugEnabled || !payload || typeof payload !== "object") {
+            return;
+        }
+
+        try {
+            const body = JSON.stringify(payload);
+            if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+                const blob = new Blob([body], { type: "application/json" });
+                navigator.sendBeacon(setupDebugEndpoint, blob);
+                return;
+            }
+
+            if (typeof fetch === "function") {
+                void fetch(setupDebugEndpoint, {
+                    method: "POST",
+                    body,
+                    keepalive: true,
+                    credentials: "same-origin",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+            }
+        } catch {
+            // Ignore debug transport failures.
+        }
+    };
+
+    const writeSetupDebug = (stage, details = {}) => {
+        if (!isLocalSetupDebugEnabled) {
+            return;
+        }
+
+        sendSetupDebugToServer({
+            stage,
+            details,
+            href: window.location.href,
+            userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+            timestampUtc: new Date().toISOString()
+        });
+    };
+
+    const readFormInvalidFields = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return [];
+        }
+
+        const controls = Array.from(form.elements).filter(control =>
+            control instanceof HTMLInputElement ||
+            control instanceof HTMLSelectElement ||
+            control instanceof HTMLTextAreaElement);
+
+        return controls
+            .filter(control =>
+                typeof control.willValidate === "boolean" &&
+                control.willValidate &&
+                control.validity &&
+                !control.validity.valid)
+            .map(control => ({
+                name: (control.name ?? "").trim(),
+                type: control instanceof HTMLInputElement ? (control.type ?? "input") : control.tagName.toLowerCase(),
+                valueMissing: control.validity.valueMissing === true,
+                typeMismatch: control.validity.typeMismatch === true,
+                patternMismatch: control.validity.patternMismatch === true,
+                tooShort: control.validity.tooShort === true,
+                tooLong: control.validity.tooLong === true,
+                rangeUnderflow: control.validity.rangeUnderflow === true,
+                rangeOverflow: control.validity.rangeOverflow === true,
+                stepMismatch: control.validity.stepMismatch === true,
+                badInput: control.validity.badInput === true,
+                customError: control.validity.customError === true,
+                validationMessage: control.validationMessage ?? ""
+            }));
+    };
+
+    const readJQueryInvalidCount = form => {
+        try {
+            if (!(form instanceof HTMLFormElement) || typeof window.jQuery !== "function") {
+                return null;
+            }
+
+            const validator = window.jQuery(form).data("validator");
+            if (!validator || typeof validator.numberOfInvalids !== "function") {
+                return null;
+            }
+
+            const invalidCount = validator.numberOfInvalids();
+            return Number.isFinite(invalidCount) ? invalidCount : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const readJQueryValidationErrors = form => {
+        try {
+            if (!(form instanceof HTMLFormElement) || typeof window.jQuery !== "function") {
+                return [];
+            }
+
+            const validator = window.jQuery(form).data("validator");
+            if (!validator) {
+                return [];
+            }
+
+            const errorList = Array.isArray(validator.errorList) ? validator.errorList : [];
+            return errorList.map(errorItem => {
+                const element = errorItem?.element;
+                const isInputElement = element instanceof HTMLInputElement;
+                const isSelectElement = element instanceof HTMLSelectElement;
+                const isTextAreaElement = element instanceof HTMLTextAreaElement;
+                const tagName = element instanceof Element ? element.tagName.toLowerCase() : "";
+
+                return {
+                    name: element instanceof Element ? (element.getAttribute("name") ?? "") : "",
+                    id: element instanceof Element ? (element.getAttribute("id") ?? "") : "",
+                    type: isInputElement
+                        ? (element.type ?? "input")
+                        : isSelectElement
+                            ? "select"
+                            : isTextAreaElement
+                                ? "textarea"
+                                : tagName,
+                    hidden: element instanceof HTMLElement ? element.matches(":hidden") : false,
+                    disabled: element instanceof HTMLElement ? element.matches(":disabled") : false,
+                    message: typeof errorItem?.message === "string" ? errorItem.message : ""
+                };
+            });
+        } catch {
+            return [];
+        }
+    };
 
     const showPlanLoadingShell = () => {
         if (!(appRoot instanceof HTMLElement) || !(planLoadingShell instanceof HTMLElement)) {
@@ -115,6 +259,19 @@
         submitLoadingDelayTimers.delete(form);
     };
 
+    const clearPlanSkeletonDelay = form => {
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const timerId = submitPlanSkeletonDelayTimers.get(form);
+        if (typeof timerId === "number") {
+            window.clearTimeout(timerId);
+        }
+
+        submitPlanSkeletonDelayTimers.delete(form);
+    };
+
     const lockSubmitButtonWidth = submitButton => {
         if (!(submitButton instanceof HTMLButtonElement) || submitButton.dataset.loadingWidthLocked === "true") {
             return;
@@ -172,8 +329,31 @@
                 return;
             }
             const targetForm = event.currentTarget;
-
             const submitButton = getSubmitButton(event);
+            const setupModeValueInput = targetForm.querySelector("[data-setup-mode-value]");
+            const setupMode = setupModeValueInput instanceof HTMLInputElement
+                ? setupModeValueInput.value.trim().toLowerCase()
+                : "";
+            const submitterMode = submitButton instanceof HTMLButtonElement
+                ? (submitButton.dataset.setupModeSubmit ?? "").trim().toLowerCase()
+                : "";
+            writeSetupDebug("setup-submit-handler-enter", {
+                formId: targetForm.id ?? "",
+                setupMode,
+                submitterMode,
+                defaultPrevented: event.defaultPrevented === true
+            });
+
+            if (event.defaultPrevented) {
+                writeSetupDebug("setup-submit-already-prevented", {
+                    formId: targetForm.id ?? "",
+                    setupMode,
+                    submitterMode,
+                    jqueryInvalidCount: readJQueryInvalidCount(targetForm)
+                });
+                return;
+            }
+
             if (!(submitButton instanceof HTMLButtonElement)) {
                 return;
             }
@@ -191,8 +371,69 @@
             targetForm.setAttribute("data-is-submitting", "true");
             submitButton.disabled = true;
             submitButton.setAttribute("aria-busy", "true");
-            if (submitButton.hasAttribute("data-show-plan-skeleton") || targetForm.hasAttribute("data-show-plan-skeleton")) {
-                showPlanLoadingShell();
+            const shouldShowPlanSkeleton =
+                submitButton.hasAttribute("data-show-plan-skeleton") ||
+                targetForm.hasAttribute("data-show-plan-skeleton");
+            if (shouldShowPlanSkeleton) {
+                clearPlanSkeletonDelay(targetForm);
+                if (planLoadingShellDelayMs <= 0) {
+                    showPlanLoadingShell();
+                } else {
+                    const skeletonTimerId = window.setTimeout(() => {
+                        if (
+                            targetForm.getAttribute("data-is-submitting") === "true" &&
+                            !event.defaultPrevented
+                        ) {
+                            showPlanLoadingShell();
+                        }
+                        submitPlanSkeletonDelayTimers.delete(targetForm);
+                    }, planLoadingShellDelayMs);
+                    submitPlanSkeletonDelayTimers.set(targetForm, skeletonTimerId);
+                }
+                window.setTimeout(() => {
+                    if (
+                        event.defaultPrevented &&
+                        targetForm.getAttribute("data-is-submitting") === "true"
+                    ) {
+                        const jqueryInvalidCount = readJQueryInvalidCount(targetForm);
+                        const jqueryErrors = readJQueryValidationErrors(targetForm);
+                        const invalidFields = readFormInvalidFields(targetForm);
+                        writeSetupDebug("setup-submit-prevented-after-handler", {
+                            formId: targetForm.id ?? "",
+                            setupMode,
+                            submitterMode,
+                            jqueryInvalidCount,
+                            jqueryErrors,
+                            invalidFieldCount: invalidFields.length,
+                            invalidFields
+                        });
+
+                        const hasPhantomJQueryInvalidState =
+                            Number.isInteger(jqueryInvalidCount) &&
+                            jqueryInvalidCount > 0 &&
+                            jqueryErrors.length === 0 &&
+                            invalidFields.length === 0;
+
+                        if (hasPhantomJQueryInvalidState) {
+                            writeSetupDebug("setup-submit-fallback-native-submit", {
+                                formId: targetForm.id ?? "",
+                                setupMode,
+                                submitterMode,
+                                jqueryInvalidCount
+                            });
+                            window.requestAnimationFrame(() => {
+                                HTMLFormElement.prototype.submit.call(targetForm);
+                            });
+                            return;
+                        }
+
+                        if (typeof targetForm.reportValidity === "function") {
+                            targetForm.reportValidity();
+                        }
+                        resetFormSubmittingState(targetForm);
+                        hidePlanLoadingShell();
+                    }
+                }, 0);
             }
             if (targetForm.hasAttribute("data-skip-submit-loading")) {
                 return;
@@ -2386,6 +2627,7 @@
         }
 
         clearSubmitLoadingDelay(form);
+        clearPlanSkeletonDelay(form);
         form.removeAttribute("data-is-submitting");
 
         const buttons = Array.from(form.querySelectorAll("button[type='submit']"));

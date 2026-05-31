@@ -32,6 +32,8 @@ public partial class AislePilotServiceTests
 
         var request = new AislePilotRequestModel
         {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
             DietaryModes = ["Vegan", "Gluten-Free"],
             CookDays = 7,
             WeeklyBudget = 70m,
@@ -156,6 +158,8 @@ public partial class AislePilotServiceTests
 
         var request = new AislePilotRequestModel
         {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
             DietaryModes = ["Balanced"],
             PlanDays = 4,
             CookDays = 4,
@@ -183,6 +187,153 @@ public partial class AislePilotServiceTests
         Assert.True(
             maxLunchRepeatCount <= 2,
             $"Expected lunch repeats to be capped at two in fallback plan, but found {maxLunchRepeatCount}.");
+    }
+
+    [Fact]
+    public void BuildPlan_WithLunchOnlySlots_UsesCompactAiPayloadOnFirstAttempt()
+    {
+        ClearAiPool();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "false"
+            })
+            .Build();
+
+        var recipeSteps = new[]
+        {
+            "Heat a large non-stick pan over medium heat for two minutes.",
+            "Add oil and onions, then cook for five minutes until softened.",
+            "Stir in the main ingredients and cook until hot throughout.",
+            "Season, simmer briefly, and adjust texture if needed.",
+            "Serve immediately with a simple side."
+        };
+
+        object[] BuildIngredients(string primaryIngredient) =>
+        [
+            new { name = primaryIngredient, department = "Meat & Fish", quantityForTwo = 0.35m, unit = "kg", estimatedCostForTwo = 2.7m },
+            new { name = "Rice", department = "Tins & Dry Goods", quantityForTwo = 0.4m, unit = "kg", estimatedCostForTwo = 0.95m },
+            new { name = "Bell peppers", department = "Produce", quantityForTwo = 2m, unit = "pcs", estimatedCostForTwo = 1.2m }
+        ];
+
+        static string BuildChatCompletionResponse(IEnumerable<object> meals)
+        {
+            var payloadContent = JsonSerializer.Serialize(new { meals });
+            return JsonSerializer.Serialize(new
+            {
+                choices = new[]
+                {
+                    new
+                    {
+                        message = new
+                        {
+                            content = payloadContent
+                        }
+                    }
+                }
+            });
+        }
+
+        var primaryAttemptPayload = BuildChatCompletionResponse(
+        [
+            new
+            {
+                name = "Chicken wrap lunch box",
+                baseCostForTwo = 5.2m,
+                isQuick = true,
+                tags = new[] { "Balanced" },
+                recipeSteps,
+                ingredients = BuildIngredients("Chicken breast")
+            },
+            new
+            {
+                name = "Roasted salmon traybake",
+                baseCostForTwo = 8.6m,
+                isQuick = false,
+                tags = new[] { "Balanced" },
+                recipeSteps,
+                ingredients = BuildIngredients("Salmon fillet")
+            },
+            new
+            {
+                name = "Tuna salad wraps",
+                baseCostForTwo = 5.8m,
+                isQuick = true,
+                tags = new[] { "Balanced" },
+                recipeSteps,
+                ingredients = BuildIngredients("Tuna")
+            },
+            new
+            {
+                name = "Beef chilli skillet",
+                baseCostForTwo = 7.8m,
+                isQuick = true,
+                tags = new[] { "Balanced" },
+                recipeSteps,
+                ingredients = BuildIngredients("Beef mince")
+            }
+        ]);
+
+        var compactPayload = BuildChatCompletionResponse(
+        [
+            new
+            {
+                name = "Chicken wrap lunch box",
+                baseCostForTwo = 5.2m,
+                isQuick = true,
+                tags = new[] { "Balanced" },
+                recipeSteps,
+                ingredients = BuildIngredients("Chicken breast")
+            },
+            new
+            {
+                name = "Tuna salad wraps",
+                baseCostForTwo = 5.8m,
+                isQuick = true,
+                tags = new[] { "Balanced" },
+                recipeSteps,
+                ingredients = BuildIngredients("Tuna")
+            }
+        ]);
+
+        using var handler = new RequestAwareResponseHandler(requestBody =>
+        {
+            if (requestBody.Contains("\"max_tokens\":3400", StringComparison.Ordinal))
+            {
+                return (HttpStatusCode.OK, primaryAttemptPayload);
+            }
+
+            return (HttpStatusCode.OK, compactPayload);
+        });
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+        var request = new AislePilotRequestModel
+        {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
+            DietaryModes = ["Balanced"],
+            PlanDays = 2,
+            CookDays = 2,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Lunch"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2
+        };
+
+        var result = service.BuildPlan(request);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Single(handler.RequestBodies);
+        Assert.Contains("\"max_tokens\":2200", handler.RequestBodies[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("\"max_tokens\":3400", handler.RequestBodies[0], StringComparison.Ordinal);
+        Assert.True(result.UsedAiGeneratedMeals);
+        Assert.Equal(2, result.MealPlan.Count);
+        Assert.All(
+            result.MealPlan,
+            meal => Assert.Equal("Lunch", meal.MealType, ignoreCase: true));
     }
 
     [Fact]
@@ -297,6 +448,8 @@ public partial class AislePilotServiceTests
 
         var request = new AislePilotRequestModel
         {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
             DietaryModes = ["Balanced"],
             CookDays = 2,
             WeeklyBudget = 65m,
@@ -369,6 +522,8 @@ public partial class AislePilotServiceTests
 
         var request = new AislePilotRequestModel
         {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
             DietaryModes = ["Balanced"],
             CookDays = 1,
             WeeklyBudget = 65m,
@@ -440,6 +595,8 @@ public partial class AislePilotServiceTests
 
         var request = new AislePilotRequestModel
         {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
             DietaryModes = ["Balanced"],
             CookDays = 1,
             WeeklyBudget = 65m,
@@ -524,6 +681,8 @@ public partial class AislePilotServiceTests
 
         var request = new AislePilotRequestModel
         {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
             DietaryModes = ["Balanced"],
             CookDays = 1,
             PlanDays = 1,
@@ -614,6 +773,8 @@ public partial class AislePilotServiceTests
 
         var request = new AislePilotRequestModel
         {
+            Supermarket = "Custom",
+            CustomAisleOrder = "Produce, Bakery, Dairy & Eggs",
             DietaryModes = ["Balanced"],
             CookDays = 1,
             WeeklyBudget = 65m,
@@ -832,6 +993,31 @@ public partial class AislePilotServiceTests
         finally
         {
             RemoveAiPoolMeal(mealName);
+        }
+    }
+
+    private sealed class RequestAwareResponseHandler(
+        Func<string, (HttpStatusCode StatusCode, string ResponseBody)> responseFactory)
+        : HttpMessageHandler
+    {
+        private readonly Func<string, (HttpStatusCode StatusCode, string ResponseBody)> _responseFactory = responseFactory;
+
+        public List<string> RequestBodies { get; } = [];
+        public int CallCount { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            CallCount++;
+            var requestBody = request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            RequestBodies.Add(requestBody);
+            var response = _responseFactory(requestBody);
+
+            return new HttpResponseMessage(response.StatusCode)
+            {
+                Content = new StringContent(response.ResponseBody)
+            };
         }
     }
 }

@@ -67,6 +67,7 @@ public sealed partial class AislePilotService : IAislePilotService
     private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(22);
     private static readonly TimeSpan OpenAiImageRequestTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan OpenAiImageDownloadTimeout = TimeSpan.FromSeconds(18);
+    private static readonly TimeSpan FirestoreReadTimeout = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
     private static readonly TimeSpan AiMealPersistenceBackgroundBudget = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan MaxOpenAiRetryAfterDelay = TimeSpan.FromSeconds(3);

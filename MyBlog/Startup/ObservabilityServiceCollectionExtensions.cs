@@ -38,6 +38,12 @@ internal static class ObservabilityServiceCollectionExtensions
                 Indented = false
             };
         });
+        var localRunLogOptions = LocalRunLogOptions.From(builder.Configuration, builder.Environment.EnvironmentName);
+        var localRunLogProvider = LocalRunFileLoggerProvider.TryCreate(localRunLogOptions, builder.Environment.ContentRootPath);
+        if (localRunLogProvider is not null)
+        {
+            builder.Logging.AddProvider(localRunLogProvider);
+        }
         builder.Logging.Configure(loggingOptions =>
         {
             loggingOptions.ActivityTrackingOptions =

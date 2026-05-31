@@ -26,7 +26,6 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
                 RegexOptions.IgnoreCase),
             html);
     }
-
     [Fact]
     public async Task Index_Get_RendersSavedMealRepeatStrengthSliderWithPlanBasicsFrameStyle()
     {
@@ -40,7 +39,6 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
                 RegexOptions.IgnoreCase),
             html);
     }
-
     [Fact]
     public async Task Index_Get_RendersMealsPerDayControl_DefaultingToThree()
     {
@@ -58,7 +56,6 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("name=\"Request.SelectedMealTypes\" value=\"Lunch\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("name=\"Request.SelectedMealTypes\" value=\"Dinner\"", html, StringComparison.OrdinalIgnoreCase);
     }
-
     [Fact]
     public async Task Index_Get_RendersPlanLoadingSkeletonShellAndPlannerTrigger()
     {
@@ -70,7 +67,6 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("data-setup-mode-submit=\"planner\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-show-plan-skeleton", html, StringComparison.OrdinalIgnoreCase);
     }
-
     [Fact]
     public async Task Index_Get_UsesSimplifiedAislePilotLayoutWithoutDecorativeOverlays()
     {
@@ -81,7 +77,6 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.DoesNotContain("class=\"page-aurora\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("data-scroll-progress", html, StringComparison.OrdinalIgnoreCase);
     }
-
     [Fact]
     public async Task Index_Get_RendersStepBasedSetupWorkspaceWithSummaryCard()
     {
@@ -420,11 +415,18 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     public async Task AislePilotScript_PreservesIconOnlyButtonsWhenSubmitLoadingStarts()
     {
         using var client = CreateClient(allowAutoRedirect: true);
-
         var script = await GetCombinedAislePilotScriptAsync(client);
-
         Assert.Contains("if (submitButton.classList.contains(\"is-icon-only\"))", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("submitButton.setAttribute(\"aria-label\", nextAriaLabel);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const shouldShowPlanSkeleton =", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const planLoadingShellDelayMs = 0;", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("event.defaultPrevented &&", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("setup-submit-prevented-after-handler", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("setup-submit-fallback-native-submit", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("window.requestAnimationFrame(() => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("HTMLFormElement.prototype.submit.call(targetForm);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("targetForm.reportValidity();", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("resetFormSubmittingState(targetForm);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("if (!button.classList.contains(\"is-icon-only\") && originalLabel && originalLabel.length > 0)", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const visibleLabel = button.querySelector(\"[data-setup-toggle-label]\")", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("if (visibleLabel instanceof HTMLElement) {", script, StringComparison.OrdinalIgnoreCase);
@@ -438,9 +440,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     public async Task AislePilotScript_LeftoverPlanner_SubmitsImmediatelyFromCardToggle()
     {
         using var client = CreateClient(allowAutoRedirect: true);
-
         var script = await GetCombinedAislePilotScriptAsync(client);
-
         Assert.Contains("const leftoverRebalanceForms = scope instanceof Element", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const maxExtraRaw = Number.parseInt(", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const getZoneToggleButtons = zone => {", script, StringComparison.OrdinalIgnoreCase);
