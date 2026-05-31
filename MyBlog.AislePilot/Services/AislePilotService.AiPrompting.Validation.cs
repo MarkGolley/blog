@@ -120,6 +120,28 @@ public sealed partial class AislePilotService
         };
     }
 
+    private static bool ShouldUseCompactPayloadFirstAttempt(
+        int requestedMealCount,
+        IReadOnlyList<string>? mealTypeSlots)
+    {
+        var normalizedMealCount = Math.Clamp(requestedMealCount, 1, MaxFreshAiPlanMeals);
+        if (normalizedMealCount > 5)
+        {
+            return false;
+        }
+
+        var normalizedSlots = NormalizeMealTypeSlots(mealTypeSlots, fallbackMealsPerDay: 1)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (normalizedSlots.Count != 1)
+        {
+            return false;
+        }
+
+        return normalizedSlots[0].Equals("Breakfast", StringComparison.OrdinalIgnoreCase) ||
+               normalizedSlots[0].Equals("Lunch", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool ShouldRetryWithCompactPayload(int requestedMealCount)
     {
         var normalizedMealCount = Math.Clamp(requestedMealCount, 1, MaxFreshAiPlanMeals);

@@ -415,10 +415,25 @@ Return JSON only with this schema:
                 return;
             }
 
-            var snapshot = await _db.Collection(AiMealsCollection)
-                .OrderByDescending(nameof(FirestoreAislePilotMeal.CreatedAtUtc))
-                .Limit(150)
-                .GetSnapshotAsync(cancellationToken);
+            QuerySnapshot snapshot;
+            try
+            {
+                using var firestoreReadBudgetCts = CreateFirestoreReadBudgetCts(cancellationToken);
+                snapshot = await _db.Collection(AiMealsCollection)
+                    .OrderByDescending(nameof(FirestoreAislePilotMeal.CreatedAtUtc))
+                    .Limit(150)
+                    .GetSnapshotAsync(firestoreReadBudgetCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                LogFirestoreReadTimeout("AI meal pool hydration");
+                return;
+            }
+            catch (Exception ex)
+            {
+                LogFirestoreReadFailure(ex, "AI meal pool hydration");
+                return;
+            }
             var refreshedAtUtc = DateTime.UtcNow;
 
             foreach (var doc in snapshot.Documents)

@@ -277,7 +277,22 @@ public sealed partial class AislePilotService
                 return;
             }
 
-            var snapshot = await _db.Collection(SupermarketLayoutsCollection).GetSnapshotAsync(cancellationToken);
+            QuerySnapshot snapshot;
+            try
+            {
+                using var firestoreReadBudgetCts = CreateFirestoreReadBudgetCts(cancellationToken);
+                snapshot = await _db.Collection(SupermarketLayoutsCollection).GetSnapshotAsync(firestoreReadBudgetCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                LogFirestoreReadTimeout("supermarket layout cache hydration");
+                return;
+            }
+            catch (Exception ex)
+            {
+                LogFirestoreReadFailure(ex, "supermarket layout cache hydration");
+                return;
+            }
             foreach (var doc in snapshot.Documents)
             {
                 if (!doc.Exists)

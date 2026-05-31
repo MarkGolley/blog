@@ -216,10 +216,25 @@ public sealed partial class AislePilotService : IAislePilotService
                 return;
             }
 
-            var snapshot = await _db.Collection(DessertAddOnsCollection)
-                .OrderByDescending(nameof(FirestoreAislePilotDessertAddOn.UpdatedAtUtc))
-                .Limit(160)
-                .GetSnapshotAsync(cancellationToken);
+            QuerySnapshot snapshot;
+            try
+            {
+                using var firestoreReadBudgetCts = CreateFirestoreReadBudgetCts(cancellationToken);
+                snapshot = await _db.Collection(DessertAddOnsCollection)
+                    .OrderByDescending(nameof(FirestoreAislePilotDessertAddOn.UpdatedAtUtc))
+                    .Limit(160)
+                    .GetSnapshotAsync(firestoreReadBudgetCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                LogFirestoreReadTimeout("dessert add-on pool hydration");
+                return;
+            }
+            catch (Exception ex)
+            {
+                LogFirestoreReadFailure(ex, "dessert add-on pool hydration");
+                return;
+            }
             DessertAddOnPool.Clear();
 
             foreach (var doc in snapshot.Documents)

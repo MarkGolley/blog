@@ -35,6 +35,7 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
                 ["AislePilot:EnableAiGeneration"] = "false",
                 ["AislePilot:AllowTemplateFallback"] = "true",
                 ["Observability:EnableOtlp"] = "false",
+                ["Observability:LocalRunLogs:Enabled"] = "false",
                 ["OPENAI_API_KEY"] = resolvedOpenAiKey
             });
         });
