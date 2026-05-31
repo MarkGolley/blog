@@ -47,6 +47,30 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Deployment\observability\s
 
 The default local compose configuration intentionally uses an invalid `OPENAI_API_KEY` when none is provided, so AI-dependency failures can be diagnosed end to end without consuming live API credits.
 
+## Grafana Cloud Cutover (Low-Cost Public Dashboard)
+
+If you want a public dashboard link on `/projects` without running a 24/7 VM, use Grafana Cloud and point Cloud Run OTEL export directly at Grafana Cloud OTLP.
+
+Scripts:
+
+- `Deployment/observability-grafana-cloud-on.ps1`
+- `Deployment/observability-grafana-cloud-off.ps1`
+
+Enable (requires values from Grafana Cloud OpenTelemetry tile):
+
+```powershell
+.\Deployment\observability-grafana-cloud-on.ps1 `
+  -DashboardUrl "https://<your-shared-dashboard-url>" `
+  -OtlpEndpoint "https://<your-otlp-endpoint>" `
+  -OtlpHeaders "Authorization=Basic <base64-instanceid:token>"
+```
+
+Disable:
+
+```powershell
+.\Deployment\observability-grafana-cloud-off.ps1
+```
+
 ## Pre-Deploy Checks
 
 Run from repo root:
