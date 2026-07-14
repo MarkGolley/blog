@@ -1,0 +1,659 @@
+<!-- PublishedDate: 2026-07-06 -->
+<!-- Title: How AI Agents Actually Work, and How to Use Them Well -->
+<!-- Summary: A practical guide to AI agents as work loops: how they gather context, use tools, verify results, and where human judgement still matters. -->
+<!-- Tags: AI, Agentic AI, Developer Productivity, Software Engineering -->
+<!-- ReadingTime: 21 -->
+<!-- CoverImage: /images/blog/ai-agent-workflow-cover.svg -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>How AI Agents Actually Work, and How to Use Them Well</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+
+<p>After using agents across real code tasks, this is the model that finally made them click for me. Nick Saraev's <a href="https://www.youtube.com/watch?v=EsTrWCV0Ph4" target="_blank" rel="noopener noreferrer">AI Agents Full Course 2026</a> helped me sharpen the language, but this is not a transcript or a recap. It is a practical follow-up to my own posts on <a href="/blog/early_thoughts_on_agentic_systems">agentic systems</a>, <a href="/blog/Why_AI_Permission_Popups_Matter">permission popups</a>, and <a href="/blog/AI_Agents_Can_Do_The_Work_But_Dont_Skip_The_Learning">using AI without skipping the learning</a>.</p>
+
+<p>The short version: agents are not just better chatbots. They are systems that can observe, choose tools, act, inspect the result, and keep going until they hit a stopping point.</p>
+
+<section class="post-brief" aria-labelledby="reader-promise">
+    <span class="post-capsule-label">In this post</span>
+    <h2 id="reader-promise">What you will get from the article</h2>
+    <ul>
+        <li>A plain-English model for how agents actually work.</li>
+        <li>A way to separate the model, runtime, tools, context, policy, and verification loop.</li>
+        <li>A translation layer for the things you see agents do but may not understand yet.</li>
+        <li>A practical workflow for using agents without letting them drift into broad, unreviewed changes.</li>
+        <li>A checklist for deciding whether an agent's work is ready to trust.</li>
+    </ul>
+</section>
+
+<nav class="post-jump-nav" aria-label="Article sections">
+    <span class="post-capsule-label">Jump to</span>
+    <a href="#part-1-how-agents-work">What agents are doing</a>
+    <a href="#agent-context-and-tools">Context and tools</a>
+    <a href="#agent-visible-behaviour">What you are seeing</a>
+    <a href="#part-2-how-to-use-agents-well">Working with agents safely</a>
+    <a href="#agent-failure-modes">Failure modes</a>
+    <a href="#agent-trust-checklist">Trust checklist</a>
+</nav>
+
+<section class="post-part-break" aria-labelledby="part-1-how-agents-work">
+    <span class="post-part-kicker">Part 1</span>
+    <h2 id="part-1-how-agents-work">What agents are doing</h2>
+    <p>First, separate the machinery from the behaviour. An agent is useful because it can loop through work, not because it gives one impressive answer.</p>
+</section>
+
+<h2>The simplest useful definition</h2>
+
+<p>My current definition is: an AI agent is a model inside a loop, connected to tools, with enough instructions to decide what to do next.</p>
+
+<figure class="post-diagram post-diagram-loop" aria-label="Agent loop: observe, reason, act, inspect result, repeat.">
+    <div class="diagram-step-chain">
+        <span>Observe</span>
+        <span>Reason</span>
+        <span>Act</span>
+        <span>Inspect result</span>
+        <span>Repeat</span>
+    </div>
+    <figcaption>The useful part is the loop: gather context, choose the next action, call a tool, inspect the result, then continue.</figcaption>
+</figure>
+
+<p>That loop is the shift. A normal chatbot can answer from the context you paste in. An agent can inspect the environment, make a change, run a check, learn from the result, and decide whether the work is done.</p>
+
+<h2>The model is not the whole agent</h2>
+
+<p>It is easy to talk about agents as if the model itself is doing everything. Really, the model is only one part of the system around it. I find it clearer to separate the parts from the path the work takes.</p>
+
+<p>The main parts are:</p>
+
+<ul>
+    <li><strong>Model:</strong> reasons over the available context and proposes the next action.</li>
+    <li><strong>Runtime:</strong> manages the loop: context, tool calls, approvals, retries, memory, and stopping conditions.</li>
+    <li><strong>Tools:</strong> expose real capabilities such as files, shell commands, browsers, APIs, tests, docs, or databases.</li>
+    <li><strong>Policy:</strong> decides what the agent can do automatically and what needs human approval.</li>
+    <li><strong>Verification:</strong> checks whether the work should be trusted.</li>
+</ul>
+
+<p>The diagram below is the same idea from a different angle. It shows one pass through the loop: a goal and instructions become context for the model; the model chooses a possible action; the runtime checks policy; a tool runs; the result comes back as an observation; then the agent either verifies the work or loops again.</p>
+
+<figure class="post-diagram post-diagram-agent-stack" aria-label="Agent loop from goal and instructions through context, model reasoning, tool choice, policy check, execution, observation, and verification.">
+    <div class="agent-stack-grid">
+        <span>User goal</span>
+        <span>Rules and context</span>
+        <span>Model reasoning</span>
+        <span>Tool choice</span>
+        <span>Policy check</span>
+        <span>Tool execution</span>
+        <span>Observation</span>
+        <span>Verify or repeat</span>
+    </div>
+    <figcaption>The model is only one box in the loop. The surrounding runtime, tools, policy, context, and verification shape what the agent actually does.</figcaption>
+</figure>
+
+<p>That is why two agents can use the same model and still behave differently. It is also why repeatability is not guaranteed even with the same agent setup. Unless the model call, settings, context, tool outputs, runtime behaviour, and external state are all fixed, the next run may make a different choice or produce a different result.</p>
+
+<p>This matters when something goes wrong. The fix is not always "write a better prompt". Sometimes the tool output was unclear. Sometimes the context was stale. Sometimes the runtime allowed too much access. Sometimes there was no test step. Sometimes the model just made a bad assumption and then built on it.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Practical guardrails</span>
+        <span class="post-capsule-text">How to reduce those failure modes.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<ul>
+    <li><strong>Unclear tool output:</strong> ask for short, explicit command results and check the evidence yourself.</li>
+    <li><strong>Stale context:</strong> have the agent re-read the relevant files, docs, or external state before acting.</li>
+    <li><strong>Too much access:</strong> keep permissions narrow and require approval for risky actions.</li>
+    <li><strong>No verification:</strong> ask what test, screenshot, log, or check proves the work.</li>
+    <li><strong>Bad early assumption:</strong> use small plans and review points before letting the agent continue.</li>
+</ul>
+
+    </div>
+</details>
+
+<h2 id="agent-context-and-tools">Context and tools decide what the agent can actually do</h2>
+
+<p>The model does not know your repo, product, database, or browser state in the way you do. It sees whatever the runtime gives it, plus whatever it actively gathers through tools.</p>
+
+<figure class="post-diagram post-diagram-context" aria-label="Context lifecycle: startup context, gathered context, tool output, conversation window, external state, compressed handover.">
+    <div class="context-flow">
+        <span>Startup context</span>
+        <span>Gathered context</span>
+        <span>Tool output</span>
+        <span>Conversation window</span>
+        <span>External state</span>
+        <span>Compressed handover</span>
+    </div>
+    <figcaption>Context is loaded, gathered, returned from tools, held temporarily, checked against external state, and eventually compressed for handover.</figcaption>
+</figure>
+
+<p>At a high level, context can include the user request, platform instructions, project rules such as <code>AGENTS.md</code>, opened files, search results, tool outputs, previous reasoning, and summaries. If the important fact is not in that context, the model is guessing.</p>
+
+<p>Tools usually come from a few places:</p>
+
+<ul>
+    <li><strong>Built-in platform tools:</strong> file reading, editing, terminal access, browser automation, image viewing, or web search.</li>
+    <li><strong>Local machine tools:</strong> installed programs such as <code>dotnet</code>, <code>git</code>, <code>npm</code>, <code>rg</code>, or test runners.</li>
+    <li><strong>Project scripts:</strong> commands like <code>run_checks.ps1</code>, build tasks, lint tasks, seed scripts, or deployment helpers.</li>
+    <li><strong>Connectors and MCP servers:</strong> integrations for GitHub, Slack, Jira, databases, browsers, internal docs, or custom systems.</li>
+    <li><strong>Custom application tools:</strong> functions with explicit input and output schemas registered with the runtime.</li>
+</ul>
+
+<p>The runtime describes those tools to the model. The model requests a tool call. The runtime executes it and returns the result. That boundary is important: a tool description is part of the contract, and bad tool output can become bad reasoning in the next loop.</p>
+
+<p>The agent does not directly know that the world changed. It sees observations. If a command fails silently, a search result is stale, a test runner reports only part of the failure, or the agent misreads a diff, the next decision can be built on weak evidence. That is why good agent workflows make tool output short, explicit, and easy to verify.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">A simple tool schema and why MCP matters.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<p>A tool exposed to an agent might look conceptually like this:</p>
+
+<pre><code>{
+  "name": "search_blog_posts",
+  "description": "Search published blog post HTML files by keyword.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "The keyword or phrase to search for."
+      },
+      "maxResults": {
+        "type": "integer",
+        "description": "Maximum number of matching posts to return."
+      }
+    },
+    "required": ["query"]
+  }
+}</code></pre>
+
+<p>If that description is vague, the model may call the wrong tool or pass weak arguments. If the tool fails but returns something that looks valid, the model may treat the result as truth.</p>
+
+<p>MCP, or Model Context Protocol, is one way to standardise this boundary. In plain English, it gives agent runtimes a common way to discover and call external tools or data sources: GitHub, internal docs, browsers, databases, tickets, health checks, and more. That is powerful because it turns private systems into agent-usable capabilities. It is risky for the same reason, so permissions, audit logs, validation, and failure modes matter.</p>
+
+    </div>
+</details>
+
+<h2>A small example makes the difference clearer</h2>
+
+<p>If I ask a chatbot, <code>Why is my test failing?</code>, it can answer from whatever error message I paste in.</p>
+
+<p>If I ask an agent inside a codebase, it can do more:</p>
+
+<ol>
+    <li>Read the failing test output.</li>
+    <li>Open the test file.</li>
+    <li>Find the production code being exercised.</li>
+    <li>Compare the assertion with the current behaviour.</li>
+    <li>Make a small change.</li>
+    <li>Run the targeted test again.</li>
+    <li>Summarise what changed and what risk remains.</li>
+</ol>
+
+<p>That is a different workflow. The value is not just that the agent writes code. The value is that it can move between observation and action, then check whether the action worked.</p>
+
+<h2 id="agent-visible-behaviour">What you are watching when an agent runs</h2>
+
+<p>A lot of agent behaviour looks strange until you map it back to the loop. When an agent reads files before editing, it is building context. When it asks for approval, it has reached a policy boundary. When it runs a test after a small change, it is trying to turn a guess into evidence.</p>
+
+<p>The common visible steps usually mean:</p>
+
+<ul>
+    <li><strong>File reads:</strong> the agent is collecting the facts it was not given in the prompt.</li>
+    <li><strong>Searches:</strong> it is trying to find ownership, examples, naming patterns, or the exact failure surface.</li>
+    <li><strong>Plans:</strong> it is stating a temporary hypothesis. A plan is useful, but it is not proof.</li>
+    <li><strong>Permission prompts:</strong> the runtime is enforcing a boundary before a higher-risk action.</li>
+    <li><strong>Tool calls:</strong> the agent is observing or changing external state through a controlled interface.</li>
+    <li><strong>Diffs:</strong> this is the moment to check scope. The changed files should match the stated task.</li>
+    <li><strong>Tests and checks:</strong> these prove only the behaviour they cover. Passing tests are evidence, not a guarantee.</li>
+    <li><strong>Retries:</strong> the agent is adapting to a failed action, but repeated retries can also mean it has the wrong model of the problem.</li>
+    <li><strong>Context summaries:</strong> the runtime is preserving active state while dropping detail. Useful, but not lossless.</li>
+</ul>
+
+<p>The important habit is to read those steps as signals. File reads and plans are not wasted time if they reduce guessing. A permission prompt is not an annoyance if it prevents an unsafe action. A confident final answer is not enough if the diff, tests, or evidence do not support it.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">A realistic loop-by-loop agent trace.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<pre><code>Goal:
+Fix a bug where a settings page saves a value but does not show it after refresh.
+
+Loop 1:
+Observe: read the task, project instructions, and the failing behaviour.
+Reason: this sounds like a save-or-load path, not a styling issue.
+Act: search for the settings page, request handler, and storage code.
+
+Loop 2:
+Observe: find the form submits the right field name.
+Reason: the problem is probably after submission.
+Act: inspect the server handler and the saved settings model.
+
+Loop 3:
+Observe: the handler saves the new value, but the page reload reads an older field.
+Reason: the write path and read path use different property names.
+Act: update the read path to use the saved property.
+
+Loop 4:
+Observe: no test covers saving and reloading this setting.
+Reason: add a narrow regression test at the page or service boundary.
+Act: write a test that saves the setting and expects it after refresh.
+
+Loop 5:
+Observe: test fails.
+Reason: the test now proves the current bug.
+Act: apply the fix and rerun the targeted test.</code></pre>
+
+    </div>
+</details>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Small questions</span>
+        <span class="post-capsule-text">Things I wondered about agents but did not ask at first.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<p>Some agent questions feel too small to ask, but they are useful because they reveal how the system really behaves.</p>
+
+<ul>
+    <li><strong>Do spelling mistakes in prompts matter?</strong> Usually not much if the intent is clear. They can matter when the typo changes a name, command, file path, option, or technical term the agent needs to match exactly.</li>
+    <li><strong>Does being polite help?</strong> Politeness does not magically improve the model, but clear, calm instructions often do. "Please keep this scoped to one file and run the narrow test" is useful because it is specific, not because it is polite.</li>
+    <li><strong>Does a longer prompt always work better?</strong> No. Long prompts can help when they add constraints, examples, and context. They hurt when they bury the actual task under noise.</li>
+    <li><strong>Why does the agent sometimes sound confident when it is wrong?</strong> The model is generating the most plausible continuation from its context. Confidence in the wording is not the same as evidence from files, tools, tests, or logs.</li>
+    <li><strong>Why does asking twice give a different answer?</strong> Model calls can involve sampling, and the surrounding context may have changed. Treat repeated answers as more evidence to inspect, not as proof by repetition.</li>
+    <li><strong>Should I paste everything or let the agent inspect files?</strong> For code tasks, I prefer giving the goal and letting the agent inspect the relevant files. Pasted snippets are useful, but they can hide nearby code that explains the real problem.</li>
+</ul>
+
+    </div>
+</details>
+
+<section class="post-part-break post-part-break-major" aria-labelledby="part-2-how-to-use-agents-well">
+    <span class="post-part-kicker">Part 2</span>
+    <h2 id="part-2-how-to-use-agents-well">How to work with agents safely</h2>
+    <p>Once the mechanics are clearer, the practical question becomes: how do I use this without creating a mess? My answer is narrower scope, clearer verification, and human judgement at the points where judgement matters.</p>
+</section>
+
+<h2>Give the agent a contract, not a vibe</h2>
+
+<p>For day-to-day software work, I do not want an agent to sprint off and make a large unreviewed change. I want a small contract:</p>
+
+<ol>
+    <li><strong>Understand the task:</strong> read the relevant files and restate the goal.</li>
+    <li><strong>Plan the smallest change:</strong> identify the responsible module and expected files.</li>
+    <li><strong>Edit carefully:</strong> touch the fewest files needed.</li>
+    <li><strong>Verify:</strong> run the most relevant tests or checks.</li>
+    <li><strong>Explain:</strong> summarise what changed, why, and what risk remains.</li>
+</ol>
+
+<p>A vague prompt says:</p>
+
+<pre><code>Can you fix this bug?</code></pre>
+
+<p>A useful prompt contract gives the agent edges: what to do, where to work, what constraints matter, and how the result should be checked.</p>
+
+<h2>A practical operator playbook</h2>
+
+<p>The way you use an agent matters as much as the prompt. I try to run the session in small, reviewable phases:</p>
+
+<ol>
+    <li><strong>Start with the outcome:</strong> describe the behaviour you want, the bug you see, or the decision you need.</li>
+    <li><strong>Name the boundary:</strong> tell the agent what area to inspect first and what it should avoid changing.</li>
+    <li><strong>Ask for a short plan before edits:</strong> the plan should name likely files, risk, and verification.</li>
+    <li><strong>Interrupt broad work early:</strong> if the agent starts touching unrelated files, stop and narrow the task.</li>
+    <li><strong>Ask for evidence, not confidence:</strong> tests run, screenshots captured, docs checked, or commands executed.</li>
+    <li><strong>Review the diff yourself:</strong> make sure the changed files match the goal.</li>
+    <li><strong>Make the final answer concrete:</strong> what changed, why, what proved it, and what risk remains.</li>
+</ol>
+
+<p>Useful stop signals are broad refactors you did not ask for, repeated failed commands, vague explanations, missing tests for a bug fix, or a final answer that sounds stronger than the evidence. When that happens, I would rather pause and reframe than let the agent continue building on a weak assumption.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">A concrete prompt contract example.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<pre><code>Task:
+Fix the bug where the settings page saves a value but shows the old value after refresh.
+
+Scope:
+Start with the settings page, its request handler, and the settings storage service.
+Only edit the smallest set of files needed for this behaviour.
+
+Constraints:
+- Preserve the current public route and form fields unless the bug requires otherwise.
+- Follow the existing validation and persistence patterns.
+- Do not refactor unrelated settings or shared infrastructure.
+- Add or update a regression test that fails before the fix.
+
+Definition of done:
+- Saving the setting and refreshing the page shows the new value.
+- Existing settings still load correctly.
+- The targeted regression test passes.
+- Any broader affected tests have been run or called out.
+
+Before editing:
+Summarise your planned changes in 5 bullets.</code></pre>
+
+    </div>
+</details>
+
+<h2>Reusable instructions help, but only if they stay focused</h2>
+
+<p>One part of the video that resonated with me was the idea of standardising agent workflows through skills or reusable instruction files. I already see the value of this in my own repo. An <code>AGENTS.md</code> file can tell agents how to work here: read the architecture map, keep edits small, avoid generated directories, add tests for bug fixes, and run the right checks.</p>
+
+<p>The bigger pattern is simple:</p>
+
+<ul>
+    <li>Put stable project rules in files.</li>
+    <li>Keep task prompts focused on the current goal.</li>
+    <li>Use skills or manuals for specialised workflows.</li>
+    <li>Let the agent load detailed instructions only when they are relevant.</li>
+</ul>
+
+<p>This helps with context too. A giant prompt can become noisy. Smaller reusable instructions are easier to maintain, easier to review, and less likely to bury the important task-specific detail.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">Self-correcting rules, treated carefully.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<p>A lightweight version of self-correcting instructions could be useful:</p>
+
+<pre><code># Learned Rules
+1. Tests: when fixing a user-visible bug, add a regression test at the narrowest useful layer.
+2. Sources: when summarising external material, link the source and avoid copying long passages.
+3. Scope: before editing, identify the smallest module responsible for the behaviour.</code></pre>
+
+<p>The safe version is that the agent may propose a new rule after a real correction or failure, but the human reviews it before it becomes permanent. Otherwise, instruction files can slowly fill with outdated preferences and misunderstood lessons.</p>
+
+    </div>
+</details>
+
+<h2>Use multiple agents only when independence helps</h2>
+
+<p>Multi-agent workflows can be useful, but I would not reach for them by default. For most normal tasks, one well-constrained agent plus good tests is enough.</p>
+
+<p>In practice, using multiple agents can be as simple as running separate sessions with different roles. One agent implements the change. Another reviews the diff. A third might read documentation, check security assumptions, or look at performance. They do not need to talk to each other directly for the pattern to be useful; the value is that each pass starts from a different brief.</p>
+
+<p>The reason to do this is independence. If one agent makes an early bad assumption, a second agent with a review-only brief is more likely to challenge it than an agent continuing its own work. Multiple agents help most when the jobs are genuinely different: build, review, research, test, security, UX, or performance.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Practical comparison</span>
+        <span class="post-capsule-text">One visible agent, internal sub-agents, or separate sessions.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<p>There are a few different things people mean by "multiple agents":</p>
+
+<ul>
+    <li><strong>One visible agent session:</strong> this is one continuous conversation and one main loop. You can ask it to implement, then review its own diff, but it still carries the same context and may keep the same assumptions.</li>
+    <li><strong>Internally orchestrated sub-agents:</strong> a CLI or platform might spawn several workers behind the scenes, such as one for code search, one for documentation, and one for review. This can be efficient, but the real independence depends on how separate their prompts, context, and tools are.</li>
+    <li><strong>Separate agent sessions:</strong> running three terminals, IDE windows, or branches gives you more manual independence. Each agent can get a different brief. The trade-off is coordination: if they all edit the same files, you can create conflicts or duplicated work.</li>
+</ul>
+
+<p>The useful question is not "how many agents are running?" It is "are they bringing different evidence or judgement?" Three agents repeating the same prompt against the same context may just produce more text. A builder, a reviewer, and a researcher with separate briefs can be much more useful.</p>
+
+    </div>
+</details>
+
+<p>If I did use multiple agents, I would keep the workflow simple:</p>
+
+<ol>
+    <li><strong>Give each agent a separate job:</strong> implementation, review, research, security, performance, or UX. Do not ask everyone to do everything.</li>
+    <li><strong>Give them the same goal and constraints:</strong> otherwise disagreement may come from different assumptions, not useful judgement.</li>
+    <li><strong>Ask for short outputs:</strong> findings, risks, recommendation, and evidence. Avoid long transcripts.</li>
+    <li><strong>Compare disagreement explicitly:</strong> if agents disagree, make the disagreement the thing to inspect.</li>
+    <li><strong>Keep one final owner:</strong> one person or one final synthesis step decides what actually changes.</li>
+</ol>
+
+<p>The useful patterns are:</p>
+
+<ul>
+    <li><strong>Doer and reviewer:</strong> one agent implements, another reviews the diff for bugs and missing tests.</li>
+    <li><strong>Specialist review:</strong> one pass for security, another for performance, another for UX or accessibility.</li>
+    <li><strong>Consensus:</strong> several agents independently assess a risky decision, and disagreement becomes a signal.</li>
+    <li><strong>Research split:</strong> separate investigations into docs, code, and runtime logs before one final synthesis.</li>
+</ul>
+
+<p>The risk is that orchestration can look impressive while adding noise. More agents does not automatically mean better judgement. It can just mean more text, more disagreement, and more cost.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">What a useful multi-agent output should look like.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<p>The output I would want from a multi-agent discussion is not a long transcript. It is a decision record:</p>
+
+<pre><code>Decision:
+Use the small controller-level fix instead of refactoring the whole agent runtime.
+
+Why:
+- Fixes the reported bug directly.
+- Lower blast radius.
+- Can be covered with one regression test.
+- Keeps the public route and request model stable.
+
+What the agents contributed:
+- Implementation agent found the failing controller path and proposed a fix.
+- Reviewer agent rejected a broader service extraction as unnecessary for this bug.
+- Performance reviewer found no evidence that this path is currently hot.
+
+Follow-up:
+- Add a metric before optimising this path.
+- Revisit extraction if another feature needs the same logic.</code></pre>
+
+    </div>
+</details>
+
+<h2 id="agent-failure-modes">The failure mode I watch for</h2>
+
+<p>The failure mode that worries me most is not one bad answer. It is a bad early assumption that survives for too long. This can send you down a rabbit hole, especially if the task sits outside your own experience and you are more likely to accept what the agent suggests.</p>
+
+<p>An agent can misread a requirement, pick the wrong file, or misunderstand a failing test. If nothing interrupts that, it can spend the next chunk of work confidently building on top of the mistake. The conversation then fills with its own previous reasoning, and the story starts to feel more coherent than the evidence actually is.</p>
+
+<p>This is why I like short plans, targeted tests, and validator loops. They create natural interruption points.</p>
+
+<p>The doer-validator pattern is one of the most practical agent patterns for software work:</p>
+
+<pre><code>Doer:
+- read context
+- make the edit
+- run a first check
+- explain the change
+
+Validator:
+- inspect the diff
+- check scope
+- run or request tests
+- look for missing regression coverage
+- reject weak explanations</code></pre>
+
+<p>This does not have to mean two separate AI tools. Sometimes it is the same agent in a different mode: first implement, then review the diff like a strict reviewer. True independence is stronger, but even a deliberate second pass is better than no review step.</p>
+
+<section class="post-capsule post-takeaway" id="agent-trust-checklist" aria-labelledby="agent-trust-checklist-title">
+    <span class="post-capsule-label">Practical checklist</span>
+    <h2 id="agent-trust-checklist-title">Before trusting an agent's change, I want these answered</h2>
+    <ul>
+        <li>What exact behaviour changed?</li>
+        <li>Which files were touched and why?</li>
+        <li>What test would fail without this change?</li>
+        <li>What command proved the change works?</li>
+        <li>What assumption is still unverified?</li>
+        <li>What is the blast radius if this is wrong?</li>
+    </ul>
+</section>
+
+<h2>Context is an engineering limit, not just a token limit</h2>
+
+<p>Agents can burn through a lot of context because every loop adds observations, plans, outputs, errors, and corrections. The issue is not only cost, although cost matters. The issue is that the agent can lose the important signal inside too much history.</p>
+
+<p>Good context management means:</p>
+
+<ul>
+    <li>Give the agent the files it needs, not the whole world.</li>
+    <li>Keep tool output focused.</li>
+    <li>Summarise old investigation steps when they are no longer active.</li>
+    <li>Keep the current goal and definition of done visible.</li>
+    <li>Do not let stale assumptions hang around unchallenged.</li>
+</ul>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">Context compression and cost change the design.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<p>A bad compression says:</p>
+
+<pre><code>We investigated the issue and made some progress.</code></pre>
+
+<p>A useful compression preserves state:</p>
+
+<pre><code>Goal:
+Fix a settings page bug where saved preferences reset after refresh.
+
+Known files:
+- The settings form posts to SavePreferences.
+- Preferences are read back through the user settings service.
+
+Completed:
+- Confirmed the form submits the new value.
+- Found the save path writes the correct field.
+- Found the read path still maps the old field name.
+
+Verification still needed:
+- Add a regression test for save then refresh.
+- Run the targeted settings tests.</code></pre>
+
+<p>Cost follows the same pattern. Not every step needs the strongest model. Cheap models may be fine for summarising logs or repetitive transformations. Stronger models make more sense for architecture decisions, security-sensitive review, and ambiguous trade-offs. Deterministic tools should handle tests, parsing, linting, and policy checks.</p>
+
+    </div>
+</details>
+
+<h2>Start with low-risk autonomy</h2>
+
+<p>If I was advising someone who had only used normal chat tools, I would not start with five agents, browser automation, MCP servers, and complex orchestration. I would start with safe tasks: documentation cleanup, a small test, or a narrow refactor.</p>
+
+<figure class="post-diagram post-diagram-ladder" aria-label="Autonomy ladder from level zero explanations to level five broad production autonomy.">
+    <div class="autonomy-ladder">
+        <span><strong>5</strong> Production-affecting autonomy</span>
+        <span><strong>4</strong> Tool or sub-agent coordination</span>
+        <span><strong>3</strong> Tests and iteration in a workspace</span>
+        <span><strong>2</strong> Low-risk edits with review</span>
+        <span><strong>1</strong> Suggested changes you apply</span>
+        <span><strong>0</strong> Explanations and examples</span>
+    </div>
+    <figcaption>The higher the autonomy, the more you need policy, observability, approvals, and audit logs.</figcaption>
+</figure>
+
+<p>I am comfortable spending more time around levels 2 and 3. Level 4 is interesting for research-heavy or high-volume work. Level 5 is where I want serious policy, observability, approvals, and audit logs before I would trust it.</p>
+
+<p>My current boundaries are:</p>
+
+<ul>
+    <li><strong>Low-risk:</strong> formatting, small docs changes, simple tests, straightforward HTML edits.</li>
+    <li><strong>Medium-risk:</strong> application logic, refactors, controller or service changes. I want a plan, narrow scope, and tests.</li>
+    <li><strong>High-risk:</strong> auth, payments, data deletion, deployment, secrets, production config. I want explicit approvals and stricter review.</li>
+    <li><strong>Very high-risk:</strong> broad filesystem access, destructive commands, production writes. I want policy enforcement, audit logs, and usually manual execution.</li>
+</ul>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Starter prompt</span>
+        <span class="post-capsule-text">A practical first agent prompt for a codebase task.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+
+<pre><code>You are helping me make a small, safe change in this repo.
+
+Task:
+[describe the change]
+
+Before editing:
+1. Read the project instructions.
+2. Find the smallest responsible module.
+3. Tell me the files you expect to touch and why.
+
+Constraints:
+- Keep the change scoped to this behaviour only.
+- Prefer existing patterns.
+- Do not edit generated folders.
+- If this is a bug fix, add or update a regression test.
+
+Verification:
+- Run the narrowest relevant test first.
+- Tell me exactly what passed or what could not be run.
+
+Final response:
+- What changed.
+- Why this approach.
+- What test proves it.
+- Any remaining risk.</code></pre>
+
+    </div>
+</details>
+
+<h2>What agents are good and bad at right now</h2>
+
+<p>In my experience, agents are strongest when the task has a clear feedback loop:</p>
+
+<ul>
+    <li>Fix this test.</li>
+    <li>Refactor this small area without changing behaviour.</li>
+    <li>Add validation and cover it with a unit test.</li>
+    <li>Read these docs and summarise the implementation path.</li>
+    <li>Generate a first draft, then let me edit it.</li>
+    <li>Compare two approaches and surface the trade-offs.</li>
+</ul>
+
+<p>They are weaker when the task depends on hidden context, team politics, product judgement, unclear ownership, or subtle production risk. They can overfit to the immediate context, create plausible explanations after the fact, miss the file they did not inspect, and make broad changes look normal unless you force them to account for each touched file.</p>
+
+<h2>The practical stack I would aim for</h2>
+
+<p>If I was designing a serious agent workflow for a team, I would want this stack:</p>
+
+<ul>
+    <li><strong>Project instructions:</strong> coding standards, testing policy, ownership boundaries, generated-folder exclusions.</li>
+    <li><strong>Tool registry:</strong> clear tools with schemas, permissions, and predictable outputs.</li>
+    <li><strong>Approval policy:</strong> low-risk actions run automatically, high-risk actions require explicit approval.</li>
+    <li><strong>Audit log:</strong> record commands, file edits, external calls, approvals, and failures.</li>
+    <li><strong>Verification:</strong> tests, linters, policy checks, screenshots, or smoke tests depending on the work.</li>
+    <li><strong>Review mode:</strong> a second pass focused on bugs, missing tests, and blast radius.</li>
+    <li><strong>Context hygiene:</strong> summaries that preserve active state and drop stale noise.</li>
+    <li><strong>Cost controls:</strong> avoid using expensive reasoning for cheap mechanical steps.</li>
+</ul>
+
+<p>Most of that is normal engineering discipline applied to agents. The model is new. The need for clear contracts, tests, logs, permissions, and review is not.</p>
+
+<h2>What I am taking from all this</h2>
+
+<p>The main thing I am taking from the video and from my own use is that agents are best understood as work loops, not answer machines.</p>
+
+<p>The model matters, but the surrounding system matters just as much: what it can observe, what tools it can call, what rules it follows, what checks run before the work is trusted, and what the human still owns.</p>
+
+<p>That last question is the big one for me. The agent can do more of the mechanical work now, but I still need to own the judgement. I need to understand the change, know the failure mode, and be able to defend the result.</p>
+
+<p>For now, my practical rule is simple: give agents useful tools, narrow goals, clear constraints, and real verification. That is where they start to feel less like a clever chatbot and more like a useful engineering system.</p>
+
+</body>
+</html>

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">AI agent workflow diagram</title>
+  <desc id="desc">A structured workflow showing a user goal moving through instructions, context, model reasoning, tools, policy, verification, and repeated observation.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7faf9"/>
+      <stop offset="0.52" stop-color="#edf7f4"/>
+      <stop offset="1" stop-color="#f6efe6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#173144" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <path d="M110 535C240 430 322 465 426 384C539 296 542 166 679 138C797 114 870 197 1068 94" fill="none" stroke="#c98c42" stroke-width="8" stroke-linecap="round" opacity="0.28"/>
+  <path d="M102 150C214 214 303 185 392 245C500 318 521 422 660 432C801 442 879 342 1079 424" fill="none" stroke="#0f6d78" stroke-width="8" stroke-linecap="round" opacity="0.22"/>
+
+  <g filter="url(#shadow)">
+    <rect x="96" y="99" width="1008" height="477" rx="22" fill="#ffffff" stroke="#d5e3df" stroke-width="2"/>
+  </g>
+
+  <text x="146" y="169" fill="#193549" font-family="Arial, sans-serif" font-size="42" font-weight="700">How AI agents actually work</text>
+  <text x="146" y="211" fill="#516575" font-family="Arial, sans-serif" font-size="23">A model inside a loop, connected to tools and bounded by policy.</text>
+
+  <g font-family="Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle">
+    <rect x="145" y="292" width="145" height="78" rx="12" fill="#e7f4f2" stroke="#0f6d78" stroke-width="2"/>
+    <text x="217.5" y="339" fill="#103f48">Goal</text>
+
+    <rect x="344" y="292" width="155" height="78" rx="12" fill="#fff4e7" stroke="#c98c42" stroke-width="2"/>
+    <text x="421.5" y="327" fill="#5f3d14">Context +</text>
+    <text x="421.5" y="352" fill="#5f3d14">instructions</text>
+
+    <rect x="553" y="292" width="145" height="78" rx="12" fill="#eef1f6" stroke="#66758a" stroke-width="2"/>
+    <text x="625.5" y="327" fill="#26384e">Model</text>
+    <text x="625.5" y="352" fill="#26384e">reasoning</text>
+
+    <rect x="752" y="292" width="145" height="78" rx="12" fill="#eef8ee" stroke="#43865a" stroke-width="2"/>
+    <text x="824.5" y="339" fill="#245235">Tools</text>
+
+    <rect x="951" y="292" width="116" height="78" rx="12" fill="#f8eeee" stroke="#b95656" stroke-width="2"/>
+    <text x="1009" y="339" fill="#6c2929">Check</text>
+  </g>
+
+  <g fill="none" stroke="#486170" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M297 331h40"/>
+    <path d="M330 321l10 10-10 10"/>
+    <path d="M506 331h40"/>
+    <path d="M539 321l10 10-10 10"/>
+    <path d="M705 331h40"/>
+    <path d="M738 321l10 10-10 10"/>
+    <path d="M904 331h40"/>
+    <path d="M937 321l10 10-10 10"/>
+    <path d="M1009 383c0 72-105 108-287 108H439c-168 0-222-37-222-104"/>
+    <path d="M205 398l12-14 12 14"/>
+  </g>
+
+  <text x="600" y="466" text-anchor="middle" fill="#516575" font-family="Arial, sans-serif" font-size="22">Observe result, update context, repeat until done.</text>
+</svg>

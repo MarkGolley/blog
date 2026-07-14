@@ -115,6 +115,17 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task HowAiAgentsPost_DoesNotRenderDuplicateBodyTitle()
+    {
+        using var client = _factory.CreateClient();
+
+        var html = await client.GetStringAsync("/blog/How_AI_Agents_Actually_Work");
+
+        Assert.Contains("<h2 id=\"post-title\">How AI Agents Actually Work, and How to Use Them Well</h2>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<h1>How AI Agents Actually Work, and How to Use Them Well</h1>", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task WhyAiPermissionPopupsPost_RendersInteractiveQuizSection()
     {
         using var client = _factory.CreateClient();
@@ -197,8 +208,19 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("-webkit-overflow-scrolling: touch;", css, StringComparison.Ordinal);
         Assert.Contains("-webkit-text-size-adjust: 100%;", css, StringComparison.Ordinal);
         Assert.Contains("text-size-adjust: 100%;", css, StringComparison.Ordinal);
+        Assert.Contains("--blog-anchor-scroll-margin-top: 6.75rem;", css, StringComparison.Ordinal);
+        Assert.Contains("scroll-margin-top: var(--blog-anchor-scroll-margin-top, 6.75rem);", css, StringComparison.Ordinal);
+        Assert.Contains("counter-reset: diagram-step;", css, StringComparison.Ordinal);
+        Assert.Contains("counter-increment: diagram-step;", css, StringComparison.Ordinal);
+        Assert.Contains(".blog-post-content-shell:has(.blog-post-cover-link) {", css, StringComparison.Ordinal);
+        Assert.Contains("body.route-blog-index .blog-post-cover-link {", css, StringComparison.Ordinal);
+        Assert.Contains("body.route-blog-index .blog-post-content-shell:has(.blog-post-cover-link) {", css, StringComparison.Ordinal);
+        Assert.Contains("object-fit: contain;", css, StringComparison.Ordinal);
         Assert.Contains(".post-content :not(pre) > code {", css, StringComparison.Ordinal);
         Assert.Contains(":root[data-theme=\"dark\"] .post-content pre {", css, StringComparison.Ordinal);
+        Assert.Contains(":root[data-theme=\"dark\"] .post-hero-media img {", css, StringComparison.Ordinal);
+        Assert.Contains(":root[data-theme=\"dark\"] .blog-post-cover {", css, StringComparison.Ordinal);
+        Assert.Contains("filter: brightness(0.86) saturate(0.92);", css, StringComparison.Ordinal);
     }
 
     [Fact]
