@@ -1,4 +1,5 @@
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace MyBlog.Startup;
 
@@ -78,7 +79,10 @@ internal static class ApplicationBuilderStartupExtensions
             context.Response.StatusCode = StatusCodes.Status404NotFound;
         });
 
-        app.UseStaticFiles();
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = ApplyAislePilotMealImageCachePolicy
+        });
         if (!string.IsNullOrWhiteSpace(app.Environment.WebRootPath))
         {
             var aislePilotImageRoot = Path.Combine(app.Environment.WebRootPath, "images");
@@ -87,7 +91,8 @@ internal static class ApplicationBuilderStartupExtensions
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     FileProvider = new PhysicalFileProvider(aislePilotImageRoot),
-                    RequestPath = "/projects/aisle-pilot/images"
+                    RequestPath = "/projects/aisle-pilot/images",
+                    OnPrepareResponse = ApplyAislePilotMealImageCachePolicy
                 });
             }
         }
@@ -149,5 +154,15 @@ internal static class ApplicationBuilderStartupExtensions
             pattern: "{controller=Home}/{action=Index}/{id?}");
 
         return app;
+    }
+
+    private static void ApplyAislePilotMealImageCachePolicy(StaticFileResponseContext context)
+    {
+        if (context.Context.Request.Path.Value?.Contains(
+                "/aislepilot-meals/",
+                StringComparison.OrdinalIgnoreCase) == true)
+        {
+            context.Context.Response.Headers.CacheControl = "public, max-age=86400";
+        }
     }
 }

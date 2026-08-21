@@ -245,6 +245,8 @@ public sealed partial class AislePilotService
             prompt = BuildAiMealImagePrompt(meal),
             size = "1024x1024",
             quality = "low",
+            output_format = "jpeg",
+            output_compression = 70,
             n = 1
         };
         var serializedBody = JsonSerializer.Serialize(requestBody);
@@ -284,6 +286,12 @@ public sealed partial class AislePilotService
                         attempt,
                         OpenAiImageMaxAttempts,
                         errorSample);
+                    if (!IsTransientOpenAiStatus(response.StatusCode) || attempt >= OpenAiImageMaxAttempts)
+                    {
+                        return null;
+                    }
+
+                    await Task.Delay(GetRetryDelay(response, attempt), cancellationToken);
                     continue;
                 }
 

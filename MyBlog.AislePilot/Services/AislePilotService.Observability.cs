@@ -35,8 +35,10 @@ public sealed partial class AislePilotService
         {
             "gpt-4.1-mini" => (0.40d, 1.60d),
             "gpt-4.1" => (2.00d, 8.00d),
+            "gpt-5.6-terra" => (2.00d, 12.00d),
+            "gpt-5.6-luna" => (0.20d, 1.20d),
             "gpt-image-1-mini" => (2.00d, 0d),
-            _ => (0.40d, 1.60d)
+            _ => (0d, 0d)
         };
     }
 
@@ -70,6 +72,18 @@ public sealed partial class AislePilotService
                 completionTokenElement.TryGetInt32(out var parsedCompletionTokens))
             {
                 completionTokens = parsedCompletionTokens;
+            }
+
+            if (usage.TryGetProperty("input_tokens", out var inputTokenElement) &&
+                inputTokenElement.TryGetInt32(out var parsedInputTokens))
+            {
+                promptTokens = parsedInputTokens;
+            }
+
+            if (usage.TryGetProperty("output_tokens", out var outputTokenElement) &&
+                outputTokenElement.TryGetInt32(out var parsedOutputTokens))
+            {
+                completionTokens = parsedOutputTokens;
             }
         }
         catch (JsonException)

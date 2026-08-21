@@ -43,7 +43,6 @@ public sealed partial class AislePilotService : IAislePilotService
     private const string MealImagesCollection = "aislePilotMealImages";
     private const string DessertAddOnsCollection = "aislePilotDessertAddOns";
     private const string SupermarketLayoutsCollection = "aislePilotSupermarketLayouts";
-    private const string OpenAiChatCompletionsEndpoint = "https://api.openai.com/v1/chat/completions";
     private const string OpenAiResponsesEndpoint = "https://api.openai.com/v1/responses";
     private const string OpenAiImageGenerationsEndpoint = "https://api.openai.com/v1/images/generations";
     private const int OpenAiMaxAttempts = 2;
@@ -65,7 +64,7 @@ public sealed partial class AislePilotService : IAislePilotService
     private const decimal AiMealBaseCostMinToIngredientFactor = 0.90m;
     private const decimal AiMealBaseCostMaxToIngredientFactor = 1.35m;
     private static readonly TimeSpan OpenAiRequestTimeout = TimeSpan.FromSeconds(22);
-    private static readonly TimeSpan OpenAiImageRequestTimeout = TimeSpan.FromSeconds(18);
+    private static readonly TimeSpan OpenAiImageRequestTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan OpenAiImageDownloadTimeout = TimeSpan.FromSeconds(18);
     private static readonly TimeSpan FirestoreReadTimeout = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan OpenAiGenerationBudget = TimeSpan.FromSeconds(65);
@@ -1063,7 +1062,10 @@ public sealed partial class AislePilotService : IAislePilotService
     private readonly HttpClient? _httpClient;
     private readonly ILogger<AislePilotService>? _logger;
     private readonly string? _apiKey;
-    private readonly string _model;
+    private readonly string _planningModel;
+    private readonly string _utilityModel;
+    private readonly string _planningReasoningEffort;
+    private readonly string _utilityReasoningEffort;
     private readonly string _imageModel;
     private readonly bool _enableAiGeneration;
     private readonly bool _enableAiImageGeneration;
@@ -1105,8 +1107,16 @@ public sealed partial class AislePilotService : IAislePilotService
         _nutritionRecipeFallbackEngine = nutritionRecipeFallbackEngine ?? new AislePilotNutritionRecipeFallbackEngine();
         _pantryRankingEngine = pantryRankingEngine ?? new AislePilotPantryRankingEngine();
         _apiKey = configuration?["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        _model = configuration?["AislePilot:Model"] ?? "gpt-4.1-mini";
-        _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-1-mini";
+        var legacyModel = configuration?["AislePilot:Model"];
+        _planningModel = legacyModel ?? configuration?["AislePilot:PlanningModel"] ?? "gpt-5.6-terra";
+        _utilityModel = legacyModel ?? configuration?["AislePilot:UtilityModel"] ?? "gpt-5.6-luna";
+        _planningReasoningEffort = NormalizeReasoningEffort(
+            configuration?["AislePilot:PlanningReasoningEffort"],
+            "low");
+        _utilityReasoningEffort = NormalizeReasoningEffort(
+            configuration?["AislePilot:UtilityReasoningEffort"],
+            "none");
+        _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-2";
         _enableAiGeneration = !bool.TryParse(configuration?["AislePilot:EnableAiGeneration"], out var parsed) || parsed;
         _enableAiImageGeneration = !bool.TryParse(
             configuration?["AislePilot:EnableAiImageGeneration"],
@@ -1123,5 +1133,13 @@ public sealed partial class AislePilotService : IAislePilotService
     internal IAislePilotPlanComparisonService PlanComparisonService => _planComparisonService;
 
     internal bool AllowTemplateFallback => _allowTemplateFallback;
+
+    private static string NormalizeReasoningEffort(string? configuredValue, string fallback)
+    {
+        var normalized = configuredValue?.Trim().ToLowerInvariant();
+        return normalized is "none" or "low" or "medium" or "high" or "xhigh" or "max"
+            ? normalized
+            : fallback;
+    }
 
 }

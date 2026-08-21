@@ -851,8 +851,33 @@ public partial class AislePilotServiceTests
         Assert.Equal(1, handler.CallCount);
         Assert.Equal("https://api.openai.com/v1/images/generations", handler.LastRequestUri?.ToString());
         Assert.Equal(new byte[] { 1, 2, 3 }, bytes);
-        Assert.Contains("\"model\":\"gpt-image-1-mini\"", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"model\":\"gpt-image-2\"", handler.LastRequestBody, StringComparison.Ordinal);
         Assert.Contains("\"size\":\"1024x1024\"", handler.LastRequestBody, StringComparison.Ordinal);
         Assert.Contains("\"quality\":\"low\"", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"output_format\":\"jpeg\"", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"output_compression\":70", handler.LastRequestBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TryGenerateMealImageBytesWithAiAsync_PermanentApiFailure_IsNotRetried()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["OPENAI_API_KEY"] = "test-key" })
+            .Build();
+        using var handler = new CapturingResponseHandler(HttpStatusCode.BadRequest, "{\"error\":\"invalid request\"}");
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+        var meal = CreateMealTemplateWithIngredients(
+            "Egg fried rice",
+            [("Eggs", "Dairy & Eggs", 4m, "pcs", 1.20m)]);
+        var method = typeof(AislePilotService).GetMethod(
+            "TryGenerateMealImageBytesWithAiAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+
+        var task = method!.Invoke(service, [meal, CancellationToken.None]) as Task<byte[]?>;
+        var bytes = await task!;
+
+        Assert.Null(bytes);
+        Assert.Equal(1, handler.CallCount);
     }
 }

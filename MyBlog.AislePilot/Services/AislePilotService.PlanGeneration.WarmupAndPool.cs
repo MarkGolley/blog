@@ -76,39 +76,24 @@ public sealed partial class AislePilotService
 
         var strictModes = ResolveHardDietaryModes(context.DietaryModes);
         var prompt = BuildAiSpecialTreatMealPrompt(request, context, mealTypeSlots.Count, excludedMealNames);
-        var requestBody = new
-        {
-            model = _model,
-            temperature = 0.85,
-            max_tokens = SpecialTreatMealMaxTokens,
-            response_format = new { type = "json_object" },
-            messages = new object[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You generate one indulgent special-treat dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English."
-                },
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+        var requestBody = BuildOpenAiJsonResponseRequest(
+            _utilityModel,
+            _utilityReasoningEffort,
+            "You generate one indulgent special-treat dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English.",
+            prompt,
+            SpecialTreatMealMaxTokens);
 
         var responseContent = await SendOpenAiRequestWithRetryAsync(
             requestBody,
             cancellationToken,
             operation: "special_treat_generation",
-            model: _model);
+            model: _utilityModel);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return null;
         }
 
-        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        var rawJson = ExtractOpenAiResponseText(responseContent);
         if (string.IsNullOrWhiteSpace(rawJson))
         {
             return null;
@@ -163,39 +148,24 @@ public sealed partial class AislePilotService
         }
 
         var prompt = BuildAiWarmupMealPrompt(strictModes, excludedMealNames);
-        var requestBody = new
-        {
-            model = _model,
-            temperature = 0.75,
-            max_tokens = WarmupMealMaxTokens,
-            response_format = new { type = "json_object" },
-            messages = new object[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You generate one practical dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English."
-                },
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+        var requestBody = BuildOpenAiJsonResponseRequest(
+            _utilityModel,
+            _utilityReasoningEffort,
+            "You generate one practical dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English.",
+            prompt,
+            WarmupMealMaxTokens);
 
         var responseContent = await SendOpenAiRequestWithRetryAsync(
             requestBody,
             cancellationToken,
             operation: "warmup_meal_generation",
-            model: _model);
+            model: _utilityModel);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return null;
         }
 
-        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        var rawJson = ExtractOpenAiResponseText(responseContent);
         if (string.IsNullOrWhiteSpace(rawJson))
         {
             return null;

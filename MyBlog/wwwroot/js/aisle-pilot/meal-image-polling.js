@@ -6,6 +6,7 @@
         const pollMaxAttempts = Number.isInteger(config.maxAttempts) ? config.maxAttempts : 48;
         const fastFollowupPollIntervalMs = 750;
         const mediumFollowupPollIntervalMs = 1500;
+        const pollBatchSize = 3;
         const mealImageCacheStorageKey = "aislepilot:meal-image-cache";
         const mealImageCacheTtlMs = Number.isInteger(config.cacheTtlMs) ? config.cacheTtlMs : 1000 * 60 * 60 * 12;
 
@@ -419,7 +420,7 @@
 
             try {
                 const searchParams = new URLSearchParams();
-                pendingByMealName.forEach((_, mealName) => {
+                Array.from(pendingByMealName.keys()).slice(0, pollBatchSize).forEach(mealName => {
                     searchParams.append("mealNames", mealName);
                 });
 

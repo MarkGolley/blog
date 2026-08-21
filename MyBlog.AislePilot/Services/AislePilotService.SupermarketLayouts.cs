@@ -512,12 +512,13 @@ public sealed partial class AislePilotService
 
         var requestBody = new
         {
-            model = _model,
+            model = _utilityModel,
+            reasoning = new { effort = _utilityReasoningEffort },
             tools = new object[]
             {
                 new
                 {
-                    type = "web_search_preview",
+                    type = "web_search",
                     search_context_size = "medium"
                 }
             },
@@ -542,7 +543,7 @@ public sealed partial class AislePilotService
             {
                 RecordAislePilotAiRequest(
                     operation: "supermarket_layout_discovery",
-                    model: _model,
+                    model: _utilityModel,
                     duration: requestStopwatch.Elapsed,
                     success: false,
                     responseContent: responseContent,
@@ -559,7 +560,7 @@ public sealed partial class AislePilotService
 
             RecordAislePilotAiRequest(
                 operation: "supermarket_layout_discovery",
-                model: _model,
+                model: _utilityModel,
                 duration: requestStopwatch.Elapsed,
                 success: true,
                 responseContent: responseContent,
@@ -571,7 +572,7 @@ public sealed partial class AislePilotService
         {
             RecordAislePilotAiRequest(
                 operation: "supermarket_layout_discovery",
-                model: _model,
+                model: _utilityModel,
                 duration: requestStopwatch.Elapsed,
                 success: false,
                 promptText: inputPrompt,

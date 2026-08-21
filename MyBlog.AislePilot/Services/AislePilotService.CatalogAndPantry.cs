@@ -717,32 +717,18 @@ public sealed partial class AislePilotService : IAislePilotService
             requestedCount,
             excludedMealNames,
             generationNonce);
-        var requestBody = new
-        {
-            model = _model,
-            temperature = 0.85,
-            max_tokens = PrimaryAiMealPlanMaxTokens,
-            response_format = new { type = "json_object" },
-            messages = new object[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You generate practical UK pantry meal ideas. Prioritise pantry matching, avoid random substitutions, and return valid JSON only."
-                },
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+        var requestBody = BuildOpenAiJsonResponseRequest(
+            _utilityModel,
+            _utilityReasoningEffort,
+            "You generate practical UK pantry meal ideas. Prioritise pantry matching, avoid random substitutions, and return valid JSON only.",
+            prompt,
+            PrimaryAiMealPlanMaxTokens);
 
         var responseContent = await SendOpenAiRequestWithRetryAsync(
             requestBody,
             cancellationToken,
             operation: "pantry_suggestions",
-            model: _model);
+            model: _utilityModel);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return [];
@@ -750,8 +736,7 @@ public sealed partial class AislePilotService : IAislePilotService
 
         try
         {
-            var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-            var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+            var rawJson = ExtractOpenAiResponseText(responseContent);
             if (string.IsNullOrWhiteSpace(rawJson))
             {
                 return [];
