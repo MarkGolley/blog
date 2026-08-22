@@ -1,0 +1,12 @@
+{
+  "name": "myblog-performance-checks",
+  "private": true,
+  "scripts": {
+    "lighthouse:mobile": ".\\node_modules\\node\\bin\\node.exe node_modules/@lhci/cli/src/cli.js autorun --config=lighthouserc.mobile.json",
+    "lighthouse:desktop": ".\\node_modules\\node\\bin\\node.exe node_modules/@lhci/cli/src/cli.js autorun --config=lighthouserc.desktop.json"
+  },
+  "devDependencies": {
+    "@lhci/cli": "0.15.1",
+    "node": "22.23.1"
+  }
+}

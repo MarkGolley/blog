@@ -100,6 +100,8 @@ public sealed partial class AislePilotService
         var source = mealSource ?? MealTemplates;
 
         var baseFiltered = source
+            .Where(meal => IsMealCompatibleWithDietaryIngredients(meal, dietaryModes))
+            .Where(meal => !ContainsKnownAllergen(meal, dislikesOrAllergens))
             .Where(meal => disallowedTokens.All(token => !ContainsToken(meal, token)))
             .ToList();
 

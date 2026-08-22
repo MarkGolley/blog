@@ -698,6 +698,226 @@
         },
         "showUnfilled": true
       }
+    },
+    {
+      "id": 18,
+      "title": "AislePilot Plan Stage Percentiles (s)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 45
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (stage, le) (rate({__name__=~\"myblog_aislepilot_plan_stage_duration.*_bucket\",service_name=~\"$service\"}[5m])))",
+          "legendFormat": "p50 {{stage}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (stage, le) (rate({__name__=~\"myblog_aislepilot_plan_stage_duration.*_bucket\",service_name=~\"$service\"}[5m])))",
+          "legendFormat": "p95 {{stage}}"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (stage, le) (rate({__name__=~\"myblog_aislepilot_plan_stage_duration.*_bucket\",service_name=~\"$service\"}[5m])))",
+          "legendFormat": "p99 {{stage}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "title": "AislePilot Browser Journey Percentiles (ms)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (metric, le) (rate({__name__=~\"myblog_aislepilot_client_performance.*_bucket\",service_name=~\"$service\"}[15m])))",
+          "legendFormat": "p50 {{metric}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.75, sum by (metric, le) (rate({__name__=~\"myblog_aislepilot_client_performance.*_bucket\",service_name=~\"$service\"}[15m])))",
+          "legendFormat": "p75 {{metric}}"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum by (metric, le) (rate({__name__=~\"myblog_aislepilot_client_performance.*_bucket\",service_name=~\"$service\"}[15m])))",
+          "legendFormat": "p95 {{metric}}"
+        },
+        {
+          "refId": "D",
+          "expr": "histogram_quantile(0.99, sum by (metric, le) (rate({__name__=~\"myblog_aislepilot_client_performance.*_bucket\",service_name=~\"$service\"}[15m])))",
+          "legendFormat": "p99 {{metric}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "title": "AislePilot Replenishment by Request Profile (30m)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 52 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (dietary_complexity, meal_slot_count, plan_length, prefer_quick_meals, include_special_treat, success) (increase({__name__=~\"myblog_aislepilot_background_jobs.*\",service_name=~\"$service\",job=\"plan_pool_replenishment\"}[30m]))",
+          "legendFormat": "{{dietary_complexity}} / {{meal_slot_count}} slots / {{plan_length}} / quick={{prefer_quick_meals}} / treat={{include_special_treat}} / success={{success}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 21,
+      "title": "AislePilot Plan Sources (30m)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 52 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (increase({__name__=~\"myblog_aislepilot_plans_completed.*\",service_name=~\"$service\"}[30m]))",
+          "legendFormat": "{{source}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 22,
+      "title": "AislePilot Managed Queue Throughput (15m)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 59 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (job, event) (increase({__name__=~\"myblog_aislepilot_background_queue_events.*\",service_name=~\"$service\"}[15m]))",
+          "legendFormat": "{{job}} / {{event}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 23,
+      "title": "AislePilot Managed Queue Depth and P95 Wait",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 59 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max({__name__=~\"myblog_aislepilot_queue_depth.*\",service_name=~\"$service\",queue=\"managed_background\"})",
+          "legendFormat": "queued items"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (job, le) (rate({__name__=~\"myblog_aislepilot_background_queue_wait.*_bucket\",service_name=~\"$service\"}[5m])))",
+          "legendFormat": "p95 wait {{job}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 2 }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 24,
+      "title": "AislePilot Cache Refresh Age (s)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 66 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (cache, outcome) ({__name__=~\"myblog_aislepilot_cache_refresh_age.*\",service_name=~\"$service\"})",
+          "legendFormat": "{{cache}} / last {{outcome}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 0 }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 25,
+      "title": "AislePilot Cache Refresh Outcomes (30m)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 66 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (cache, outcome) (increase({__name__=~\"myblog_aislepilot_cache_refreshes.*\",service_name=~\"$service\"}[30m]))",
+          "legendFormat": "{{cache}} / {{outcome}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      }
     }
   ],
   "annotations": {

@@ -108,15 +108,14 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Get_RendersAislePilotSubBrandFontLinksAndThemeColor()
+    public async Task Index_Get_UsesLocalFontFallbackAndRendersThemeColor()
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
         var html = await client.GetStringAsync("/projects/aisle-pilot");
 
-        Assert.Contains("rel=\"preconnect\" href=\"https://fonts.googleapis.com\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("family=Plus+Jakarta+Sans", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fonts.googleapis.com", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fonts.gstatic.com", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<meta name=\"theme-color\" content=\"#0F6D78\"", html, StringComparison.OrdinalIgnoreCase);
     }
 

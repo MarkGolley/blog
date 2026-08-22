@@ -23,8 +23,11 @@ public sealed partial class AislePilotService
                 DessertAddOnRecoveryInFlight.Count,
                 new KeyValuePair<string, object?>("queue", "dessert_addon_recovery")),
             new Measurement<long>(
-                SupermarketLayoutRefreshInFlight.Count,
-                new KeyValuePair<string, object?>("queue", "supermarket_layout_refresh"))
+                SupermarketLayoutRefreshInFlight.Count + SupermarketLayoutRefreshQueued.Count,
+                new KeyValuePair<string, object?>("queue", "supermarket_layout_refresh")),
+            new Measurement<long>(
+                SupermarketLayoutHydrationQueued.Count,
+                new KeyValuePair<string, object?>("queue", "supermarket_layout_hydration"))
         ]);
     }
 
@@ -155,12 +158,14 @@ public sealed partial class AislePilotService
         string jobName,
         Stopwatch stopwatch,
         bool success,
-        Exception? ex = null)
+        Exception? ex = null,
+        AislePilotTelemetry.BackgroundRequestProfile? requestProfile = null)
     {
         AislePilotTelemetry.RecordBackgroundJob(
             jobName,
             stopwatch.Elapsed,
             success,
-            ex?.GetType().Name);
+            ex?.GetType().Name,
+            requestProfile);
     }
 }

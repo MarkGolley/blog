@@ -1,9 +1,24 @@
 using Microsoft.AspNetCore.WebUtilities;
+using MyBlog.Services;
 
 namespace MyBlog.Startup;
 
 internal static class AppRequestPolicies
 {
+    public static string? ResolveAislePilotMealImageCacheControl(PathString path)
+    {
+        var value = path.Value;
+        if (string.IsNullOrWhiteSpace(value) ||
+            !value.Contains("/aislepilot-meals/", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return AislePilotMealImageVersioning.IsVersionedPath(value)
+            ? "public, max-age=31536000, immutable"
+            : "public, max-age=86400";
+    }
+
     public static CachePolicy ResolveCachePolicy(HttpContext context)
     {
         if (context.Response.Headers.ContainsKey("Set-Cookie"))
@@ -171,7 +186,7 @@ internal static class AppRequestPolicies
         var isAislePilotPath =
             value.Equals("/projects/aisle-pilot", StringComparison.OrdinalIgnoreCase)
             || value.StartsWith("/projects/aisle-pilot/", StringComparison.OrdinalIgnoreCase)
-            || value.Equals("/admin/aisle-pilot/warmup", StringComparison.OrdinalIgnoreCase);
+            || value.StartsWith("/admin/aisle-pilot/", StringComparison.OrdinalIgnoreCase);
 
         return appMode switch
         {

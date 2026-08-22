@@ -22,6 +22,7 @@ internal static class ApplicationBuilderStartupExtensions
 
         app.UseForwardedHeaders();
         app.UseRequestDiagnostics();
+        app.UseResponseCompression();
         app.Use(async (context, next) =>
         {
             context.Response.OnStarting(() =>
@@ -158,11 +159,11 @@ internal static class ApplicationBuilderStartupExtensions
 
     private static void ApplyAislePilotMealImageCachePolicy(StaticFileResponseContext context)
     {
-        if (context.Context.Request.Path.Value?.Contains(
-                "/aislepilot-meals/",
-                StringComparison.OrdinalIgnoreCase) == true)
+        var cacheControl = AppRequestPolicies.ResolveAislePilotMealImageCacheControl(
+            context.Context.Request.Path);
+        if (!string.IsNullOrWhiteSpace(cacheControl))
         {
-            context.Context.Response.Headers.CacheControl = "public, max-age=86400";
+            context.Context.Response.Headers.CacheControl = cacheControl;
         }
     }
 }

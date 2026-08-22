@@ -38,6 +38,8 @@
         }
     })();
     const swapDebugEndpoint = "/projects/aisle-pilot/debug-client-log";
+    const reportClientDuration = (metric, startedAt) =>
+        window.AislePilotPerformance?.reportDuration(metric, startedAt);
 
     const sendSwapDebugToServer = payload => {
         if (!isLocalSwapDebugEnabled || !payload || typeof payload !== "object") {
@@ -5268,6 +5270,7 @@
                 }
 
                 exportForm.dataset.exportDownloadSubmitting = "true";
+                const exportStartedAt = performance.now();
                 clearSubmitLoadingDelay(exportForm);
                 setSubmitButtonLoadingState(submitButton);
 
@@ -5318,6 +5321,7 @@
                     HTMLFormElement.prototype.submit.call(exportForm);
                     return;
                 } finally {
+                    reportClientDuration("export_latency", exportStartedAt);
                     delete exportForm.dataset.exportDownloadSubmitting;
                 }
             });
@@ -5363,6 +5367,7 @@
         }
 
         swapForm.dataset.ajaxSwapSubmitting = "true";
+        const actionStartedAt = performance.now();
         const submitActionLabel = submitButton instanceof HTMLButtonElement
             ? (submitButton.getAttribute("aria-label") ?? submitButton.textContent ?? "").trim()
             : "";
@@ -5627,6 +5632,9 @@
             HTMLFormElement.prototype.submit.call(swapForm);
             return;
         } finally {
+            reportClientDuration(
+                isFavoriteForm ? "save_latency" : "swap_latency",
+                actionStartedAt);
             if (!handoffToNativeSubmit && !isFavoriteForm && currentCard instanceof HTMLElement && currentCard.isConnected) {
                 currentCard.classList.remove("is-swap-fading-out");
                 currentCard.removeAttribute("aria-busy");

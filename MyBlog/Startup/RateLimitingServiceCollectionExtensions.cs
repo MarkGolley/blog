@@ -93,6 +93,18 @@ internal static class RateLimitingServiceCollectionExtensions
                         AutoReplenishment = true
                     }));
 
+            options.AddPolicy("aislePilotTelemetry", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: GetRateLimitPartitionKey(httpContext),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
             options.AddPolicy("aislePilotAdminWarmupWrites", httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     partitionKey: GetRateLimitPartitionKey(httpContext),

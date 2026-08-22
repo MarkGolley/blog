@@ -6,6 +6,7 @@
     var fallbackMealImageUrl = ViewData["FallbackMealImageUrl"] as string
         ?? AislePilotMealImageUrlResolver.ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
     var mealImagesPollUrl = ViewData["MealImagesPollUrl"] as string ?? "/projects/aisle-pilot/meal-images";
+    const string mealImageSizes = "(max-width: 760px) calc(100vw - 2rem), (max-width: 1100px) 48vw, 36rem";
     var strictCoreModeEnabled = Model.Request.RequireCorePantryIngredients;
     var hasTopUpSuggestions = Model.PantrySuggestions.Any(suggestion => !suggestion.CanCookNow);
     var pantrySuggestionCountLabel = $"{Model.PantrySuggestions.Count} suggestion{(Model.PantrySuggestions.Count == 1 ? string.Empty : "s")}";
@@ -46,6 +47,10 @@
                 <div class="aislepilot-meal-image-shell">
                     <img class="aislepilot-meal-image"
                          src="@imageUrl"
+                         srcset="@($"{imageUrl} {(imageUrl.Contains("aislepilot-icon.svg", StringComparison.OrdinalIgnoreCase) ? 512 : 1024)}w")"
+                         sizes="@mealImageSizes"
+                         width="1024"
+                         height="1024"
                          data-meal-image
                          data-meal-name="@suggestion.MealName"
                          alt="@($"{suggestion.MealName} plated meal")"

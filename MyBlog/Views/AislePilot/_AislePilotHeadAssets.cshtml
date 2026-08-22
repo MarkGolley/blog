@@ -1,8 +1,5 @@
 <link rel="icon" type="image/svg+xml" href="~/images/aislepilot-favicon.svg" />
 <link rel="apple-touch-icon" href="~/images/aislepilot-icon.svg" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
 <meta name="theme-color" content="#0F6D78" />
 <script>
     (() => {
@@ -30,7 +27,25 @@
         }
     })();
 </script>
-<link rel="stylesheet" href="~/css/aisle-pilot.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/aisle-pilot-shell.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/aisle-pilot-overview.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/aisle-pilot-setup.css" asp-append-version="true" />
+@if (Model.HasResult)
+{
+    <link rel="stylesheet" href="~/css/aisle-pilot-results.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/aisle-pilot-actions.css" asp-append-version="true" />
+}
+else
+{
+    <link rel="stylesheet" media="print" href="~/css/aisle-pilot-results.css" asp-append-version="true" onload="this.onload=null;this.media='all'" />
+    <link rel="stylesheet" media="print" href="~/css/aisle-pilot-actions.css" asp-append-version="true" onload="this.onload=null;this.media='all'" />
+    <noscript>
+        <link rel="stylesheet" href="~/css/aisle-pilot-results.css" asp-append-version="true" />
+        <link rel="stylesheet" href="~/css/aisle-pilot-actions.css" asp-append-version="true" />
+    </noscript>
+}
+<link rel="stylesheet" href="~/css/aisle-pilot-responsive.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/aisle-pilot-dark.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/aisle-pilot-refresh.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/aisle-pilot-header-compact.css" asp-append-version="true" />
 <link rel="stylesheet" href="~/css/aisle-pilot-overview-balance.css" asp-append-version="true" />
@@ -46,3 +61,4 @@
         [data-aislepilot-window] .aislepilot-window-panel { min-width: 100% !important; margin-bottom: 0.75rem; }
     </style>
 </noscript>
+@model AislePilotPageViewModel

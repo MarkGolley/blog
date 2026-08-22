@@ -397,11 +397,13 @@ Return JSON only with this schema:
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 LogFirestoreReadTimeout("AI meal pool hydration");
+                AislePilotTelemetry.RecordCacheRefresh("ai_meal_pool", success: false);
                 return;
             }
             catch (Exception ex)
             {
                 LogFirestoreReadFailure(ex, "AI meal pool hydration");
+                AislePilotTelemetry.RecordCacheRefresh("ai_meal_pool", success: false);
                 return;
             }
             var refreshedAtUtc = DateTime.UtcNow;
@@ -423,6 +425,7 @@ Return JSON only with this schema:
 
             PruneAiMealPool(refreshedAtUtc);
             _lastAiMealPoolRefreshUtc = refreshedAtUtc;
+            AislePilotTelemetry.RecordCacheRefresh("ai_meal_pool", success: true);
         }
         finally
         {
@@ -535,11 +538,22 @@ Return JSON only with this schema:
             return;
         }
 
-        _ = Task.Run(async () =>
+        if (_backgroundTaskQueue is null)
         {
+            foreach (var docId in queuedKeys)
+            {
+                AiMealPersistenceInFlight.TryRemove(docId, out _);
+            }
+            return;
+        }
+
+        var queued = _backgroundTaskQueue.TryEnqueue("ai_meal_persistence", async stoppingToken =>
+        {
+            var stopwatch = Stopwatch.StartNew();
             try
             {
-                using var backgroundPersistenceCts = new CancellationTokenSource(AiMealPersistenceBackgroundBudget);
+                using var backgroundPersistenceCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                backgroundPersistenceCts.CancelAfter(AiMealPersistenceBackgroundBudget);
                 var persistedMeals = await PersistAiMealsAsync(queuedMeals, backgroundPersistenceCts.Token);
                 if (persistedMeals.Count < queuedMeals.Count)
                 {
@@ -549,6 +563,10 @@ Return JSON only with this schema:
                         queuedMeals.Count,
                         sourceLabel);
                 }
+                RecordAislePilotBackgroundJob(
+                    "ai_meal_persistence",
+                    stopwatch,
+                    success: persistedMeals.Count == queuedMeals.Count);
             }
             catch (Exception ex)
             {
@@ -557,15 +575,26 @@ Return JSON only with this schema:
                     "AislePilot background AI meal persistence failed. MealCount={MealCount}, Source={Source}",
                     queuedMeals.Count,
                     sourceLabel);
+                RecordAislePilotBackgroundJob("ai_meal_persistence", stopwatch, success: false, ex);
+                throw;
             }
-            finally
+        }, () =>
+        {
+            foreach (var docId in queuedKeys)
             {
-                foreach (var docId in queuedKeys)
-                {
-                    AiMealPersistenceInFlight.TryRemove(docId, out _);
-                }
+                AiMealPersistenceInFlight.TryRemove(docId, out _);
             }
         });
+        if (!queued)
+        {
+            foreach (var docId in queuedKeys)
+            {
+                AiMealPersistenceInFlight.TryRemove(docId, out _);
+            }
+            _logger?.LogWarning(
+                "AislePilot AI-meal persistence was not queued because the bounded background queue is full. Capacity={Capacity}",
+                _backgroundTaskQueue.Capacity);
+        }
     }
 
     private static string BuildAiMealSwapPrompt(

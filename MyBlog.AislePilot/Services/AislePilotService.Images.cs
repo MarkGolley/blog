@@ -492,6 +492,16 @@ public sealed partial class AislePilotService
                     lookupCount,
                     hydratedCount);
             }
+            AislePilotTelemetry.RecordCacheRefresh("meal_images", success: true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            AislePilotTelemetry.RecordCacheRefresh("meal_images", success: false);
+            throw;
         }
         finally
         {

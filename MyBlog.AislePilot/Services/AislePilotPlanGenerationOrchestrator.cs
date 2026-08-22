@@ -1,5 +1,6 @@
 using MyBlog.Models;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace MyBlog.Services;
 
@@ -11,7 +12,13 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
         IReadOnlyList<string>? excludedMealNames = null,
         CancellationToken cancellationToken = default)
     {
-        var context = await service.BuildPlanContextAsync(request, cancellationToken);
+        var totalStopwatch = Stopwatch.StartNew();
+        var contextStopwatch = Stopwatch.StartNew();
+        var context = service.EnableInteractiveAiGeneration
+            ? await service.BuildPlanContextAsync(request, cancellationToken)
+            : service.BuildPlanContextForInteractiveRequest(request);
+        var contextElapsedMs = contextStopwatch.ElapsedMilliseconds;
+        AislePilotTelemetry.RecordPlanStage("context", contextStopwatch.Elapsed);
         var planDays = AislePilotService.NormalizePlanDays(request.PlanDays);
         var cookDays = AislePilotService.NormalizeCookDays(request.CookDays, planDays);
         var mealTypeSlots = AislePilotService.BuildMealTypeSlots(request);
@@ -29,18 +36,39 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
                 cancellationToken);
         }
 
+        var poolStopwatch = Stopwatch.StartNew();
         var pooledAiPlan = await service.TryBuildPlanFromAiPoolAsync(
             request,
             context,
             cookDays,
             totalMealCount,
             excludedMealNames,
-            cancellationToken);
+            cancellationToken,
+            hydrateOnMiss: service.EnableInteractiveAiGeneration);
+        AislePilotTelemetry.RecordPlanStage("pool_lookup", poolStopwatch.Elapsed);
         if (pooledAiPlan is not null)
         {
+            LogInteractiveTiming(service, totalStopwatch, contextElapsedMs, "pool");
             return pooledAiPlan;
         }
 
+        if (!service.EnableInteractiveAiGeneration)
+        {
+            service.QueuePlanPoolReplenishment(request, excludedMealNames);
+            var fallbackStopwatch = Stopwatch.StartNew();
+            var fallbackPlan = await service.BuildPlanFromTemplateCatalogAsync(
+                request,
+                context,
+                cookDays,
+                totalMealCount,
+                excludedMealNames,
+                cancellationToken);
+            AislePilotTelemetry.RecordPlanStage("template_selection_and_assembly", fallbackStopwatch.Elapsed, "template");
+            LogInteractiveTiming(service, totalStopwatch, contextElapsedMs, "template_fast_fallback");
+            return fallbackPlan;
+        }
+
+        var aiStopwatch = Stopwatch.StartNew();
         var aiPlan = await service.TryBuildPlanWithAiAsync(
             request,
             context,
@@ -48,6 +76,7 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
             totalMealCount,
             excludedMealNames,
             cancellationToken);
+        AislePilotTelemetry.RecordPlanStage("ai_generation_and_validation", aiStopwatch.Elapsed, "ai");
         if (aiPlan is not null)
         {
             return aiPlan;
@@ -107,5 +136,18 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
             totalMealCount,
             excludedMealNames,
             cancellationToken);
+    }
+
+    private static void LogInteractiveTiming(
+        AislePilotService service,
+        Stopwatch totalStopwatch,
+        long contextElapsedMs,
+        string source)
+    {
+        service.Logger?.LogInformation(
+            "AislePilot interactive plan completed in {ElapsedMs}ms. ContextMs={ContextMs}, Source={Source}",
+            totalStopwatch.ElapsedMilliseconds,
+            contextElapsedMs,
+            source);
     }
 }

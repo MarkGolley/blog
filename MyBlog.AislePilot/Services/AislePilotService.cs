@@ -89,11 +89,17 @@ public sealed partial class AislePilotService : IAislePilotService
     private static readonly ConcurrentDictionary<string, byte> AiMealPersistenceInFlight = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> SpecialTreatGenerationInFlight =
         new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, byte> PlanPoolReplenishmentInFlight =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> DessertAddOnRecoveryInFlight =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, SupermarketLayoutCacheEntry> SupermarketLayoutCache =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, byte> SupermarketLayoutRefreshInFlight =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, byte> SupermarketLayoutRefreshQueued =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, byte> SupermarketLayoutHydrationQueued =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, DateTime> SupermarketLayoutLastAttemptUtc =
         new(StringComparer.OrdinalIgnoreCase);
@@ -101,6 +107,7 @@ public sealed partial class AislePilotService : IAislePilotService
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim AiMealPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImagePoolRefreshLock = new(1, 1);
+    private static readonly SemaphoreSlim MealImageCleanupLock = new(1, 1);
     private static readonly SemaphoreSlim DessertAddOnPoolRefreshLock = new(1, 1);
     private static readonly SemaphoreSlim MealImageGenerationThrottle =
         new(MealImageGenerationMaxConcurrency, MealImageGenerationMaxConcurrency);
@@ -110,6 +117,7 @@ public sealed partial class AislePilotService : IAislePilotService
     private static DateTime? _lastAiMealPoolRefreshUtc;
     private static DateTime? _lastDessertAddOnPoolRefreshUtc;
     private static DateTime? _lastSupermarketLayoutCacheRefreshUtc;
+    private static DateTime? _lastMealImageCleanupUtc;
 
     private static readonly HashSet<string> GenericPantryTokens = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -699,7 +707,7 @@ public sealed partial class AislePilotService : IAislePilotService
             ["Balanced", "Vegetarian", "Vegan"],
             [
                 new IngredientTemplate("Firm tofu", "Dairy & Eggs", 0.40m, "kg", 1.60m),
-                new IngredientTemplate("Egg noodles", "Tins & Dry Goods", 0.35m, "kg", 1.00m),
+                new IngredientTemplate("Rice noodles", "Tins & Dry Goods", 0.35m, "kg", 1.00m),
                 new IngredientTemplate("Carrots", "Produce", 4m, "pcs", 0.80m),
                 new IngredientTemplate("Stir fry sauce", "Spices & Sauces", 1m, "jar", 0.75m)
             ]),
@@ -1069,6 +1077,7 @@ public sealed partial class AislePilotService : IAislePilotService
     private readonly string _imageModel;
     private readonly bool _enableAiGeneration;
     private readonly bool _enableAiImageGeneration;
+    private readonly bool _enableInteractiveAiGeneration;
     private readonly bool _allowTemplateFallback;
     private readonly string _supermarketPriceProfilesPath;
     private readonly FirestoreDb? _db;
@@ -1080,6 +1089,11 @@ public sealed partial class AislePilotService : IAislePilotService
     private readonly AislePilotSlotSelectionEngine _slotSelectionEngine;
     private readonly AislePilotNutritionRecipeFallbackEngine _nutritionRecipeFallbackEngine;
     private readonly AislePilotPantryRankingEngine _pantryRankingEngine;
+    private readonly IAislePilotBackgroundTaskQueue? _backgroundTaskQueue;
+    private readonly TimeSpan _mealImageDiskRetention;
+    private readonly TimeSpan _mealImageFirestoreRetention;
+    private readonly TimeSpan _mealImageCleanupInterval;
+    private readonly int _mealImageCleanupMaximumDeletes;
 
     public AislePilotService(
         HttpClient? httpClient = null,
@@ -1093,7 +1107,8 @@ public sealed partial class AislePilotService : IAislePilotService
         IAislePilotMealSwapPipeline? mealSwapPipeline = null,
         AislePilotSlotSelectionEngine? slotSelectionEngine = null,
         AislePilotNutritionRecipeFallbackEngine? nutritionRecipeFallbackEngine = null,
-        AislePilotPantryRankingEngine? pantryRankingEngine = null)
+        AislePilotPantryRankingEngine? pantryRankingEngine = null,
+        IAislePilotBackgroundTaskQueue? backgroundTaskQueue = null)
     {
         _httpClient = httpClient;
         _logger = logger;
@@ -1106,6 +1121,7 @@ public sealed partial class AislePilotService : IAislePilotService
         _slotSelectionEngine = slotSelectionEngine ?? new AislePilotSlotSelectionEngine();
         _nutritionRecipeFallbackEngine = nutritionRecipeFallbackEngine ?? new AislePilotNutritionRecipeFallbackEngine();
         _pantryRankingEngine = pantryRankingEngine ?? new AislePilotPantryRankingEngine();
+        _backgroundTaskQueue = backgroundTaskQueue;
         _apiKey = configuration?["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         var legacyModel = configuration?["AislePilot:Model"];
         _planningModel = legacyModel ?? configuration?["AislePilot:PlanningModel"] ?? "gpt-5.6-terra";
@@ -1117,10 +1133,21 @@ public sealed partial class AislePilotService : IAislePilotService
             configuration?["AislePilot:UtilityReasoningEffort"],
             "none");
         _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-2";
+        _mealImageDiskRetention = TimeSpan.FromDays(Math.Clamp(
+            configuration?.GetValue("AislePilot:MealImageDiskRetentionDays", 30) ?? 30, 7, 365));
+        _mealImageFirestoreRetention = TimeSpan.FromDays(Math.Clamp(
+            configuration?.GetValue("AislePilot:MealImageFirestoreRetentionDays", 365) ?? 365, 30, 3650));
+        _mealImageCleanupInterval = TimeSpan.FromHours(Math.Clamp(
+            configuration?.GetValue("AislePilot:MealImageCleanupIntervalHours", 24) ?? 24, 1, 168));
+        _mealImageCleanupMaximumDeletes = Math.Clamp(
+            configuration?.GetValue("AislePilot:MealImageCleanupMaximumDeletes", 100) ?? 100, 1, 500);
         _enableAiGeneration = !bool.TryParse(configuration?["AislePilot:EnableAiGeneration"], out var parsed) || parsed;
         _enableAiImageGeneration = !bool.TryParse(
             configuration?["AislePilot:EnableAiImageGeneration"],
             out var parsedImageGeneration) || parsedImageGeneration;
+        _enableInteractiveAiGeneration = !bool.TryParse(
+            configuration?["AislePilot:EnableInteractiveAiGeneration"],
+            out var parsedInteractiveAiGeneration) || parsedInteractiveAiGeneration;
         _supermarketPriceProfilesPath = configuration?["AislePilot:SupermarketPriceProfilesPath"] ?? string.Empty;
         _allowTemplateFallback =
             bool.TryParse(configuration?["AislePilot:AllowTemplateFallback"], out var allowTemplateFallback)
@@ -1133,6 +1160,8 @@ public sealed partial class AislePilotService : IAislePilotService
     internal IAislePilotPlanComparisonService PlanComparisonService => _planComparisonService;
 
     internal bool AllowTemplateFallback => _allowTemplateFallback;
+
+    internal bool EnableInteractiveAiGeneration => _enableInteractiveAiGeneration;
 
     private static string NormalizeReasoningEffort(string? configuredValue, string fallback)
     {

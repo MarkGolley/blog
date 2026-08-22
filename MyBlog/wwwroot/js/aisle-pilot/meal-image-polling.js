@@ -18,6 +18,7 @@
         const mealImageCache = new Map();
         let mealImageCacheLoaded = false;
         let cacheWriteTimerId = null;
+        const imageStarts = new WeakMap();
 
         const normalizeImagePath = value => {
             if (typeof value !== "string") {
@@ -184,9 +185,7 @@
                     if (typeof probe.decode === "function") {
                         try {
                             await probe.decode();
-                        } catch {
-                            // Best effort only.
-                        }
+                        } catch { }
                     }
 
                     finish(true);
@@ -286,7 +285,7 @@
                         return;
                     }
 
-                    imageElement.src = pollContext.fallbackUrl;
+                    imageElement.src = pollContext.fallbackUrl; imageElement.srcset = `${pollContext.fallbackUrl} 512w`;
                     setMealImageLoadingState(imageElement, true);
                 });
 
@@ -352,7 +351,7 @@
                     const cachedImageUrl = getCachedMealImageUrl(mealName);
                     if (cachedImageUrl && normalizeImagePath(cachedImageUrl) !== pollContext.fallbackPath) {
                         if (currentSrc.trim() !== cachedImageUrl) {
-                            imageElement.src = cachedImageUrl;
+                            imageElement.src = cachedImageUrl; imageElement.srcset = `${cachedImageUrl} 1024w`;
                         }
 
                         setMealImageLoadingState(imageElement, true);
@@ -404,6 +403,11 @@
             }
 
             const pendingByMealName = getPendingMealImageNames(pollContext);
+            pendingByMealName.forEach(imageElements => imageElements.forEach(imageElement => {
+                if (imageElement instanceof HTMLImageElement && !imageStarts.has(imageElement)) {
+                    imageStarts.set(imageElement, performance.now());
+                }
+            }));
             syncMealImageLoadingStates(pollContext, pendingByMealName);
             if (pendingByMealName.size === 0) {
                 stop();
@@ -482,8 +486,11 @@
                     setCachedMealImageUrl(mealName, nextImageUrl);
                     imageElements.forEach(imageElement => {
                         if (imageElement instanceof HTMLImageElement) {
-                            imageElement.src = cacheBustedUrl;
+                            imageElement.src = cacheBustedUrl; imageElement.srcset = `${cacheBustedUrl} 1024w`;
                             setMealImageLoadingState(imageElement, false);
+                            window.AislePilotPerformance?.reportDuration(
+                                "image_placeholder_to_image", imageStarts.get(imageElement));
+                            imageStarts.delete(imageElement);
                         }
                     });
                 });

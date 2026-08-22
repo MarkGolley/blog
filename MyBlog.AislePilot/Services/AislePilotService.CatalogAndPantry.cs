@@ -53,6 +53,15 @@ public sealed partial class AislePilotService : IAislePilotService
                !string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath);
     }
 
+    public async Task WarmRuntimeCachesAsync(CancellationToken cancellationToken = default)
+    {
+        await Task.WhenAll(
+            EnsureAiMealPoolHydratedAsync(cancellationToken),
+            EnsureDessertAddOnPoolHydratedAsync(cancellationToken),
+            EnsureSupermarketLayoutCacheHydratedAsync(cancellationToken));
+        await CleanupMealImagesIfDueAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> GetMealImageUrlsAsync(
         IReadOnlyList<string> mealNames,
         CancellationToken cancellationToken = default)
@@ -228,11 +237,13 @@ public sealed partial class AislePilotService : IAislePilotService
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 LogFirestoreReadTimeout("dessert add-on pool hydration");
+                AislePilotTelemetry.RecordCacheRefresh("dessert_addon_pool", success: false);
                 return;
             }
             catch (Exception ex)
             {
                 LogFirestoreReadFailure(ex, "dessert add-on pool hydration");
+                AislePilotTelemetry.RecordCacheRefresh("dessert_addon_pool", success: false);
                 return;
             }
             DessertAddOnPool.Clear();
@@ -262,6 +273,7 @@ public sealed partial class AislePilotService : IAislePilotService
             }
 
             _lastDessertAddOnPoolRefreshUtc = DateTime.UtcNow;
+            AislePilotTelemetry.RecordCacheRefresh("dessert_addon_pool", success: true);
         }
         finally
         {

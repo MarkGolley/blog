@@ -776,6 +776,7 @@ public partial class AislePilotServiceTests
         var result = _service.BuildPlan(request);
 
         Assert.Equal(5, result.MealPlan.Count);
+        AssertValidCorePlan(result, expectedMealCount: 5);
         Assert.All(result.MealPlan, meal =>
         {
             Assert.False(string.IsNullOrWhiteSpace(meal.MealImageUrl));

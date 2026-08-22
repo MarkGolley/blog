@@ -44,8 +44,9 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(2, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", result.PlanSourceLabel);
         Assert.Equal(7, result.MealPlan.Count);
+        AssertValidCorePlan(result, expectedMealCount: 7);
     }
 
     [Fact]
@@ -182,7 +183,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(1, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", result.PlanSourceLabel);
         Assert.Equal(4, lunchMeals.Count);
         Assert.True(
             maxLunchRepeatCount <= 2,
@@ -470,7 +471,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(2, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", result.PlanSourceLabel);
         Assert.Equal(2, result.MealPlan.Count);
     }
 
@@ -544,7 +545,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(2, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", result.PlanSourceLabel);
     }
 
     [Fact]

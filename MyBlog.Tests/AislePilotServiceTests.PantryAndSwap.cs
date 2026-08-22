@@ -606,7 +606,7 @@ public partial class AislePilotServiceTests
 
         Assert.Single(plan.MealPlan);
         Assert.Equal("Egg fried rice", plan.MealPlan[0].MealName);
-        Assert.Equal("AI meal pool", plan.PlanSourceLabel);
+        Assert.Equal("Personalised meal plan", plan.PlanSourceLabel);
     }
 
     [Fact]
@@ -636,7 +636,8 @@ public partial class AislePilotServiceTests
 
         Assert.Single(plan.MealPlan);
         Assert.False(plan.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", plan.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", plan.PlanSourceLabel);
+        AssertValidCorePlan(plan, expectedMealCount: 1);
     }
 
     [Fact]
@@ -715,7 +716,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(0, handler.CallCount);
         Assert.NotEqual(currentMealName, swappedPlan.MealPlan[0].MealName);
-        Assert.Equal("Template swap", swappedPlan.PlanSourceLabel);
+        Assert.Equal("Updated meal choice", swappedPlan.PlanSourceLabel);
     }
 
     [Fact]
@@ -803,7 +804,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(1, handler.CallCount);
         Assert.Equal(uniqueMealName, swappedPlan.MealPlan[0].MealName);
-        Assert.Equal("OpenAI swap", swappedPlan.PlanSourceLabel);
+        Assert.Equal("Fresh meal suggestion", swappedPlan.PlanSourceLabel);
     }
 
     [Fact]

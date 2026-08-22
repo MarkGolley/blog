@@ -10,6 +10,7 @@
     var ukCulture = CultureInfo.GetCultureInfo("en-GB");
     var fallbackMealImageUrl = AislePilotMealImageUrlResolver.ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
     var mealImagesPollUrl = Url.Action("MealImages", "AislePilot") ?? "/projects/aisle-pilot/meal-images";
+    const string mealImageSizes = "(max-width: 760px) calc(100vw - 2rem), (max-width: 1100px) 48vw, 36rem";
     var aisleRank = result.AisleOrderUsed
         .Select((department, index) => new { department, index })
         .ToDictionary(x => x.department, x => x.index, StringComparer.OrdinalIgnoreCase);
@@ -737,7 +738,7 @@
                                     {
                                         var reorderMeal = slotEntry.meal;
                                         var reorderMealIsIgnored = ignoredMealSlotIndexes.Contains(slotEntry.index) || reorderMeal.IsIgnored;
-                                        <div class="aislepilot-day-reorder-meal-item@(reorderMealIsIgnored ? " is-ignored" : string.Empty)" data-day-reorder-meal-item><img class="aislepilot-day-reorder-meal-thumbnail" data-day-reorder-meal-thumbnail src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(reorderMeal.MealImageUrl)" alt="" loading="lazy" decoding="async" /><span class="aislepilot-day-reorder-meal-type">@reorderMeal.MealType</span><span class="aislepilot-day-reorder-meal-name">@reorderMeal.MealName</span></div>
+                                        <div class="aislepilot-day-reorder-meal-item@(reorderMealIsIgnored ? " is-ignored" : string.Empty)" data-day-reorder-meal-item><img class="aislepilot-day-reorder-meal-thumbnail" data-day-reorder-meal-thumbnail src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(reorderMeal.MealImageUrl)" alt="" width="32" height="32" loading="lazy" decoding="async" /><span class="aislepilot-day-reorder-meal-type">@reorderMeal.MealType</span><span class="aislepilot-day-reorder-meal-name">@reorderMeal.MealName</span></div>
                                     }
                                 </div>
                                 @if (dayGroup.Entries.Count > 1)
@@ -816,7 +817,7 @@
                                                              title="@mealDetailsTriggerLabel">
                                                         <div class="aislepilot-meal-image-shell" data-day-meal-swipe-surface>
                                                             <img class="aislepilot-meal-image"
-                                                                 src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl)"
+                                                                 src="@(AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl))" srcset="@($"{AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl)} 1024w")" sizes="@mealImageSizes" width="1024" height="1024"
                                                                  data-meal-image
                                                                  data-meal-name="@meal.MealName"
                                                                  alt="@($"{meal.MealName} plated meal")"
@@ -1108,7 +1109,7 @@
                                                          title="@dessertDetailsTriggerLabel">
                                                     <div class="aislepilot-meal-image-shell" data-day-meal-swipe-surface>
                                                         <img class="aislepilot-meal-image"
-                                                             src="@fallbackMealImageUrl"
+                                                             src="@fallbackMealImageUrl" srcset="@($"{fallbackMealImageUrl} 512w")" sizes="@mealImageSizes" width="1024" height="1024"
                                                              data-meal-image
                                                              data-meal-name="@result.DessertAddOnName"
                                                              alt="@($"{result.DessertAddOnName} plated dessert")"

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using MyBlog.Services;
 using System.Diagnostics;
 using System.Security.Cryptography;
@@ -18,6 +19,14 @@ internal static class ServiceCollectionStartupExtensions
         CookieSecurePolicy secureCookiePolicy)
     {
         builder.Services.AddControllersWithViews();
+        builder.Services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.Providers.Add<BrotliCompressionProvider>();
+            options.Providers.Add<GzipCompressionProvider>();
+            options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+                ["image/svg+xml"]);
+        });
         builder.Services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders =
@@ -103,7 +112,8 @@ internal static class ServiceCollectionStartupExtensions
             builder.Configuration["Firestore:DatabaseId"] ??
             "(default)";
 
-        var allowInMemoryFallback = builder.Environment.IsDevelopment();
+        var allowInMemoryFallback = builder.Environment.IsDevelopment() ||
+                                    builder.Configuration.GetValue<bool>("Firestore:AllowInMemoryFallback");
         var firestoreEnabled = false;
 
         if (string.IsNullOrWhiteSpace(firestoreProjectId))
@@ -114,7 +124,7 @@ internal static class ServiceCollectionStartupExtensions
                     "Firestore project id is missing in non-development environment. Set GOOGLE_CLOUD_PROJECT or Firestore:ProjectId.");
             }
 
-            Console.WriteLine("Firestore project id not configured. Using in-memory comments/likes (development only).");
+            Console.WriteLine("Firestore project id not configured. Using explicitly allowed in-memory comments/likes.");
         }
         else
         {
@@ -139,7 +149,7 @@ internal static class ServiceCollectionStartupExtensions
                         ex);
                 }
 
-                Console.WriteLine($"Firestore unavailable. Falling back to in-memory comments/likes (development only). {ex.Message}");
+                Console.WriteLine($"Firestore unavailable. Falling back to explicitly allowed in-memory comments/likes. {ex.Message}");
             }
         }
         var dataProtectionApplicationName =
@@ -166,6 +176,10 @@ internal static class ServiceCollectionStartupExtensions
         builder.Services.AddSingleton<AislePilotSlotSelectionEngine>();
         builder.Services.AddSingleton<AislePilotNutritionRecipeFallbackEngine>();
         builder.Services.AddSingleton<AislePilotPantryRankingEngine>();
+        builder.Services.AddSingleton<AislePilotBackgroundTaskQueue>();
+        builder.Services.AddSingleton<IAislePilotBackgroundTaskQueue>(sp =>
+            sp.GetRequiredService<AislePilotBackgroundTaskQueue>());
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<AislePilotBackgroundTaskQueue>());
         builder.Services.AddScoped<CommentService>();
         builder.Services.AddScoped<LikeService>();
         builder.Services.AddScoped<SubscriptionService>();
@@ -175,6 +189,7 @@ internal static class ServiceCollectionStartupExtensions
             client.Timeout = TimeSpan.FromSeconds(75);
         });
         builder.Services.AddScoped<IAislePilotService>(sp => sp.GetRequiredService<AislePilotService>());
+        builder.Services.AddHostedService<AislePilotCacheWarmupService>();
         builder.Services.AddScoped<IAislePilotExportService, AislePilotExportService>();
         builder.Services.AddHttpClient<AIModerationService>(client =>
         {
