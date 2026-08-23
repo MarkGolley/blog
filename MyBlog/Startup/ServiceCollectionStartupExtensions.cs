@@ -210,7 +210,7 @@ internal static class ServiceCollectionStartupExtensions
         }
 
         builder.Services.AddRouting(options => options.LowercaseUrls = true);
-        builder.Services.AddMyBlogRateLimiting();
+        builder.Services.AddMyBlogRateLimiting(builder.Configuration);
     }
 
     private static Task RecordAuthEventAsync(

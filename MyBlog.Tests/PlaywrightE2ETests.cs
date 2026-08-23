@@ -1110,19 +1110,21 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             return new LocalAppHost(null, baseUri.ToString().TrimEnd('/'), new StringBuilder());
         }
 
-        public static async Task<LocalAppHost> StartAsync()
+        public static async Task<LocalAppHost> StartAsync(
+            IReadOnlyDictionary<string, string?>? environmentOverrides = null)
         {
             var port = GetFreePort();
             var baseUrl = $"http://127.0.0.1:{port}";
             var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-            var projectPath = Path.Combine(repoRoot, "MyBlog", "MyBlog.csproj");
+            var appContentRoot = Path.Combine(repoRoot, "MyBlog");
+            var appAssemblyPath = Path.Combine(AppContext.BaseDirectory, "MyBlog.dll");
             var output = new StringBuilder();
 
             var startInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"run --project \"{projectPath}\"",
-                WorkingDirectory = repoRoot,
+                Arguments = $"\"{appAssemblyPath}\"",
+                WorkingDirectory = appContentRoot,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -1131,10 +1133,19 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
             startInfo.Environment["PORT"] = port.ToString();
             startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
+            startInfo.Environment["ASPNETCORE_CONTENTROOT"] = appContentRoot;
+            startInfo.Environment["ASPNETCORE_WEBROOT"] = Path.Combine(appContentRoot, "wwwroot");
             startInfo.Environment["ADMIN_USERNAME"] = AdminUsername;
             startInfo.Environment["ADMIN_PASSWORD"] = AdminPassword;
             startInfo.Environment["SUBSCRIBER_NOTIFY_KEY"] = "integration-notify-key";
             startInfo.Environment["OPENAI_API_KEY"] = string.Empty;
+            if (environmentOverrides is not null)
+            {
+                foreach (var (key, value) in environmentOverrides)
+                {
+                    startInfo.Environment[key] = value;
+                }
+            }
 
             var process = new Process
             {

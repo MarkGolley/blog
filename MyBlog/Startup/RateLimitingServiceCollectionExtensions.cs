@@ -5,8 +5,14 @@ namespace MyBlog.Startup;
 
 internal static class RateLimitingServiceCollectionExtensions
 {
-    public static IServiceCollection AddMyBlogRateLimiting(this IServiceCollection services)
+    public static IServiceCollection AddMyBlogRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
+        var aislePilotPermitLimit = Math.Max(
+            1,
+            configuration.GetValue<int?>("RateLimiting:AislePilotPermitLimit") ?? 45);
+
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -24,6 +30,15 @@ internal static class RateLimitingServiceCollectionExtensions
                     await context.HttpContext.Response.WriteAsync(
                         "{\"success\":false,\"error\":\"Too many requests. Please try again shortly.\"}",
                         cancellationToken);
+                    return;
+                }
+
+                var acceptsHtml = request.Headers.Accept.Any(value =>
+                    value?.Contains("text/html", StringComparison.OrdinalIgnoreCase) == true);
+                if (acceptsHtml && request.Path.StartsWithSegments("/projects/aisle-pilot"))
+                {
+                    context.HttpContext.Response.StatusCode = StatusCodes.Status303SeeOther;
+                    context.HttpContext.Response.Headers.Location = "/projects/aisle-pilot/rate-limited";
                     return;
                 }
 
@@ -86,7 +101,7 @@ internal static class RateLimitingServiceCollectionExtensions
                     partitionKey: GetRateLimitPartitionKey(httpContext),
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 45,
+                        PermitLimit = aislePilotPermitLimit,
                         Window = TimeSpan.FromMinutes(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0,
