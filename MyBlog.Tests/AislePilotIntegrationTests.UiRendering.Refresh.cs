@@ -28,9 +28,9 @@ public partial class AislePilotIntegrationTests
 
         Assert.DoesNotContain("class=\"aislepilot-app-head-metrics\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-setup-track\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Choose your output", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Best for weekly shops", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Best for use-what-you-have", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("What would you like to do?", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Plan my week", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Use my ingredients", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-setup-mode-toggle--weekly", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-setup-mode-toggle-detail\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
@@ -123,14 +123,10 @@ public partial class AislePilotIntegrationTests
                 @"@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*\.aislepilot-mobile-context\s*\{[\s\S]*top:\s*calc\(var\(--ap-mobile-context-top\)\s*\+\s*0\.38rem\);[\s\S]*padding:\s*0\.44rem\s*0\.46rem;",
                 RegexOptions.IgnoreCase),
             css);
+        Assert.DoesNotContain(".aislepilot-day-carousel-controls", css, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
-                @"@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*\.aislepilot-day-carousel-controls\s*\{[\s\S]*display:\s*none;",
-                RegexOptions.IgnoreCase),
-            css);
-        Assert.Matches(
-            new Regex(
-                @"@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*\.aislepilot-day-carousel-pagination\s*\{[\s\S]*padding:\s*0\s*0\.68rem\s*0\.16rem\s*0\.12rem;[\s\S]*scroll-padding-inline:\s*0\.68rem;",
+                @"@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*\.aislepilot-day-carousel-pagination\s*\{[\s\S]*padding:\s*0\s*0\.12rem\s*0\.16rem;",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(

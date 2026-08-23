@@ -359,6 +359,62 @@
         });
     };
 
+    const captureResultSelection = () => {
+        const slide = document.querySelector("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])");
+        const activeTab = slide?.querySelector("[data-day-meal-tab].is-active, [data-day-meal-tab][aria-selected='true']");
+        const tabs = slide instanceof HTMLElement
+            ? Array.from(slide.querySelectorAll("[data-day-meal-tab]"))
+            : [];
+        const activeDayOrder = slide instanceof HTMLElement
+            ? Number.parseInt(slide.dataset.dayCardOrder ?? "", 10)
+            : -1;
+
+        return {
+            activeDayOrder: Number.isInteger(activeDayOrder) && activeDayOrder >= 0 ? activeDayOrder : null,
+            activeMealSlot: Math.max(0, tabs.indexOf(activeTab))
+        };
+    };
+
+    const restoreResultSelection = snapshot => {
+        if (!snapshot || typeof snapshot !== "object") {
+            return;
+        }
+
+        const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
+        const targetIndex = slides.findIndex(slide =>
+            slide instanceof HTMLElement &&
+            Number.parseInt(slide.dataset.dayCardOrder ?? "", 10) === snapshot.activeDayOrder);
+        if (targetIndex < 0) {
+            return;
+        }
+
+        slides.forEach((slide, index) => {
+            if (slide instanceof HTMLElement) {
+                slide.setAttribute("aria-hidden", index === targetIndex ? "false" : "true");
+            }
+        });
+
+        const card = slides[targetIndex];
+        const tabs = Array.from(card.querySelectorAll("[data-day-meal-tab]"));
+        const mealPanels = Array.from(card.querySelectorAll("[data-day-meal-panel]"));
+        const slotIndex = Math.max(0, Math.min(Math.min(tabs.length, mealPanels.length) - 1, snapshot.activeMealSlot));
+        if (slotIndex < 0) {
+            return;
+        }
+
+        tabs.forEach((tab, index) => {
+            if (tab instanceof HTMLElement) {
+                const isActive = index === slotIndex;
+                tab.classList.toggle("is-active", isActive);
+                tab.setAttribute("aria-selected", isActive ? "true" : "false");
+                tab.setAttribute("tabindex", isActive ? "0" : "-1");
+            }
+        });
+        mealPanels.forEach((panel, index) => {
+            panel.setAttribute("aria-hidden", index === slotIndex ? "false" : "true");
+        });
+    };
+
     const persistSwapScrollPosition = form => {
         let targetX = window.scrollX;
         let targetY = window.scrollY;
@@ -396,10 +452,13 @@
         }
 
         const activePanelId = panels[currentIndex]?.id ?? null;
+        const resultSelection = captureResultSelection();
         const payload = {
             x: targetX,
             y: targetY,
             activePanelId,
+            activeDayOrder: resultSelection.activeDayOrder,
+            activeMealSlot: resultSelection.activeMealSlot,
             anchorDayIndex,
             anchorPanelId,
             anchorTop,
@@ -453,6 +512,8 @@
                     syncUi(panelIndex, false);
                 }
             }
+
+            restoreResultSelection(parsed);
 
             const targetX = typeof parsed.x === "number" ? parsed.x : 0;
             const fallbackTargetY = parsed.y;
@@ -2994,7 +3055,11 @@
             }
 
             card.dataset.dayMealCardWired = "true";
-            let currentSlotIndex = 0;
+            let currentSlotIndex = readActiveDayMealSlotIndex(card);
+            const initialDayKey = readCardDayKey(card);
+            if (initialDayKey) {
+                dayMealSlotState.set(initialDayKey, currentSlotIndex);
+            }
 
             const syncSlot = (nextIndex, options = {}) => {
                 const slotCount = Math.min(tabs.length, panels.length);
@@ -3827,6 +3892,10 @@
                     cleanupReorder(false);
                 });
             });
+
+            root.querySelectorAll("[data-day-reorder-move]").forEach(button => button.addEventListener("click", () =>
+                button.closest("article")?.querySelector("[data-day-reorder-handle]")?.dispatchEvent(
+                    new KeyboardEvent("keydown",{key:button.dataset.dayReorderMove === "earlier"?"ArrowUp":"ArrowDown"}))));
         });
     };
 
@@ -3843,8 +3912,6 @@
             const viewport = carousel.querySelector("[data-day-carousel-viewport]");
             const track = carousel.querySelector("[data-day-carousel-track]");
             const status = carousel.querySelector("[data-day-carousel-status]");
-            const previousButton = carousel.querySelector("[data-day-carousel-prev]");
-            const nextButton = carousel.querySelector("[data-day-carousel-next]");
             const pagination = carousel.querySelector("[data-day-carousel-pagination]");
             const dots = Array.from(carousel.querySelectorAll("[data-day-carousel-dot]"));
             const viewToggle = carousel.querySelector("[data-day-view-toggle]");
@@ -4098,35 +4165,12 @@
                 return Math.max(0, Math.min(maxScrollLeft, Math.round(centeredLeft)));
             };
 
-            const scrollPaginationToActiveDot = behavior => {
-                if (!(pagination instanceof HTMLElement)) {
-                    return;
-                }
-
-                const activeDot = dots[activeIndex];
-                if (!(activeDot instanceof HTMLElement)) {
-                    return;
-                }
-
-                const maxScrollLeft = Math.max(0, pagination.scrollWidth - pagination.clientWidth);
-                if (maxScrollLeft <= 0) {
-                    return;
-                }
-
-                const targetLeft = activeDot.offsetLeft - ((pagination.clientWidth - activeDot.offsetWidth) / 2);
-                pagination.scrollTo({
-                    left: Math.max(0, Math.min(maxScrollLeft, Math.round(targetLeft))),
-                    behavior
-                });
-            };
-
             const updateChrome = (nextIndex, options = {}) => {
                 const slides = getSlides();
                 if (slides.length === 0) {
                     return;
                 }
 
-                const previousActiveIndex = activeIndex;
                 activeIndex = clampIndex(nextIndex);
                 if (isStackedPresentationMode()) {
                     slides.forEach(slide => {
@@ -4148,14 +4192,6 @@
                         dot.setAttribute("tabindex", "-1");
                         dot.setAttribute("aria-current", "false");
                     });
-
-                    if (previousButton instanceof HTMLButtonElement) {
-                        previousButton.disabled = true;
-                    }
-
-                    if (nextButton instanceof HTMLButtonElement) {
-                        nextButton.disabled = true;
-                    }
 
                     if (status instanceof HTMLElement) {
                         status.textContent = isDayReorderMode
@@ -4209,14 +4245,6 @@
                     dot.setAttribute("aria-current", isActive ? "true" : "false");
                 });
 
-                if (previousButton instanceof HTMLButtonElement) {
-                    previousButton.disabled = slides.length <= 1;
-                }
-
-                if (nextButton instanceof HTMLButtonElement) {
-                    nextButton.disabled = slides.length <= 1;
-                }
-
                 if (status instanceof HTMLElement) {
                     const activeSlide = slides[activeIndex];
                     const dayName = activeSlide instanceof HTMLElement
@@ -4235,29 +4263,6 @@
                         : `Day ${dayPosition} of ${totalDays}`;
                 }
 
-                if (previousButton instanceof HTMLButtonElement) {
-                    const previousIndex = activeIndex === 0 ? slides.length - 1 : activeIndex - 1;
-                    const previousDayName = slides[previousIndex] instanceof HTMLElement
-                        ? (slides[previousIndex].dataset.dayCardDayName ?? "").trim()
-                        : "";
-                    previousButton.setAttribute("aria-label", previousDayName.length > 0
-                        ? `Show ${previousDayName}`
-                        : "Show previous day");
-                }
-
-                if (nextButton instanceof HTMLButtonElement) {
-                    const nextWrappedIndex = activeIndex === slides.length - 1 ? 0 : activeIndex + 1;
-                    const nextDayName = slides[nextWrappedIndex] instanceof HTMLElement
-                        ? (slides[nextWrappedIndex].dataset.dayCardDayName ?? "").trim()
-                        : "";
-                    nextButton.setAttribute("aria-label", nextDayName.length > 0
-                        ? `Show ${nextDayName}`
-                        : "Show next day");
-                }
-
-                if (options.forcePaginationSync === true || activeIndex !== previousActiveIndex) {
-                    scrollPaginationToActiveDot(options.paginationBehavior === "smooth" ? "smooth" : "auto");
-                }
             };
 
             const scrollToIndex = (nextIndex, behavior, motion = "") => {
@@ -4283,10 +4288,7 @@
                 // while smooth scrolling passes over intermediate slides.
                 suppressScrollChromeSync = resolvedBehavior === "smooth" && slides.length > 1;
                 clearScrollSettleTimer();
-                updateChrome(activeIndex, {
-                    paginationBehavior: resolvedBehavior,
-                    forcePaginationSync: true
-                });
+                updateChrome(activeIndex, { forcePaginationSync: true });
                 const targetSlide = slides[activeIndex];
                 if (!(targetSlide instanceof HTMLElement)) {
                     return;
@@ -4454,40 +4456,6 @@
                 scrollSyncFrame = window.requestAnimationFrame(syncFromScroll);
             }, { passive: true });
 
-            if (previousButton instanceof HTMLButtonElement) {
-                previousButton.addEventListener("click", () => {
-                    if (isStackedPresentationMode()) {
-                        return;
-                    }
-
-                    const slides = getSlides();
-                    if (slides.length <= 1) {
-                        return;
-                    }
-
-                    const isWrapping = activeIndex === 0;
-                    const previousIndex = isWrapping ? slides.length - 1 : activeIndex - 1;
-                    scrollToIndex(previousIndex, isWrapping ? "auto" : "smooth", "prev");
-                });
-            }
-
-            if (nextButton instanceof HTMLButtonElement) {
-                nextButton.addEventListener("click", () => {
-                    if (isStackedPresentationMode()) {
-                        return;
-                    }
-
-                    const slides = getSlides();
-                    if (slides.length <= 1) {
-                        return;
-                    }
-
-                    const isWrapping = activeIndex === slides.length - 1;
-                    const nextWrappedIndex = isWrapping ? 0 : activeIndex + 1;
-                    scrollToIndex(nextWrappedIndex, isWrapping ? "auto" : "smooth", "next");
-                });
-            }
-
             dots.forEach(dot => {
                 if (!(dot instanceof HTMLButtonElement) || dot.dataset.dayCarouselDotWired === "true") {
                     return;
@@ -4504,6 +4472,30 @@
                         return;
                     }
 
+                    scrollToIndex(targetIndex, "smooth", "jump");
+                });
+
+                dot.addEventListener("keydown", event => {
+                    if (isStackedPresentationMode()
+                        || !["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const currentIndex = dots.indexOf(dot);
+                    const targetIndex = event.key === "Home"
+                        ? 0
+                        : event.key === "End"
+                            ? dots.length - 1
+                            : event.key === "ArrowRight"
+                                ? (currentIndex + 1) % dots.length
+                                : (currentIndex - 1 + dots.length) % dots.length;
+                    const targetDot = dots[targetIndex];
+                    if (!(targetDot instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    targetDot.focus();
                     scrollToIndex(targetIndex, "smooth", "jump");
                 });
             });
@@ -4530,8 +4522,6 @@
                 carousel.classList.toggle("is-day-stacked-mode", isDayStackedMode);
                 carousel.dataset.dayStackedMode = isDayStackedMode ? "true" : "false";
                 carousel.dataset.dayReorderMode = isDayReorderMode ? "true" : "false";
-                setElementHidden(previousButton, isStacked);
-                setElementHidden(nextButton, isStacked);
                 setElementHidden(pagination, isStacked);
                 if (isStacked) {
                     resetCompactStackedInlineDetailsTouchState(carousel);
@@ -4867,6 +4857,12 @@
             submitButton.setAttribute("aria-label", isSavedMeal ? "Unsave meal" : "Save meal");
             submitButton.setAttribute("title", isSavedMeal ? "Unsave meal" : "Save meal");
             label.textContent = isSavedMeal ? "Unsave" : "Save";
+            const primaryButton = document.querySelector(`.aislepilot-meal-primary-action[form='${form.id}']`);
+            if (primaryButton instanceof HTMLButtonElement) {
+                primaryButton.classList.toggle("is-saved", isSavedMeal);
+                primaryButton.setAttribute("aria-label", isSavedMeal ? "Unsave meal" : "Save meal");
+                primaryButton.textContent = isSavedMeal ? "Unsave" : "Save";
+            }
             syncedButtons += 1;
         });
 

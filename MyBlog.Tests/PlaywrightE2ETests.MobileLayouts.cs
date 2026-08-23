@@ -704,7 +704,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotStickyContext_CanJumpBetweenPanels()
+    public async Task Mobile_AislePilotPrimaryResultsNavigation_CanSwitchBetweenPanels()
     {
         if (!IsE2EEnabled())
         {
@@ -723,7 +723,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 15000
         });
 
-        var shoppingJump = stickyContext.Locator("button[data-window-tab='aislepilot-shop']").First;
+        var shoppingJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-shop']").First;
         await shoppingJump.ClickAsync();
 
         var shoppingPanel = page.Locator("#aislepilot-shop[aria-hidden='false']").First;
@@ -734,7 +734,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         });
         Assert.Equal("true", await shoppingJump.GetAttributeAsync("aria-selected"));
 
-        var exportsJump = stickyContext.Locator("button[data-window-tab='aislepilot-export']").First;
+        var exportsJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-export']").First;
         await exportsJump.ClickAsync();
 
         var exportPanel = page.Locator("#aislepilot-export[aria-hidden='false']").First;
@@ -1149,9 +1149,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(3, initialMetrics.Length);
         Assert.True(Convert.ToInt32(initialMetrics[2]) >= 2, $"Expected multiple day slides. Count={initialMetrics[2]}.");
 
-        var nextButton = page.Locator("[data-day-carousel-next]").First;
-        await nextButton.ScrollIntoViewIfNeededAsync();
-        await nextButton.ClickAsync();
+        var secondDayTab = page.Locator("[data-day-carousel-dot][data-day-carousel-target='1']").First;
+        await secondDayTab.ScrollIntoViewIfNeededAsync();
+        await secondDayTab.ClickAsync();
 
         await page.WaitForFunctionAsync(
             """
@@ -1171,26 +1171,20 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeSlides = slides.filter(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
-                const previousButton = document.querySelector("[data-day-carousel-prev]");
-                const nextButton = document.querySelector("[data-day-carousel-next]");
                 return [
                     status instanceof HTMLElement ? (status.textContent || "").trim() : "",
                     activeIndex,
                     activeSlides.length,
-                    activeDot instanceof HTMLElement ? Number.parseInt(activeDot.getAttribute("data-day-carousel-target") || "-1", 10) : -1,
-                    previousButton instanceof HTMLButtonElement && !previousButton.disabled ? 1 : 0,
-                    nextButton instanceof HTMLButtonElement && !nextButton.disabled ? 1 : 0
+                    activeDot instanceof HTMLElement ? Number.parseInt(activeDot.getAttribute("data-day-carousel-target") || "-1", 10) : -1
                 ];
             }
             """);
 
-        Assert.Equal(6, carouselMetrics.Length);
+        Assert.Equal(4, carouselMetrics.Length);
         Assert.Contains("2 of", Convert.ToString(carouselMetrics[0]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, Convert.ToInt32(carouselMetrics[1]));
         Assert.Equal(1, Convert.ToInt32(carouselMetrics[2]));
         Assert.Equal(1, Convert.ToInt32(carouselMetrics[3]));
-        Assert.Equal(1, Convert.ToInt32(carouselMetrics[4]));
-        Assert.Equal(1, Convert.ToInt32(carouselMetrics[5]));
     }
 
     [Fact]
@@ -1213,7 +1207,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 15000
         });
 
-        var shopJump = stickyContext.Locator("button[data-window-tab='aislepilot-shop']").First;
+        var shopJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-shop']").First;
         await shopJump.ClickAsync();
         await page.Locator("#aislepilot-shop[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
         {
@@ -1237,7 +1231,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(1, Convert.ToInt32(shopMetrics[0]));
         Assert.True(Convert.ToDouble(shopMetrics[1]) >= 10, $"Expected shop cards to use rounded panel surface. Radius={shopMetrics[1]}.");
 
-        var exportJump = stickyContext.Locator("button[data-window-tab='aislepilot-export']").First;
+        var exportJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-export']").First;
         await exportJump.ClickAsync();
         await page.Locator("#aislepilot-export[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
         {

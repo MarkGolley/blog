@@ -10,6 +10,13 @@
         )
     );
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
+    document.addEventListener("blur", event => {
+        const validator = event.target?.form && window.jQuery?.(event.target.form).data("validator");
+        if (validator) {
+            validator.settings.onkeyup = false;
+            validator.element(event.target);
+        }
+    }, true);
     const supermarketSelectionStorageKey = "aislepilot:setup-supermarket";
     const submitLoadingDelayTimers = new WeakMap();
     const submitPlanSkeletonDelayTimers = new WeakMap();
@@ -54,7 +61,6 @@
                 });
             }
         } catch {
-            // Ignore debug transport failures.
         }
     };
 
@@ -215,7 +221,6 @@
             try {
                 input.select();
             } catch {
-                // Some input types may not support selection.
             }
         });
     };
@@ -620,7 +625,6 @@
 
     wireSubmitLoadingHandlers(document);
     wireExportThemeForms(document);
-
     const wirePlanBasicsSliders = scope => {
         const forms = scope instanceof Element
             ? Array.from(scope.querySelectorAll("form"))
@@ -1897,8 +1901,8 @@
                 }
 
                 generatorCoreSummary.textContent = strictCoreInput.checked
-                    ? "Strict core on"
-                    : "Strict core off";
+                    ? "Use every listed ingredient"
+                    : "Flexible ingredient matching";
             };
 
             const updateSpecialOptionsSummary = () => {
@@ -2172,7 +2176,6 @@
         try {
             window.localStorage.setItem(supermarketSelectionStorageKey, normalizedValue);
         } catch {
-            // Ignore storage failures in private modes.
         }
     };
 
@@ -2432,7 +2435,6 @@
                     await navigator.clipboard.writeText(text);
                     return true;
                 } catch {
-                    // Fallback below.
                 }
             }
 
@@ -2716,7 +2718,6 @@
         mealImagePollingController.start();
     };
 
-    // Image polling must run for both planner and generator-only pages.
     startMealImagePolling();
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {

@@ -115,9 +115,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         var targetIndex = Math.Min(3, moreActionsTriggerCount - 1);
         var targetTrigger = moreActionsTriggers.Nth(targetIndex);
-        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
-        await targetTrigger.ScrollIntoViewIfNeededAsync();
-        await targetTrigger.ClickAsync();
+        var targetMealPanel = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-panel][1]");
+        var targetSwapButton = targetMealPanel.Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -171,9 +171,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var targetIndex = Math.Min(2, moreActionsTriggerCount - 1);
         var targetTrigger = moreActionsTriggers.Nth(targetIndex);
         var targetCard = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-card][1]");
-        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
-        await targetTrigger.ScrollIntoViewIfNeededAsync();
-        await targetTrigger.ClickAsync();
+        var targetSwapButton = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-panel][1]").Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -230,7 +229,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotSwap_ClosesActionsSheetAndPreservesActiveDayAndSlot()
+    public async Task Mobile_AislePilotPrimarySwap_PreservesActiveDayAndSlot()
     {
         if (!IsE2EEnabled())
         {
@@ -280,10 +279,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var activeMealPanel = targetCard.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
         var previousMealName = (await activeMealPanel.Locator("h3").First.InnerTextAsync()).Trim();
 
-        var targetMoreActionsSummary = targetCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
-        await targetMoreActionsSummary.ScrollIntoViewIfNeededAsync();
-        await targetMoreActionsSummary.ClickAsync();
+        var targetSwapButton = activeMealPanel.Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,

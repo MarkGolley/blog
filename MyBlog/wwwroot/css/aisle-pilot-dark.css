@@ -4,6 +4,9 @@
 :root[data-theme="dark"] .aislepilot-field,
 :root[data-theme="dark"] .aislepilot-field-optional,
 :root[data-theme="dark"] .aislepilot-collapsible,
+:root[data-theme="dark"] .aislepilot-core-choice,
+:root[data-theme="dark"] .aislepilot-personalise-content,
+:root[data-theme="dark"] .aislepilot-outcome-summary,
 :root[data-theme="dark"] .aislepilot-setup-mode,
 :root[data-theme="dark"] .aislepilot-setup-panel,
 :root[data-theme="dark"] .aislepilot-setup-strip,
@@ -267,9 +270,6 @@
 :root[data-theme="dark"] .aislepilot-window-tab.is-active,
 :root[data-theme="dark"] .aislepilot-window-tab[aria-selected="true"],
 :root[data-theme="dark"] .aislepilot-window-tab[aria-current="page"],
-:root[data-theme="dark"] .aislepilot-mobile-context-jump.is-active,
-:root[data-theme="dark"] .aislepilot-mobile-context-jump[aria-selected="true"],
-:root[data-theme="dark"] .aislepilot-mobile-context-jump[aria-current="page"],
 :root[data-theme="dark"] .aislepilot-leftover-day-chip.is-leftover-source,
 :root[data-theme="dark"] .aislepilot-day-card-leftover-controls.is-leftover-source,
 :root[data-theme="dark"] .aislepilot-overview-regenerate-btn,
@@ -403,7 +403,6 @@
 }
 
 :root[data-theme="dark"] .aislepilot-window-tab,
-:root[data-theme="dark"] .aislepilot-mobile-context-jump,
 :root[data-theme="dark"] .aislepilot-leftover-toggle,
 :root[data-theme="dark"] .aislepilot-day-meal-tab,
 :root[data-theme="dark"] .aislepilot-meal-details > summary,
@@ -417,25 +416,20 @@
 }
 
 :root[data-theme="dark"] .aislepilot-window-tab:hover,
-:root[data-theme="dark"] .aislepilot-mobile-context-jump:hover,
 :root[data-theme="dark"] .aislepilot-leftover-day-chip:hover,
 :root[data-theme="dark"] .aislepilot-more-actions-trigger:hover {
     background: rgba(29, 45, 67, 0.96);
 }
 
 :root[data-theme="dark"] .aislepilot-window-tab[aria-selected="true"],
-:root[data-theme="dark"] .aislepilot-window-tab[aria-current="page"],
-:root[data-theme="dark"] .aislepilot-mobile-context-jump[aria-selected="true"],
-:root[data-theme="dark"] .aislepilot-mobile-context-jump[aria-current="page"] {
+:root[data-theme="dark"] .aislepilot-window-tab[aria-current="page"] {
     border-color: transparent;
     background: linear-gradient(98deg, #2e8dab 0%, #1f557c 100%);
     color: #f4faff;
 }
 
 :root[data-theme="dark"] .aislepilot-window-tab[aria-selected="true"] .aislepilot-symbol-glyph,
-:root[data-theme="dark"] .aislepilot-window-tab[aria-current="page"] .aislepilot-symbol-glyph,
-:root[data-theme="dark"] .aislepilot-mobile-context-jump[aria-selected="true"] .aislepilot-symbol-glyph,
-:root[data-theme="dark"] .aislepilot-mobile-context-jump[aria-current="page"] .aislepilot-symbol-glyph {
+:root[data-theme="dark"] .aislepilot-window-tab[aria-current="page"] .aislepilot-symbol-glyph {
     border-color: rgba(235, 247, 255, 0.56);
     background: rgba(244, 250, 255, 0.22);
     color: #f4faff;
@@ -445,6 +439,18 @@
     border-color: rgba(125, 167, 213, 0.16);
     background: rgba(14, 25, 39, 0.84);
     box-shadow: 0 8px 14px rgba(2, 7, 14, 0.18);
+}
+
+:root[data-theme="dark"] .aislepilot-meal-primary-action {
+    border-color: rgba(125, 167, 213, 0.24);
+    background: rgba(14, 25, 39, 0.9);
+    color: #deefff;
+}
+
+:root[data-theme="dark"] .aislepilot-meal-primary-action.is-saved {
+    border-color: rgba(99, 196, 152, 0.42);
+    background: rgba(31, 82, 63, 0.88);
+    color: #e8fff4;
 }
 
 :root[data-theme="dark"] .aislepilot-day-card-header-actions > .aislepilot-card-more-actions > .aislepilot-more-actions-trigger .aislepilot-symbol-glyph {
@@ -501,17 +507,6 @@
     background:
         radial-gradient(ellipse at 50% 42%, rgba(65, 163, 214, 0.14), rgba(65, 163, 214, 0.05) 30%, rgba(5, 11, 19, 0) 72%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.008), rgba(5, 11, 19, 0.02) 30%, rgba(5, 11, 19, 0.14));
-}
-
-:root[data-theme="dark"] .aislepilot-day-carousel-arrow {
-    border-color: rgba(125, 167, 213, 0.18);
-    background: rgba(10, 18, 29, 0.72);
-    color: #deefff;
-    box-shadow: 0 14px 24px rgba(2, 7, 14, 0.24);
-}
-
-:root[data-theme="dark"] .aislepilot-day-carousel-arrow:hover:not(:disabled) {
-    background: rgba(14, 25, 39, 0.9);
 }
 
 :root[data-theme="dark"] .aislepilot-day-carousel-pagination {

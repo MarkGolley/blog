@@ -49,6 +49,20 @@ public partial class AislePilotIntegrationTests
     }
 
     [Fact]
+    public async Task AislePilotActions_ProvideImmediatePressedAndSubmittingFeedback()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await GetCombinedAislePilotCssAsync(client);
+        var script = await GetCombinedAislePilotScriptAsync(client);
+
+        Assert.Contains(".aislepilot-app :where(button:not(:disabled), a[href], summary):active", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("filter: brightness(0.86);", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const planLoadingShellDelayMs = 0;", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("setSubmitButtonLoadingState(submitButton);", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AislePilotStylesheet_RefreshPalette_UsesLogoBrandTokensInsteadOfLegacyGreen()
     {
         using var client = CreateClient(allowAutoRedirect: true);

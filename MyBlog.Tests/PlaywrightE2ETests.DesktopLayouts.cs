@@ -111,7 +111,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Desktop_AislePilotDayCarousel_DayPillAndArrowAdvanceToExpectedSlides()
+    public async Task Desktop_AislePilotDayTabs_SelectExpectedSlidesWithoutCompetingArrows()
     {
         if (!IsE2EEnabled())
         {
@@ -158,8 +158,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             }
             """);
 
-        var nextButton = page.Locator("[data-day-carousel-next]").First;
-        await nextButton.ClickAsync();
+        Assert.Equal(0, await page.Locator("[data-day-carousel-prev], [data-day-carousel-next]").CountAsync());
+        var sundayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='6']").First;
+        await sundayPill.ClickAsync();
 
         await page.WaitForFunctionAsync(
             """
@@ -169,8 +170,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeSlide = slides[activeIndex];
                 const status = document.querySelector("[data-day-carousel-status]");
-                const nextButton = document.querySelector("[data-day-carousel-next]");
-                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement) || !(nextButton instanceof HTMLButtonElement)) {
+                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement)) {
                     return false;
                 }
 
@@ -189,14 +189,14 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 return activeIndex === 6 &&
                     /Sunday/i.test(status.textContent || "") &&
                     centerDelta <= 12 &&
-                    !nextButton.disabled &&
                     ghostVisibleWidth >= 28 &&
                     ghostPlaceholder instanceof HTMLElement &&
                     !(ghostTitle instanceof HTMLElement);
             }
             """);
 
-        await nextButton.ClickAsync();
+        var mondayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='0']").First;
+        await mondayPill.ClickAsync();
 
         await page.WaitForFunctionAsync(
             """
@@ -206,8 +206,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeSlide = slides[activeIndex];
                 const status = document.querySelector("[data-day-carousel-status]");
-                const previousButton = document.querySelector("[data-day-carousel-prev]");
-                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement) || !(previousButton instanceof HTMLButtonElement)) {
+                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement)) {
                     return false;
                 }
 
@@ -226,7 +225,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 return activeIndex === 0 &&
                     /Monday/i.test(status.textContent || "") &&
                     centerDelta <= 12 &&
-                    !previousButton.disabled &&
                     ghostVisibleWidth >= 28 &&
                     ghostPlaceholder instanceof HTMLElement &&
                     !(ghostTitle instanceof HTMLElement);
@@ -296,9 +294,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray());
 
-        var nextButton = page.Locator("[data-day-carousel-next]").First;
+        var saturdayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='5']").First;
         await page.EvaluateAsync("() => { window.__aislePilotStatusHistory = []; }");
-        await nextButton.ClickAsync();
+        await saturdayPill.ClickAsync();
         await page.WaitForFunctionAsync(
             """
             () => {

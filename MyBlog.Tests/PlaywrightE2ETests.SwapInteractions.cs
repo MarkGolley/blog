@@ -64,9 +64,8 @@ public sealed partial class PlaywrightE2ETests
         var targetCard = page.Locator("[data-day-meal-card]").Nth(targetIndex);
         var previousMealName = (await targetCard.Locator(".aislepilot-day-meal-panel[aria-hidden='false'] h3").First.InnerTextAsync()).Trim();
 
-        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
-        await targetTrigger.ScrollIntoViewIfNeededAsync();
-        await targetTrigger.ClickAsync();
+        var targetSwapButton = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-panel][1]").Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -119,8 +118,8 @@ public sealed partial class PlaywrightE2ETests
             });
 
         var beforeCarouselStatus = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
-        var nextButton = page.Locator("[data-day-carousel-next]").First;
-        await nextButton.ClickAsync();
+        var secondDayTab = page.Locator("[data-day-carousel-dot][data-day-carousel-target='1']").First;
+        await secondDayTab.ClickAsync();
 
         await page.WaitForFunctionAsync(
             """

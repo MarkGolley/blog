@@ -1,6 +1,6 @@
 # AislePilot Improvement Plan
 
-Last updated: 22 August 2026  
+Last updated: 23 August 2026
 Owner: Unassigned  
 Overall status: In progress
 
@@ -43,8 +43,8 @@ This is the working delivery checklist for improving AislePilot. Update the chec
 |---|---|---|
 | 1. Measurement and budgets | In progress | Baselines, dashboards, and CI budgets exist |
 | 2. Fast backend architecture | Complete | Managed background work and production-like verification complete |
-| 3. Setup simplification | Not started | First-time default plan requires four core decisions |
-| 4. Results simplification | Not started | Results have one clear navigation hierarchy |
+| 3. Setup simplification | In progress | First-time default plan requires four core decisions |
+| 4. Results simplification | In progress | Results have one clear navigation hierarchy |
 | 5. Frontend performance | In progress | Asset and Core Web Vitals budgets pass |
 | 6. Accessibility | Not started | WCAG 2.2 AA checks and keyboard journeys pass |
 | 7. Reliability, privacy, security | Not started | Failure, retention, privacy, and abuse controls verified |
@@ -164,47 +164,47 @@ The UI direction is an accessible, friendly flat design using the existing Plus 
 
 ### Default journey
 
-- [ ] Reduce the default setup to household size, number of days, meals required, and weekly budget.
-- [ ] Choose safe defaults for supermarket, portion size, meal types, and cooking preference.
-- [ ] Keep one visually dominant primary action per setup mode.
-- [ ] Place a compact “What you will get” summary immediately above the primary action.
-- [ ] Ensure the primary action remains visible and unobstructed on small mobile screens.
+- [x] Reduce the default setup to household size, number of days, meals required, and weekly budget. These four controls now form the expanded core path; optional serving, dietary, cooking, repetition, and exclusion settings sit behind Personalise.
+- [x] Choose safe defaults for supermarket, portion size, meal types, and cooking preference. Fresh visits use Tesco, medium portions, Breakfast/Lunch/Dinner, and quick meals; the rendered defaults are covered by an HTTP regression.
+- [x] Keep one visually dominant primary action per setup mode. Rendering tests enforce exactly one planner submit and one pantry-idea submit.
+- [x] Place a compact “What you will get” summary immediately above the primary action. Planner and pantry modes now have independent outcome cards adjacent to their action.
+- [x] Ensure the primary action remains visible and unobstructed on small mobile screens. The existing real hit-test regression continues to pass after the outcome card was added.
 
 ### Progressive disclosure
 
-- [ ] Move portion size into a single “Personalise” section.
-- [ ] Move quick-meal preference into “Personalise.”
-- [ ] Move dietary style and foods to avoid into “Personalise,” while keeping safety-critical allergen entry clearly labelled.
-- [ ] Move saved-meal repetition into “Personalise.”
-- [ ] Move supermarket layout, special treat, and dessert options into “Personalise.”
-- [ ] Preserve all advanced values when the section is collapsed or the mode changes.
+- [x] Move portion size into a single “Personalise” section.
+- [x] Move quick-meal preference into “Personalise.”
+- [x] Move dietary style and foods to avoid into “Personalise,” while keeping safety-critical allergen entry clearly labelled.
+- [x] Move saved-meal repetition into “Personalise.”
+- [x] Move supermarket layout, special treat, and dessert options into “Personalise.” Supermarket selection, custom aisle order, treat scheduling, and dessert now share one weekly-plan disclosure.
+- [x] Preserve all advanced values when the section is collapsed or the mode changes. A narrow-mobile browser regression changes supermarket, switches to pantry mode and back, and verifies the selection remains intact.
 
 ### Planner and pantry modes
 
-- [ ] Give “Plan my week” a concise purpose statement and dedicated defaults.
-- [ ] Give “Use my ingredients” a concise purpose statement and dedicated defaults.
-- [ ] Hide irrelevant controls in each mode rather than disabling them without explanation.
-- [ ] Use independent summaries and primary actions for both modes.
-- [ ] Preserve the selected mode without creating surprising state on a fresh visit.
+- [x] Give “Plan my week” a concise purpose statement and dedicated defaults. The choice promises meals, recipes, and shopping and states its seven-day, three-meal, Tesco, and £65 starting point.
+- [x] Give “Use my ingredients” a concise purpose statement and dedicated defaults. The choice promises three quick suggestions and explains its flexible ingredient-matching default.
+- [x] Hide irrelevant controls in each mode rather than disabling them without explanation. Browser coverage verifies planner-only and ingredient-only sections swap visibility, while the ingredient constraint becomes enabled in its relevant mode.
+- [x] Use independent summaries and primary actions for both modes. Each task has its own outcome card, detailed snapshot, and single submit action.
+- [x] Preserve the selected mode without creating surprising state on a fresh visit. A fresh context starts on Plan my week; a user-selected ingredient mode survives reload, while server-forced validation/result states retain precedence.
 
 ### Language and validation
 
-- [ ] Review “strict core,” “repeat strength,” “cook days,” “plan days,” “special treat,” and “budget rebalance” with users.
-- [ ] Replace implementation-oriented copy with task-oriented language.
-- [ ] Associate every validation message with its field.
-- [ ] Focus the first invalid field after submission.
-- [ ] Add an accessible error summary with links when multiple errors exist.
-- [ ] Validate on blur rather than while the user is typing where practical.
-- [ ] Preserve every entered value after validation failure.
-- [ ] Stop classifying failures by parsing display-message text; use typed error categories.
+- [~] Review “strict core,” “repeat strength,” “cook days,” “plan days,” “special treat,” and “budget rebalance” with users. Setup-facing instances now use task language such as “Number of days,” “How often to reuse saved meals,” and “Treat dinner”; qualitative user review and Phase 4 result terminology remain open.
+- [~] Replace implementation-oriented copy with task-oriented language. Setup modes, ingredient flexibility, day count, saved-meal reuse, and treat scheduling are task-based; remaining result-state terms such as budget rebalance still need the Phase 4 copy pass.
+- [x] Associate every validation message with its field. User-editable setup controls and grouped choices use stable error IDs with `aria-describedby`; the linked summary targets the same controls or fieldsets.
+- [x] Focus the first invalid field after submission. Server-rendered `autofocus` targets the first keyed validation error and works without JavaScript; a narrow-mobile browser regression verifies actual focus.
+- [x] Add an accessible error summary with links when multiple errors exist. The alert retains field keys, labels up to five issues, links directly to stable control/group IDs, and is exposed as an alert region.
+- [x] Validate on blur rather than while the user is typing where practical. AislePilot now validates the field when it loses focus, disables key-up revalidation, and a narrow-mobile browser regression proves errors appear and clear only after blur.
+- [x] Preserve every entered value after validation failure. HTTP coverage posts multiple invalid values and verifies both values remain in the rendered controls; the pantry browser journey verifies its submitted value too.
+- [x] Stop classifying failures by parsing display-message text; use typed error categories. Validation, dietary-constraint, and operation alerts now use `AislePilotAlertCategory`; display-message substring parsing was removed.
 
 ### Phase 3 acceptance
 
-- [ ] A first-time user can generate a default plan without opening advanced settings.
-- [ ] Default setup contains no more than four required decisions.
+- [x] A first-time user can generate a default plan without opening advanced settings. The closed Personalise state retains executable defaults and the default planner path is covered by HTTP and browser setup regressions.
+- [x] Default setup contains no more than four required decisions. People, meals required, number of days, and weekly budget are the only expanded core choices.
 - [ ] Both setup modes are understandable without documentation.
-- [ ] Validation recovery passes keyboard and screen-reader tests.
-- [ ] All setup touch targets are at least 44 by 44 pixels with at least 8px separation.
+- [x] Validation recovery passes keyboard and screen-reader tests. A keyboard-only ingredient-mode journey opens the relevant disclosure, changes the constraint, submits, verifies alert/link semantics and the field description, follows the summary link, and confirms focus returns to the invalid field.
+- [x] All setup touch targets are at least 44 by 44 pixels with at least 8px separation. A 320px touch-browser audit opens every disclosure in both modes and measures visible sliders, fields, selects, summaries, buttons, option labels, and adjacent target spacing.
 
 ---
 
@@ -212,19 +212,19 @@ The UI direction is an accessible, friendly flat design using the existing Plus 
 
 ### Information hierarchy
 
-- [ ] Establish the order: weekly status, selected day, meal details, shopping, exports.
-- [ ] Keep one primary results navigation model across desktop and mobile.
-- [ ] Keep one day-selection model and avoid competing carousel, tab, and quick-jump semantics.
-- [ ] Remove nested scroll regions where normal page scrolling is sufficient.
-- [ ] Ensure returning from an action restores the selected day, meal slot, panel, and scroll position.
+- [x] Establish the order: weekly status, selected day, meal details, shopping, exports. Results now expose these five stages in stable document order, the overview is labelled “Weekly status,” and the results hint directs people from days and meals to shopping and exports; an HTTP regression enforces the hierarchy.
+- [x] Keep one primary results navigation model across desktop and mobile. Meals, Shopping, and Exports now use one shared tablist at every viewport; the duplicate mobile quick-jump tablist and its CSS were removed, while the compact mobile weekly-status strip remains context-only. HTTP and mobile browser coverage enforce one tablist, keyboard switching, panel state, and a 44px mobile target.
+- [x] Keep one day-selection model and avoid competing carousel, tab, and quick-jump semantics. The labelled day tablist is now the only explicit day selector on desktop and mobile; redundant previous/next arrows and their code/styles were removed. Arrow-key, Home/End, click, and touch access all update the same selected tab, while swipe remains an optional enhancement.
+- [x] Remove nested scroll regions where normal page scrolling is sufficient. The seven labelled day tabs now wrap into the normal document layout instead of creating a hidden horizontal scroller, and obsolete tab-strip scroll-centering JavaScript was removed. The meal-card swipe viewport and viewport-bounded menu/sheet scrolling remain intentionally constrained interaction surfaces.
+- [x] Ensure returning from an action restores the selected day, meal slot, panel, and scroll position. AJAX actions retain the existing in-memory selection model; native-postback fallbacks now include the active results panel, selected day and meal slot, and anchored viewport coordinates in the existing short-lived session snapshot. Control initialization adopts restored selections instead of resetting to the first slot.
 
 ### Meal interactions
 
-- [ ] Make “View recipe,” “Swap,” and “Save” the visible primary meal actions.
-- [ ] Move remove, reorder, and infrequent controls to a clearly labelled overflow menu.
-- [ ] Provide explicit move-earlier and move-later controls as the accessible alternative to drag-and-drop.
-- [ ] Treat drag and swipe as progressive enhancements, never the sole route to an action.
-- [ ] Ensure every action provides visible feedback within 100ms.
+- [x] Make “View recipe,” “Swap,” and “Save” the visible primary meal actions. The image disclosure now says “View recipe,” and each active meal exposes a compact 44px Swap and Save/Unsave row. The visible controls submit the existing AJAX forms through native form association, avoiding duplicated request fields or behavior, and saved-state updates keep both surfaces synchronised.
+- [x] Move remove, reorder, and infrequent controls to a clearly labelled overflow menu. The meal overflow is explicitly “More meal actions” and exposes only the secondary Ignore/Include action; Swap and Save remain visible primary actions. Plan-level reordering lives in its clearly labelled “Swap days” mode, where it applies to day cards rather than individual meals.
+- [x] Provide explicit move-earlier and move-later controls as the accessible alternative to drag-and-drop. Every day card now exposes labelled 44px Move earlier/Move later buttons in reorder mode, with unavailable boundary actions natively disabled; they reuse the existing keyboard swap, announcement, state rebuild, and AJAX-save path.
+- [x] Treat drag and swipe as progressive enhancements, never the sole route to an action. Labelled day tabs remain the non-swipe navigation route, while explicit move buttons are now the primary described reorder route and drag remains optional.
+- [x] Ensure every action provides visible feedback within 100ms. All enabled buttons, links, and disclosure summaries now receive an immediate, non-layout-shifting pressed state; submissions additionally switch synchronously to loading text/spinners or card-level busy state, and plan generation reveals its loading shell with a zero-millisecond delay.
 - [ ] Keep touch targets at least 44 by 44 pixels.
 - [ ] Prevent gesture conflicts between image taps, meal-slot selection, day swipes, and page navigation.
 
@@ -418,6 +418,34 @@ The UI direction is an accessible, friendly flat design using the existing Plus 
 - [ ] This plan and its phase status table are updated.
 
 ## Progress log
+
+- 2026-08-23 — Consolidated results navigation across desktop and mobile. The single Meals/Shopping/Exports tablist now serves every viewport, the duplicate mobile quick-jump controls and obsolete styling were removed, and the mobile weekly-status strip remains informational only. This reduced AislePilot CSS by roughly 2.8 KB; browser coverage verifies one accessible tablist, touch sizing, arrow/Home keyboard behavior, and panel switching.
+
+- 2026-08-23 — Began Phase 4 by formalising the results hierarchy as weekly status, selected day, meal details, shopping, then exports. Stable stage markers and a server-rendered ordering regression protect the sequence, while the overview heading and navigation hint now explain the intended journey in task language.
+
+- 2026-08-23 — Standardised day selection on the labelled day tablist across desktop and mobile. Removed the competing previous/next arrow controls and obsolete styling/JavaScript, added Arrow Left/Right and Home/End tab behavior, retained swipe as a progressive enhancement, and updated HTTP and browser regressions.
+
+- 2026-08-23 — Removed the avoidable nested day-tab scroller. Day tabs now wrap within the normal page flow at narrow widths, the obsolete scroll-centering code and scrollbar styling are gone, and browser coverage checks that the mobile tablist has no horizontal overflow. Intentional carousel and constrained-overlay scrolling remain.
+
+- 2026-08-23 — Completed action-context restoration across AJAX and native-postback paths. The short-lived restore snapshot now carries the active results panel, selected day and meal slot, and anchored scroll position; restored meal controls initialise from that state rather than reverting to slot one. Script-contract regressions protect the fallback path alongside existing browser swap coverage.
+
+- 2026-08-23 — Promoted the three core meal actions. Recipe disclosure is explicitly labelled “View recipe,” while visible Swap and Save/Unsave controls use native form association to reuse the existing AJAX forms. Save state stays synchronised across visible and overflow controls, and server/browser regressions cover rendering, form linkage, visibility, and 44px mobile targets.
+
+- 2026-08-23 — Simplified the meal overflow to secondary actions. It is now labelled “More meal actions,” while Swap and Save are removed from its visible/accessibility surface and continue to use hidden associated forms. Affected browser tests now exercise the promoted controls; plan-level reorder placement remains paired with the next accessible move-control slice.
+- 2026-08-23 — Made day reordering independent of drag-and-drop. Reorder mode now shows explicit Move earlier and Move later buttons with native boundary disabling and 44px targets; each button delegates to the established keyboard reorder path so announcements, plan-state rebuilding, persistence, and AJAX submission remain identical. Instructions lead with the buttons and describe dragging only as an optional enhancement, closing the paired overflow and progressive-enhancement items.
+- 2026-08-23 — Closed the immediate-feedback gap across the AislePilot action surface. Every enabled button, link, and disclosure summary now shows a synchronous brightness press state without moving layout; existing submit handlers continue immediately into labelled loading, spinner, card-busy, or plan-skeleton feedback. A bundle contract protects both layers of the response.
+
+- 2026-08-23 — Completed the objective Phase 3 accessibility gates. All visible setup controls in both modes now pass a 320px browser audit for 44px targets and 8px separation; sliders, meal choices, supermarkets, toggles, text fields, treat controls, and dietary choices were corrected. A keyboard-only validation journey now proves alert/link/description semantics and focus recovery. The journey also exposed and fixed an optional dislikes/allergens field that Razor had incorrectly emitted as client-required.
+
+- 2026-08-23 — Completed practical blur-based setup validation. Errors now appear after leaving a field and clear after a corrected field is left again, without typing-time noise; a real narrow-mobile browser journey covers both transitions. Remaining setup terminology was also simplified to “Number of days,” “How often to reuse saved meals,” and “Treat dinner.” The checklist deliberately retains qualitative user review, screen-reader validation, and complete touch-target auditing as open gates.
+
+- 2026-08-23 — Added accessible setup validation recovery. Alerts now retain validation keys, use typed categories rather than parsing customer-facing messages, expose field-labelled anchor links, and focus the first invalid control through server-rendered autofocus. Multiple-invalid-value HTTP coverage and a narrow-mobile pantry validation journey prove links, focus, and value preservation without relying on client JavaScript.
+
+- 2026-08-23 — Completed the Phase 3 planner-and-pantry mode group. Choices are now task-based (“Plan my week” and “Use my ingredients”), state their outputs and defaults, and avoid internal generator/strict-core language. Fixed initial-mode precedence so normal returning visits restore the saved choice while forced server states remain authoritative; narrow-mobile coverage verifies fresh, switched, hidden-control, enabled-control, and reload behavior.
+
+- 2026-08-23 — Completed the Phase 3 default-journey and progressive-disclosure groups. Safe planner defaults are executable contracts; supermarket, custom layout, treat, and dessert controls now live inside Personalise; each mode has one primary action with an adjacent “What you will get” card. Narrow-mobile browser coverage verifies state survives mode changes, 44px disclosure height, 8px action spacing, no horizontal overflow, and an unobstructed planner action.
+
+- 2026-08-23 — Began Phase 3 setup simplification. The weekly planner now presents four expanded core choices—people, meal slots, plan length, and budget—while portion size, dietary settings, quick meals, saved-meal repetition, and foods to avoid retain their values inside one native Personalise disclosure. Copy now explains that safe defaults cover optional settings.
 
 - 2026-08-22 — Completed the Phase 2 production-like performance gate. A repeatable Release/Production Kestrel profile now sends full seven-day, three-meal plans through the antiforgery-protected HTTP endpoint at eight-way concurrency. With external AI disabled, cold-session p95 measured 414 ms and warm p95 119 ms, inside the 5,000 ms and 2,000 ms gates.
 

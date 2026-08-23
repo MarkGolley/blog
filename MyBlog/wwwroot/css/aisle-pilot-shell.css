@@ -79,6 +79,10 @@
     box-shadow: var(--ap-focus-ring) !important;
 }
 
+.aislepilot-app :where(button:not(:disabled), a[href], summary):active {
+    filter: brightness(0.86);
+}
+
 html.aislepilot-restore-pending .aislepilot-app {
     visibility: hidden;
 }

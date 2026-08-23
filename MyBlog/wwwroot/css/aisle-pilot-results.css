@@ -107,50 +107,6 @@
     white-space: nowrap;
 }
 
-.aislepilot-day-carousel-controls {
-    position: absolute;
-    inset-inline: max(0.5rem, calc((100% - var(--ap-day-card-slide-width)) / 2 - 1rem));
-    top: 47.2%;
-    z-index: 6;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    pointer-events: none;
-}
-
-.aislepilot-day-carousel-arrow {
-    width: 2.45rem;
-    min-width: 2.45rem;
-    height: 2.45rem;
-    padding: 0;
-    border: 1px solid rgba(16, 63, 101, 0.12);
-    border-radius: 999px;
-    background: rgba(250, 253, 255, 0.92);
-    color: var(--brand-deep);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    line-height: 1;
-    box-shadow: 0 14px 28px rgba(10, 26, 44, 0.12);
-    backdrop-filter: blur(14px);
-    pointer-events: auto;
-    transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
-}
-
-.aislepilot-day-carousel-arrow:hover:not(:disabled) {
-    border-color: rgba(16, 63, 101, 0.18);
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 18px 30px rgba(10, 26, 44, 0.14);
-    transform: scale(1.02);
-}
-
-.aislepilot-day-carousel-arrow:disabled {
-    opacity: 0.22;
-    cursor: default;
-    box-shadow: none;
-}
-
 .aislepilot-meal-grid {
     position: relative;
     display: block;
@@ -215,12 +171,10 @@
 
 .aislepilot-day-carousel-pagination {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
     gap: 0.38rem;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    touch-action: pan-x pinch-zoom;
     padding: 0.28rem;
     margin-inline: auto;
     width: min(100%, calc(var(--ap-day-card-slide-width) - 3rem));
@@ -232,12 +186,6 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.72),
         0 10px 20px rgba(10, 26, 44, 0.06);
     backdrop-filter: blur(18px);
-    scrollbar-width: none;
-    scroll-padding-inline: 0.36rem;
-}
-
-.aislepilot-day-carousel-pagination::-webkit-scrollbar {
-    display: none;
 }
 
 .aislepilot-day-carousel-dot {
@@ -335,8 +283,6 @@
     text-decoration: line-through;
 }
 
-.aislepilot-day-carousel.is-day-reorder-mode .aislepilot-day-carousel-controls,
-.aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-day-carousel-controls,
 .aislepilot-day-carousel.is-day-reorder-mode .aislepilot-day-carousel-pagination,
 .aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-day-carousel-pagination {
     display: none !important;
@@ -1700,6 +1646,44 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     white-space: nowrap;
+}
+
+.aislepilot-day-reorder-move-actions {
+    display: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+}
+
+.aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-day-reorder-move-actions {
+    display: grid;
+}
+
+.aislepilot-day-reorder-move {
+    min-height: 2.75rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid rgba(16, 63, 101, 0.22);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--brand-deep);
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 750;
+    line-height: 1.15;
+}
+
+.aislepilot-day-reorder-move:hover:not(:disabled) {
+    border-color: rgba(16, 63, 101, 0.4);
+    background: rgba(240, 246, 255, 1);
+}
+
+.aislepilot-day-reorder-move:focus-visible {
+    outline: 2px solid var(--ap-focus-ring-color);
+    outline-offset: 2px;
+}
+
+.aislepilot-day-reorder-move:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
 }
 
 .aislepilot-card-head-with-title {

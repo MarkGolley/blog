@@ -20,5 +20,5 @@ public sealed class AislePilotSharedSetupViewModel
     public int SavedMealRepeatRatePercent { get; set; }
     public bool ExclusionsDetailsOpen { get; set; }
     public string ExclusionsSummaryText { get; set; } = string.Empty;
-    public string DislikesOrAllergens { get; set; } = string.Empty;
+    public string? DislikesOrAllergens { get; set; }
 }

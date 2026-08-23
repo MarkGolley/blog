@@ -5,7 +5,7 @@ namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
     [Fact]
-    public async Task Mobile_AislePilotDayCarousel_PaginationSwipeDoesNotSwitchToShoppingPanel()
+    public async Task Mobile_AislePilotDayTabs_WrapWithoutNestedHorizontalScrolling()
     {
         if (!IsE2EEnabled())
         {
@@ -24,69 +24,27 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 15000
         });
 
-        var activePanelBeforeSwipe = await page.EvaluateAsync<string>(
-            """
-            () => {
-                const activePanel = document.querySelector(".aislepilot-window-panel[aria-hidden='false']");
-                return activePanel instanceof HTMLElement ? (activePanel.id || "") : "";
-            }
-            """);
-        Assert.Equal("aislepilot-meals", activePanelBeforeSwipe);
-
-        var carouselStatusBeforeSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
-
-        var swipeState = await pagination.EvaluateAsync<object[]>(
+        var tabLayout = await pagination.EvaluateAsync<object[]>(
             """
             paginationRoot => {
                 if (!(paginationRoot instanceof HTMLElement)) {
-                    return [0, ""];
+                    return [1, "", 0];
                 }
 
-                const overflowWidth = paginationRoot.scrollWidth - paginationRoot.clientWidth;
-                const rect = paginationRoot.getBoundingClientRect();
-                if (overflowWidth <= 8 || rect.width < 100 || rect.height < 20) {
-                    return [overflowWidth, window.getComputedStyle(paginationRoot).touchAction || ""];
-                }
-
-                const edgeInset = Math.min(36, rect.width * 0.18);
-                const startX = rect.right - edgeInset;
-                const endX = rect.left + edgeInset;
-                const y = rect.top + (rect.height / 2);
-
-                const createTouchEvent = (type, x, touchY) => {
-                    const event = new Event(type, { bubbles: true, cancelable: true });
-                    Object.defineProperty(event, "changedTouches", {
-                        configurable: true,
-                        value: [{ clientX: x, clientY: touchY }]
-                    });
-                    return event;
-                };
-
-                paginationRoot.dispatchEvent(createTouchEvent("touchstart", startX, y));
-                paginationRoot.dispatchEvent(createTouchEvent("touchmove", ((startX + endX) / 2), y));
-                paginationRoot.dispatchEvent(createTouchEvent("touchend", endX, y));
-
-                return [overflowWidth, window.getComputedStyle(paginationRoot).touchAction || ""];
-            }
-            """);
-
-        Assert.Equal(2, swipeState.Length);
-        Assert.True(Convert.ToDouble(swipeState[0]) > 8d, $"Expected the day pill strip to overflow on mobile. Overflow={swipeState[0]}.");
-        Assert.Contains("pan-x", Convert.ToString(swipeState[1]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-
-        await page.WaitForTimeoutAsync(150);
-
-        var activePanelAfterSwipe = await page.EvaluateAsync<string>(
-            """
-            () => {
                 const activePanel = document.querySelector(".aislepilot-window-panel[aria-hidden='false']");
-                return activePanel instanceof HTMLElement ? (activePanel.id || "") : "";
+                const tabs = Array.from(paginationRoot.querySelectorAll("[data-day-carousel-dot]"));
+                const rows = new Set(tabs.map(tab => Math.round(tab.getBoundingClientRect().top)));
+                return [
+                    paginationRoot.scrollWidth - paginationRoot.clientWidth,
+                    activePanel instanceof HTMLElement ? (activePanel.id || "") : "",
+                    rows.size
+                ];
             }
             """);
-        Assert.Equal("aislepilot-meals", activePanelAfterSwipe);
-
-        var carouselStatusAfterSwipe = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
-        Assert.Equal(carouselStatusBeforeSwipe, carouselStatusAfterSwipe);
+        Assert.Equal(3, tabLayout.Length);
+        Assert.InRange(Convert.ToDouble(tabLayout[0]), 0d, 1d);
+        Assert.Equal("aislepilot-meals", Convert.ToString(tabLayout[1]));
+        Assert.True(Convert.ToInt32(tabLayout[2]) >= 2, $"Expected seven mobile day tabs to wrap onto multiple rows. Rows={tabLayout[2]}.");
     }
 
     [Fact]
@@ -161,7 +119,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCarousel_ArrowsWrapAcrossWeekBoundary()
+    public async Task Mobile_AislePilotDayTabs_KeyboardWrapsAcrossWeekBoundaryWithoutArrows()
     {
         if (!IsE2EEnabled())
         {
@@ -180,16 +138,14 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             """
             () => {
                 const status = document.querySelector("[data-day-carousel-status]");
-                const nextButton = document.querySelector("[data-day-carousel-next]");
                 return status instanceof HTMLElement &&
-                    /Sunday/i.test(status.textContent || "") &&
-                    nextButton instanceof HTMLButtonElement &&
-                    !nextButton.disabled;
+                    /Sunday/i.test(status.textContent || "");
             }
             """);
 
-        var nextButton = page.Locator("[data-day-carousel-next]").First;
-        await nextButton.ClickAsync();
+        Assert.Equal(0, await page.Locator("[data-day-carousel-prev], [data-day-carousel-next]").CountAsync());
+        await sundayPill.FocusAsync();
+        await sundayPill.PressAsync("ArrowRight");
 
         await page.WaitForFunctionAsync(
             """
@@ -199,8 +155,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeSlide = slides[activeIndex];
                 const status = document.querySelector("[data-day-carousel-status]");
-                const previousButton = document.querySelector("[data-day-carousel-prev]");
-                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement) || !(previousButton instanceof HTMLButtonElement)) {
+                if (!(viewport instanceof HTMLElement) || !(activeSlide instanceof HTMLElement) || !(status instanceof HTMLElement)) {
                     return false;
                 }
 
@@ -215,7 +170,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 return activeIndex === 0 &&
                     /Monday/i.test(status.textContent || "") &&
                     centerDelta <= 10 &&
-                    !previousButton.disabled &&
                     ghostVisibleWidth <= 2;
             }
             """);

@@ -2998,31 +2998,8 @@
         line-height: 1.25;
     }
 
-    .aislepilot-mobile-context-jumps {
-        gap: 0.18rem;
-    }
-
-    .aislepilot-mobile-context-jump {
-        min-height: 2.34rem;
-        gap: 0.24rem;
-        padding-inline: 0.48rem;
-    }
-
-    .aislepilot-mobile-context-jump-text {
-        font-size: 0.75rem;
-    }
-
-    .aislepilot-day-carousel-controls {
-        display: none;
-    }
-
     .aislepilot-day-carousel-pagination {
-        padding: 0 0.68rem 0.16rem 0.12rem;
-        scroll-padding-inline: 0.68rem;
-    }
-
-    .aislepilot-day-carousel-dot:last-child {
-        margin-right: 0.38rem;
+        padding: 0 0.12rem 0.16rem;
     }
 
     .aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary,

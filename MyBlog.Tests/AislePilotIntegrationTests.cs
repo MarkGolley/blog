@@ -1049,7 +1049,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("2 day(s)", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-mobile-context-meta-values\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Plan snapshot", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Your weekly plan", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("data-overview-content hidden", html, StringComparison.OrdinalIgnoreCase);
     }
 

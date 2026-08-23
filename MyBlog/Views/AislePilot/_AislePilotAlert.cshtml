@@ -1,16 +1,28 @@
-@model IReadOnlyList<string>
+@model AislePilotAlertViewModel
 @{
-    var alertTitle = ViewData["AlertTitle"] as string ?? "Please review your settings";
-    var alertGuidance = ViewData["AlertGuidance"] as string ?? "Review the message below, then try again.";
-    var hasResult = ViewData["HasResult"] is true;
+    var (alertTitle, alertGuidance) = Model.Category switch
+    {
+        AislePilotAlertCategory.Constraint => ("Your preferences need a small change", "Follow the links below, adjust one preference, then try again."),
+        AislePilotAlertCategory.Operation => ("We could not complete that action", "Your settings are safe. Review the message below and try again."),
+        _ => ("Check the highlighted settings", "Follow each link to the field that needs attention, then try again.")
+    };
 }
-<section aria-labelledby="aislepilot-alert-title" class="aislepilot-shell aislepilot-alert-shell" data-reveal>
+<section aria-labelledby="aislepilot-alert-title" class="aislepilot-shell aislepilot-alert-shell" role="alert" data-validation-summary data-reveal>
     <h2 id="aislepilot-alert-title" class="aislepilot-section-title">@alertTitle</h2>
     <p class="aislepilot-alert-guidance">@alertGuidance</p>
     <ul class="aislepilot-alert-list">
-        @foreach (var errorMessage in Model.Take(3))
+        @foreach (var error in Model.Items.Take(5))
         {
-            <li>@errorMessage</li>
+            <li>
+                @if (!string.IsNullOrWhiteSpace(error.TargetId))
+                {
+                    <a href="#@error.TargetId">@(error.FieldLabel is null ? error.Message : $"{error.FieldLabel}: {error.Message}")</a>
+                }
+                else
+                {
+                    @error.Message
+                }
+            </li>
         }
     </ul>
     <div class="aislepilot-alert-actions">
@@ -21,7 +33,7 @@
                 data-show-plan-skeleton>
             Generate again
         </button>
-        @if (hasResult)
+        @if (Model.HasResult)
         {
             <button type="button"
                     class="aislepilot-alert-btn is-secondary"
