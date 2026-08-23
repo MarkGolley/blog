@@ -905,6 +905,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Matches(new Regex(@"<button[^>]*form=""meal-swap-[^""]+""[^>]*>Swap</button>", RegexOptions.IgnoreCase), html);
         Assert.Matches(new Regex(@"<button[^>]*form=""meal-save-[^""]+""[^>]*>(Save|Unsave)</button>", RegexOptions.IgnoreCase), html);
         Assert.Matches(new Regex(@"<form[^>]*id=""meal-swap-[^""]+""[^>]*hidden", RegexOptions.IgnoreCase), html);
+        Assert.DoesNotMatch(new Regex(@"<form[^>]*id=""meal-swap-[^""]+""[^>]*class=""[^""]*aislepilot-card-more-action-form", RegexOptions.IgnoreCase), html);
         Assert.Matches(new Regex(@"<form[^>]*id=""meal-save-[^""]+""[^>]*hidden", RegexOptions.IgnoreCase), html);
     }
 

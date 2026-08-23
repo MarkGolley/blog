@@ -2730,6 +2730,7 @@
         clearPersistedSwapScroll,
         clearRestorePending,
         clearSubmitLoadingDelay,
+        getSubmitButton,
         hidePlanLoadingShell,
         resetFormSubmittingState,
         schedulePlanBasicsSliderRefresh,

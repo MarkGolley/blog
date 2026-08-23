@@ -118,6 +118,7 @@ public sealed partial class AislePilotService
         var dedupedCandidates = allCandidates
             .Select(meal => EnsureMealTypeSuitability(meal))
             .ToList();
+        var safeMealsPerDay = NormalizeMealsPerDay(mealsPerDay);
         var preferredPool = dedupedCandidates
             .Where(meal =>
                 !meal.Name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase) &&
@@ -126,11 +127,33 @@ public sealed partial class AislePilotService
 
         if (preferredPool.Count == 0)
         {
+            var slotOffset = dayIndex % safeMealsPerDay;
+            var slotCount = selectedMeals.Count <= slotOffset
+                ? 0
+                : ((selectedMeals.Count - 1 - slotOffset) / safeMealsPerDay) + 1;
+            var maxRepeats = ResolveMaxMealRepeatsForSlotType(mealType, slotCount);
+            if (maxRepeats <= 1)
+            {
+                return null;
+            }
+
+            var selectedNameCounts = selectedMeals
+                .Where((_, index) => index != dayIndex)
+                .GroupBy(meal => meal.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+            preferredPool = dedupedCandidates
+                .Where(meal =>
+                    !meal.Name.Equals(currentMealName, StringComparison.OrdinalIgnoreCase) &&
+                    (!selectedNameCounts.TryGetValue(meal.Name, out var count) || count < maxRepeats))
+                .ToList();
+        }
+
+        if (preferredPool.Count == 0)
+        {
             return null;
         }
 
         var normalizedDayMultiplier = Math.Max(1, dayMultiplier);
-        var safeMealsPerDay = NormalizeMealsPerDay(mealsPerDay);
         var targetMealCost = (weeklyBudget / (7m * safeMealsPerDay)) * normalizedDayMultiplier;
         var previousName = dayIndex > 0 ? selectedMeals[dayIndex - 1].Name : null;
         var nextName = dayIndex < selectedMeals.Count - 1 ? selectedMeals[dayIndex + 1].Name : null;

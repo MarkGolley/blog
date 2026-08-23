@@ -10,6 +10,7 @@ namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
     private const string E2EEnvVar = "RUN_PLAYWRIGHT_E2E";
+    private const string ExternalBaseUrlEnvVar = "PLAYWRIGHT_EXTERNAL_BASE_URL";
     private const string AdminUsername = "admin";
     private const string AdminPassword = "password";
     private const string ModerationBannerText =
@@ -26,7 +27,10 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             return;
         }
 
-        _appHost = await LocalAppHost.StartAsync();
+        var externalBaseUrl = Environment.GetEnvironmentVariable(ExternalBaseUrlEnvVar);
+        _appHost = Uri.TryCreate(externalBaseUrl, UriKind.Absolute, out var externalUri)
+            ? LocalAppHost.Connect(externalUri)
+            : await LocalAppHost.StartAsync();
         _playwright = await Playwright.CreateAsync();
         _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
@@ -1089,10 +1093,10 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
     private sealed class LocalAppHost : IAsyncDisposable
     {
-        private readonly Process _process;
+        private readonly Process? _process;
         private readonly StringBuilder _output;
 
-        private LocalAppHost(Process process, string baseUrl, StringBuilder output)
+        private LocalAppHost(Process? process, string baseUrl, StringBuilder output)
         {
             _process = process;
             BaseUrl = baseUrl;
@@ -1100,6 +1104,11 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         }
 
         public string BaseUrl { get; }
+
+        public static LocalAppHost Connect(Uri baseUri)
+        {
+            return new LocalAppHost(null, baseUri.ToString().TrimEnd('/'), new StringBuilder());
+        }
 
         public static async Task<LocalAppHost> StartAsync()
         {
@@ -1159,6 +1168,11 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         public async ValueTask DisposeAsync()
         {
+            if (_process is null)
+            {
+                return;
+            }
+
             if (_process.HasExited)
             {
                 _process.Dispose();

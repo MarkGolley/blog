@@ -50,19 +50,11 @@ public partial class AislePilotIntegrationTests
             script,
             StringComparison.Ordinal);
         Assert.Contains(
-            "const isMobileSheetSwapForm =",
-            script,
-            StringComparison.Ordinal);
-        Assert.Contains(
             "const isCardMoreActionsSwapForm =",
             script,
             StringComparison.Ordinal);
         Assert.Contains(
-            "const shouldUseNativeSubmitForCardMoreActionsSwap = isCardMoreActionsSwapForm;",
-            script,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "actionSheetPanel.classList.contains(\"is-mobile-sheet\")",
+            "isCardMoreActionsSwapForm && actionSheetPanel instanceof HTMLElement;",
             script,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -71,10 +63,6 @@ public partial class AislePilotIntegrationTests
             StringComparison.Ordinal);
         Assert.Contains(
             "isCardMoreActionsSwapForm,",
-            script,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "shouldUseNativeSubmitForCardMoreActionsSwap,",
             script,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -160,6 +148,10 @@ public partial class AislePilotIntegrationTests
         Assert.Contains(
             "window.AislePilotCore = {",
             script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "clearSubmitLoadingDelay,\n        getSubmitButton,\n        hidePlanLoadingShell,",
+            script.Replace("\r\n", "\n", StringComparison.Ordinal),
             StringComparison.Ordinal);
         Assert.Contains(
             "writeSwapDebug(\"menu-submit-card-start\"",
@@ -287,6 +279,10 @@ public partial class AislePilotIntegrationTests
             StringComparison.Ordinal);
         Assert.Contains(
             "void handleAjaxSwapFormSubmit(event.currentTarget, getSubmitButton(event));",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "}, true);",
             script,
             StringComparison.Ordinal);
         Assert.Contains(

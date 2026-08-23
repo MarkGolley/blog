@@ -303,6 +303,40 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public void SwapMealForDay_WhenBreakfastPoolIsAlreadyUsed_AllowsSecondWeeklyOccurrence()
+    {
+        ClearAiPool();
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            PlanDays = 7,
+            CookDays = 7,
+            MealsPerDay = 3,
+            SelectedMealTypes = ["Breakfast", "Lunch", "Dinner"]
+        };
+
+        var initialPlan = _service.BuildPlan(request);
+        Assert.Equal(21, initialPlan.MealPlan.Count);
+        var currentMealName = initialPlan.MealPlan[0].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan.Select(meal => meal.MealName).ToList();
+
+        var swappedPlan = _service.SwapMealForDay(
+            request,
+            dayIndex: 0,
+            currentMealName,
+            currentPlanMealNames,
+            [currentMealName]);
+
+        var replacementName = swappedPlan.MealPlan[0].MealName;
+        Assert.NotEqual(currentMealName, replacementName);
+        Assert.Equal(2, swappedPlan.MealPlan.Count(meal =>
+            meal.MealName.Equals(replacementName, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
     public void SwapMealForDay_InvalidDay_ThrowsArgumentOutOfRangeException()
     {
         var request = new AislePilotRequestModel

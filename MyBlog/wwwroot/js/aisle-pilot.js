@@ -13,6 +13,7 @@
         clearPersistedSwapScroll,
         clearRestorePending,
         clearSubmitLoadingDelay,
+        getSubmitButton,
         hidePlanLoadingShell,
         resetFormSubmittingState,
         schedulePlanBasicsSliderRefresh,
@@ -5395,14 +5396,8 @@
             isDirectMealSwapForm &&
             swapForm.classList.contains("aislepilot-card-more-action-form") &&
             parentActionsMenu instanceof HTMLDetailsElement;
-        const shouldUseNativeSubmitForCardMoreActionsSwap = isCardMoreActionsSwapForm;
-        const isMobileSheetSwapForm =
-            isCardMoreActionsSwapForm &&
-            (
-                actionSheetPanel instanceof HTMLElement &&
-                actionSheetPanel.classList.contains("is-mobile-sheet") ||
-                parentActionsMenu.open
-            );
+        const shouldUseNativeSubmitForCardMoreActionsSwap =
+            isCardMoreActionsSwapForm && actionSheetPanel instanceof HTMLElement;
         writeSwapDebug("submit-start", {
             formAction: swapForm.getAttribute("action") ?? "",
             submitActionLabel,
@@ -5413,8 +5408,6 @@
             isDayReorderForm,
             isDirectMealSwapForm,
             isCardMoreActionsSwapForm,
-            shouldUseNativeSubmitForCardMoreActionsSwap,
-            isMobileSheetSwapForm,
             swapDayIndex,
             parentMenuOpen: parentActionsMenu instanceof HTMLDetailsElement ? parentActionsMenu.open : false,
             currentCardFound: currentCard instanceof HTMLElement
@@ -5665,7 +5658,7 @@
 
             event.preventDefault();
             void handleAjaxSwapFormSubmit(event.currentTarget, getSubmitButton(event));
-        });
+        }, true);
     };
 
     const wireAjaxSwapHandlers = scope => {
