@@ -1,0 +1,123 @@
+/* Results use the same quiet surfaces as setup. */
+:root[data-theme] .aislepilot-app .aislepilot-window-shell,
+:root[data-theme] .aislepilot-app #aislepilot-overview,
+:root[data-theme] .aislepilot-app .aislepilot-day-card {
+    background: var(--ap-refresh-surface);
+    border: 1px solid var(--ap-refresh-border);
+    box-shadow: none;
+    border-radius: 14px;
+}
+:root[data-theme] .aislepilot-app .aislepilot-stat-card {
+    background: transparent;
+    box-shadow: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0.65rem 0.85rem;
+    min-height: 0;
+}
+:root[data-theme] .aislepilot-app .aislepilot-stat-card::before,
+:root[data-theme] .aislepilot-app .aislepilot-stat-card::after { display: none; }
+.aislepilot-app .aislepilot-budget-grid { gap: 0.25rem; }
+.aislepilot-app .aislepilot-stat-label { font-size: 0.75rem; letter-spacing: 0.04em; }
+.aislepilot-app .aislepilot-stat-value { font-size: 1.1rem; }
+.aislepilot-app .aislepilot-budget-grid--primary {
+    border-bottom: 1px solid var(--ap-refresh-border);
+    padding-bottom: 0.5rem;
+}
+.aislepilot-app .aislepilot-source-details { border-top: 1px solid var(--ap-refresh-border); margin-top: 0.75rem; }
+.aislepilot-app .aislepilot-source-details > summary {
+    cursor: pointer;
+    min-height: 44px;
+    padding: 0.75rem 0;
+    color: var(--ap-refresh-text-muted);
+    font-size: 0.875rem;
+}
+:root[data-theme] .aislepilot-app .aislepilot-overview-supermarket-insights {
+    background: var(--ap-refresh-surface-strong);
+    box-shadow: none;
+    border: 0;
+}
+:root[data-theme] .aislepilot-app .aislepilot-window-tabs {
+    background: transparent;
+    box-shadow: none;
+    border-bottom: 1px solid var(--ap-refresh-border);
+    border-radius: 0;
+    padding: 0 0 0.75rem;
+    gap: 0.5rem;
+}
+:root[data-theme] .aislepilot-app .aislepilot-window-tab,
+:root[data-theme] .aislepilot-app .aislepilot-day-carousel-dot,
+:root[data-theme] .aislepilot-app .aislepilot-day-meal-tab {
+    background: var(--ap-refresh-surface-strong);
+    color: var(--ap-refresh-text);
+    border: 1px solid var(--ap-refresh-border);
+    box-shadow: none;
+    min-height: 44px;
+    border-radius: 8px;
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-window-tab,.aislepilot-day-carousel-dot,.aislepilot-day-meal-tab)[aria-selected='true'] {
+    background: var(--ap-refresh-primary);
+    color: #fff;
+    border-color: var(--ap-refresh-primary);
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-card-body {
+    background: transparent;
+    padding: clamp(0.85rem, 2vw, 1.5rem);
+}
+.aislepilot-app .aislepilot-day-meal-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(1.35rem, 2.5vw, 1.85rem);
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    font-weight: 400;
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-image-shell {
+    aspect-ratio: 4 / 3;
+    height: auto;
+    max-height: none;
+    border-radius: 10px;
+    background: var(--ap-refresh-surface-strong);
+    overflow: hidden;
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-image {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    filter: none;
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-primary-action {
+    min-height: 44px;
+    background: var(--ap-refresh-surface-strong);
+    color: var(--ap-refresh-text);
+    border: 1px solid var(--ap-refresh-border);
+    border-radius: 8px;
+    box-shadow: none;
+}
+.aislepilot-app.has-results .aislepilot-head-action-note { display: none; }
+:root[data-theme] .aislepilot-app .aislepilot-app-head-actions { background: transparent; border: 0; box-shadow: none; padding: 0; }
+@media (min-width: 900px) {
+    .aislepilot-app .aislepilot-budget-grid--primary { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+    .aislepilot-app .aislepilot-stat-card { padding: 0.5rem; }
+    .aislepilot-app .aislepilot-budget-grid--primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Legacy slot controls use important declarations; keep their selected state clear. */
+:root[data-theme] .aislepilot-app .aislepilot-day-meal-tab[aria-selected='true'] {
+    background: var(--ap-refresh-primary);
+    color: #fff;
+    box-shadow: none;
+}
+:root[data-theme] .aislepilot-app .aislepilot-window-tab[aria-selected='true'],
+:root[data-theme] .aislepilot-app .aislepilot-day-carousel-dot[aria-selected='true'],
+:root[data-theme] .aislepilot-app .aislepilot-overview-regenerate-btn {
+    background: var(--ap-refresh-primary);
+    color: #fff;
+    box-shadow: none;
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-meal-tab[aria-selected='true'] {
+    background: var(--ap-refresh-primary) !important;
+    color: #fff !important;
+}
+:root[data-theme] .aislepilot-app .aislepilot-more-actions-trigger { color: var(--ap-refresh-text) !important; }

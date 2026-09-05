@@ -17,7 +17,9 @@ public partial class AislePilotIntegrationTests
             "/css/aisle-pilot-dark.css",
             "/css/aisle-pilot-refresh.css",
             "/css/aisle-pilot-header-compact.css",
-            "/css/aisle-pilot-overview-balance.css"
+            "/css/aisle-pilot-overview-balance.css",
+            "/css/aisle-pilot-kitchen.css",
+            "/css/aisle-pilot-kitchen-results.css"
         };
 
         var cssChunks = new List<string>(assetPaths.Length);

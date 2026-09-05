@@ -1,0 +1,366 @@
+/* Kitchen direction: one quiet canvas, clear choices and restrained emphasis. */
+body:has(.aislepilot-app) {
+    background: #f5f3ed;
+    background-image: none;
+}
+body:has(.aislepilot-app)::before,
+body:has(.aislepilot-app)::after { display: none; }
+.aislepilot-app {
+    --ap-font-sans: 'Segoe UI', sans-serif;
+    --ap-font-display: var(--ap-font-sans);
+    --ap-refresh-canvas: #f5f3ed;
+    --ap-refresh-surface: #fffefa;
+    --ap-refresh-surface-strong: #f4f5ef;
+    --ap-refresh-text: #233d32;
+    --ap-refresh-text-muted: #58645b;
+    --ap-refresh-border: #d9ded4;
+    --ap-refresh-border-strong: #7d9582;
+    --ap-refresh-primary: #285840;
+    --ap-refresh-primary-strong: #204633;
+    --ap-refresh-accent: #285840;
+    --ap-refresh-primary-rgb: 40 88 64;
+    --ap-refresh-primary-strong-rgb: 32 70 51;
+    --ap-refresh-accent-rgb: 40 88 64;
+    --ap-refresh-shadow: none;
+    --ap-shadow-soft: none;
+    --ap-shadow-card: none;
+    --ap-focus-ring-color: #698c72;
+    gap: 1.5rem;
+}
+:root[data-theme='dark'] body:has(.aislepilot-app) { background: #17221c; }
+:root[data-theme='dark'] .aislepilot-app {
+    --ap-refresh-canvas: #17221c;
+    --ap-refresh-surface: #1e2c23;
+    --ap-refresh-surface-strong: #26372c;
+    --ap-refresh-text: #f0f2e9;
+    --ap-refresh-text-muted: #b8c5b8;
+    --ap-refresh-border: #405146;
+    --ap-refresh-border-strong: #8ea894;
+    --ap-refresh-primary: #356449;
+    --ap-refresh-primary-strong: #2c553e;
+    --ap-refresh-accent: #b6d6b4;
+    --ap-refresh-primary-rgb: 53 100 73;
+    --ap-refresh-primary-strong-rgb: 44 85 62;
+    --ap-refresh-accent-rgb: 182 214 180;
+    --ap-refresh-shadow: none;
+}
+.aislepilot-app .aislepilot-app-head {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 1rem 0 1.5rem;
+    border-bottom: 1px solid var(--ap-refresh-border);
+}
+.aislepilot-app .aislepilot-brand-lockup {
+    background: var(--ap-refresh-surface);
+    box-shadow: none;
+    border-color: var(--ap-refresh-border);
+}
+.aislepilot-app .aislepilot-app-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(2rem, 3.5vw, 3.25rem);
+    font-weight: 400;
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+    max-width: 24ch;
+    color: var(--ap-refresh-text);
+}
+.aislepilot-app .aislepilot-app-subtitle { max-width: 58ch; line-height: 1.6; }
+.aislepilot-app .aislepilot-app-head-topline { margin-top: 0.75rem; }
+.aislepilot-app .aislepilot-app-badge {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    letter-spacing: 0.12em;
+    color: var(--ap-refresh-accent);
+}
+.aislepilot-app:not(.has-results) .aislepilot-app-head-status,
+.aislepilot-app:not(.has-results) .aislepilot-app-highlights,
+.aislepilot-app:not(.has-results) .aislepilot-app-head-actions { display: none; }
+.aislepilot-app #aislepilot-setup {
+    padding: clamp(1rem, 3vw, 2rem);
+    border-radius: 16px;
+    background: var(--ap-refresh-surface);
+    box-shadow: none;
+}
+.aislepilot-app #aislepilot-setup .aislepilot-section-head {
+    background: transparent;
+    padding: 0;
+    margin-bottom: 1.25rem;
+}
+.aislepilot-app #aislepilot-setup .aislepilot-section-title {
+    font-family: var(--ap-font-sans);
+    font-size: 1.45rem;
+    letter-spacing: -0.03em;
+}
+.aislepilot-app .aislepilot-setup-track { gap: 1rem; margin-top: 1rem; }
+.aislepilot-app .aislepilot-setup-track-item {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font-weight: 500;
+}
+.aislepilot-app .aislepilot-setup-mode-toggle {
+    min-height: 6rem;
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 1rem !important;
+}
+.aislepilot-app .aislepilot-setup-mode-toggle.is-active {
+    background: var(--ap-refresh-primary) !important;
+    border-color: var(--ap-refresh-primary);
+}
+.aislepilot-app .aislepilot-setup-mode-toggle-kicker,
+.aislepilot-app .aislepilot-setup-mode-toggle-detail { display: none; }
+.aislepilot-app .aislepilot-setup-mode-toggle-title { font-size: 1rem; }
+.aislepilot-app .aislepilot-setup-mode-toggle-note { font-weight: 400; }
+.aislepilot-app .aislepilot-setup-mode-toggle-icon { border: 0; border-radius: 8px; }
+.aislepilot-app .aislepilot-setup-workspace { gap: 1.75rem; margin-top: 0.75rem; }
+.aislepilot-app .aislepilot-setup-step {
+    border: 0;
+    border-radius: 0;
+    padding: 0.75rem 0 1.5rem;
+    background: transparent;
+    box-shadow: none;
+    border-bottom: 1px solid var(--ap-refresh-border);
+}
+.aislepilot-app .aislepilot-setup-step-title,
+.aislepilot-app .aislepilot-setup-summary-title {
+    font-family: var(--ap-font-sans);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+.aislepilot-app .aislepilot-setup-summary {
+    background: var(--ap-refresh-surface-strong);
+    border: 1px solid var(--ap-refresh-border);
+    box-shadow: none;
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+.aislepilot-app .aislepilot-core-choice,
+.aislepilot-app .aislepilot-collapsible,
+.aislepilot-app .aislepilot-personalise-content {
+    background: var(--ap-refresh-surface);
+    border-color: var(--ap-refresh-border);
+    box-shadow: none;
+}
+.aislepilot-app .aislepilot-collapsible > summary { min-height: 48px; }
+.aislepilot-app .aislepilot-field-help { font-size: 0.875rem; }
+.aislepilot-app .aislepilot-head-primary-action {
+    background: var(--ap-refresh-primary);
+    box-shadow: none;
+}
+@media (max-width: 600px) {
+    .aislepilot-app .aislepilot-app-head { padding-top: 0; }
+    .aislepilot-app .aislepilot-setup-mode-switch { grid-template-columns: minmax(0, 1fr); }
+    .aislepilot-app .aislepilot-setup-mode-toggle { min-height: 4.5rem; }
+    .aislepilot-app .aislepilot-setup-workspace { gap: 1rem; }
+    .aislepilot-app .aislepilot-setup-track { flex-wrap: wrap; }
+    .aislepilot-app #aislepilot-setup :where(select, textarea, input:not([type='range'])) { font-size: 1rem; }
+}
+/* Match the specificity of the legacy dark-theme rules. */
+:root[data-theme] .aislepilot-app .aislepilot-app-head {
+    background: transparent;
+}
+:root[data-theme] .aislepilot-app .aislepilot-brand-lockup,
+:root[data-theme] .aislepilot-app .aislepilot-core-choice,
+:root[data-theme] .aislepilot-app .aislepilot-collapsible,
+:root[data-theme] .aislepilot-app .aislepilot-personalise-content {
+    background: var(--ap-refresh-surface);
+    border-color: var(--ap-refresh-border);
+}
+:root[data-theme] .aislepilot-app .aislepilot-setup-mode-switch {
+    background: transparent;
+    border: 0;
+}
+/* Keep setup choices close to the introduction, especially on a phone. */
+:root[data-theme] .aislepilot-app .aislepilot-setup-mode-toggle-kicker,
+.aislepilot-app .aislepilot-setup-track,
+.aislepilot-app .aislepilot-setup-mode-lede { display: none; }
+.aislepilot-app .aislepilot-setup-intro { max-width: 65ch; }
+.aislepilot-app .aislepilot-app-head-topline { margin-top: 0.25rem; }
+@media (max-width: 600px) {
+    .aislepilot-app .aislepilot-app-title { font-size: 1.85rem; }
+    .aislepilot-app .aislepilot-app-head { padding-bottom: 1rem; }
+    .aislepilot-app .aislepilot-setup-mode-switch { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+    .aislepilot-app .aislepilot-setup-mode-toggle { padding: 0.75rem !important; }
+    .aislepilot-app .aislepilot-setup-mode-toggle-main { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; text-align: left; }
+    .aislepilot-app .aislepilot-setup-mode-toggle-title { white-space: normal; line-height: 1.4; }
+    .aislepilot-app .aislepilot-setup-mode-toggle-icon { display: none; }
+}
+/* Shared colour contracts: legacy component rules must not introduce a second palette.
+   Important is restricted to colour properties because older styles also use it. */
+:root[data-theme] .aislepilot-app :is(
+    .aislepilot-field, .aislepilot-checkboxes, .aislepilot-outcome-summary,
+    .aislepilot-head-menu-panel, .aislepilot-head-menu-item,
+    .aislepilot-card-more-actions-panel, .aislepilot-overview-actions-panel,
+    .aislepilot-overview-supermarket-panel, .aislepilot-shopping-group,
+    .aislepilot-export-card, .aislepilot-mobile-context,
+    .aislepilot-slider-value, .aislepilot-card-meta-pill,
+    .aislepilot-day-meal-tabs, .aislepilot-day-card-meta,
+    .aislepilot-meal-primary-action, .aislepilot-more-actions-trigger
+) {
+    background: var(--ap-refresh-surface-strong) !important;
+    color: var(--ap-refresh-text);
+    border-color: var(--ap-refresh-border);
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-shared-setup, .aislepilot-planner-settings, .aislepilot-setup-step) {
+    background: transparent !important;
+}
+:root[data-theme] .aislepilot-app :is(select, textarea, input:not([type='range']):not([type='checkbox']):not([type='radio'])) {
+    background-color: var(--ap-refresh-surface);
+    color: var(--ap-refresh-text);
+    border-color: var(--ap-refresh-border-strong);
+}
+:root[data-theme] .aislepilot-app input { accent-color: var(--ap-refresh-primary); }
+:root[data-theme] .aislepilot-app .aislepilot-slider-input { background: transparent !important; }
+:root[data-theme] .aislepilot-app .aislepilot-slider-input::-webkit-slider-thumb { background: var(--ap-refresh-primary); border-color: var(--ap-refresh-primary); }
+:root[data-theme] .aislepilot-app .aislepilot-slider-input::-moz-range-thumb { background: var(--ap-refresh-primary); border-color: var(--ap-refresh-primary); }
+:root[data-theme] .aislepilot-app :is(.aislepilot-checkboxes label, .aislepilot-setup-mode-toggle:not(.is-active)) {
+    background: var(--ap-refresh-surface-strong) !important;
+    color: var(--ap-refresh-text);
+    border-color: var(--ap-refresh-border);
+}
+:root[data-theme] .aislepilot-app :is(
+    .aislepilot-head-primary-action, .aislepilot-head-menu-trigger,
+    .aislepilot-form button[type='submit'], .aislepilot-overview-regenerate-btn,
+    .aislepilot-setup-mode-toggle.is-active
+) {
+    background: var(--ap-refresh-primary) !important;
+    color: #fff !important;
+    border-color: var(--ap-refresh-primary);
+    box-shadow: none;
+}
+:root[data-theme] .aislepilot-app :is(
+    .aislepilot-head-primary-action, .aislepilot-head-menu-trigger,
+    .aislepilot-form button[type='submit'], .aislepilot-overview-regenerate-btn
+):hover {
+    background: var(--ap-refresh-primary-strong);
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-head-menu-item, .aislepilot-meal-primary-action):hover {
+    background: var(--ap-refresh-surface) !important;
+    border-color: var(--ap-refresh-border-strong);
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-head-menu-item.is-disabled, button:disabled) {
+    color: var(--ap-refresh-text-muted) !important;
+    background: var(--ap-refresh-surface-strong) !important;
+}
+:root[data-theme] .aislepilot-app .aislepilot-head-menu-item.is-danger { color: var(--ap-danger-text); }
+.aislepilot-app { --ap-danger-text: #922f2c; --ap-danger-surface: #fff1ed; --ap-danger-border: #d8aaa0; }
+:root[data-theme='dark'] .aislepilot-app { --ap-danger-text: #ffc0b0; --ap-danger-surface: #3a2825; --ap-danger-border: #956154; }
+:root[data-theme] .aislepilot-app :is(
+    .aislepilot-collapsible > summary, .aislepilot-app-head-status,
+    .aislepilot-app-highlights > li, .aislepilot-day-reorder-toggle,
+    .aislepilot-day-carousel-pagination, .aislepilot-card-more-actions-menu,
+    .aislepilot-shop-card, .aislepilot-checkbox-item,
+    .aislepilot-export-intro, .aislepilot-export-action,
+    .aislepilot-swap-btn.is-secondary, .aislepilot-export-btn.is-secondary,
+    .aislepilot-export-btn.is-tertiary, .aislepilot-meal-image-summary
+) {
+    background: var(--ap-refresh-surface-strong) !important;
+    color: var(--ap-refresh-text);
+    border-color: var(--ap-refresh-border);
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-app-head-actions, .aislepilot-symbol-glyph) { background: transparent !important; }
+:root[data-theme] .aislepilot-app :is(.is-carousel-ghost, .aislepilot-day-card-ghost-band, .aislepilot-day-card-ghost-panel) { background: var(--ap-refresh-surface-strong) !important; }
+:root[data-theme] .aislepilot-app .aislepilot-export-btn.is-primary {
+    background: var(--ap-refresh-primary) !important;
+    color: #fff !important;
+    border-color: var(--ap-refresh-primary);
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-overbudget-flag, .aislepilot-swap-btn.is-danger) {
+    background: var(--ap-danger-surface) !important;
+    color: var(--ap-danger-text);
+    border-color: var(--ap-danger-border);
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-overbudget-flag p, .aislepilot-mobile-context-budget-status.is-over-budget, .aislepilot-stat-value.is-over-budget) { color: var(--ap-danger-text); }
+:root[data-theme] .aislepilot-app .aislepilot-meal-image-hint {
+    background: rgb(23 34 28 / 0.85) !important;
+    color: #fff !important;
+}
+body:has(.aislepilot-app) { --ap-shell-surface: #fffefa; --ap-shell-text: #233d32; --ap-shell-border: #d9ded4; }
+:root[data-theme='dark'] body:has(.aislepilot-app) { --ap-shell-surface: #1e2c23; --ap-shell-text: #f0f2e9; --ap-shell-border: #405146; }
+:root[data-theme] body:has(.aislepilot-app) :is(.app-shell-back, .app-theme-toggle, .theme-toggle-track, .theme-toggle-thumb) {
+    background: var(--ap-shell-surface) !important;
+    color: var(--ap-shell-text) !important;
+    border-color: var(--ap-shell-border);
+    box-shadow: none;
+}
+:root[data-theme='dark'] .aislepilot-app .aislepilot-brand-logo { filter: brightness(0) invert(0.94); }
+:root[data-theme] .aislepilot-app .aislepilot-day-view-toggle {
+    background: var(--ap-refresh-surface-strong) !important;
+    color: var(--ap-refresh-text);
+    border-color: var(--ap-refresh-border);
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-view-toggle[aria-pressed='true'] {
+    background: var(--ap-refresh-primary) !important;
+    color: #fff !important;
+}
+:root[data-theme] .aislepilot-app .aislepilot-head-menu-trigger::before { background: none; }
+:root[data-theme] .aislepilot-app .aislepilot-head-menu-trigger { border-radius: 8px; }
+/* Native range handles and fixed value readouts share one layout at every size. */
+:root[data-theme] .aislepilot-app .aislepilot-slider-field {
+    position: relative;
+    padding: 0.85rem;
+}
+:root[data-theme] .aislepilot-app .aislepilot-slider-field > label { padding-right: 5rem; }
+:root[data-theme] .aislepilot-app .aislepilot-slider-meta {
+    position: absolute;
+    top: 0.65rem;
+    right: 0.85rem;
+    width: auto;
+    margin: 0;
+}
+:root[data-theme] .aislepilot-app .aislepilot-slider-field .aislepilot-slider-value {
+    position: static;
+    transform: none;
+    min-height: 1.5rem;
+    padding: 0.2rem 0.4rem;
+    box-shadow: none;
+    pointer-events: none;
+    cursor: default;
+    font-variant-numeric: tabular-nums;
+}
+:root[data-theme] .aislepilot-app .aislepilot-slider-input::-webkit-slider-runnable-track {
+    height: 6px;
+    background: linear-gradient(to right, var(--ap-refresh-primary) var(--slider-progress, 0%), var(--ap-refresh-border-strong) var(--slider-progress, 0%));
+}
+:root[data-theme] .aislepilot-app .aislepilot-slider-field .aislepilot-slider-input::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    margin-top: -8px;
+    opacity: 1;
+    background: var(--ap-refresh-primary);
+    border: 3px solid var(--ap-refresh-surface);
+    box-shadow: 0 0 0 1px var(--ap-refresh-primary);
+}
+:root[data-theme] .aislepilot-app .aislepilot-slider-input::-moz-range-track { height: 6px; background: var(--ap-refresh-border-strong); }
+:root[data-theme] .aislepilot-app .aislepilot-slider-input::-moz-range-progress { height: 6px; background: var(--ap-refresh-primary); }
+:root[data-theme] .aislepilot-app .aislepilot-slider-field .aislepilot-slider-input::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    opacity: 1;
+    background: var(--ap-refresh-primary);
+    border: 3px solid var(--ap-refresh-surface);
+    box-shadow: 0 0 0 1px var(--ap-refresh-primary);
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-mode-option, .aislepilot-supermarket-option, .aislepilot-meals-per-day-option, .aislepilot-toggle-chip) > span {
+    min-height: 44px;
+    border-radius: 8px;
+    background: var(--ap-refresh-surface);
+    color: var(--ap-refresh-text);
+    border: 1px solid var(--ap-refresh-border-strong);
+    box-shadow: none;
+    text-transform: none;
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-mode-option, .aislepilot-supermarket-option, .aislepilot-meals-per-day-option, .aislepilot-toggle-chip) > input:checked + span {
+    background: var(--ap-refresh-primary);
+    color: #fff;
+    border-color: var(--ap-refresh-primary);
+    box-shadow: inset 0 0 0 1px var(--ap-refresh-primary);
+}
+:root[data-theme] .aislepilot-app :is(.aislepilot-mode-option, .aislepilot-supermarket-option, .aislepilot-meals-per-day-option, .aislepilot-toggle-chip) > input:focus-visible + span {
+    outline: 2px solid var(--ap-refresh-accent);
+    outline-offset: 3px;
+}
