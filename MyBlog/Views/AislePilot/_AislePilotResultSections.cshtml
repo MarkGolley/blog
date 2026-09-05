@@ -248,8 +248,21 @@
             <div class="aislepilot-overview-title-row">
                 <div>
                     <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Weekly status</h2>
-                    <p class="aislepilot-overview-caption">Check the budget and weekly structure before reviewing each day.</p>
+                    <p class="aislepilot-overview-caption">
+                        @result.EstimatedTotalCost.ToString("C", ukCulture) meal estimate
+                        <span aria-hidden="true">&middot;</span>
+                        @budgetDeltaSummaryText
+                    </p>
                 </div>
+                <button type="button"
+                        class="aislepilot-overview-details-toggle"
+                        data-overview-toggle
+                        data-overview-toggle-collapsed-label="Plan details"
+                        data-overview-toggle-expanded-label="Hide details"
+                        aria-controls="aislepilot-overview-content"
+                        aria-expanded="@(result.IsOverBudget ? "true" : "false")">
+                    <span data-overview-toggle-label>@(result.IsOverBudget ? "Hide details" : "Plan details")</span>
+                </button>
             </div>
             <div class="aislepilot-overview-actions">
                 <div class="aislepilot-overview-actions-inline">
@@ -357,7 +370,7 @@
                 </details>
             </div>
         </div>
-        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content>
+        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content hidden="@(result.IsOverBudget ? null : "hidden")">
             @if (result.IsOverBudget)
             {
                 <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
@@ -445,9 +458,9 @@
                 <p class="aislepilot-mobile-context-meta">
                     <span class="aislepilot-mobile-context-title">Weekly plan</span>
                     <span class="aislepilot-mobile-context-meta-values">
-                        <span>Meal est. @result.EstimatedTotalCost.ToString("C", ukCulture)</span>
+                        <span>@result.PlanDays day plan</span>
                         <span aria-hidden="true">&middot;</span>
-                        <span class="aislepilot-mobile-context-budget-status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">@budgetDeltaSummaryText</span>
+                        <span>@result.MealsPerDay meal@(result.MealsPerDay == 1 ? string.Empty : "s") per day</span>
                     </span>
                 </p>
             </div>
@@ -764,6 +777,11 @@
                                                 @if (!isIgnored)
                                                 {
                                                     <div class="aislepilot-meal-primary-actions" data-meal-primary-actions aria-label="Primary meal actions">
+                                                        <button type="button"
+                                                                class="aislepilot-meal-primary-action is-recipe"
+                                                                data-recipe-details-trigger
+                                                                aria-controls="@detailsPanelId"
+                                                                aria-expanded="false">Recipe</button>
                                                         <button type="submit" form="@swapFormId" class="aislepilot-meal-primary-action" aria-label="Swap meal">Swap</button>
                                                         <button type="submit" form="@saveFormId" class="aislepilot-meal-primary-action@(isSavedMeal ? " is-saved" : string.Empty)" aria-label="@saveActionLabel">@(isSavedMeal ? "Unsave" : "Save")</button>
                                                     </div>

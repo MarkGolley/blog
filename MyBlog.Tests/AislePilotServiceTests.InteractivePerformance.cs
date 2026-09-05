@@ -133,6 +133,41 @@ public partial class AislePilotServiceTests
         Assert.Contains(result.MealPlan, meal => meal.IsSpecialTreat);
     }
 
+    [Fact]
+    public async Task BuildPlanAsync_WithInteractiveAiEnabled_DoesNotBlockOnSupermarketLayoutResearch()
+    {
+        ClearAiPool();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OPENAI_API_KEY"] = "test-key",
+                ["AislePilot:EnableAiGeneration"] = "true",
+                ["AislePilot:EnableInteractiveAiGeneration"] = "true",
+                ["AislePilot:AllowTemplateFallback"] = "true"
+            })
+            .Build();
+        using var handler = new CapturingEmptyResponseHandler();
+        using var httpClient = new HttpClient(handler);
+        var service = new AislePilotService(httpClient, configuration);
+
+        var result = await service.BuildPlanAsync(new AislePilotRequestModel
+        {
+            Supermarket = "Tesco",
+            DietaryModes = ["Balanced"],
+            CookDays = 1,
+            PlanDays = 1,
+            MealsPerDay = 1,
+            SelectedMealTypes = ["Dinner"],
+            WeeklyBudget = 35m,
+            HouseholdSize = 2
+        });
+
+        Assert.NotEmpty(result.MealPlan);
+        Assert.NotEmpty(handler.RequestBodies);
+        Assert.All(handler.RequestBodies, body =>
+            Assert.DoesNotContain("web_search", body, StringComparison.Ordinal));
+    }
+
     private sealed class SlowResponseHandler : HttpMessageHandler
     {
         private int _callCount;
@@ -145,6 +180,21 @@ public partial class AislePilotServiceTests
         {
             Interlocked.Increment(ref _callCount);
             await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
+        }
+    }
+
+    private sealed class CapturingEmptyResponseHandler : HttpMessageHandler
+    {
+        public List<string> RequestBodies { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestBodies.Add(request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken));
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
         }
     }

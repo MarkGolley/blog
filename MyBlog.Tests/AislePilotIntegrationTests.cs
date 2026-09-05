@@ -1050,7 +1050,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("class=\"aislepilot-mobile-context-meta-values\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Your weekly plan", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("data-overview-content hidden", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-overview-content hidden=\"hidden\"", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1288,7 +1288,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         var match = Regex.Match(
             html,
-            @"<span class=""aislepilot-mobile-context-budget-status[^""]*"">\s*(?<value>[^<]+)\s*</span>",
+            @"<p class=""aislepilot-overview-caption"">\s*[^<]+\s*<span[^>]*>[^<]*</span>\s*(?<value>[^<]+)\s*</p>",
             RegexOptions.IgnoreCase);
         Assert.True(match.Success, "Could not find weekly summary budget text.");
         var raw = WebUtility.HtmlDecode(match.Groups["value"].Value);

@@ -18,6 +18,25 @@
 :root[data-theme] .aislepilot-app .aislepilot-stat-card::before,
 :root[data-theme] .aislepilot-app .aislepilot-stat-card::after { display: none; }
 .aislepilot-app .aislepilot-budget-grid { gap: 0.25rem; }
+.aislepilot-app .aislepilot-overview-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+}
+.aislepilot-app .aislepilot-overview-details-toggle {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--ap-refresh-border);
+    border-radius: 8px;
+    background: var(--ap-refresh-surface-strong);
+    color: var(--ap-refresh-text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
 .aislepilot-app .aislepilot-stat-label { font-size: 0.75rem; letter-spacing: 0.04em; }
 .aislepilot-app .aislepilot-stat-value { font-size: 1.1rem; }
 .aislepilot-app .aislepilot-budget-grid--primary {
@@ -93,6 +112,14 @@
     border: 1px solid var(--ap-refresh-border);
     border-radius: 8px;
     box-shadow: none;
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-primary-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-primary-action.is-recipe {
+    background: var(--ap-refresh-primary) !important;
+    color: #fff !important;
+    border-color: var(--ap-refresh-primary) !important;
 }
 .aislepilot-app.has-results .aislepilot-head-action-note { display: none; }
 :root[data-theme] .aislepilot-app .aislepilot-app-head-actions { background: transparent; border: 0; box-shadow: none; padding: 0; }

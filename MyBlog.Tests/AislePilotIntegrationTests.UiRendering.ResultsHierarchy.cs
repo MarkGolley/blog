@@ -37,5 +37,9 @@ public partial class AislePilotIntegrationTests
         Assert.True(shopping < exports, "Shopping must precede exports.");
         Assert.Contains(">Weekly status<", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Review days and meals first, then open shopping or exports.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-overview-toggle", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-overview-content hidden=\"hidden\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-recipe-details-trigger", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Recipe</button>", html, StringComparison.OrdinalIgnoreCase);
     }
 }

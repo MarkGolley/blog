@@ -2993,6 +2993,7 @@
 
             toggle.dataset.inlineDetailsWired = "true";
             const summary = toggle.querySelector("summary");
+            const recipeTriggers = Array.from(mealPanel.querySelectorAll("[data-recipe-details-trigger]"));
 
             const syncDetailsPanel = () => {
                 const isExpanded = toggle.open;
@@ -3007,6 +3008,11 @@
                     detailsPanel.setAttribute("hidden", "hidden");
                     detailsPanel.setAttribute("aria-hidden", "true");
                 }
+
+                recipeTriggers.forEach(trigger => {
+                    trigger.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+                    trigger.textContent = isExpanded ? "Hide recipe" : "Recipe";
+                });
 
                 updateViewportHeight(true);
             };
@@ -3031,6 +3037,14 @@
                     applyRememberedDayMealSlotToCard(card);
                 });
             }
+
+            recipeTriggers.forEach(trigger => {
+                trigger.addEventListener("click", () => {
+                    if (summary instanceof HTMLElement) {
+                        summary.click();
+                    }
+                });
+            });
 
             toggle.addEventListener("toggle", syncDetailsPanel);
             syncDetailsPanel();

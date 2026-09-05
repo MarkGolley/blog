@@ -219,7 +219,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_RendersPersistentPlanSnapshotWithoutOverviewToggle()
+    public async Task Index_Post_RendersCompactExpandablePlanSnapshot()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -244,10 +244,10 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
         Assert.Contains("Your weekly plan", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Check the budget and weekly structure before reviewing each day.", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("data-overview-toggle", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("meal estimate", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-overview-toggle", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("data-setup-toggle-label", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("data-overview-content hidden", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-overview-content hidden=\"hidden\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Adjust settings", html, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -816,7 +816,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     }
 
     [Fact]
-    public async Task Index_Post_WithThreeMealsPerDay_RendersStyledBudgetStatusInWeeklyPlanSummary()
+    public async Task Index_Post_WithThreeMealsPerDay_RendersCompactPlanShapeInMobileSummary()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -839,15 +839,9 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
-        var css = await GetCombinedAislePilotCssAsync(client);
-
-        Assert.Matches(
-            new Regex(
-                @"<span[^>]*class=""[^""]*aislepilot-mobile-context-budget-status[^""]*(?:is-over-budget|is-on-budget)[^""]*""[^>]*>[^<]*(?:under|over|On budget)[^<]*</span>",
-                RegexOptions.IgnoreCase),
-            html);
-        Assert.Contains(".aislepilot-mobile-context-budget-status.is-over-budget", css, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(".aislepilot-mobile-context-budget-status.is-on-budget", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">2 day plan</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">3 meals per day</span>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("aislepilot-mobile-context-budget-status", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

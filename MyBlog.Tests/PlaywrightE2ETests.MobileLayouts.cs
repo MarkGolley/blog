@@ -811,7 +811,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotOverviewActions_UseHamburgerMenuForRefreshAndSettings()
+    public async Task Mobile_AislePilotOverviewActions_UseHamburgerMenuForRefreshAndSave()
     {
         if (!IsE2EEnabled())
         {
@@ -885,9 +885,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
                 const rect = menu.getBoundingClientRect();
                 const refresh = menu.querySelector(".aislepilot-overview-regenerate-btn");
-                const settings = menu.querySelector(".aislepilot-edit-setup-btn");
+                const save = menu.querySelectorAll(".aislepilot-overview-regenerate-btn")[1];
                 const refreshText = refresh instanceof HTMLElement ? (refresh.textContent || "").trim() : "";
-                const settingsText = settings instanceof HTMLElement ? (settings.textContent || "").trim() : "";
+                const saveText = save instanceof HTMLElement ? (save.textContent || "").trim() : "";
                 const mobileContext = document.querySelector(".aislepilot-mobile-context");
 
                 const isButtonCenterVisible = button => {
@@ -917,9 +917,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     Math.max(0, rect.right - (window.innerWidth - 8)),
                     menu.querySelectorAll(".aislepilot-overview-regenerate-btn, .aislepilot-edit-setup-btn").length,
                     refreshText,
-                    settingsText,
+                    saveText,
                     isButtonCenterVisible(refresh) ? 1 : 0,
-                    isButtonCenterVisible(settings) ? 1 : 0,
+                    isButtonCenterVisible(save) ? 1 : 0,
                     Number.isFinite(menuZIndex) ? menuZIndex : -1,
                     Number.isFinite(mobileContextZIndex) ? mobileContextZIndex : -1,
                     overviewSection instanceof HTMLElement && overviewSection.classList.contains("is-actions-menu-open") ? 1 : 0
@@ -930,9 +930,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(10, menuMetrics.Length);
         Assert.True(Convert.ToDouble(menuMetrics[0]) <= 1.5, $"Expected overview menu to stay inside viewport on left edge. Overflow={menuMetrics[0]}.");
         Assert.True(Convert.ToDouble(menuMetrics[1]) <= 1.5, $"Expected overview menu to stay inside viewport on right edge. Overflow={menuMetrics[1]}.");
-        Assert.Equal(3, Convert.ToInt32(menuMetrics[2]));
+        Assert.Equal(2, Convert.ToInt32(menuMetrics[2]));
         Assert.Contains("Refresh plan", Convert.ToString(menuMetrics[3]), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("settings", Convert.ToString(menuMetrics[4]), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Save week", Convert.ToString(menuMetrics[4]), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, Convert.ToInt32(menuMetrics[5]));
         Assert.Equal(1, Convert.ToInt32(menuMetrics[6]));
         Assert.True(

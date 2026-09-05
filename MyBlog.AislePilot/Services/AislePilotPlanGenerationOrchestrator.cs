@@ -14,9 +14,7 @@ public sealed class AislePilotPlanGenerationOrchestrator : IAislePilotPlanGenera
     {
         var totalStopwatch = Stopwatch.StartNew();
         var contextStopwatch = Stopwatch.StartNew();
-        var context = service.EnableInteractiveAiGeneration
-            ? await service.BuildPlanContextAsync(request, cancellationToken)
-            : service.BuildPlanContextForInteractiveRequest(request);
+        var context = service.BuildPlanContextForInteractiveRequest(request);
         var contextElapsedMs = contextStopwatch.ElapsedMilliseconds;
         AislePilotTelemetry.RecordPlanStage("context", contextStopwatch.Elapsed);
         var planDays = AislePilotService.NormalizePlanDays(request.PlanDays);
