@@ -151,6 +151,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
 
         var indexHtml = await client.GetStringAsync("/projects/aisle-pilot");
         Assert.Contains("data-head-menu", indexHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Saved in this browser", indexHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-head-menu-section-title", indexHtml, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(">Saved weeks<", indexHtml, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("id=\"aislepilot-saved-weeks\"", indexHtml, StringComparison.OrdinalIgnoreCase);

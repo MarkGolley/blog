@@ -685,15 +685,6 @@
                      role="tabpanel"
                      data-setup-mode-panel="planner"
                      @plannerModeHiddenAttribute>
-                <div class="aislepilot-setup-step-head">
-                    <p class="aislepilot-setup-step-kicker">Step 3</p>
-                    <h3 class="aislepilot-setup-step-title">Plan my week</h3>
-                    <p class="aislepilot-setup-step-copy">Review the snapshot, then build a meal plan, recipes, and a supermarket-ordered shopping list.</p>
-                </div>
-                <div class="aislepilot-setup-mode-head">
-                    <p class="aislepilot-setup-mode-copy">Build your weekly plan, recipes, and supermarket-ordered shopping list.</p>
-                </div>
-
                 <div class="aislepilot-setup-sections">
                     <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics"
                               hidden
@@ -782,7 +773,7 @@
 
                 <div class="aislepilot-submit-actions">
                     <div class="aislepilot-outcome-summary" aria-labelledby="aislepilot-planner-outcome-title">
-                        <p class="aislepilot-outcome-kicker">What you will get</p>
+                        <p class="aislepilot-outcome-kicker">Review and generate</p>
                         <h4 id="aislepilot-planner-outcome-title">Complete plan for <span data-plan-basic-mirror="plan-days">@selectedPlanDays days</span></h4>
                         <p><span data-plan-basic-mirror="meal-types">@selectedMealTypesSummaryText</span> for <span data-household-count>@safeHouseholdSize</span>, recipes and a <span data-plan-basic-mirror="supermarket">@FormatSupermarketLabel(selectedSupermarket)</span>-ordered shopping list aiming for your <span data-plan-basic-mirror="budget">@Model.Request.WeeklyBudget.ToString("C0", ukCulture)</span> budget.</p>
                     </div>
@@ -809,19 +800,11 @@
                      role="tabpanel"
                      data-setup-mode-panel="generator"
                      @generatorModeHiddenAttribute>
-                <div class="aislepilot-setup-step-head">
-                    <p class="aislepilot-setup-step-kicker">Step 3</p>
-                    <h3 class="aislepilot-setup-step-title">Use my ingredients</h3>
-                    <p class="aislepilot-setup-step-copy">Create three quick ideas based on the foods already in your kitchen.</p>
-                </div>
-                <div class="aislepilot-setup-mode-head">
-                    <p class="aislepilot-setup-mode-copy">Use your on-hand foods to generate 3 quick meal ideas.</p>
-                </div>
                 <div class="aislepilot-submit-actions aislepilot-generator-submit-actions">
                     <div class="aislepilot-outcome-summary" aria-labelledby="aislepilot-generator-outcome-title">
-                        <p class="aislepilot-outcome-kicker">What you will get</p>
+                        <p class="aislepilot-outcome-kicker">Review and generate</p>
                         <h4 id="aislepilot-generator-outcome-title">Three practical meal ideas</h4>
-                        <p>Quick suggestions shaped around the ingredients you listed, with dietary preferences applied.</p>
+                        <p>Based on <span data-pantry-summary title="@pantrySummaryText">@pantrySummaryText</span>, with your dietary and cooking preferences applied.</p>
                     </div>
                     <button
                         type="submit"

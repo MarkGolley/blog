@@ -1078,29 +1078,12 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         var budgetDifferenceText = ExtractOverviewBudgetDifferenceText(html);
         var weeklySummaryText = ExtractWeeklyBudgetSummaryText(html);
 
+        Assert.Equal(budgetDifferenceText, weeklySummaryText, ignoreCase: true);
         Assert.True(
-            decimal.TryParse(
-                budgetDifferenceText.Replace("\u00A0", " "),
-                NumberStyles.Currency,
-                CultureInfo.GetCultureInfo("en-GB"),
-                out var budgetDifferenceValue),
-            $"Could not parse budget difference value '{budgetDifferenceText}'.");
-
-        if (budgetDifferenceValue < 0m)
-        {
-            Assert.Contains("over", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("under", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
-            return;
-        }
-
-        if (budgetDifferenceValue > 0m)
-        {
-            Assert.Contains("under", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("over", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
-            return;
-        }
-
-        Assert.Contains("on budget", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
+            budgetDifferenceText.Contains("over budget", StringComparison.OrdinalIgnoreCase) ||
+            budgetDifferenceText.Contains("left in budget", StringComparison.OrdinalIgnoreCase) ||
+            budgetDifferenceText.Contains("on budget", StringComparison.OrdinalIgnoreCase),
+            $"Expected a plain-language budget direction, received '{budgetDifferenceText}'.");
     }
 
     [Fact]

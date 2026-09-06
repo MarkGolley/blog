@@ -5,7 +5,7 @@ namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
     [Fact]
-    public async Task Mobile_AislePilotDayTabs_WrapWithoutNestedHorizontalScrolling()
+    public async Task Mobile_AislePilotDayTabs_UseSingleScrollableRail()
     {
         if (!IsE2EEnabled())
         {
@@ -42,9 +42,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             }
             """);
         Assert.Equal(3, tabLayout.Length);
-        Assert.InRange(Convert.ToDouble(tabLayout[0]), 0d, 1d);
+        Assert.True(Convert.ToDouble(tabLayout[0]) > 1d, "Expected the seven day tabs to use a horizontally scrollable rail.");
         Assert.Equal("aislepilot-meals", Convert.ToString(tabLayout[1]));
-        Assert.True(Convert.ToInt32(tabLayout[2]) >= 2, $"Expected seven mobile day tabs to wrap onto multiple rows. Rows={tabLayout[2]}.");
+        Assert.Equal(1, Convert.ToInt32(tabLayout[2]));
     }
 
     [Fact]
@@ -245,5 +245,28 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     && /Recipe/i.test(primaryText);
             }
             """);
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotDayChange_CollapsesRecipeFromPreviousDay()
+    {
+        if (!IsE2EEnabled()) return;
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+        await GoToAislePilotAndGeneratePlanAsync(page);
+
+        var firstDay = page.Locator("[data-day-card-slide]:not([data-day-carousel-ghost='true'])").First;
+        var recipe = firstDay.Locator("[data-recipe-details-trigger]").First;
+        await recipe.ClickAsync();
+        Assert.Equal("true", await recipe.GetAttributeAsync("aria-expanded"));
+
+        await page.Locator("[data-day-carousel-dot][data-day-carousel-target='1']").First.ClickAsync();
+        await page.WaitForFunctionAsync("""
+            () => document.querySelector("[data-day-carousel-dot][data-day-carousel-target='1']")?.getAttribute("aria-selected") === "true"
+                && document.querySelector("[data-day-card-slide]:not([data-day-carousel-ghost='true']) [data-recipe-details-trigger]")?.getAttribute("aria-expanded") === "false"
+        """);
+
+        Assert.Equal("false", await recipe.GetAttributeAsync("aria-expanded"));
+        Assert.False(await firstDay.Locator("[data-inline-details-panel]").First.IsVisibleAsync());
     }
 }

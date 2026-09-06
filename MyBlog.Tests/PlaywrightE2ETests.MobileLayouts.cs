@@ -1012,6 +1012,71 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mobile_AislePilotOverBudgetStatus_RemainsVisibleWithCollapsedDetailsAndRebalancesOnce()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.Locator("input[name='Request.WeeklyBudget']:not(:disabled)").EvaluateAsync(
+            """
+            element => {
+                element.value = '105';
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            """);
+        await page.Locator("[data-setup-mode-submit='planner']").ClickAsync(new LocatorClickOptions { Force = true });
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var details = page.Locator("[data-overview-content]");
+        var toggle = page.Locator("[data-overview-toggle]");
+        var warning = page.Locator(".aislepilot-overbudget-flag");
+        var recovery = warning.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Refresh lower-cost plan" });
+        Assert.True(await warning.IsVisibleAsync());
+        Assert.True(await recovery.IsVisibleAsync());
+        Assert.True(await details.IsHiddenAsync());
+        Assert.Equal("false", await toggle.GetAttributeAsync("aria-expanded"));
+        Assert.Contains("over budget", await page.Locator(".aislepilot-overview-caption").TextContentAsync(), StringComparison.OrdinalIgnoreCase);
+
+        await toggle.ClickAsync();
+        Assert.True(await details.IsVisibleAsync());
+        Assert.Equal("true", await toggle.GetAttributeAsync("aria-expanded"));
+        Assert.True(await warning.IsVisibleAsync());
+        await toggle.ClickAsync();
+        Assert.True(await details.IsHiddenAsync());
+        Assert.Equal("false", await toggle.GetAttributeAsync("aria-expanded"));
+        Assert.True(await warning.IsVisibleAsync());
+
+        var navBottom = await page.Locator(".aislepilot-window-tabs").EvaluateAsync<double>("element => element.getBoundingClientRect().bottom");
+        Assert.True(navBottom <= 844, $"Expected Meals, Shop and Export navigation in the first viewport. Bottom={navBottom:F1}px.");
+
+        var rebalancePosts = 0;
+        page.Request += (_, request) =>
+        {
+            if (request.Method == "POST" && request.Url.Contains("rebalance-budget", StringComparison.OrdinalIgnoreCase))
+            {
+                rebalancePosts++;
+            }
+        };
+        Assert.Equal("105", await warning.Locator("input[name='Request.WeeklyBudget']").InputValueAsync());
+        await recovery.ClickAsync();
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        Assert.Equal(1, rebalancePosts);
+        Assert.True(await page.Locator("input[name='Request.WeeklyBudget'][value='105']").CountAsync() > 0);
+    }
+
+    [Fact]
     public async Task Mobile_AislePilotDayCarousel_ShowsSinglePrimarySlideAndHeaderSummary()
     {
         if (!IsE2EEnabled())

@@ -65,6 +65,10 @@ try {
     if ($Mode -eq "Tests" -or $Mode -eq "PreDeploy") {
         Stop-LocalMyBlogHosts
 
+        Invoke-Step -Name "Testing deployment version probe" -Action {
+            powershell -NoProfile -ExecutionPolicy Bypass -File ".\Deployment\tests\app-version-probe.tests.ps1"
+        }
+
         $testArgs = @("test", $testProject)
         if (-not $hasOpenAiKey) {
             Write-Host "OPENAI_API_KEY is not set. Skipping live moderation test (AIModerationServiceLiveTests)."

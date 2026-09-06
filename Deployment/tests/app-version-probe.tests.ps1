@@ -16,7 +16,7 @@ $eventualHeaders = {
     $script:attempt++
     if ($script:attempt -eq 1) {
         return @("HTTP/1.1 503 Service Unavailable", "server: Google Frontend")
-+    }
+    }
 
     return @("HTTP/1.1 200 OK", "x-app-version: production-test")
 }

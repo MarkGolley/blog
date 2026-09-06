@@ -1090,6 +1090,7 @@ public sealed partial class AislePilotService : IAislePilotService
     private readonly AislePilotNutritionRecipeFallbackEngine _nutritionRecipeFallbackEngine;
     private readonly AislePilotPantryRankingEngine _pantryRankingEngine;
     private readonly IAislePilotBackgroundTaskQueue? _backgroundTaskQueue;
+    private readonly TimeSpan _aiMealPoolRetention;
     private readonly TimeSpan _mealImageDiskRetention;
     private readonly TimeSpan _mealImageFirestoreRetention;
     private readonly TimeSpan _mealImageCleanupInterval;
@@ -1133,6 +1134,8 @@ public sealed partial class AislePilotService : IAislePilotService
             configuration?["AislePilot:UtilityReasoningEffort"],
             "none");
         _imageModel = configuration?["AislePilot:ImageModel"] ?? "gpt-image-2";
+        _aiMealPoolRetention = TimeSpan.FromDays(Math.Clamp(
+            configuration?.GetValue("AislePilot:AiMealPoolRetentionDays", 30) ?? 30, 7, 180));
         _mealImageDiskRetention = TimeSpan.FromDays(Math.Clamp(
             configuration?.GetValue("AislePilot:MealImageDiskRetentionDays", 30) ?? 30, 7, 365));
         _mealImageFirestoreRetention = TimeSpan.FromDays(Math.Clamp(

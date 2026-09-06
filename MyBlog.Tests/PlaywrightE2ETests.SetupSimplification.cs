@@ -5,6 +5,72 @@ namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests
 {
     [Fact]
+    public async Task AislePilotFreshSetup_KeepsMobileReviewCompactAndDesktopSummaryUseful()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        if (_browser is null || _appHost is null)
+        {
+            throw new InvalidOperationException("Playwright is not initialized.");
+        }
+
+        await using (var mobileContext = await _browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            IsMobile = true,
+            HasTouch = true,
+            DeviceScaleFactor = 2,
+            ViewportSize = new ViewportSize { Width = 390, Height = 844 }
+        }))
+        {
+            var page = await mobileContext.NewPageAsync();
+            await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+            var metrics = await page.EvaluateAsync<double[]>(
+                """
+                () => {
+                    const setup = document.querySelector('#aislepilot-setup');
+                    const review = document.querySelector('#aislepilot-planner-mode .aislepilot-outcome-summary');
+                    const action = document.querySelector("#aislepilot-planner-mode [data-setup-mode-submit='planner']");
+                    const detailedSummary = document.querySelector('.aislepilot-setup-summary:not(.is-generator)');
+                    const visibleSubmits = [...document.querySelectorAll('[data-setup-mode-submit]')]
+                        .filter(element => {
+                            const rect = element.getBoundingClientRect();
+                            const style = getComputedStyle(element);
+                            return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden';
+                        });
+                    if (!(setup instanceof HTMLElement) || !(review instanceof HTMLElement)
+                        || !(action instanceof HTMLElement) || !(detailedSummary instanceof HTMLElement)) return [-1, -1, -1, -1];
+                    return [
+                        setup.getBoundingClientRect().height,
+                        action.getBoundingClientRect().top - review.getBoundingClientRect().bottom,
+                        getComputedStyle(detailedSummary).display === 'none' ? 1 : 0,
+                        visibleSubmits.length
+                    ];
+                }
+                """);
+
+            Assert.True(metrics[0] <= 2234, $"Expected compact setup at or below 2,234px. Height={metrics[0]:F1}px.");
+            Assert.True(metrics[1] >= 7, $"Expected review immediately before action with at least 8px separation. Gap={metrics[1]:F1}px.");
+            Assert.Equal(1, metrics[2]);
+            Assert.Equal(1, metrics[3]);
+        }
+
+        await using (var desktopContext = await CreateDesktopContextAsync())
+        {
+            var page = await desktopContext.NewPageAsync();
+            await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+            Assert.True(await page.Locator(".aislepilot-setup-summary:not(.is-generator)").IsVisibleAsync());
+            Assert.True(await page.Locator("#aislepilot-planner-mode .aislepilot-outcome-summary").IsVisibleAsync());
+        }
+    }
+
+    [Fact]
     public async Task NarrowMobile_AislePilotSetupControlsMeetTouchTargetAndSpacingContract()
     {
         if (!IsE2EEnabled())

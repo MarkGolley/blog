@@ -102,8 +102,8 @@
     var householdLabel = safeHouseholdSize == 1 ? "person" : "people";
     var budgetDeltaSummaryText = result.BudgetDelta switch
     {
-        > 0m => $"{result.BudgetDelta.ToString("C", ukCulture)} under",
-        < 0m => $"{Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over",
+        > 0m => $"{result.BudgetDelta.ToString("C", ukCulture)} left in budget",
+        < 0m => $"{Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over budget",
         _ => "On budget"
     };
     var layoutInsight = result.LayoutInsight ?? new AislePilotSupermarketLayoutInsightViewModel();
@@ -260,8 +260,8 @@
                         data-overview-toggle-collapsed-label="Plan details"
                         data-overview-toggle-expanded-label="Hide details"
                         aria-controls="aislepilot-overview-content"
-                        aria-expanded="@(result.IsOverBudget ? "true" : "false")">
-                    <span data-overview-toggle-label>@(result.IsOverBudget ? "Hide details" : "Plan details")</span>
+                        aria-expanded="false">
+                    <span data-overview-toggle-label>Plan details</span>
                 </button>
             </div>
             <div class="aislepilot-overview-actions">
@@ -370,33 +370,33 @@
                 </details>
             </div>
         </div>
-        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content hidden="@(result.IsOverBudget ? null : "hidden")">
-            @if (result.IsOverBudget)
-            {
-                <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
-                    <p class="aislepilot-overbudget-title">
-                        This plan is @Math.Abs(result.BudgetDelta).ToString("C", ukCulture) over your weekly budget.
-                    </p>
-                    <p class="aislepilot-overbudget-note">
-                        @(string.IsNullOrWhiteSpace(result.BudgetRebalanceStatusMessage)
-                            ? "Keep this plan if you are happy to spend more, or refresh with a lower-cost mix."
-                            : result.BudgetRebalanceStatusMessage)
-                    </p>
-                    <form method="post"
-                          action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"
-                          class="aislepilot-overview-regenerate-form">
-                        @Html.AntiForgeryToken()
-                        <partial name="_AislePilotHiddenRequestFields"
-                                 model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                        <button type="submit"
-                                class="aislepilot-overview-regenerate-btn"
-                                data-loading-label="Refreshing lower-cost plan..."
-                                data-show-plan-skeleton>
-                            Refresh lower-cost plan
-                        </button>
-                    </form>
-                </div>
-            }
+        @if (result.IsOverBudget)
+        {
+            <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
+                <p class="aislepilot-overbudget-title">
+                    This plan is @Math.Abs(result.BudgetDelta).ToString("C", ukCulture) over your weekly budget.
+                </p>
+                <p class="aislepilot-overbudget-note">
+                    @(string.IsNullOrWhiteSpace(result.BudgetRebalanceStatusMessage)
+                        ? "Keep this plan if you are happy to spend more, or refresh with a lower-cost mix."
+                        : result.BudgetRebalanceStatusMessage)
+                </p>
+                <form method="post"
+                      action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"
+                      class="aislepilot-overview-regenerate-form">
+                    @Html.AntiForgeryToken()
+                    <partial name="_AislePilotHiddenRequestFields"
+                             model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                    <button type="submit"
+                            class="aislepilot-overview-regenerate-btn"
+                            data-loading-label="Refreshing lower-cost plan..."
+                            data-show-plan-skeleton>
+                        Refresh lower-cost plan
+                    </button>
+                </form>
+            </div>
+        }
+        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content hidden="hidden">
             <div class="aislepilot-budget-grid aislepilot-budget-grid--primary"
                  data-overview-primary-grid>
                 <article class="aislepilot-stat-card aislepilot-stat-card--meta aislepilot-stat-card--supermarket"
@@ -423,7 +423,7 @@
                 <article class="aislepilot-stat-card aislepilot-stat-card--status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                     <p class="aislepilot-stat-label">Budget difference</p>
                     <p class="aislepilot-stat-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
-                        @result.BudgetDelta.ToString("C", ukCulture)
+                        @budgetDeltaSummaryText
                     </p>
                 </article>
             </div>
@@ -1123,6 +1123,20 @@
                     <p class="aislepilot-window-meta">
                         @mealIngredientEstimateLabel: @result.EstimatedTotalCost.ToString("C", ukCulture). @shoppingEstimateDisclaimer
                     </p>
+                    <p class="aislepilot-shopping-instruction">Tick items you have or have picked up. This does not change the plan estimate.</p>
+                    <div class="aislepilot-shopping-toolbar">
+                        <p class="aislepilot-shopping-progress" data-shopping-progress role="status" aria-live="polite"></p>
+                        <label class="aislepilot-shopping-filter">
+                            <input type="checkbox" data-shopping-hide-checked />
+                            <span data-shopping-filter-label>Hide checked items</span>
+                        </label>
+                        <button type="button" class="aislepilot-shopping-reset" data-shopping-reset>Reset checks</button>
+                        <div class="aislepilot-shopping-reset-confirm" data-shopping-reset-confirm hidden>
+                            <span>Clear all checks from this list?</span>
+                            <button type="button" data-shopping-reset-accept>Reset</button>
+                            <button type="button" data-shopping-reset-cancel>Cancel</button>
+                        </div>
+                    </div>
                     @if (result.IncludeDessertAddOn)
                     {
                         <p class="aislepilot-window-meta">
@@ -1132,10 +1146,10 @@
                     <div class="aislepilot-shopping-grid">
                         @foreach (var department in groupedItems)
                         {
-                            <article class="aislepilot-card aislepilot-shop-card">
+                            <article class="aislepilot-card aislepilot-shop-card" data-shopping-department>
                                 <div class="aislepilot-shop-card-head">
                                     <h3>@department.Key</h3>
-                                    <span class="aislepilot-shop-card-count">@department.Count() item(s)</span>
+                                    <span class="aislepilot-shop-card-count" data-shopping-department-count>@department.Count() item(s)</span>
                                 </div>
                                 <ul class="aislepilot-shop-list">
                                     @foreach (var item in department)
@@ -1147,8 +1161,12 @@
                                                    data-shopping-item-key="@shoppingItemKey">
                                                 <input type="checkbox"
                                                        data-shopping-item-input
-                                                       aria-label="Mark @item.Name as already have this ingredient" />
-                                                <span data-shopping-item-text>@item.Name (@item.QuantityDisplay) - Est. @item.EstimatedCost.ToString("C", ukCulture)</span>
+                                                       aria-label="Mark @item.Name as picked up or already available" />
+                                                <span class="aislepilot-shopping-item-content">
+                                                    <span class="aislepilot-shopping-item-name" data-shopping-item-text>@item.Name</span>
+                                                    <span class="aislepilot-shopping-item-quantity">@item.QuantityDisplay</span>
+                                                    <span class="aislepilot-shopping-item-price">Est. @item.EstimatedCost.ToString("C", ukCulture)</span>
+                                                </span>
                                             </label>
                                         </li>
                                     }
@@ -1182,16 +1200,16 @@
                 <section id="aislepilot-export" aria-label="Exports" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel aislepilot-export-panel" data-window-name="Exports" data-results-stage="exports">
                     <div class="aislepilot-export-intro">
                         <p class="aislepilot-export-eyebrow">Take this plan with you</p>
-                        <h3 class="aislepilot-export-title">Start with the shopping list on your phone.</h3>
-                        <p class="aislepilot-export-copy">Share is the quickest option for supermarket trips. Download the PDF when you want the full week, and keep the text checklist as a lightweight backup.</p>
+                        <h3 class="aislepilot-export-title">Share or download your shopping list.</h3>
+                        <p class="aislepilot-export-copy">Share or copy your list into another app. Downloads and printing include the full list, including items currently hidden after being checked.</p>
                     </div>
 
                     <div class="aislepilot-export-actions">
                         <article class="aislepilot-export-action is-primary" data-notes-export-shell>
                             <div class="aislepilot-export-card-copy">
                                 <p class="aislepilot-export-card-kicker">Best for shopping now</p>
-                                <h4 class="aislepilot-export-card-title">Share to your phone</h4>
-                                <p class="aislepilot-export-card-description">Opens the share sheet on supported devices and can fall back to copying the list when sharing is unavailable.</p>
+                                <h4 class="aislepilot-export-card-title">Share shopping list</h4>
+                                <p class="aislepilot-export-card-description">Opens your device share sheet, or copies the list when sharing is unavailable.</p>
                             </div>
                             <textarea hidden data-notes-export-content>@shoppingListNotesText</textarea>
                             <button type="button"

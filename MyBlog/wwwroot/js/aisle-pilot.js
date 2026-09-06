@@ -16,10 +16,12 @@
         getSubmitButton,
         hidePlanLoadingShell,
         resetFormSubmittingState,
+        readExportDownloadFileName,
         schedulePlanBasicsSliderRefresh,
         setSubmitButtonLoadingState,
         showToast,
         startMealImagePolling,
+        triggerFileDownload,
         swapScrollRestoreDurationMs,
         syncMobileContextOffset,
         wireCustomAisleFieldVisibility,
@@ -4180,13 +4182,39 @@
                 return Math.max(0, Math.min(maxScrollLeft, Math.round(centeredLeft)));
             };
 
+            const resetSlideExpansion = slide => {
+                if (!(slide instanceof HTMLElement)) return;
+                slide.querySelectorAll("[data-inline-details-toggle]").forEach(toggle => {
+                    if (!(toggle instanceof HTMLDetailsElement)) return;
+                    toggle.open = false;
+                    toggle.querySelector("summary")?.setAttribute("aria-expanded", "false");
+                    const mealPanel = toggle.closest("[data-day-meal-panel]");
+                    const detailsPanel = mealPanel?.querySelector("[data-inline-details-panel]");
+                    if (detailsPanel instanceof HTMLElement) {
+                        detailsPanel.hidden = true;
+                        detailsPanel.setAttribute("aria-hidden", "true");
+                    }
+                    mealPanel?.querySelectorAll("[data-recipe-details-trigger]").forEach(trigger => {
+                        trigger.setAttribute("aria-expanded", "false");
+                        trigger.textContent = "Recipe";
+                    });
+                });
+                slide.querySelectorAll("[data-card-more-actions]").forEach(menu => {
+                    if (menu instanceof HTMLDetailsElement) closeCardMoreActionsMenuImmediately(menu);
+                });
+            };
+
             const updateChrome = (nextIndex, options = {}) => {
                 const slides = getSlides();
                 if (slides.length === 0) {
                     return;
                 }
 
-                activeIndex = clampIndex(nextIndex);
+                const nextActiveIndex = clampIndex(nextIndex);
+                if (!isStackedPresentationMode() && nextActiveIndex !== activeIndex) {
+                    resetSlideExpansion(slides[activeIndex]);
+                }
+                activeIndex = nextActiveIndex;
                 if (isStackedPresentationMode()) {
                     slides.forEach(slide => {
                         if (!(slide instanceof HTMLElement)) {
@@ -4260,6 +4288,13 @@
                     dot.setAttribute("aria-current", isActive ? "true" : "false");
                 });
 
+                const activeDot = dots[activeIndex];
+                if (activeDot instanceof HTMLElement && pagination instanceof HTMLElement && pagination.scrollWidth > pagination.clientWidth) {
+                    const left = Math.max(0, Math.min(pagination.scrollWidth - pagination.clientWidth,
+                        activeDot.offsetLeft - ((pagination.clientWidth - activeDot.offsetWidth) / 2)));
+                    pagination.scrollTo({ left, behavior: prefersReducedMotion ? "auto" : "smooth" });
+                }
+
                 if (status instanceof HTMLElement) {
                     const activeSlide = slides[activeIndex];
                     const dayName = activeSlide instanceof HTMLElement
@@ -4286,7 +4321,11 @@
                     return;
                 }
 
-                activeIndex = clampIndex(nextIndex);
+                const requestedIndex = clampIndex(nextIndex);
+                if (!isStackedPresentationMode() && requestedIndex !== activeIndex) {
+                    resetSlideExpansion(slides[activeIndex]);
+                }
+                activeIndex = requestedIndex;
                 if (isStackedPresentationMode()) {
                     updateChrome(activeIndex, { forcePaginationSync: true });
                     updateViewportHeight(true);
@@ -5388,7 +5427,7 @@
         const wasSavedMealFavorite =
             isFavoriteForm &&
             submitButton instanceof HTMLButtonElement &&
-            submitButton.classList.contains("is-saved-meal");
+            (submitButton.classList.contains("is-saved-meal") || submitButton.classList.contains("is-saved"));
         const isIgnoreForm = swapForm.classList.contains("aislepilot-ignore-form");
         const isLeftoverRebalanceForm = swapForm.hasAttribute("data-leftover-rebalance-form");
         const isDessertSwapForm = swapForm.action.toLowerCase().includes("/swap-dessert");
@@ -5702,6 +5741,8 @@
         wireDayMealCards(scope);
         window.AislePilotShopping?.wireShoppingChecklist(scope);
         window.AislePilotShopping?.wireCustomShoppingList(scope);
+        window.AislePilotShopping?.wireShoppingFilter();
+        window.AislePilotShopping?.wireShoppingReset();
         wireAjaxSwapHandlers(scope);
     };
 

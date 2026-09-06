@@ -873,6 +873,14 @@ public partial class AislePilotServiceTests
         Assert.True(handler.CallCount >= 1);
         Assert.True(result.UsedAiGeneratedMeals);
         Assert.True(AiPoolContains("Runtime pool test meal"));
+
+        var callsAfterGeneration = handler.CallCount;
+        var cachedResult = service.BuildPlan(request);
+
+        Assert.Equal(callsAfterGeneration, handler.CallCount);
+        Assert.True(cachedResult.UsedAiGeneratedMeals);
+        Assert.Equal("Personalised meal plan", cachedResult.PlanSourceLabel);
+        Assert.Equal("Runtime pool test meal", cachedResult.MealPlan[0].MealName);
     }
 
     [Fact]

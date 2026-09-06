@@ -49,11 +49,12 @@ public partial class AislePilotIntegrationTests
         Assert.Single(Regex.Matches(html, @"data-setup-mode-submit=""planner""", RegexOptions.IgnoreCase).Cast<Match>());
         Assert.Single(Regex.Matches(html, @"data-setup-mode-submit=""generator""", RegexOptions.IgnoreCase).Cast<Match>());
         Assert.Matches(
-            new Regex(@"class=""aislepilot-outcome-summary""[^>]*>[\s\S]*?What you will get[\s\S]*?</div>\s*<button[^>]*data-setup-mode-submit=""planner""", RegexOptions.IgnoreCase),
+            new Regex(@"class=""aislepilot-outcome-summary""[^>]*>[\s\S]*?Review and generate[\s\S]*?</div>\s*<button[^>]*data-setup-mode-submit=""planner""", RegexOptions.IgnoreCase),
             html);
         Assert.Matches(
             new Regex(@"class=""aislepilot-outcome-summary""[^>]*>[\s\S]*?Three practical meal ideas[\s\S]*?</div>\s*<button[\s\S]*?data-setup-mode-submit=""generator""", RegexOptions.IgnoreCase),
             html);
+        Assert.Equal(2, Regex.Matches(html, @">Review and generate<", RegexOptions.IgnoreCase).Count);
         Assert.Contains("data-household-count", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-plan-basic-mirror=\"meal-types\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aiming for your", html, StringComparison.OrdinalIgnoreCase);

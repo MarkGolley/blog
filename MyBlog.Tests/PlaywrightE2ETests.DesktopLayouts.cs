@@ -827,7 +827,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             },
             exportButtonLabels);
 
-        var checklistButton = page.Locator("#aislepilot-export .aislepilot-export-btn").Nth(1);
+        var checklistButton = page.Locator("#aislepilot-export .aislepilot-export-btn").Nth(2);
         var checklistResponseTask = page.WaitForResponseAsync(response =>
             string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
             response.Url.Contains("/projects/aisle-pilot/export/checklist", StringComparison.OrdinalIgnoreCase));
@@ -835,23 +835,13 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         await checklistButton.ClickAsync();
         _ = await checklistResponseTask;
 
-        await page.WaitForFunctionAsync(
-            """
-            () => {
-                const button = Array.from(document.querySelectorAll("#aislepilot-export .aislepilot-export-btn"))
-                    .find(candidate => candidate.textContent?.includes("Download checklist"));
-                return button instanceof HTMLButtonElement
-                    && !button.disabled
-                    && !button.classList.contains("is-loading")
-                    && button.getAttribute("aria-busy") !== "true"
-                    && button.textContent?.trim() === "Download checklist (.txt)";
-            }
-            """,
-            null,
-            new PageWaitForFunctionOptions
-            {
-                Timeout = 10000
-            });
+        await page.WaitForTimeoutAsync(500);
+        var checklistState = await checklistButton.EvaluateAsync<string>(
+            "button => JSON.stringify({ text: button.textContent?.trim(), disabled: button.disabled, loading: button.classList.contains('is-loading'), busy: button.getAttribute('aria-busy') })");
+        Assert.Equal("Download checklist (.txt)", (await checklistButton.TextContentAsync())?.Trim());
+        Assert.False(await checklistButton.IsDisabledAsync(), checklistState);
+        Assert.DoesNotContain("is-loading", await checklistButton.GetAttributeAsync("class") ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual("true", await checklistButton.GetAttributeAsync("aria-busy"));
     }
 
     [Fact]
@@ -1132,6 +1122,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var page = await context.NewPageAsync();
 
         await GoToAislePilotAndGeneratePlanAsync(page);
+        await page.Locator("[data-overview-toggle]").ClickAsync();
 
         var fontSizes = await page.EvaluateAsync<double[]>(
             """
@@ -1165,6 +1156,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var page = await context.NewPageAsync();
 
         await GoToAislePilotAndGeneratePlanAsync(page);
+        await page.Locator("[data-overview-toggle]").ClickAsync();
+        await page.Locator(".aislepilot-source-details > summary").ClickAsync();
 
         var snapshotMetrics = await page.EvaluateAsync<double[]>(
             """
@@ -1217,7 +1210,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(snapshotMetrics[1] <= snapshotMetrics[2] + 18, $"Expected the estimate card to stay compact beside the other primary cards. Estimate={snapshotMetrics[1]:F1}px Featured={snapshotMetrics[2]:F1}px.");
         Assert.True(snapshotMetrics[3] >= 0.92, $"Expected the supermarket insight strip to use most of the snapshot width. Ratio={snapshotMetrics[3]:F2}.");
         Assert.True(snapshotMetrics[4] >= 8 && snapshotMetrics[4] <= 24, $"Expected the support grid to sit directly below the primary grid. Gap={snapshotMetrics[4]:F1}px.");
-        Assert.True(snapshotMetrics[5] >= 8 && snapshotMetrics[5] <= 28, $"Expected the insight strip to sit directly below the support grid. Gap={snapshotMetrics[5]:F1}px.");
+        Assert.True(snapshotMetrics[5] >= 8 && snapshotMetrics[5] <= 80, $"Expected the insight strip to follow the support grid and its source disclosure. Gap={snapshotMetrics[5]:F1}px.");
         Assert.True(snapshotMetrics[6] >= 2, $"Expected structured supermarket insight panels. Count={snapshotMetrics[6]:F0}.");
         Assert.True(snapshotMetrics[7] >= 0.92, $"Expected the summary row to use most of the snapshot width. Coverage={snapshotMetrics[7]:F2}.");
         Assert.Equal(0, snapshotMetrics[8]);

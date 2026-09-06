@@ -957,7 +957,7 @@ body.aislepilot-mobile-meal-sheet-open {
     border: 1px solid rgba(16, 63, 101, 0.16);
     border-radius: 16px;
     background: rgba(251, 254, 255, 0.96);
-    padding: 0.85rem;
+    padding: 0.5rem;
 }
 
 .aislepilot-export-card-copy {

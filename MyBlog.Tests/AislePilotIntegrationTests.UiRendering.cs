@@ -1105,7 +1105,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = await response.Content.ReadAsStringAsync();
 
-        var introIndex = html.IndexOf("Start with the shopping list on your phone.", StringComparison.OrdinalIgnoreCase);
+        var introIndex = html.IndexOf("Share or download your shopping list.", StringComparison.OrdinalIgnoreCase);
         var shareIndex = html.IndexOf("Share shopping list", StringComparison.OrdinalIgnoreCase);
         var planPackIndex = html.IndexOf("Download plan pack (.pdf)", StringComparison.OrdinalIgnoreCase);
         var checklistIndex = html.IndexOf("Download checklist (.txt)", StringComparison.OrdinalIgnoreCase);
@@ -1117,7 +1117,9 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.True(checklistIndex > planPackIndex, "Expected text checklist download to follow the PDF action.");
         Assert.True(printIndex > planPackIndex, "Expected print action to be the final export option.");
         Assert.Contains("Take this plan with you", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Share to your phone", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Share or copy your list into another app.", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("including items currently hidden after being checked", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Share to your phone", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Need a paper copy for the kitchen or a shared shop?", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-action is-primary\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-export-btn is-primary\"", html, StringComparison.OrdinalIgnoreCase);
@@ -1156,6 +1158,15 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("data-shopping-item-key=", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-shopping-item-input", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-shopping-item-text", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-hide-checked", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-progress", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-reset", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-reset-confirm hidden", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-shopping-department-count", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-shopping-item-name", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-shopping-item-quantity", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-shopping-item-price", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Tick items you have or have picked up. This does not change the plan estimate.", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-shop-card-head\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-shop-card-count\"", html, StringComparison.OrdinalIgnoreCase);
     }

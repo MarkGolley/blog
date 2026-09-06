@@ -407,6 +407,7 @@ Return JSON only with this schema:
                 return;
             }
             var refreshedAtUtc = DateTime.UtcNow;
+            var expiredMealCount = 0;
 
             foreach (var doc in snapshot.Documents)
             {
@@ -416,6 +417,15 @@ Return JSON only with this schema:
                 }
 
                 var firestoreMeal = doc.ConvertTo<FirestoreAislePilotMeal>();
+                if (!AislePilotAiMealRetentionPolicy.ShouldReuse(
+                        firestoreMeal.CreatedAtUtc,
+                        refreshedAtUtc,
+                        _aiMealPoolRetention))
+                {
+                    expiredMealCount++;
+                    continue;
+                }
+
                 var mappedMeal = FromFirestoreDocument(firestoreMeal);
                 if (mappedMeal is not null)
                 {
@@ -425,6 +435,13 @@ Return JSON only with this schema:
 
             PruneAiMealPool(refreshedAtUtc);
             _lastAiMealPoolRefreshUtc = refreshedAtUtc;
+            if (expiredMealCount > 0)
+            {
+                _logger?.LogInformation(
+                    "AislePilot retired {ExpiredMealCount} cached AI meals outside the {RetentionDays}-day reuse window.",
+                    expiredMealCount,
+                    (int)_aiMealPoolRetention.TotalDays);
+            }
             AislePilotTelemetry.RecordCacheRefresh("ai_meal_pool", success: true);
         }
         finally

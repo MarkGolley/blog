@@ -57,9 +57,20 @@ public sealed partial class PlaywrightE2ETests
             "sticky",
             await page.Locator(".app-shell-header").EvaluateAsync<string>("element => getComputedStyle(element).position"));
         await WriteAislePilotStateScreenshotAsync(page, $"colour-setup-{width}-{theme}");
+        await page.EvaluateAsync("() => window.AislePilotCore.showPlanLoadingShell()");
+        await AssertThemeColourAsync(page, ".aislepilot-plan-loading-surface", "--ap-refresh-surface");
+        await AssertThemeColourAsync(page, ".aislepilot-plan-loading-card", "--ap-refresh-surface-strong");
+        await AssertThemeTextColourAsync(page.Locator(".aislepilot-plan-loading-title"), "--ap-refresh-text");
+        await AssertThemeTextColourAsync(page.Locator(".aislepilot-plan-loading-meta"), "--ap-refresh-text-muted");
+        await page.EvaluateAsync("() => window.AislePilotCore.hidePlanLoadingShell()");
         await GetAislePilotGenerateButton(page).ClickAsync();
         await page.Locator("#aislepilot-tab-meals").WaitForAsync();
         await AssertThemeColourAsync(page, ".aislepilot-head-primary-action", "--ap-refresh-primary");
+        var activeMeal = page.Locator("[data-day-meal-panel][aria-hidden='false']").First;
+        await AssertThemeTextColourAsync(activeMeal.Locator(".aislepilot-more-actions-trigger .aislepilot-symbol-glyph"), "--ap-refresh-text");
+        await activeMeal.Locator(".aislepilot-meal-primary-action.is-recipe").ClickAsync();
+        await AssertThemeColourAsync(page, "[data-day-meal-panel][aria-hidden='false'] [data-inline-details-panel]", "--ap-refresh-surface-strong");
+        await AssertThemeColourAsync(page, "[data-day-meal-panel][aria-hidden='false'] [data-inline-details-panel] .aislepilot-meal-section", "--ap-refresh-surface");
         Assert.False(await page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth > innerWidth"));
         await WriteAislePilotStateScreenshotAsync(page, $"colour-results-{width}-{theme}");
     }
@@ -80,5 +91,21 @@ public sealed partial class PlaywrightE2ETests
             """, token);
         Assert.Equal(colours[0], colours[1]);
         Assert.Equal("none", colours[2]);
+    }
+
+    private static async Task AssertThemeTextColourAsync(ILocator locator, string token)
+    {
+        var colours = await locator.EvaluateAsync<string[]>(
+            """
+            (element, token) => {
+                const probe = document.createElement('span');
+                probe.style.color = `var(${token})`;
+                element.appendChild(probe);
+                const expected = getComputedStyle(probe).color;
+                probe.remove();
+                return [expected, getComputedStyle(element).color];
+            }
+            """, token);
+        Assert.Equal(colours[0], colours[1]);
     }
 }
