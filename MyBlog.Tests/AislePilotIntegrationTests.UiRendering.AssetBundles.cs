@@ -82,5 +82,30 @@ public partial class AislePilotIntegrationTests
         Assert.DoesNotContain("17 92 78", css, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task AislePilotStylesheet_WeeklyStatusMenu_UsesCurrentThemeTokens()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await GetCombinedAislePilotCssAsync(client);
+
+        Assert.Contains(":root[data-theme] .aislepilot-app .aislepilot-overview-actions-trigger", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("color: var(--ap-refresh-accent);", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("background: var(--ap-refresh-surface-strong);", css, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_PrimaryResultsTabs_UseSingleAlignedDivider()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await GetCombinedAislePilotCssAsync(client);
+
+        Assert.Contains(":root[data-theme] .aislepilot-app .aislepilot-window-tabs", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("border: 0;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("border-bottom: 1px solid var(--ap-refresh-border);", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("width: 100%;", css, StringComparison.OrdinalIgnoreCase);
+    }
+
 
 }

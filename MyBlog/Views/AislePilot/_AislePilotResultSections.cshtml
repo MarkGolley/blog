@@ -723,8 +723,9 @@
                                             var detailsPanelId = $"meal-details-{mealIndex}";
                                             var slotMoreActionsMenuId = $"meal-actions-{mealIndex}-{slotIndex}";
                                             var slotMoreActionsTitleId = $"meal-actions-title-{mealIndex}-{slotIndex}";
-                                            var swapFormId = $"meal-swap-{mealIndex}-{slotIndex}";
-                                            var saveFormId = $"meal-save-{mealIndex}-{slotIndex}";
+                                             var swapFormId = $"meal-swap-{mealIndex}-{slotIndex}";
+                                             var saveFormId = $"meal-save-{mealIndex}-{slotIndex}";
+                                             var ignoreFormId = $"meal-ignore-{mealIndex}-{slotIndex}";
                                             var shouldPrioritizeImage = slotIndex == 0 && dayGroupIndex < 2;
                                             var mealDetailsTriggerLabel = "View meal details: macros, ingredients and method";
                                             var saveActionLabel = isSavedMeal ? "Unsave meal" : "Save meal";
@@ -783,9 +784,16 @@
                                                                 aria-controls="@detailsPanelId"
                                                                 aria-expanded="false">Recipe</button>
                                                         <button type="submit" form="@swapFormId" class="aislepilot-meal-primary-action" aria-label="Swap meal">Swap</button>
-                                                        <button type="submit" form="@saveFormId" class="aislepilot-meal-primary-action@(isSavedMeal ? " is-saved" : string.Empty)" aria-label="@saveActionLabel">@(isSavedMeal ? "Unsave" : "Save")</button>
-                                                    </div>
-                                                }
+                                                         <button type="submit" form="@saveFormId" class="aislepilot-meal-primary-action@(isSavedMeal ? " is-saved" : string.Empty)" aria-label="@saveActionLabel">@(isSavedMeal ? "Unsave" : "Save")</button>
+                                                         <button type="submit" form="@ignoreFormId" class="aislepilot-meal-primary-action is-danger" aria-label="Ignore meal">Ignore</button>
+                                                     </div>
+                                                 }
+                                                 else
+                                                 {
+                                                     <div class="aislepilot-meal-primary-actions is-single-action" data-meal-primary-actions aria-label="Primary meal actions">
+                                                         <button type="submit" form="@ignoreFormId" class="aislepilot-meal-primary-action" aria-label="Include meal">Include meal</button>
+                                                     </div>
+                                                 }
                                                 <div class="aislepilot-card-action-row is-inline-actions aislepilot-day-card-header-actions aislepilot-meal-panel-image-actions@(slotIndex == 0 ? " is-active" : string.Empty)"
                                                      data-day-card-header-actions
                                                      data-slot-index="@slotIndex"
@@ -885,8 +893,9 @@
                                                                 </button>
                                                             </form>
 
-                                                            <form method="post"
-                                                                  action="@Url.Action("IgnoreMeal", "AislePilot")#aislepilot-meals"
+                                                             <form method="post"
+                                                                   id="@ignoreFormId"
+                                                                   action="@Url.Action("IgnoreMeal", "AislePilot")#aislepilot-meals"
                                                                   class="aislepilot-swap-form aislepilot-ignore-form aislepilot-card-more-action-form"
                                                                   data-preserve-scroll-form
                                                                   data-ajax-swap-form>

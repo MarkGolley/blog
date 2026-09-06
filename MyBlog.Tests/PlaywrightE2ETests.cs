@@ -1021,7 +1021,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         // Force-click keeps downstream scenario tests deterministic; direct hit-testing has its own regression test.
         await generateButton.ClickAsync(new LocatorClickOptions { Force = true });
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First.WaitForAsync(new LocatorWaitForOptions
+        await page.Locator("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true']) [data-meal-primary-actions]").First.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 15000
