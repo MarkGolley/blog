@@ -23,11 +23,17 @@ public sealed partial class PlaywrightE2ETests
         Assert.True(await page.Locator("[data-day-carousel-pagination]").IsHiddenAsync());
         Assert.Equal(0, await page.Locator("[data-day-card-slide]:not([data-day-carousel-ghost='true'])[aria-hidden='true']").CountAsync());
         Assert.Equal("Done", (await swapDays.InnerTextAsync()).Trim());
+        var guide = page.Locator("[data-day-reorder-guide]");
+        Assert.True(await guide.IsVisibleAsync());
+        Assert.Equal("false", await guide.GetAttributeAsync("aria-hidden"));
+        Assert.True(await page.Locator("[data-day-reorder-handle]").First.IsVisibleAsync());
+        Assert.True(await page.Locator("[data-day-reorder-move='later']").First.IsVisibleAsync());
 
         await swapDays.ClickAsync();
         await page.WaitForFunctionAsync("""
             () => document.querySelector("[data-day-card-carousel]")?.getAttribute("data-day-reorder-mode") === "false"
         """);
         Assert.True(await page.Locator("[data-day-carousel-pagination]").IsVisibleAsync());
+        Assert.Equal("true", await guide.GetAttributeAsync("aria-hidden"));
     }
 }

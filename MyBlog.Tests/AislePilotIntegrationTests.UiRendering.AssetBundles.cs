@@ -107,5 +107,31 @@ public partial class AislePilotIntegrationTests
         Assert.Contains("width: 100%;", css, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task AislePilotStylesheet_MealTitles_UseAvailableCardWidth()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var kitchenCss = await client.GetStringAsync("/css/aisle-pilot-kitchen-results.css");
+
+        Assert.Contains(".aislepilot-app .aislepilot-day-meal-title", kitchenCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("width: 100%;", kitchenCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("max-width: none;", kitchenCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("padding-right: 0;", kitchenCss, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AislePilotStylesheet_MealPhotoLoader_UsesDelayedRevealAndCrossFade()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var kitchenCss = await client.GetStringAsync("/css/aisle-pilot-kitchen-results.css");
+
+        Assert.Contains("transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);", kitchenCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-meal-image-loading 2.4s ease-in-out infinite", kitchenCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aislepilot-meal-image-loader-reveal 320ms ease-out 160ms both", kitchenCss, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("@keyframes aislepilot-meal-image-loader-reveal", kitchenCss, StringComparison.OrdinalIgnoreCase);
+    }
+
 
 }

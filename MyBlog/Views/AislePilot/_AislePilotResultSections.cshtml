@@ -574,7 +574,7 @@
                              data-results-stage="selected-day"
                              aria-label="Meal plan by day"
                              data-day-card-count="@dayMealGroups.Count"
-                             data-day-reorder-status="Reorder mode: use Move earlier or Move later. You can also drag a day card onto another day.">
+                             data-day-reorder-status="Rearrange your week. Use Earlier or Later, or drag a menu onto another day.">
                         <div class="aislepilot-day-carousel-header">
                             <div class="aislepilot-day-carousel-status"
                                  aria-live="polite"
@@ -583,12 +583,16 @@
                                 Day 1 of @dayMealGroups.Count
                             </div>
                             @if (canReorderDayCards)
-                            {
-                                <div class="aislepilot-day-carousel-header-actions">
-                                    <partial name="_AislePilotDayReorderToggle" />
-                                </div>
-                            }
-                        </div>
+                             {
+                                 <div class="aislepilot-day-carousel-header-actions">
+                                     <partial name="_AislePilotDayReorderToggle" />
+                                 </div>
+                             }
+                         </div>
+                         <div class="aislepilot-day-reorder-guide" data-day-reorder-guide aria-hidden="true">
+                             <strong>Rearrange your week</strong>
+                             <span>Move a complete day’s menu earlier or later. Your weekday labels stay in place.</span>
+                         </div>
                         <div class="aislepilot-meal-grid"
                              data-day-carousel-viewport
                              data-meal-image-poll-root

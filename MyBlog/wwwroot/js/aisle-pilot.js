@@ -3928,6 +3928,7 @@
             const viewport = carousel.querySelector("[data-day-carousel-viewport]");
             const track = carousel.querySelector("[data-day-carousel-track]");
             const status = carousel.querySelector("[data-day-carousel-status]");
+            const reorderGuide = carousel.querySelector("[data-day-reorder-guide]");
             const pagination = carousel.querySelector("[data-day-carousel-pagination]");
             const dots = Array.from(carousel.querySelectorAll("[data-day-carousel-dot]"));
             const reorderToggle = carousel.querySelector("[data-day-reorder-toggle]");
@@ -4520,6 +4521,9 @@
                 const isStacked = isStackedPresentationMode();
                 carousel.classList.toggle("is-day-reorder-mode", isStacked);
                 carousel.dataset.dayReorderMode = isDayReorderMode ? "true" : "false";
+                if (reorderGuide instanceof HTMLElement) {
+                    reorderGuide.setAttribute("aria-hidden", isDayReorderMode ? "false" : "true");
+                }
                 setElementHidden(pagination, isStacked);
                 if (isStacked) {
                     resetCompactStackedInlineDetailsTouchState(carousel);

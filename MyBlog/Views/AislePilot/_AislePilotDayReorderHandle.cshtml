@@ -8,8 +8,8 @@
 <button type="button"
         class="aislepilot-day-card-reorder-handle"
         data-day-reorder-handle
-        aria-label="@($"Reorder {safeDayName}")"
-        title="@($"Reorder {safeDayName}")">
+        aria-label="@($"Drag {safeDayName} menu to another day")"
+        title="@($"Drag {safeDayName} menu")">
     <span class="aislepilot-day-card-reorder-handle-glyph" aria-hidden="true">
         <svg viewBox="0 0 24 24" focusable="false">
             <circle cx="8" cy="7" r="1.6"></circle>
@@ -20,10 +20,10 @@
             <circle cx="16" cy="17" r="1.6"></circle>
         </svg>
     </span>
-    <span class="aislepilot-day-card-reorder-handle-label" aria-hidden="true">Drag</span>
-    <span class="sr-only">Drag to reorder @safeDayName</span>
+    <span class="aislepilot-day-card-reorder-handle-label" aria-hidden="true">Drag menu</span>
+    <span class="sr-only">Drag @safeDayName menu to another day</span>
 </button>
 <div class="aislepilot-day-reorder-move-actions" role="group" aria-label="Move @safeDayName">
-    <button type="button" class="aislepilot-day-reorder-move" data-day-reorder-move="earlier" aria-label="Move @safeDayName earlier" @earlierDisabled>Move earlier</button>
-    <button type="button" class="aislepilot-day-reorder-move" data-day-reorder-move="later" aria-label="Move @safeDayName later" @laterDisabled>Move later</button>
+    <button type="button" class="aislepilot-day-reorder-move" data-day-reorder-move="earlier" aria-label="Move @safeDayName menu earlier" @earlierDisabled><span aria-hidden="true">↑</span> Earlier</button>
+    <button type="button" class="aislepilot-day-reorder-move" data-day-reorder-move="later" aria-label="Move @safeDayName menu later" @laterDisabled>Later <span aria-hidden="true">↓</span></button>
 </div>

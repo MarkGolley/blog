@@ -128,6 +128,10 @@ font-size: clamp(1.35rem, 2.5vw, 1.85rem);
 line-height: 1.25;
 letter-spacing: -0.02em;
 font-weight: 400;
+width: 100%;
+max-width: none;
+padding-right: 0;
+box-sizing: border-box;
 }
 :root[data-theme] .aislepilot-app .aislepilot-meal-image-shell {
 aspect-ratio: 4 / 3;
@@ -143,6 +147,38 @@ height: 100%;
 aspect-ratio: 4 / 3;
 object-fit: cover;
 filter: none;
+opacity: 1;
+transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-image-shell[data-meal-image-loading='true'] {
+background: var(--ap-refresh-surface-strong);
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-image-shell[data-meal-image-loading='true'] .aislepilot-meal-image {
+opacity: 0;
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-image-shell[data-meal-image-loading='true']::before {
+background:
+linear-gradient(105deg, transparent 30%, rgb(var(--ap-refresh-accent-rgb) / 0.12) 48%, transparent 66%),
+var(--ap-refresh-surface-strong);
+background-size: 220% 100%, 100% 100%;
+animation:
+aislepilot-meal-image-loading 2.4s ease-in-out infinite,
+aislepilot-meal-image-loader-reveal 320ms ease-out 160ms both;
+}
+:root[data-theme] .aislepilot-app .aislepilot-meal-image-shell[data-meal-image-loading='true']::after {
+border-color: var(--ap-refresh-border);
+background: color-mix(in srgb, var(--ap-refresh-surface) 92%, transparent);
+color: var(--ap-refresh-text-muted);
+animation: aislepilot-meal-image-loader-reveal 320ms ease-out 220ms both;
+}
+@keyframes aislepilot-meal-image-loader-reveal {
+from { opacity: 0; }
+to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+:root[data-theme] .aislepilot-app .aislepilot-meal-image { transition: none; }
+:root[data-theme] .aislepilot-app .aislepilot-meal-image-shell[data-meal-image-loading='true']::before,
+:root[data-theme] .aislepilot-app .aislepilot-meal-image-shell[data-meal-image-loading='true']::after { animation: none; }
 }
 :root[data-theme] .aislepilot-app .aislepilot-meal-primary-action {
 min-height: 44px;
@@ -215,3 +251,34 @@ border-color: var(--ap-refresh-border);
 background: var(--ap-refresh-surface);
 box-shadow: none;
 }
+.aislepilot-app .aislepilot-day-reorder-guide { display: none; }
+:root[data-theme] .aislepilot-app .aislepilot-day-reorder-toggle {
+min-height: 44px; border: 1px solid var(--ap-refresh-border-strong); border-radius: 8px;
+background: var(--ap-refresh-surface-strong); color: var(--ap-refresh-text); box-shadow: none;
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-reorder-toggle[aria-pressed='true'] {
+background: var(--ap-refresh-primary); border-color: var(--ap-refresh-primary); color: #fff; box-shadow: none;
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-carousel[data-day-reorder-mode='true'] .aislepilot-day-reorder-guide {
+display: grid; gap: .18rem; margin: .2rem 0 .75rem; padding: .75rem .85rem;
+border: 1px solid var(--ap-refresh-border); border-radius: 10px;
+background: color-mix(in srgb,var(--ap-refresh-accent) 7%,var(--ap-refresh-surface)); color: var(--ap-refresh-text);
+}
+.aislepilot-app .aislepilot-day-reorder-guide span { color: var(--ap-refresh-text-muted); font-size: .84rem; line-height: 1.4; }
+:root[data-theme] .aislepilot-app .aislepilot-day-carousel[data-day-reorder-mode='true'] .aislepilot-day-card {
+border-radius: 10px; padding: .85rem; background: var(--ap-refresh-surface); border-color: var(--ap-refresh-border);
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-carousel[data-day-reorder-mode='true'] .aislepilot-day-card-head {
+align-items: flex-start; margin-bottom: .65rem;
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-card-reorder-handle {
+min-height: 44px; padding: .45rem .65rem; border: 1px solid var(--ap-refresh-border-strong);
+border-radius: 8px; background: var(--ap-refresh-surface-strong); color: var(--ap-refresh-accent); box-shadow: none;
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-card-reorder-handle-glyph { color: currentColor; }
+:root[data-theme] .aislepilot-app .aislepilot-day-reorder-move-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .5rem; margin-top: .7rem; }
+:root[data-theme] .aislepilot-app .aislepilot-day-reorder-move {
+min-height: 44px; border: 1px solid var(--ap-refresh-border-strong); border-radius: 8px;
+background: var(--ap-refresh-surface-strong); color: var(--ap-refresh-text); font-weight: 700;
+}
+:root[data-theme] .aislepilot-app .aislepilot-day-reorder-move:disabled { opacity: .42; cursor: not-allowed; }
