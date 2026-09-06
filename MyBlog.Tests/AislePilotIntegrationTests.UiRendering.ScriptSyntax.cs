@@ -73,6 +73,29 @@ public partial class AislePilotIntegrationTests
     }
 
     [Fact]
+    public async Task AislePilotScript_MealImagePolling_RequestsVisibleMealsInBoundedBatches()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var script = await client.GetStringAsync("/js/aisle-pilot/meal-image-polling.js");
+
+        Assert.Contains("const pollBatchSize = 3;", script, StringComparison.Ordinal);
+        Assert.Contains("Array.from(pendingByMealName.keys()).slice(0, pollBatchSize)", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AislePilotScript_MealImagePolling_KeepsResponsiveCandidateInSyncWhenSourceChanges()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var script = await client.GetStringAsync("/js/aisle-pilot/meal-image-polling.js");
+
+        Assert.Contains("imageElement.srcset = `${pollContext.fallbackUrl} 512w`;", script, StringComparison.Ordinal);
+        Assert.Contains("imageElement.srcset = `${cachedImageUrl} 1024w`;", script, StringComparison.Ordinal);
+        Assert.Contains("imageElement.srcset = `${cacheBustedUrl} 1024w`;", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AislePilotScript_DayCardReorder_ForcesVisiblePreviewSlotInReorderMode()
     {
         using var client = CreateClient(allowAutoRedirect: true);

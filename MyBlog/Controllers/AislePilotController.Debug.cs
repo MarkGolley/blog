@@ -1,10 +1,57 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using MyBlog.Services;
 
 namespace MyBlog.Controllers;
 
 public partial class AislePilotController
 {
+    public sealed class AislePilotClientPerformanceRequest
+    {
+        public string? Metric { get; init; }
+        public double ValueMilliseconds { get; init; }
+        public string? Event { get; init; }
+        public string? NavigationType { get; init; }
+        public bool HasResult { get; init; }
+    }
+
+    [HttpPost("client-performance")]
+    [IgnoreAntiforgeryToken]
+    [EnableRateLimiting("aislePilotTelemetry")]
+    public IActionResult ClientPerformance([FromBody] AislePilotClientPerformanceRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest();
+        }
+
+        var recorded = string.IsNullOrWhiteSpace(request.Event)
+            ? AislePilotTelemetry.TryRecordClientPerformance(
+                request.Metric,
+                request.ValueMilliseconds,
+                request.NavigationType,
+                request.HasResult)
+            : AislePilotTelemetry.TryRecordClientEvent(
+                request.Event,
+                request.NavigationType,
+                request.HasResult);
+        if (!recorded)
+        {
+            return BadRequest();
+        }
+
+        if (request.Event is "client_error" or "unhandled_rejection")
+        {
+            logger.LogWarning(
+                "AislePilot privacy-safe client failure event. Event={ClientEvent}, RequestId={RequestId}",
+                request.Event,
+                HttpContext.TraceIdentifier);
+        }
+
+        return NoContent();
+    }
+
     public sealed class AislePilotClientDebugLogRequest
     {
         public string? Stage { get; init; }

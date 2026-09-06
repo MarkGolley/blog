@@ -1,5 +1,5 @@
 (() => {
-    const setupModeStorageKey = "aislepilot:setup-mode";
+    const storageKey = "aislepilot:setup-mode";
 
     const wireSetupModeSwitches = scope => {
         const switches = scope instanceof Element
@@ -80,9 +80,8 @@
 
                 if (shouldPersist) {
                     try {
-                        window.localStorage.setItem(setupModeStorageKey, nextMode);
+                        window.localStorage.setItem(storageKey, nextMode);
                     } catch {
-                        // Ignore storage failures in private modes.
                     }
                 }
 
@@ -193,17 +192,18 @@
                 .find(panel => panel instanceof HTMLElement && !panel.hasAttribute("hidden"))
                 ?.dataset.setupModePanel;
             const defaultMode = modeSwitch.dataset.setupModeDefault;
-            const shouldForceDefaultMode = modeSwitch.dataset.setupModeForceDefault === "true";
+            const forceDefault = modeSwitch.dataset.setupModeForceDefault === "true";
             let storedMode = null;
-            if (!shouldForceDefaultMode) {
+            if (!forceDefault) {
                 try {
-                    storedMode = window.localStorage.getItem(setupModeStorageKey);
+                    storedMode = window.localStorage.getItem(storageKey);
                 } catch {
                     storedMode = null;
                 }
             }
 
-            applyMode(visibleMode ?? storedMode ?? defaultMode, { persist: false });
+            const initialMode = forceDefault ? visibleMode ?? defaultMode : storedMode ?? visibleMode ?? defaultMode;
+            applyMode(initialMode, { persist: false });
             modeSwitch.dataset.setupModeWired = "true";
         });
     };

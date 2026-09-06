@@ -76,39 +76,24 @@ public sealed partial class AislePilotService
 
         var strictModes = ResolveHardDietaryModes(context.DietaryModes);
         var prompt = BuildAiSpecialTreatMealPrompt(request, context, mealTypeSlots.Count, excludedMealNames);
-        var requestBody = new
-        {
-            model = _model,
-            temperature = 0.85,
-            max_tokens = SpecialTreatMealMaxTokens,
-            response_format = new { type = "json_object" },
-            messages = new object[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You generate one indulgent special-treat dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English."
-                },
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+        var requestBody = BuildOpenAiJsonResponseRequest(
+            _utilityModel,
+            _utilityReasoningEffort,
+            "You generate one indulgent special-treat dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English.",
+            prompt,
+            SpecialTreatMealMaxTokens);
 
         var responseContent = await SendOpenAiRequestWithRetryAsync(
             requestBody,
             cancellationToken,
             operation: "special_treat_generation",
-            model: _model);
+            model: _utilityModel);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return null;
         }
 
-        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        var rawJson = ExtractOpenAiResponseText(responseContent);
         if (string.IsNullOrWhiteSpace(rawJson))
         {
             return null;
@@ -163,39 +148,24 @@ public sealed partial class AislePilotService
         }
 
         var prompt = BuildAiWarmupMealPrompt(strictModes, excludedMealNames);
-        var requestBody = new
-        {
-            model = _model,
-            temperature = 0.75,
-            max_tokens = WarmupMealMaxTokens,
-            response_format = new { type = "json_object" },
-            messages = new object[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You generate one practical dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English."
-                },
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+        var requestBody = BuildOpenAiJsonResponseRequest(
+            _utilityModel,
+            _utilityReasoningEffort,
+            "You generate one practical dinner for a UK grocery-planning app. Always return valid JSON only. Use UK English.",
+            prompt,
+            WarmupMealMaxTokens);
 
         var responseContent = await SendOpenAiRequestWithRetryAsync(
             requestBody,
             cancellationToken,
             operation: "warmup_meal_generation",
-            model: _model);
+            model: _utilityModel);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return null;
         }
 
-        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        var rawJson = ExtractOpenAiResponseText(responseContent);
         if (string.IsNullOrWhiteSpace(rawJson))
         {
             return null;
@@ -427,14 +397,17 @@ Return JSON only with this schema:
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 LogFirestoreReadTimeout("AI meal pool hydration");
+                AislePilotTelemetry.RecordCacheRefresh("ai_meal_pool", success: false);
                 return;
             }
             catch (Exception ex)
             {
                 LogFirestoreReadFailure(ex, "AI meal pool hydration");
+                AislePilotTelemetry.RecordCacheRefresh("ai_meal_pool", success: false);
                 return;
             }
             var refreshedAtUtc = DateTime.UtcNow;
+            var expiredMealCount = 0;
 
             foreach (var doc in snapshot.Documents)
             {
@@ -444,6 +417,15 @@ Return JSON only with this schema:
                 }
 
                 var firestoreMeal = doc.ConvertTo<FirestoreAislePilotMeal>();
+                if (!AislePilotAiMealRetentionPolicy.ShouldReuse(
+                        firestoreMeal.CreatedAtUtc,
+                        refreshedAtUtc,
+                        _aiMealPoolRetention))
+                {
+                    expiredMealCount++;
+                    continue;
+                }
+
                 var mappedMeal = FromFirestoreDocument(firestoreMeal);
                 if (mappedMeal is not null)
                 {
@@ -453,6 +435,14 @@ Return JSON only with this schema:
 
             PruneAiMealPool(refreshedAtUtc);
             _lastAiMealPoolRefreshUtc = refreshedAtUtc;
+            if (expiredMealCount > 0)
+            {
+                _logger?.LogInformation(
+                    "AislePilot retired {ExpiredMealCount} cached AI meals outside the {RetentionDays}-day reuse window.",
+                    expiredMealCount,
+                    (int)_aiMealPoolRetention.TotalDays);
+            }
+            AislePilotTelemetry.RecordCacheRefresh("ai_meal_pool", success: true);
         }
         finally
         {
@@ -565,11 +555,22 @@ Return JSON only with this schema:
             return;
         }
 
-        _ = Task.Run(async () =>
+        if (_backgroundTaskQueue is null)
         {
+            foreach (var docId in queuedKeys)
+            {
+                AiMealPersistenceInFlight.TryRemove(docId, out _);
+            }
+            return;
+        }
+
+        var queued = _backgroundTaskQueue.TryEnqueue("ai_meal_persistence", async stoppingToken =>
+        {
+            var stopwatch = Stopwatch.StartNew();
             try
             {
-                using var backgroundPersistenceCts = new CancellationTokenSource(AiMealPersistenceBackgroundBudget);
+                using var backgroundPersistenceCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                backgroundPersistenceCts.CancelAfter(AiMealPersistenceBackgroundBudget);
                 var persistedMeals = await PersistAiMealsAsync(queuedMeals, backgroundPersistenceCts.Token);
                 if (persistedMeals.Count < queuedMeals.Count)
                 {
@@ -579,6 +580,10 @@ Return JSON only with this schema:
                         queuedMeals.Count,
                         sourceLabel);
                 }
+                RecordAislePilotBackgroundJob(
+                    "ai_meal_persistence",
+                    stopwatch,
+                    success: persistedMeals.Count == queuedMeals.Count);
             }
             catch (Exception ex)
             {
@@ -587,15 +592,26 @@ Return JSON only with this schema:
                     "AislePilot background AI meal persistence failed. MealCount={MealCount}, Source={Source}",
                     queuedMeals.Count,
                     sourceLabel);
+                RecordAislePilotBackgroundJob("ai_meal_persistence", stopwatch, success: false, ex);
+                throw;
             }
-            finally
+        }, () =>
+        {
+            foreach (var docId in queuedKeys)
             {
-                foreach (var docId in queuedKeys)
-                {
-                    AiMealPersistenceInFlight.TryRemove(docId, out _);
-                }
+                AiMealPersistenceInFlight.TryRemove(docId, out _);
             }
         });
+        if (!queued)
+        {
+            foreach (var docId in queuedKeys)
+            {
+                AiMealPersistenceInFlight.TryRemove(docId, out _);
+            }
+            _logger?.LogWarning(
+                "AislePilot AI-meal persistence was not queued because the bounded background queue is full. Capacity={Capacity}",
+                _backgroundTaskQueue.Capacity);
+        }
     }
 
     private static string BuildAiMealSwapPrompt(

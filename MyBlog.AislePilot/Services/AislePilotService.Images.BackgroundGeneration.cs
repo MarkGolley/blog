@@ -18,6 +18,80 @@ namespace MyBlog.Services;
 
 public sealed partial class AislePilotService
 {
+    internal void QueuePlanPoolReplenishment(
+        AislePilotRequestModel request,
+        IReadOnlyList<string>? excludedMealNames)
+    {
+        var requestCopy = CloneRequest(request);
+        var excludedCopy = excludedMealNames?.ToArray();
+        var backgroundRequestProfile = new AislePilotTelemetry.BackgroundRequestProfile(
+            NormalizeDietaryModes(requestCopy.DietaryModes)
+                .Count(mode => !mode.Equals("Balanced", StringComparison.OrdinalIgnoreCase)),
+            BuildMealTypeSlots(requestCopy).Count,
+            NormalizePlanDays(requestCopy.PlanDays),
+            requestCopy.PreferQuickMeals,
+            requestCopy.IncludeSpecialTreatMeal);
+        var key = string.Join(
+            "|",
+            NormalizeSupermarket(requestCopy.Supermarket),
+            string.Join(",", NormalizeDietaryModes(requestCopy.DietaryModes).OrderBy(mode => mode)),
+            string.Join(",", BuildMealTypeSlots(requestCopy)),
+            requestCopy.PreferQuickMeals,
+            requestCopy.DislikesOrAllergens?.Trim().ToLowerInvariant());
+        if (!PlanPoolReplenishmentInFlight.TryAdd(key, 1))
+        {
+            return;
+        }
+
+        if (_backgroundTaskQueue is null)
+        {
+            PlanPoolReplenishmentInFlight.TryRemove(key, out _);
+            return;
+        }
+
+        var queued = _backgroundTaskQueue.TryEnqueue("plan_pool_replenishment", async stoppingToken =>
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                var context = await BuildPlanContextAsync(requestCopy, stoppingToken);
+                var planDays = NormalizePlanDays(requestCopy.PlanDays);
+                var cookDays = NormalizeCookDays(requestCopy.CookDays, planDays);
+                var totalMealCount = NormalizeRequestedMealCount(cookDays * BuildMealTypeSlots(requestCopy).Count);
+                var result = await TryBuildPlanWithAiAsync(
+                    requestCopy,
+                    context,
+                    cookDays,
+                    totalMealCount,
+                    excludedCopy,
+                    stoppingToken);
+                RecordAislePilotBackgroundJob(
+                    "plan_pool_replenishment",
+                    stopwatch,
+                    result is not null,
+                    requestProfile: backgroundRequestProfile);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "AislePilot plan-pool replenishment failed.");
+                RecordAislePilotBackgroundJob(
+                    "plan_pool_replenishment",
+                    stopwatch,
+                    false,
+                    ex,
+                    backgroundRequestProfile);
+                throw;
+            }
+        }, () => PlanPoolReplenishmentInFlight.TryRemove(key, out _));
+        if (!queued)
+        {
+            PlanPoolReplenishmentInFlight.TryRemove(key, out _);
+            _logger?.LogWarning(
+                "AislePilot plan-pool replenishment was not queued because the bounded background queue is full. Capacity={Capacity}",
+                _backgroundTaskQueue.Capacity);
+        }
+    }
+
     internal void QueueSpecialTreatGeneration(
         AislePilotRequestModel request,
         PlanContext context,
@@ -47,12 +121,19 @@ public sealed partial class AislePilotService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        _ = Task.Run(async () =>
+        if (_backgroundTaskQueue is null)
+        {
+            SpecialTreatGenerationInFlight.TryRemove(key, out _);
+            return;
+        }
+
+        var queued = _backgroundTaskQueue.TryEnqueue("special_treat_generation", async stoppingToken =>
         {
             var jobStopwatch = Stopwatch.StartNew();
             try
             {
-                using var generationBudgetCts = new CancellationTokenSource(OpenAiGenerationBudget);
+                using var generationBudgetCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                generationBudgetCts.CancelAfter(OpenAiGenerationBudget);
                 var generatedTreat = await TryGenerateSpecialTreatMealWithAiAsync(
                     requestSnapshot,
                     context,
@@ -84,12 +165,16 @@ public sealed partial class AislePilotService
             {
                 _logger?.LogWarning(ex, "AislePilot deferred special treat generation failed.");
                 RecordAislePilotBackgroundJob("special_treat_generation", jobStopwatch, success: false, ex);
+                throw;
             }
-            finally
-            {
-                SpecialTreatGenerationInFlight.TryRemove(key, out _);
-            }
-        });
+        }, () => SpecialTreatGenerationInFlight.TryRemove(key, out _));
+        if (!queued)
+        {
+            SpecialTreatGenerationInFlight.TryRemove(key, out _);
+            _logger?.LogWarning(
+                "AislePilot special-treat generation was not queued because the bounded background queue is full. Capacity={Capacity}",
+                _backgroundTaskQueue.Capacity);
+        }
     }
 
     private void QueueDessertAddOnRecovery(string? selectedDessertAddOnName)
@@ -103,27 +188,37 @@ public sealed partial class AislePilotService
         }
 
         var selectedDessertNameSnapshot = selectedDessertAddOnName;
-        _ = Task.Run(async () =>
+        if (_backgroundTaskQueue is null)
+        {
+            DessertAddOnRecoveryInFlight.TryRemove(key, out _);
+            return;
+        }
+
+        var queued = _backgroundTaskQueue.TryEnqueue("dessert_addon_recovery", async stoppingToken =>
         {
             var jobStopwatch = Stopwatch.StartNew();
             try
             {
                 var resolvedTemplate = await ResolveDessertAddOnTemplateAsync(
                     selectedDessertNameSnapshot,
-                    CancellationToken.None);
-                await PersistDessertAddOnTemplateAsync(resolvedTemplate, CancellationToken.None);
+                    stoppingToken);
+                await PersistDessertAddOnTemplateAsync(resolvedTemplate, stoppingToken);
                 RecordAislePilotBackgroundJob("dessert_addon_recovery", jobStopwatch, success: true);
             }
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "AislePilot deferred dessert add-on recovery failed.");
                 RecordAislePilotBackgroundJob("dessert_addon_recovery", jobStopwatch, success: false, ex);
+                throw;
             }
-            finally
-            {
-                DessertAddOnRecoveryInFlight.TryRemove(key, out _);
-            }
-        });
+        }, () => DessertAddOnRecoveryInFlight.TryRemove(key, out _));
+        if (!queued)
+        {
+            DessertAddOnRecoveryInFlight.TryRemove(key, out _);
+            _logger?.LogWarning(
+                "AislePilot dessert recovery was not queued because the bounded background queue is full. Capacity={Capacity}",
+                _backgroundTaskQueue.Capacity);
+        }
     }
 
     private string BuildSpecialTreatBackgroundKey(AislePilotRequestModel request, PlanContext context)
@@ -163,14 +258,21 @@ public sealed partial class AislePilotService
 
         MarkMealImageLookupMiss(meal.Name, DateTime.UtcNow);
 
-        _ = Task.Run(async () =>
+        if (_backgroundTaskQueue is null)
+        {
+            MealImageGenerationInFlight.TryRemove(key, out _);
+            ClearMealImageLookupMiss(meal.Name);
+            return;
+        }
+
+        var queued = _backgroundTaskQueue.TryEnqueue("meal_image_generation", async stoppingToken =>
         {
             var throttleAcquired = false;
             var totalStopwatch = Stopwatch.StartNew();
             var queueWaitStopwatch = Stopwatch.StartNew();
             try
             {
-                await MealImageGenerationThrottle.WaitAsync(CancellationToken.None);
+                await MealImageGenerationThrottle.WaitAsync(stoppingToken);
                 throttleAcquired = true;
                 var queueWaitElapsedMs = queueWaitStopwatch.ElapsedMilliseconds;
                 var concurrencyCapacity = MealImageGenerationMaxConcurrency;
@@ -184,13 +286,13 @@ public sealed partial class AislePilotService
                     return;
                 }
 
-                var imageBytes = await TryGenerateMealImageBytesWithAiAsync(meal, CancellationToken.None);
+                var imageBytes = await TryGenerateMealImageBytesWithAiAsync(meal, stoppingToken);
                 if (imageBytes is null || imageBytes.Length == 0)
                 {
                     return;
                 }
 
-                var imageUrl = await SaveMealImageToDiskAsync(meal.Name, imageBytes, CancellationToken.None);
+                var imageUrl = await SaveMealImageToDiskAsync(meal.Name, imageBytes, stoppingToken);
                 if (string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return;
@@ -204,7 +306,7 @@ public sealed partial class AislePilotService
                     UpsertAiMealPoolEntry(existingMeal with { ImageUrl = imageUrl }, DateTime.UtcNow);
                 }
 
-                await PersistMealImageAsync(meal.Name, imageUrl, imageBytes, CancellationToken.None);
+                await PersistMealImageAsync(meal.Name, imageUrl, imageBytes, stoppingToken);
                 _logger?.LogInformation(
                     "AislePilot meal image generation completed in {ElapsedMs}ms. MealName={MealName}, QueueWaitMs={QueueWaitMs}, MaxConcurrency={MaxConcurrency}",
                     totalStopwatch.ElapsedMilliseconds,
@@ -217,6 +319,7 @@ public sealed partial class AislePilotService
             {
                 _logger?.LogWarning(ex, "AislePilot meal image generation failed for '{MealName}'.", meal.Name);
                 RecordAislePilotBackgroundJob("meal_image_generation", totalStopwatch, success: false, ex);
+                throw;
             }
             finally
             {
@@ -224,10 +327,16 @@ public sealed partial class AislePilotService
                 {
                     MealImageGenerationThrottle.Release();
                 }
-
-                MealImageGenerationInFlight.TryRemove(key, out _);
             }
-        });
+        }, () => MealImageGenerationInFlight.TryRemove(key, out _));
+        if (!queued)
+        {
+            MealImageGenerationInFlight.TryRemove(key, out _);
+            ClearMealImageLookupMiss(meal.Name);
+            _logger?.LogWarning(
+                "AislePilot meal-image generation was not queued because the bounded background queue is full. Capacity={Capacity}",
+                _backgroundTaskQueue.Capacity);
+        }
     }
 
     private async Task<byte[]?> TryGenerateMealImageBytesWithAiAsync(
@@ -245,6 +354,8 @@ public sealed partial class AislePilotService
             prompt = BuildAiMealImagePrompt(meal),
             size = "1024x1024",
             quality = "low",
+            output_format = "jpeg",
+            output_compression = 70,
             n = 1
         };
         var serializedBody = JsonSerializer.Serialize(requestBody);
@@ -284,6 +395,12 @@ public sealed partial class AislePilotService
                         attempt,
                         OpenAiImageMaxAttempts,
                         errorSample);
+                    if (!IsTransientOpenAiStatus(response.StatusCode) || attempt >= OpenAiImageMaxAttempts)
+                    {
+                        return null;
+                    }
+
+                    await Task.Delay(GetRetryDelay(response, attempt), cancellationToken);
                     continue;
                 }
 

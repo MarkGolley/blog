@@ -39,6 +39,11 @@ public partial class AislePilotIntegrationTests
         Assert.Contains("aislepilot-day-reorder-meal-type", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-day-reorder-meal-name", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-reorder-default-label=\"Swap days\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-reorder-move=\"earlier\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-reorder-move=\"later\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"Move Monday earlier\" disabled", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aria-label=\"Move Tuesday later\" disabled", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("use Move earlier or Move later", html, StringComparison.OrdinalIgnoreCase);
 
         var reorderMealItemCount = Regex.Matches(html, "data-day-reorder-meal-item", RegexOptions.IgnoreCase).Count;
         Assert.True(reorderMealItemCount >= 6, $"Expected at least 6 reorder meal items for 2 days x 3 meals, but found {reorderMealItemCount}.");

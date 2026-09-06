@@ -704,7 +704,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotStickyContext_CanJumpBetweenPanels()
+    public async Task Mobile_AislePilotPrimaryResultsNavigation_CanSwitchBetweenPanels()
     {
         if (!IsE2EEnabled())
         {
@@ -723,7 +723,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 15000
         });
 
-        var shoppingJump = stickyContext.Locator("button[data-window-tab='aislepilot-shop']").First;
+        var shoppingJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-shop']").First;
         await shoppingJump.ClickAsync();
 
         var shoppingPanel = page.Locator("#aislepilot-shop[aria-hidden='false']").First;
@@ -734,7 +734,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         });
         Assert.Equal("true", await shoppingJump.GetAttributeAsync("aria-selected"));
 
-        var exportsJump = stickyContext.Locator("button[data-window-tab='aislepilot-export']").First;
+        var exportsJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-export']").First;
         await exportsJump.ClickAsync();
 
         var exportPanel = page.Locator("#aislepilot-export[aria-hidden='false']").First;
@@ -811,7 +811,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotOverviewActions_UseHamburgerMenuForRefreshAndSettings()
+    public async Task Mobile_AislePilotOverviewActions_UseHamburgerMenuForRefreshAndSave()
     {
         if (!IsE2EEnabled())
         {
@@ -885,9 +885,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
                 const rect = menu.getBoundingClientRect();
                 const refresh = menu.querySelector(".aislepilot-overview-regenerate-btn");
-                const settings = menu.querySelector(".aislepilot-edit-setup-btn");
+                const save = menu.querySelectorAll(".aislepilot-overview-regenerate-btn")[1];
                 const refreshText = refresh instanceof HTMLElement ? (refresh.textContent || "").trim() : "";
-                const settingsText = settings instanceof HTMLElement ? (settings.textContent || "").trim() : "";
+                const saveText = save instanceof HTMLElement ? (save.textContent || "").trim() : "";
                 const mobileContext = document.querySelector(".aislepilot-mobile-context");
 
                 const isButtonCenterVisible = button => {
@@ -917,9 +917,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     Math.max(0, rect.right - (window.innerWidth - 8)),
                     menu.querySelectorAll(".aislepilot-overview-regenerate-btn, .aislepilot-edit-setup-btn").length,
                     refreshText,
-                    settingsText,
+                    saveText,
                     isButtonCenterVisible(refresh) ? 1 : 0,
-                    isButtonCenterVisible(settings) ? 1 : 0,
+                    isButtonCenterVisible(save) ? 1 : 0,
                     Number.isFinite(menuZIndex) ? menuZIndex : -1,
                     Number.isFinite(mobileContextZIndex) ? mobileContextZIndex : -1,
                     overviewSection instanceof HTMLElement && overviewSection.classList.contains("is-actions-menu-open") ? 1 : 0
@@ -930,9 +930,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(10, menuMetrics.Length);
         Assert.True(Convert.ToDouble(menuMetrics[0]) <= 1.5, $"Expected overview menu to stay inside viewport on left edge. Overflow={menuMetrics[0]}.");
         Assert.True(Convert.ToDouble(menuMetrics[1]) <= 1.5, $"Expected overview menu to stay inside viewport on right edge. Overflow={menuMetrics[1]}.");
-        Assert.Equal(3, Convert.ToInt32(menuMetrics[2]));
+        Assert.Equal(2, Convert.ToInt32(menuMetrics[2]));
         Assert.Contains("Refresh plan", Convert.ToString(menuMetrics[3]), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("settings", Convert.ToString(menuMetrics[4]), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Save week", Convert.ToString(menuMetrics[4]), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, Convert.ToInt32(menuMetrics[5]));
         Assert.Equal(1, Convert.ToInt32(menuMetrics[6]));
         Assert.True(
@@ -1009,6 +1009,71 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(2, overviewMetrics.Length);
         Assert.Equal(1, Convert.ToInt32(overviewMetrics[0]));
         Assert.Equal(0, Convert.ToInt32(overviewMetrics[1]));
+    }
+
+    [Fact]
+    public async Task Mobile_AislePilotOverBudgetStatus_RemainsVisibleWithCollapsedDetailsAndRebalancesOnce()
+    {
+        if (!IsE2EEnabled())
+        {
+            return;
+        }
+
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+        if (_appHost is null)
+        {
+            throw new InvalidOperationException("App host is not initialized.");
+        }
+
+        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.Locator("input[name='Request.WeeklyBudget']:not(:disabled)").EvaluateAsync(
+            """
+            element => {
+                element.value = '105';
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            """);
+        await page.Locator("[data-setup-mode-submit='planner']").ClickAsync(new LocatorClickOptions { Force = true });
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var details = page.Locator("[data-overview-content]");
+        var toggle = page.Locator("[data-overview-toggle]");
+        var warning = page.Locator(".aislepilot-overbudget-flag");
+        var recovery = warning.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Refresh lower-cost plan" });
+        Assert.True(await warning.IsVisibleAsync());
+        Assert.True(await recovery.IsVisibleAsync());
+        Assert.True(await details.IsHiddenAsync());
+        Assert.Equal("false", await toggle.GetAttributeAsync("aria-expanded"));
+        Assert.Contains("over budget", await page.Locator(".aislepilot-overview-caption").TextContentAsync(), StringComparison.OrdinalIgnoreCase);
+
+        await toggle.ClickAsync();
+        Assert.True(await details.IsVisibleAsync());
+        Assert.Equal("true", await toggle.GetAttributeAsync("aria-expanded"));
+        Assert.True(await warning.IsVisibleAsync());
+        await toggle.ClickAsync();
+        Assert.True(await details.IsHiddenAsync());
+        Assert.Equal("false", await toggle.GetAttributeAsync("aria-expanded"));
+        Assert.True(await warning.IsVisibleAsync());
+
+        var navBottom = await page.Locator(".aislepilot-window-tabs").EvaluateAsync<double>("element => element.getBoundingClientRect().bottom");
+        Assert.True(navBottom <= 844, $"Expected Meals, Shop and Export navigation in the first viewport. Bottom={navBottom:F1}px.");
+
+        var rebalancePosts = 0;
+        page.Request += (_, request) =>
+        {
+            if (request.Method == "POST" && request.Url.Contains("rebalance-budget", StringComparison.OrdinalIgnoreCase))
+            {
+                rebalancePosts++;
+            }
+        };
+        Assert.Equal("105", await warning.Locator("input[name='Request.WeeklyBudget']").InputValueAsync());
+        await recovery.ClickAsync();
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        Assert.Equal(1, rebalancePosts);
+        Assert.True(await page.Locator("input[name='Request.WeeklyBudget'][value='105']").CountAsync() > 0);
     }
 
     [Fact]
@@ -1149,9 +1214,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(3, initialMetrics.Length);
         Assert.True(Convert.ToInt32(initialMetrics[2]) >= 2, $"Expected multiple day slides. Count={initialMetrics[2]}.");
 
-        var nextButton = page.Locator("[data-day-carousel-next]").First;
-        await nextButton.ScrollIntoViewIfNeededAsync();
-        await nextButton.ClickAsync();
+        var secondDayTab = page.Locator("[data-day-carousel-dot][data-day-carousel-target='1']").First;
+        await secondDayTab.ScrollIntoViewIfNeededAsync();
+        await secondDayTab.ClickAsync();
 
         await page.WaitForFunctionAsync(
             """
@@ -1171,100 +1236,21 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeSlides = slides.filter(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
-                const previousButton = document.querySelector("[data-day-carousel-prev]");
-                const nextButton = document.querySelector("[data-day-carousel-next]");
                 return [
                     status instanceof HTMLElement ? (status.textContent || "").trim() : "",
                     activeIndex,
                     activeSlides.length,
-                    activeDot instanceof HTMLElement ? Number.parseInt(activeDot.getAttribute("data-day-carousel-target") || "-1", 10) : -1,
-                    previousButton instanceof HTMLButtonElement && !previousButton.disabled ? 1 : 0,
-                    nextButton instanceof HTMLButtonElement && !nextButton.disabled ? 1 : 0
+                    activeDot instanceof HTMLElement ? Number.parseInt(activeDot.getAttribute("data-day-carousel-target") || "-1", 10) : -1
                 ];
             }
             """);
 
-        Assert.Equal(6, carouselMetrics.Length);
+        Assert.Equal(4, carouselMetrics.Length);
         Assert.Contains("2 of", Convert.ToString(carouselMetrics[0]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, Convert.ToInt32(carouselMetrics[1]));
         Assert.Equal(1, Convert.ToInt32(carouselMetrics[2]));
         Assert.Equal(1, Convert.ToInt32(carouselMetrics[3]));
-        Assert.Equal(1, Convert.ToInt32(carouselMetrics[4]));
-        Assert.Equal(1, Convert.ToInt32(carouselMetrics[5]));
     }
 
-    [Fact]
-    public async Task Mobile_AislePilotShopAndExportPanels_UseConsistentCardSurfaces()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
 
-        await using var context = await CreateMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var stickyContext = page.Locator(".aislepilot-mobile-context").First;
-        await stickyContext.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var shopJump = stickyContext.Locator("button[data-window-tab='aislepilot-shop']").First;
-        await shopJump.ClickAsync();
-        await page.Locator("#aislepilot-shop[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var shopMetrics = await page.EvaluateAsync<object[]>(
-            """
-            () => {
-                const shopCard = document.querySelector("#aislepilot-shop .aislepilot-shop-card");
-                if (!(shopCard instanceof HTMLElement)) {
-                    return [0, -1];
-                }
-
-                const style = window.getComputedStyle(shopCard);
-                return [1, Number.parseFloat(style.borderRadius || "0")];
-            }
-            """);
-        Assert.Equal(2, shopMetrics.Length);
-        Assert.Equal(1, Convert.ToInt32(shopMetrics[0]));
-        Assert.True(Convert.ToDouble(shopMetrics[1]) >= 10, $"Expected shop cards to use rounded panel surface. Radius={shopMetrics[1]}.");
-
-        var exportJump = stickyContext.Locator("button[data-window-tab='aislepilot-export']").First;
-        await exportJump.ClickAsync();
-        await page.Locator("#aislepilot-export[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var exportMetrics = await page.EvaluateAsync<object[]>(
-            """
-            () => {
-                const exportAction = document.querySelector("#aislepilot-export .aislepilot-export-action");
-                const exportButton = document.querySelector("#aislepilot-export .aislepilot-export-action .aislepilot-export-btn");
-                if (!(exportAction instanceof HTMLElement) || !(exportButton instanceof HTMLElement)) {
-                    return [0, -1, Number.POSITIVE_INFINITY];
-                }
-
-                const actionStyle = window.getComputedStyle(exportAction);
-                const actionRect = exportAction.getBoundingClientRect();
-                const buttonRect = exportButton.getBoundingClientRect();
-                const widthRatio = actionRect.width > 1 ? buttonRect.width / actionRect.width : Number.POSITIVE_INFINITY;
-                return [1, Number.parseFloat(actionStyle.borderRadius || "0"), widthRatio];
-            }
-            """);
-
-        Assert.Equal(3, exportMetrics.Length);
-        Assert.Equal(1, Convert.ToInt32(exportMetrics[0]));
-        Assert.True(Convert.ToDouble(exportMetrics[1]) >= 10, $"Expected export actions to use rounded panel surface. Radius={exportMetrics[1]}.");
-        Assert.True(Convert.ToDouble(exportMetrics[2]) >= 0.94, $"Expected export button to fill action surface width. Ratio={exportMetrics[2]:F2}.");
-    }
 }

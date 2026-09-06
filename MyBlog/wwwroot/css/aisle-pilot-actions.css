@@ -210,6 +210,43 @@
     z-index: 4;
 }
 
+.aislepilot-meal-primary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.56rem;
+}
+
+.aislepilot-meal-primary-action {
+    min-height: 2.75rem;
+    padding: 0.5rem 0.72rem;
+    border: 1px solid rgba(16, 63, 101, 0.2);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--brand-deep);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 750;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+}
+
+.aislepilot-meal-primary-action:hover {
+    border-color: rgba(31, 85, 124, 0.38);
+    background: #fff;
+}
+
+.aislepilot-meal-primary-action:active {
+    transform: translateY(1px);
+}
+
+.aislepilot-meal-primary-action.is-saved {
+    border-color: rgba(24, 114, 68, 0.3);
+    background: rgba(223, 247, 233, 0.96);
+    color: #0d5f3d;
+}
+
 .aislepilot-card-action-row.is-inline-actions .aislepilot-meal-details {
     flex: 0 0 auto;
 }
@@ -920,7 +957,7 @@ body.aislepilot-mobile-meal-sheet-open {
     border: 1px solid rgba(16, 63, 101, 0.16);
     border-radius: 16px;
     background: rgba(251, 254, 255, 0.96);
-    padding: 0.85rem;
+    padding: 0.5rem;
 }
 
 .aislepilot-export-card-copy {

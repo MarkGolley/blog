@@ -24,6 +24,7 @@ public sealed partial class AislePilotService
 
         var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var fallbackCount = 0;
+        var queuedCount = 0;
         foreach (var meal in selectedMeals)
         {
             if (TryResolveImmediateMealImageUrl(meal, out var resolvedImageUrl))
@@ -36,7 +37,11 @@ public sealed partial class AislePilotService
             AislePilotTelemetry.RecordCacheLookup("meal_image", hit: false);
             resolved[meal.Name] = GetFallbackMealImageUrl();
             fallbackCount++;
-            QueueMealImageGeneration(meal);
+            if (queuedCount < MealImageGenerationMaxConcurrency)
+            {
+                QueueMealImageGeneration(meal);
+                queuedCount++;
+            }
         }
 
         if (fallbackCount > 0 || stopwatch.ElapsedMilliseconds >= 150)
@@ -113,17 +118,22 @@ public sealed partial class AislePilotService
             return false;
         }
 
-        var candidateUrl = $"/images/aislepilot-meals/{ToAiMealDocumentId(mealName)}.png";
-        if (!TryResolveMealImageDiskPath(candidateUrl, out var fullPath) || !File.Exists(fullPath))
+        foreach (var extension in new[] { ".jpg", ".png" })
         {
-            return false;
+            var candidateUrl = $"/images/aislepilot-meals/{ToAiMealDocumentId(mealName)}{extension}";
+            if (!TryResolveMealImageDiskPath(candidateUrl, out var fullPath) || !File.Exists(fullPath))
+            {
+                continue;
+            }
+
+            MealImagePool[mealName] = candidateUrl;
+            ClearMealImageLookupMiss(mealName);
+            ClearMealImageLookupCheck(mealName);
+            imageUrl = candidateUrl;
+            return true;
         }
 
-        MealImagePool[mealName] = candidateUrl;
-        ClearMealImageLookupMiss(mealName);
-        ClearMealImageLookupCheck(mealName);
-        imageUrl = candidateUrl;
-        return true;
+        return false;
     }
 
     private static bool ShouldSkipMealImageLookup(string mealName, DateTime nowUtc)
@@ -393,18 +403,23 @@ public sealed partial class AislePilotService
                 return;
             }
 
-            var lookupCount = 0;
-            var hydratedCount = 0;
             foreach (var mealName in hydrationMealNames)
             {
                 MarkMealImageLookupCheck(mealName, nowUtc);
-                lookupCount++;
+            }
+
+            using var hydrationThrottle = new SemaphoreSlim(MealImageGenerationMaxConcurrency);
+            var hydrationTasks = hydrationMealNames.Select(async mealName =>
+            {
+                await hydrationThrottle.WaitAsync(cancellationToken);
+                try
+                {
                 var docId = ToAiMealDocumentId(mealName);
                 var doc = await _db.Collection(MealImagesCollection).Document(docId).GetSnapshotAsync(cancellationToken);
                 if (!doc.Exists)
                 {
                     MarkMealImageLookupMiss(mealName, nowUtc);
-                    continue;
+                    return false;
                 }
 
                 FirestoreAislePilotMealImage? mapped;
@@ -415,13 +430,13 @@ public sealed partial class AislePilotService
                 catch
                 {
                     MarkMealImageLookupMiss(mealName, nowUtc);
-                    continue;
+                    return false;
                 }
 
                 if (mapped is null)
                 {
                     MarkMealImageLookupMiss(mealName, nowUtc);
-                    continue;
+                    return false;
                 }
 
                 var normalizedName = string.IsNullOrWhiteSpace(mapped.Name)
@@ -431,7 +446,7 @@ public sealed partial class AislePilotService
                 if (string.IsNullOrWhiteSpace(normalizedUrl))
                 {
                     MarkMealImageLookupMiss(mealName, nowUtc);
-                    continue;
+                    return false;
                 }
 
                 var imageBase64 = string.IsNullOrWhiteSpace(mapped.ImageBase64)
@@ -440,7 +455,7 @@ public sealed partial class AislePilotService
                 if (!await EnsureMealImageAvailableAsync(normalizedUrl, imageBase64, cancellationToken))
                 {
                     MarkMealImageLookupMiss(mealName, nowUtc);
-                    continue;
+                    return false;
                 }
 
                 MealImagePool[normalizedName] = normalizedUrl;
@@ -448,8 +463,6 @@ public sealed partial class AislePilotService
                 ClearMealImageLookupMiss(normalizedName);
                 ClearMealImageLookupCheck(mealName);
                 ClearMealImageLookupCheck(normalizedName);
-                hydratedCount++;
-
                 if (string.IsNullOrWhiteSpace(mapped.ImageBase64) && mapped.ImageChunkCount <= 0)
                 {
                     var diskBytes = await TryReadMealImageBytesFromDiskAsync(normalizedUrl, cancellationToken);
@@ -458,7 +471,17 @@ public sealed partial class AislePilotService
                         await PersistMealImageAsync(normalizedName, normalizedUrl, diskBytes, cancellationToken);
                     }
                 }
-            }
+
+                return true;
+                }
+                finally
+                {
+                    hydrationThrottle.Release();
+                }
+            }).ToArray();
+            var hydrationResults = await Task.WhenAll(hydrationTasks);
+            var lookupCount = hydrationMealNames.Count;
+            var hydratedCount = hydrationResults.Count(wasHydrated => wasHydrated);
 
             if (lookupCount > 0 || stopwatch.ElapsedMilliseconds >= 150)
             {
@@ -469,6 +492,16 @@ public sealed partial class AislePilotService
                     lookupCount,
                     hydratedCount);
             }
+            AislePilotTelemetry.RecordCacheRefresh("meal_images", success: true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            AislePilotTelemetry.RecordCacheRefresh("meal_images", success: false);
+            throw;
         }
         finally
         {

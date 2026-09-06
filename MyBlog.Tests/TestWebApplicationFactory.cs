@@ -34,6 +34,7 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
                 ["DailyCapsule:WarmupAdminKey"] = "integration-daily-capsule-key",
                 ["AislePilot:EnableAiGeneration"] = "false",
                 ["AislePilot:AllowTemplateFallback"] = "true",
+                ["AislePilot:WarmupAdminKey"] = "integration-aislepilot-key",
                 ["Observability:EnableOtlp"] = "false",
                 ["Observability:LocalRunLogs:Enabled"] = "false",
                 ["OPENAI_API_KEY"] = resolvedOpenAiKey

@@ -1,6 +1,8 @@
-@model string
+@model System.ValueTuple<string, bool, bool>
 @{
-    var safeDayName = string.IsNullOrWhiteSpace(Model) ? "day" : Model.Trim();
+    var safeDayName = string.IsNullOrWhiteSpace(Model.Item1) ? "day" : Model.Item1.Trim();
+    var earlierDisabled = Model.Item2 ? null : "disabled";
+    var laterDisabled = Model.Item3 ? null : "disabled";
 }
 
 <button type="button"
@@ -21,3 +23,7 @@
     <span class="aislepilot-day-card-reorder-handle-label" aria-hidden="true">Drag</span>
     <span class="sr-only">Drag to reorder @safeDayName</span>
 </button>
+<div class="aislepilot-day-reorder-move-actions" role="group" aria-label="Move @safeDayName">
+    <button type="button" class="aislepilot-day-reorder-move" data-day-reorder-move="earlier" aria-label="Move @safeDayName earlier" @earlierDisabled>Move earlier</button>
+    <button type="button" class="aislepilot-day-reorder-move" data-day-reorder-move="later" aria-label="Move @safeDayName later" @laterDisabled>Move later</button>
+</div>

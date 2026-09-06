@@ -28,9 +28,9 @@ public partial class AislePilotIntegrationTests
 
         Assert.DoesNotContain("class=\"aislepilot-app-head-metrics\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-setup-track\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Choose your output", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Best for weekly shops", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Best for use-what-you-have", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("What would you like to do?", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Plan my week", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Use my ingredients", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-setup-mode-toggle--weekly", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-setup-mode-toggle-detail\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
@@ -123,14 +123,10 @@ public partial class AislePilotIntegrationTests
                 @"@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*\.aislepilot-mobile-context\s*\{[\s\S]*top:\s*calc\(var\(--ap-mobile-context-top\)\s*\+\s*0\.38rem\);[\s\S]*padding:\s*0\.44rem\s*0\.46rem;",
                 RegexOptions.IgnoreCase),
             css);
+        Assert.DoesNotContain(".aislepilot-day-carousel-controls", css, StringComparison.OrdinalIgnoreCase);
         Assert.Matches(
             new Regex(
-                @"@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*\.aislepilot-day-carousel-controls\s*\{[\s\S]*display:\s*none;",
-                RegexOptions.IgnoreCase),
-            css);
-        Assert.Matches(
-            new Regex(
-                @"@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*\.aislepilot-day-carousel-pagination\s*\{[\s\S]*padding:\s*0\s*0\.68rem\s*0\.16rem\s*0\.12rem;[\s\S]*scroll-padding-inline:\s*0\.68rem;",
+                @"@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*\.aislepilot-day-carousel-pagination\s*\{[\s\S]*padding:\s*0\s*0\.12rem\s*0\.16rem;",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(
@@ -150,7 +146,7 @@ public partial class AislePilotIntegrationTests
 
         Assert.Matches(
             new Regex(
-                @"\.aislepilot-setup-mode-toggle\.is-active\s*\{[\s\S]*background:\s*linear-gradient\(135deg,\s*var\(--ap-refresh-primary\)\s*0%,\s*var\(--ap-refresh-primary-strong\)\s*100%\)\s*!important;[\s\S]*color:\s*#f8fbff\s*!important;[\s\S]*border:\s*1px\s*solid\s*transparent\s*!important;",
+                @"\.aislepilot-setup-mode-toggle\.is-active\s*\{[\s\S]*background:\s*linear-gradient\(135deg,\s*var\(--ap-refresh-primary\)\s*0%,\s*var\(--ap-refresh-primary-strong\)\s*100%\)\s*(?:!important)?;[\s\S]*color:\s*#f8fbff\s*!important;[\s\S]*border:\s*1px\s*solid\s*transparent\s*!important;",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(
@@ -192,12 +188,12 @@ public partial class AislePilotIntegrationTests
             css);
         Assert.Matches(
             new Regex(
-                @":root:not\(\[data-theme=""dark""\]\)\s+\.aislepilot-setup-mode-toggle--weekly:not\(\.is-active\)\s*\{[\s\S]*border-color:\s*rgb\(var\(--ap-refresh-primary-rgb\)\s*/\s*0\.34\)\s*!important;[\s\S]*background:\s*linear-gradient\(\s*135deg,\s*rgb\(var\(--ap-refresh-primary-rgb\)\s*/\s*0\.12\),\s*rgb\(var\(--ap-refresh-primary-strong-rgb\)\s*/\s*0\.2\)\s*\),\s*var\(--ap-refresh-surface-strong\)\s*!important;",
+                @":root:not\(\[data-theme=""dark""\]\)\s+\.aislepilot-setup-mode-toggle--weekly:not\(\.is-active\)\s*\{[\s\S]*border-color:\s*rgb\(var\(--ap-refresh-primary-rgb\)\s*/\s*0\.34\)\s*!important;[\s\S]*background:\s*linear-gradient\(\s*135deg,\s*rgb\(var\(--ap-refresh-primary-rgb\)\s*/\s*0\.12\),\s*rgb\(var\(--ap-refresh-primary-strong-rgb\)\s*/\s*0\.2\)\s*\),\s*var\(--ap-refresh-surface-strong\)\s*(?:!important)?;",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(
             new Regex(
-                @":root:not\(\[data-theme=""dark""\]\)\s+\.aislepilot-setup-mode-toggle--weekly:not\(\.is-active\):hover\s*\{[\s\S]*border-color:\s*rgb\(var\(--ap-refresh-primary-rgb\)\s*/\s*0\.42\)\s*!important;[\s\S]*background:\s*linear-gradient\(\s*135deg,\s*rgb\(var\(--ap-refresh-primary-rgb\)\s*/\s*0\.18\),\s*rgb\(var\(--ap-refresh-primary-strong-rgb\)\s*/\s*0\.28\)\s*\),\s*var\(--ap-refresh-surface-strong\)\s*!important;",
+                @":root:not\(\[data-theme=""dark""\]\)\s+\.aislepilot-setup-mode-toggle--weekly:not\(\.is-active\):hover\s*\{[\s\S]*border-color:\s*rgb\(var\(--ap-refresh-primary-rgb\)\s*/\s*0\.42\)\s*!important;[\s\S]*background:\s*linear-gradient\(\s*135deg,\s*rgb\(var\(--ap-refresh-primary-rgb\)\s*/\s*0\.18\),\s*rgb\(var\(--ap-refresh-primary-strong-rgb\)\s*/\s*0\.28\)\s*\),\s*var\(--ap-refresh-surface-strong\)\s*(?:!important)?;",
                 RegexOptions.IgnoreCase),
             css);
         Assert.Matches(

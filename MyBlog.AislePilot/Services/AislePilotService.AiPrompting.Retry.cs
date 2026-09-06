@@ -30,7 +30,7 @@ public sealed partial class AislePilotService
         }
 
         var serializedBody = JsonSerializer.Serialize(requestBody);
-        var resolvedModel = string.IsNullOrWhiteSpace(model) ? _model : model!;
+        var resolvedModel = string.IsNullOrWhiteSpace(model) ? _utilityModel : model!;
         var maxAttempts = OpenAiMaxAttempts;
         using var activity = AislePilotTelemetry.StartActivity("ai.aislepilot.request", ActivityKind.Client);
         activity?.SetTag("ai.provider", "openai");
@@ -43,7 +43,7 @@ public sealed partial class AislePilotService
             var requestStopwatch = Stopwatch.StartNew();
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(OpenAiRequestTimeout);
-            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, OpenAiChatCompletionsEndpoint)
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, OpenAiResponsesEndpoint)
             {
                 Content = new StringContent(serializedBody, Encoding.UTF8, "application/json")
             };
@@ -159,6 +159,68 @@ public sealed partial class AislePilotService
         activity?.SetTag("ai.success", false);
         activity?.SetTag("ai.error_type", "exhausted_retries");
         return null;
+    }
+
+    private static object BuildOpenAiJsonResponseRequest(
+        string model,
+        string reasoningEffort,
+        string instructions,
+        string input,
+        int maxOutputTokens)
+    {
+        return new
+        {
+            model,
+            instructions,
+            input,
+            reasoning = new { effort = reasoningEffort },
+            max_output_tokens = maxOutputTokens,
+            text = new
+            {
+                format = new { type = "json_object" },
+                verbosity = "low"
+            },
+            store = false
+        };
+    }
+
+    private static string? ExtractOpenAiResponseText(string responseContent)
+    {
+        if (string.IsNullOrWhiteSpace(responseContent))
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(responseContent);
+        if (document.RootElement.TryGetProperty("output_text", out var outputText) &&
+            outputText.ValueKind == JsonValueKind.String)
+        {
+            return outputText.GetString();
+        }
+
+        if (document.RootElement.TryGetProperty("output", out var output) &&
+            output.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in output.EnumerateArray())
+            {
+                if (!item.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var part in content.EnumerateArray())
+                {
+                    if (part.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+                    {
+                        return text.GetString();
+                    }
+                }
+            }
+        }
+
+        // Retain compatibility with recorded Chat Completions fixtures during rollout.
+        var legacyPayload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
+        return legacyPayload?.Choices?.FirstOrDefault()?.Message?.Content;
     }
 
     private static bool IsTransientOpenAiStatus(HttpStatusCode statusCode)

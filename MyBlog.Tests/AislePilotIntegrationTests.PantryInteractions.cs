@@ -121,6 +121,11 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
                 @"<img[^>]*class=""[^""]*aislepilot-meal-image[^""]*""(?=[^>]*loading=""lazy"")(?=[^>]*fetchpriority=""low"")[^>]*>",
                 RegexOptions.IgnoreCase),
             html);
+        Assert.Matches(
+            new Regex(
+                @"<img[^>]*class=""[^""]*aislepilot-meal-image[^""]*""(?=[^>]*srcset=""[^""]+\s+(?:512|1024)w"")(?=[^>]*sizes=""\(max-width: 760px\)[^""]+"")(?=[^>]*width=""1024"")(?=[^>]*height=""1024"")[^>]*>",
+                RegexOptions.IgnoreCase),
+            html);
     }
 
     [Fact]

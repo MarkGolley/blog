@@ -213,7 +213,9 @@ public sealed partial class AislePilotService
         var directoryPath = Path.Combine(_webHostEnvironment.WebRootPath, "images", "aislepilot-meals");
         Directory.CreateDirectory(directoryPath);
 
-        var fileName = $"{ToAiMealDocumentId(mealName)}.png";
+        var fileName = AislePilotMealImageVersioning.BuildFileName(
+            ToAiMealDocumentId(mealName),
+            imageBytes);
         var filePath = Path.Combine(directoryPath, fileName);
         await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
         return $"/images/aislepilot-meals/{fileName}";

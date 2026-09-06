@@ -215,7 +215,9 @@ public sealed partial class AislePilotService
             MidpointRounding.AwayFromZero);
         var hasMealChanges = !_planComparisonService.HasSameMealSequence(result, baselineMealNames);
         var changedMealCount = _planComparisonService.CountChangedMealDays(result, baselineMealNames);
-        var usedTargetedTrim = result.PlanSourceLabel.Contains("Budget trim swaps", StringComparison.OrdinalIgnoreCase);
+        var usedTargetedTrim = result.PlanSourceLabel.Equals(
+            CustomerBudgetTrimPlanSourceLabel,
+            StringComparison.OrdinalIgnoreCase);
 
         result.BudgetRebalanceAttempted = true;
         result.BudgetRebalanceReducedCost = costDrop > 0m;
@@ -251,15 +253,11 @@ public sealed partial class AislePilotService
     {
         var budgetDelta = decimal.Round(originalBudget - plan.EstimatedTotalCost, 2, MidpointRounding.AwayFromZero);
         var isOverBudget = budgetDelta < 0;
-        var sourceLabel = string.IsNullOrWhiteSpace(plan.PlanSourceLabel)
-            ? "Budget rebalance"
-            : $"Budget rebalance ({plan.PlanSourceLabel})";
-
         plan.WeeklyBudget = originalBudget;
         plan.BudgetDelta = budgetDelta;
         plan.IsOverBudget = isOverBudget;
         plan.BudgetTips = BuildBudgetTips(isOverBudget, budgetDelta, plan.LeftoverDays);
-        plan.PlanSourceLabel = sourceLabel;
+        plan.PlanSourceLabel = "Budget-friendly meal plan";
         return plan;
     }
 

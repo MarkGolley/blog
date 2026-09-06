@@ -17,7 +17,9 @@ public partial class AislePilotIntegrationTests
             "/css/aisle-pilot-dark.css",
             "/css/aisle-pilot-refresh.css",
             "/css/aisle-pilot-header-compact.css",
-            "/css/aisle-pilot-overview-balance.css"
+            "/css/aisle-pilot-overview-balance.css",
+            "/css/aisle-pilot-kitchen.css",
+            "/css/aisle-pilot-kitchen-results.css"
         };
 
         var cssChunks = new List<string>(assetPaths.Length);
@@ -46,6 +48,20 @@ public partial class AislePilotIntegrationTests
         }
 
         return string.Join(Environment.NewLine, scriptChunks);
+    }
+
+    [Fact]
+    public async Task AislePilotActions_ProvideImmediatePressedAndSubmittingFeedback()
+    {
+        using var client = CreateClient(allowAutoRedirect: true);
+
+        var css = await GetCombinedAislePilotCssAsync(client);
+        var script = await GetCombinedAislePilotScriptAsync(client);
+
+        Assert.Contains(".aislepilot-app :where(button:not(:disabled), a[href], summary):active", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("filter: brightness(0.86);", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const planLoadingShellDelayMs = 0;", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("setSubmitButtonLoadingState(submitButton);", script, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

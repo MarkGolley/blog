@@ -19,14 +19,14 @@ public sealed partial class AislePilotService
 {
     public AislePilotPlanResultViewModel BuildPlan(AislePilotRequestModel request)
     {
-        return _planGenerationOrchestrator.BuildPlanAsync(this, request, null).GetAwaiter().GetResult();
+        return BuildPlanAndRecordSourceAsync(request, null).GetAwaiter().GetResult();
     }
 
     public Task<AislePilotPlanResultViewModel> BuildPlanAsync(
         AislePilotRequestModel request,
         CancellationToken cancellationToken = default)
     {
-        return _planGenerationOrchestrator.BuildPlanAsync(this, request, null, cancellationToken);
+        return BuildPlanAndRecordSourceAsync(request, null, cancellationToken);
     }
 
     public Task<AislePilotPlanResultViewModel> BuildPlanAvoidingMealsAsync(
@@ -34,7 +34,21 @@ public sealed partial class AislePilotService
         IReadOnlyList<string> excludedMealNames,
         CancellationToken cancellationToken = default)
     {
-        return _planGenerationOrchestrator.BuildPlanAsync(this, request, excludedMealNames, cancellationToken);
+        return BuildPlanAndRecordSourceAsync(request, excludedMealNames, cancellationToken);
+    }
+
+    private async Task<AislePilotPlanResultViewModel> BuildPlanAndRecordSourceAsync(
+        AislePilotRequestModel request,
+        IReadOnlyList<string>? excludedMealNames,
+        CancellationToken cancellationToken = default)
+    {
+        var plan = await _planGenerationOrchestrator.BuildPlanAsync(
+            this,
+            request,
+            excludedMealNames,
+            cancellationToken);
+        AislePilotTelemetry.RecordPlanSource(plan.PlanSourceLabel);
+        return plan;
     }
 
     public async Task<AislePilotPlanResultViewModel> BuildPlanFromCurrentMealsAsync(
@@ -667,39 +681,24 @@ public sealed partial class AislePilotService
             requestedMealCount,
             compactJson,
             excludedMealNames);
-        var requestBody = new
-        {
-            model = _model,
-            temperature = compactJson ? 0.6 : 0.9,
-            max_tokens = maxTokens,
-            response_format = new { type = "json_object" },
-            messages = new object[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You generate practical weekly meal plans for a UK grocery-planning app. Always return valid JSON only. Use UK English. Prioritise variety and never repeat the same meal in a single plan unless explicitly impossible."
-                },
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+        var requestBody = BuildOpenAiJsonResponseRequest(
+            _planningModel,
+            _planningReasoningEffort,
+            "You generate practical weekly meal plans for a UK grocery-planning app. Always return valid JSON only. Use UK English. Prioritise variety and never repeat the same meal in a single plan unless explicitly impossible.",
+            prompt,
+            maxTokens);
 
         var responseContent = await SendOpenAiRequestWithRetryAsync(
             requestBody,
             cancellationToken,
             operation: "meal_plan_generation",
-            model: _model);
+            model: _planningModel);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return null;
         }
 
-        var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-        var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+        var rawJson = ExtractOpenAiResponseText(responseContent);
         if (string.IsNullOrWhiteSpace(rawJson))
         {
             return null;
@@ -910,7 +909,8 @@ public sealed partial class AislePilotService
         int cookDays,
         int totalMealCount,
         IReadOnlyList<string>? excludedMealNames = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool hydrateOnMiss = true)
     {
         var mealTypeSlots = BuildMealTypeSlots(request);
 
@@ -931,6 +931,11 @@ public sealed partial class AislePilotService
                 usedAiGeneratedMeals: true,
                 planSourceLabel: "AI meal pool",
                 cancellationToken: cancellationToken);
+        }
+
+        if (!hydrateOnMiss)
+        {
+            return null;
         }
 
         await EnsureAiMealPoolHydratedAsync(cancellationToken);

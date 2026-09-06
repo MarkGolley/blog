@@ -19,6 +19,13 @@ public sealed partial class AislePilotService
 {
     private static bool ContainsToken(MealTemplate meal, string token)
     {
+        if (token.Equals("nut", StringComparison.OrdinalIgnoreCase) ||
+            token.Equals("nuts", StringComparison.OrdinalIgnoreCase))
+        {
+            return ContainsWholeWord(meal.Name, token) ||
+                   meal.Ingredients.Any(ingredient => ContainsWholeWord(ingredient.Name, token));
+        }
+
         if (meal.Name.Contains(token, StringComparison.OrdinalIgnoreCase))
         {
             return true;

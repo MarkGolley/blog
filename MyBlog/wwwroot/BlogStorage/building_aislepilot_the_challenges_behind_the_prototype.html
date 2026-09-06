@@ -1,0 +1,128 @@
+<!-- PublishedDate: 2026-03-20 -->
+<!-- Tags: ASP.NET, C#, AI, Product, UX, Reliability, Testing -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Building AislePilot: The Challenges Behind the Prototype</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../wwwroot/css/blogs.css">
+</head>
+<body>
+
+<h1>Building AislePilot: The Challenges Behind the Prototype</h1>
+
+<p>I recently built AislePilot, a planning tool that generates weekly meals, builds a supermarket-aware shopping list, and keeps everything tied to a household budget. On paper it sounded quite straightforward. In practice, it quickly became a reliability and UX problem as much as an AI problem.</p>
+
+<p>This post is a breakdown of the real challenges I hit while building it, and what I changed to make it usable rather than just impressive in a demo.</p>
+
+<h2>What AislePilot was trying to solve</h2>
+
+<p>The aim was simple enough:</p>
+
+<ul>
+    <li>Generate a realistic weekly plan based on dietary modes, household size, and cook days</li>
+    <li>Produce a shopping list grouped by supermarket aisle order</li>
+    <li>Keep costs visible so users can compare plan total vs weekly budget</li>
+    <li>Export results to formats that are useful in real life (PDF and checklist text)</li>
+</ul>
+
+<p>The difficulty is that each one of those needs to stay consistent as users keep changing inputs, swapping meals, rebalancing leftovers, and regenerating the plan.</p>
+
+<h2>Challenge 1: AI plans are great until they are not</h2>
+
+<p>The biggest early lesson was this: AI output quality varies, and even when quality is good the call itself can still fail. Timeouts, transient API errors, odd payload formatting, and missing keys all happen in normal operation.</p>
+
+<p>So I treated AI as a preferred path, not the only path. AislePilot now has layered behaviour:</p>
+
+<ul>
+    <li>Try AI generation first when configured</li>
+    <li>Retry transient failures (429/5xx style responses) with short backoff</li>
+    <li>Sanitise and validate AI payloads before they can shape meal output</li>
+    <li>Fallback to curated local meal templates when AI is unavailable</li>
+</ul>
+
+<p>That fallback changed everything. It means users still get a useful plan even when the model is down or unconfigured, and it keeps the experience stable in dev/test environments.</p>
+
+<h2>Challenge 2: validation became part of product design</h2>
+
+<p>I started with standard form validation and quickly realised it was not enough. For this app, validation is effectively product logic.</p>
+
+<p>Some examples:</p>
+
+<ul>
+    <li>Supermarket must be one of the supported options</li>
+    <li>Dietary modes must be recognised and at least one must be selected</li>
+    <li>Custom aisle order needs enough departments to be meaningful</li>
+    <li>Constraint combinations that match no meals should fail fast with clear feedback</li>
+</ul>
+
+<p>Without this, users submit valid-looking forms but get incoherent results. Adding defensive validation made the UI feel more predictable and reduced strange edge-case plans.</p>
+
+<h2>Challenge 3: “swap meal” sounds easy, state management says otherwise</h2>
+
+<p>Swapping one meal for another sounds trivial until you want it to feel good repeatedly. The main issue was avoiding repetitive swaps while preserving constraints and keeping budget/reasoning coherent.</p>
+
+<p>I ended up carrying swap history state per day so previously seen meals are tracked and not immediately repeated. This was one of those hidden complexity features: tiny UI action, surprisingly deep state handling.</p>
+
+<details class="post-capsule post-capsule-details">
+    <summary>
+        <span class="post-capsule-label">Optional deep dive</span>
+        <span class="post-capsule-text">Why leftovers and swaps were the trickiest interaction model.</span>
+    </summary>
+    <div class="post-capsule-details-body">
+        <p>Leftovers are generated from cook-day allocations, not as an isolated toggle.</p>
+        <p>When users rebalance leftover days, the request needs to retain the full setup context while changing only leftover source day indexes.</p>
+        <p>On top of that, meal swapping needs to avoid cycling the same meals back in for a specific day. So the app serialises day-by-day swap history and reuses it on each swap request.</p>
+        <p>The end result is much better UX, but it required treating "simple controls" like a small state machine.</p>
+    </div>
+</details>
+
+<h2>Challenge 4: keeping the flow safe under repeated POST actions</h2>
+
+<p>AislePilot does a lot through forms: generate, suggest-from-pantry, swap, rebalance, export. Repeated POST interactions meant I needed to be strict about safety and abuse control from the start.</p>
+
+<ul>
+    <li>Anti-forgery validation across all write-like actions</li>
+    <li>Rate limiting policy on write endpoints</li>
+    <li>Return URL hardening (local-only and no recursive loop back into itself)</li>
+</ul>
+
+<p>None of this is flashy, but these protections stopped a lot of future pain and made the app safer to expose publicly.</p>
+
+<h2>Challenge 5: export quality had to match the planner quality</h2>
+
+<p>I did not want exports to feel like an afterthought, so I spent longer than expected on the document layout and structure. The PDF includes overview, aisle-grouped shopping sections, and full recipe steps with practical formatting.</p>
+
+<p>The checklist export is deliberately simpler and phone-friendly, because in a supermarket you often just need quick tick-box lines and aisle grouping, not a polished report.</p>
+
+<p>This was another product lesson: “usable at home” and “usable in-store” are two different contexts and often need two different output formats.</p>
+
+<h2>Challenge 6: pantry suggestions needed to avoid fake confidence</h2>
+
+<p>The pantry feature suggests meals from ingredients users already have. Initially it over-suggested by matching generic tokens too loosely. That looked smart but was actually misleading.</p>
+
+<p>I tightened this by:</p>
+
+<ul>
+    <li>Normalising pantry tokens and ingredient aliases</li>
+    <li>Separating generic pantry items from specific ingredient intent</li>
+    <li>Only returning fully matched suggestions for “can make now”</li>
+</ul>
+
+<p>This made results stricter, but much more trustworthy.</p>
+
+<h2>What I learned building it</h2>
+
+<ul>
+    <li>Reliable fallback paths matter more than flashy happy-path demos</li>
+    <li>Validation logic is part of product quality, not just backend hygiene</li>
+    <li>Small UX interactions can hide very non-trivial state management</li>
+    <li>Security basics (anti-forgery, rate limits, safe redirects) should be built in early</li>
+    <li>Export design is a real feature when users act on output in the real world</li>
+</ul>
+
+<p>AislePilot started as “generate me a meal plan” and ended up being a proper systems exercise across AI integration, guardrails, UX continuity, and operational reliability. It is still a prototype, but it now behaves like something I would trust people to actually use.</p>
+
+</body>
+</html>

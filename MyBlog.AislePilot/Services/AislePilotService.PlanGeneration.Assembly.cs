@@ -76,11 +76,35 @@ public sealed partial class AislePilotService
 
     private async Task<DessertAddOnTemplate?> TryResolveDessertAddOnTemplateForPlanAsync(
         string? selectedDessertAddOnName,
+        IReadOnlyList<string> dietaryModes,
+        string dislikesOrAllergens,
         CancellationToken cancellationToken = default)
     {
+        DessertAddOnTemplate? SelectCompatibleTemplate()
+        {
+            var compatible = GetAvailableDessertAddOnTemplatesSnapshot()
+                .Where(template => IsDessertCompatible(template, dietaryModes, dislikesOrAllergens))
+                .ToList();
+            return string.IsNullOrWhiteSpace(selectedDessertAddOnName)
+                ? compatible.FirstOrDefault()
+                : compatible.FirstOrDefault(template => template.Name.Equals(
+                    selectedDessertAddOnName.Trim(), StringComparison.OrdinalIgnoreCase)) ?? compatible.FirstOrDefault();
+        }
+
+        if (!EnableInteractiveAiGeneration)
+        {
+            var selected = SelectCompatibleTemplate();
+            QueueDessertAddOnRecovery(selectedDessertAddOnName);
+            return selected;
+        }
+
         try
         {
             var resolved = await ResolveDessertAddOnTemplateAsync(selectedDessertAddOnName, cancellationToken);
+            if (!IsDessertCompatible(resolved, dietaryModes, dislikesOrAllergens))
+            {
+                return SelectCompatibleTemplate();
+            }
             await PersistDessertAddOnTemplateAsync(resolved, cancellationToken);
             return resolved;
         }
@@ -94,7 +118,11 @@ public sealed partial class AislePilotService
 
         try
         {
-            var fallbackTemplate = ResolveDessertAddOnTemplate(selectedDessertAddOnName);
+            var fallbackTemplate = SelectCompatibleTemplate();
+            if (fallbackTemplate is null)
+            {
+                return null;
+            }
             await PersistDessertAddOnTemplateAsync(fallbackTemplate, cancellationToken);
             return fallbackTemplate;
         }
@@ -199,6 +227,27 @@ public sealed partial class AislePilotService
             portionSize);
     }
 
+    internal PlanContext BuildPlanContextForInteractiveRequest(AislePilotRequestModel request)
+    {
+        var supermarket = NormalizeSupermarket(request.Supermarket);
+        var dietaryModes = NormalizeDietaryModes(request.DietaryModes);
+        if (!TryValidateNormalizedDietaryModes(dietaryModes, out var dietaryValidationMessage))
+        {
+            throw new InvalidOperationException(dietaryValidationMessage);
+        }
+
+        var portionSize = NormalizePortionSize(request.PortionSize);
+        var portionSizeFactor = ResolvePortionSizeFactor(portionSize);
+        return new PlanContext(
+            supermarket,
+            dietaryModes,
+            ResolveSupermarketLayoutForInteractiveRequest(supermarket, request.CustomAisleOrder ?? string.Empty),
+            ResolveSupermarketPriceProfile(supermarket),
+            Math.Max(0.5m, request.HouseholdSize / 2m) * portionSizeFactor,
+            request.DislikesOrAllergens ?? string.Empty,
+            portionSize);
+    }
+
     internal static AislePilotRequestModel CloneRequest(AislePilotRequestModel request)
     {
         return new AislePilotRequestModel
@@ -283,6 +332,7 @@ public sealed partial class AislePilotService
         var imageResolutionStopwatch = Stopwatch.StartNew();
         var mealImageUrls = ResolveMealImageUrls(normalizedSelectedMeals);
         var imageResolutionElapsedMs = imageResolutionStopwatch.ElapsedMilliseconds;
+        AislePilotTelemetry.RecordPlanStage("image_resolution", imageResolutionStopwatch.Elapsed);
         var portionSizeFactor = ResolvePortionSizeFactor(context.PortionSize);
         var specialTreatMealSlotIndex = request.IncludeSpecialTreatMeal
             ? ResolveSpecialTreatDisplayMealIndex(
@@ -308,8 +358,13 @@ public sealed partial class AislePilotService
         if (request.IncludeDessertAddOn)
         {
             var dessertResolutionStopwatch = Stopwatch.StartNew();
-            dessertAddOnTemplate = await TryResolveDessertAddOnTemplateForPlanAsync(request.SelectedDessertAddOnName, cancellationToken);
+            dessertAddOnTemplate = await TryResolveDessertAddOnTemplateForPlanAsync(
+                request.SelectedDessertAddOnName,
+                context.DietaryModes,
+                context.DislikesOrAllergens,
+                cancellationToken);
             dessertResolutionElapsedMs = dessertResolutionStopwatch.ElapsedMilliseconds;
+            AislePilotTelemetry.RecordPlanStage("dessert_resolution", dessertResolutionStopwatch.Elapsed);
         }
         var hasSpecialTreatMealInPlan = request.IncludeSpecialTreatMeal &&
                                         dailyPlans.Any(meal => meal.IsSpecialTreat);
@@ -363,6 +418,7 @@ public sealed partial class AislePilotService
                 dessertResolutionElapsedMs,
                 shoppingItems.Count);
         }
+        AislePilotTelemetry.RecordPlanStage("assembly", planAssemblyStopwatch.Elapsed, planSourceLabel);
 
         return new AislePilotPlanResultViewModel
         {
@@ -370,9 +426,7 @@ public sealed partial class AislePilotService
             PortionSize = context.PortionSize,
             AppliedDietaryModes = context.DietaryModes,
             UsedAiGeneratedMeals = usedAiGeneratedMeals,
-            PlanSourceLabel = string.IsNullOrWhiteSpace(planSourceLabel)
-                ? usedAiGeneratedMeals ? "OpenAI generated" : string.Empty
-                : planSourceLabel,
+            PlanSourceLabel = ToCustomerPlanSourceLabel(planSourceLabel, usedAiGeneratedMeals),
             PlanDays = planDays,
             CookDays = normalizedCookDays,
             MealsPerDay = mealsPerDay,

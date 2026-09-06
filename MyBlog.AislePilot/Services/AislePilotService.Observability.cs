@@ -23,8 +23,11 @@ public sealed partial class AislePilotService
                 DessertAddOnRecoveryInFlight.Count,
                 new KeyValuePair<string, object?>("queue", "dessert_addon_recovery")),
             new Measurement<long>(
-                SupermarketLayoutRefreshInFlight.Count,
-                new KeyValuePair<string, object?>("queue", "supermarket_layout_refresh"))
+                SupermarketLayoutRefreshInFlight.Count + SupermarketLayoutRefreshQueued.Count,
+                new KeyValuePair<string, object?>("queue", "supermarket_layout_refresh")),
+            new Measurement<long>(
+                SupermarketLayoutHydrationQueued.Count,
+                new KeyValuePair<string, object?>("queue", "supermarket_layout_hydration"))
         ]);
     }
 
@@ -35,8 +38,10 @@ public sealed partial class AislePilotService
         {
             "gpt-4.1-mini" => (0.40d, 1.60d),
             "gpt-4.1" => (2.00d, 8.00d),
+            "gpt-5.6-terra" => (2.00d, 12.00d),
+            "gpt-5.6-luna" => (0.20d, 1.20d),
             "gpt-image-1-mini" => (2.00d, 0d),
-            _ => (0.40d, 1.60d)
+            _ => (0d, 0d)
         };
     }
 
@@ -70,6 +75,18 @@ public sealed partial class AislePilotService
                 completionTokenElement.TryGetInt32(out var parsedCompletionTokens))
             {
                 completionTokens = parsedCompletionTokens;
+            }
+
+            if (usage.TryGetProperty("input_tokens", out var inputTokenElement) &&
+                inputTokenElement.TryGetInt32(out var parsedInputTokens))
+            {
+                promptTokens = parsedInputTokens;
+            }
+
+            if (usage.TryGetProperty("output_tokens", out var outputTokenElement) &&
+                outputTokenElement.TryGetInt32(out var parsedOutputTokens))
+            {
+                completionTokens = parsedOutputTokens;
             }
         }
         catch (JsonException)
@@ -141,12 +158,14 @@ public sealed partial class AislePilotService
         string jobName,
         Stopwatch stopwatch,
         bool success,
-        Exception? ex = null)
+        Exception? ex = null,
+        AislePilotTelemetry.BackgroundRequestProfile? requestProfile = null)
     {
         AislePilotTelemetry.RecordBackgroundJob(
             jobName,
             stopwatch.Elapsed,
             success,
-            ex?.GetType().Name);
+            ex?.GetType().Name,
+            requestProfile);
     }
 }

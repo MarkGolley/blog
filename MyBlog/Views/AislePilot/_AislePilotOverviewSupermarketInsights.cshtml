@@ -2,6 +2,8 @@
 
 @if (Model.HasContent)
 {
+    <details class="aislepilot-source-details">
+        <summary>How prices and aisle order are estimated</summary>
     <aside class="aislepilot-overview-supermarket-insights"
            data-supermarket-insight-strip
            aria-label="Supermarket research summary">
@@ -40,4 +42,5 @@
                data-supermarket-insight-warning>@Model.ReviewDetail</p>
         }
     </aside>
+    </details>
 }
