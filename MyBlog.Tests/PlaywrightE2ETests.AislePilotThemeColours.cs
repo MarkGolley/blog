@@ -45,6 +45,9 @@ public sealed partial class PlaywrightE2ETests
         await page.Locator(".aislepilot-mode-option").Filter(new() { HasText = "Vegetarian" }).ClickAsync();
         Assert.True(await page.Locator("input[name='Request.DietaryModes'][value='Vegetarian']").IsCheckedAsync());
         await AssertThemeColourAsync(page, "input[value='Vegetarian'] + span", "--ap-refresh-primary");
+        Assert.NotEqual(
+            "sticky",
+            await page.Locator(".app-shell-header").EvaluateAsync<string>("element => getComputedStyle(element).position"));
         await WriteAislePilotStateScreenshotAsync(page, $"colour-setup-{width}-{theme}");
         await GetAislePilotGenerateButton(page).ClickAsync();
         await page.Locator("#aislepilot-tab-meals").WaitForAsync();

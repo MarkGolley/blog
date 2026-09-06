@@ -281,6 +281,7 @@ body:has(.aislepilot-app)::after { display: none; }
 }
 body:has(.aislepilot-app) { --ap-shell-surface: #fffefa; --ap-shell-text: #233d32; --ap-shell-border: #d9ded4; }
 :root[data-theme='dark'] body:has(.aislepilot-app) { --ap-shell-surface: #1e2c23; --ap-shell-text: #f0f2e9; --ap-shell-border: #405146; }
+body:has(.aislepilot-app) .app-shell-header { position: relative; top: auto; }
 :root[data-theme] body:has(.aislepilot-app) :is(.app-shell-back, .app-theme-toggle, .theme-toggle-track, .theme-toggle-thumb) {
     background: var(--ap-shell-surface) !important;
     color: var(--ap-shell-text) !important;
