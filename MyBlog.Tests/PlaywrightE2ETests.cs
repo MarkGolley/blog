@@ -175,6 +175,16 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var targetIndex = Math.Min(2, moreActionsTriggerCount - 1);
         var targetTrigger = moreActionsTriggers.Nth(targetIndex);
         var targetCard = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-card][1]");
+        await page.EvaluateAsync(
+            """
+            targetIndex => {
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                const unaffectedCard = cards.find((_, index) => index !== targetIndex);
+                window.__aislePilotUnaffectedCard = unaffectedCard ?? null;
+                window.__aislePilotUnaffectedImage = unaffectedCard?.querySelector("img[data-meal-image]") ?? null;
+            }
+            """,
+            targetIndex);
         var targetSwapButton = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-panel][1]").Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
         await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
@@ -198,6 +208,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await targetSwapButton.ClickAsync();
         await page.WaitForTimeoutAsync(150);
+        var pendingScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
 
         var pendingState = await targetCard.EvaluateAsync<string>(
             """
@@ -215,21 +226,39 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         Assert.Contains("true|1|", pendingState, StringComparison.Ordinal);
         Assert.Contains("Loading new meal", pendingState, StringComparison.OrdinalIgnoreCase);
+        await WriteAislePilotStateScreenshotAsync(page, "swap-transition-pending-mobile-light", fullPage: false);
 
         _ = await swapResponseTask;
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await page.WaitForTimeoutAsync(1100);
+        await WriteAislePilotStateScreenshotAsync(page, "swap-transition-complete-mobile-light", fullPage: false);
+
+        var unaffectedCardStayedMounted = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const card = window.__aislePilotUnaffectedCard;
+                const image = window.__aislePilotUnaffectedImage;
+                return card instanceof HTMLElement &&
+                    card.isConnected &&
+                    image instanceof HTMLImageElement &&
+                    image.isConnected &&
+                    image.closest("[data-day-meal-card]") === card;
+            }
+            """);
+        Assert.True(
+            unaffectedCardStayedMounted,
+            "Expected an unaffected meal card and its image to remain mounted throughout the swap transition.");
 
         var afterScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
-        var scrollDelta = Math.Abs(afterScrollY - beforeScrollY);
-        var upwardDelta = beforeScrollY - afterScrollY;
+        var scrollDelta = Math.Abs(afterScrollY - pendingScrollY);
+        var upwardDelta = pendingScrollY - afterScrollY;
 
         Assert.True(
             scrollDelta <= 8,
-            $"Expected swap viewport to stay anchored after showing pending state. Before={beforeScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
+            $"Expected the pending card to stay anchored while the swap response was applied. BeforeClick={beforeScrollY}, Pending={pendingScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
         Assert.True(
             upwardDelta <= 4,
-            $"Expected pending-state swap not to pull the viewport upward. Before={beforeScrollY}, After={afterScrollY}, UpwardDelta={upwardDelta}.");
+            $"Expected the swap response not to pull the pending card upward. Pending={pendingScrollY}, After={afterScrollY}, UpwardDelta={upwardDelta}.");
     }
 
     [Fact]

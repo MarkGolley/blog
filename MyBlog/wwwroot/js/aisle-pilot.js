@@ -1328,7 +1328,7 @@
                 responseLength: responseText.length
             });
             const slotIndex = Number.parseInt(dayIndexValue ?? "", 10);
-            const didApplySwapResponse = applyAjaxSwapResponse(responseText, slotIndex);
+            const didApplySwapResponse = applyAjaxSwapResponse(responseText, slotIndex, true);
             writeSwapDebug("menu-submit-card-apply-response", {
                 dayIndex: dayIndexValue,
                 didApplySwapResponse
@@ -5081,7 +5081,7 @@
         });
     };
 
-    const applyAjaxSwapResponse = (responseText, slotIndex) => {
+    const applyAjaxSwapResponse = (responseText, slotIndex, preferTargetedMealReplacement = false) => {
         if (typeof DOMParser === "undefined") {
             return false;
         }
@@ -5098,8 +5098,10 @@
         const responseDocument = new DOMParser().parseFromString(responseText, "text/html");
         applyRememberedDayMealSlotsToScope(responseDocument);
         applyRememberedActiveDayCardSlideToScope(responseDocument);
-        const didReplaceMealsSection = replaceSectionContent(responseDocument, "#aislepilot-meals");
-        const didReplaceMealCard = !didReplaceMealsSection && replaceSwappedMealCard(responseDocument, slotIndex);
+        const didReplaceMealCard = preferTargetedMealReplacement &&
+            replaceSwappedMealCard(responseDocument, slotIndex);
+        const didReplaceMealsSection = !didReplaceMealCard &&
+            replaceSectionContent(responseDocument, "#aislepilot-meals");
         const didReplaceMeals = didReplaceMealsSection || didReplaceMealCard;
         if (!didReplaceMeals) {
             return false;
@@ -5546,7 +5548,10 @@
                         return;
                     }
 
-                    const didApplySwapResponse = applyAjaxSwapResponse(responseText, swapDayIndex);
+                    const didApplySwapResponse = applyAjaxSwapResponse(
+                        responseText,
+                        swapDayIndex,
+                        isDirectMealSwapForm || isDessertSwapForm);
                     writeSwapDebug("apply-ajax-swap-response", {
                         swapDayIndex,
                         didApplySwapResponse

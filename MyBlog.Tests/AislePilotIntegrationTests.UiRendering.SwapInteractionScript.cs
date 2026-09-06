@@ -86,11 +86,19 @@ public partial class AislePilotIntegrationTests
             script,
             StringComparison.Ordinal);
         Assert.Contains(
-            "const didReplaceMealsSection = replaceSectionContent(responseDocument, \"#aislepilot-meals\");",
+            "const didReplaceMealCard = preferTargetedMealReplacement &&",
             script,
             StringComparison.Ordinal);
         Assert.Contains(
-            "const didReplaceMealCard = !didReplaceMealsSection && replaceSwappedMealCard(responseDocument, slotIndex);",
+            "const didReplaceMealsSection = !didReplaceMealCard &&",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "const didApplySwapResponse = applyAjaxSwapResponse(responseText, slotIndex, true);",
+            script,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "isDirectMealSwapForm || isDessertSwapForm);",
             script,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -198,7 +206,7 @@ public partial class AislePilotIntegrationTests
             script,
             StringComparison.Ordinal);
         Assert.Contains(
-            "const didApplySwapResponse = applyAjaxSwapResponse(responseText, slotIndex);",
+            "const didApplySwapResponse = applyAjaxSwapResponse(responseText, slotIndex, true);",
             script,
             StringComparison.Ordinal);
         Assert.Contains(
