@@ -7,20 +7,21 @@
     var overlayModes = Model.DietaryOptions
         .Where(mode => Model.DietarySelectionRules.OverlayModes.Contains(mode, StringComparer.OrdinalIgnoreCase))
         .ToArray();
+    var firstValidationTargetId = ViewData["FirstValidationTargetId"] as string;
 }
 <div class="aislepilot-shared-setup">
-    <details class="aislepilot-collapsible" @(Model.ServingDetailsOpen ? "open" : null)>
-        <summary>
-            <span class="aislepilot-collapsible-title">Cooking for</span>
-            <span class="aislepilot-collapsible-value" data-serving-summary>@Model.ServingSummaryText</span>
-        </summary>
-        <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics aislepilot-serving-context-fields">
+    <fieldset class="aislepilot-checkboxes aislepilot-setup-section aislepilot-plan-basics aislepilot-core-choice aislepilot-serving-context-fields">
+        <legend>How many people?</legend>
+        <p class="aislepilot-field-help">We will size every recipe and the shopping list for your household.</p>
             <div class="aislepilot-inline-fields">
                 <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-slider-field--thumb-friendly">
                     <label asp-for="HouseholdSize">People</label>
                     <div class="aislepilot-slider-track-line">
                         <span class="aislepilot-slider-boundary">1</span>
                         <input asp-for="HouseholdSize"
+                               id="aislepilot-household-size"
+                               autofocus="@(firstValidationTargetId == "aislepilot-household-size")"
+                               aria-describedby="aislepilot-household-size-error"
                                type="range"
                                min="1"
                                max="8"
@@ -35,15 +36,27 @@
                     <div class="aislepilot-slider-meta">
                         <span class="aislepilot-slider-value" data-number-slider-value>@Model.HouseholdSize</span>
                     </div>
-                    <span asp-validation-for="HouseholdSize" class="text-danger" data-valmsg-for="Request.HouseholdSize"></span>
+                    <span id="aislepilot-household-size-error" asp-validation-for="HouseholdSize" class="text-danger" data-valmsg-for="Request.HouseholdSize"></span>
                 </div>
+            </div>
+    </fieldset>
 
+    <details class="aislepilot-collapsible aislepilot-personalise" @(Model.ServingDetailsOpen || Model.DietaryDetailsOpen || Model.ExclusionsDetailsOpen ? "open" : null)>
+        <summary>
+            <span class="aislepilot-collapsible-title">Personalise</span>
+            <span class="aislepilot-collapsible-value">Diet, portions and preferences</span>
+        </summary>
+        <div class="aislepilot-personalise-content">
+            <fieldset class="aislepilot-checkboxes aislepilot-setup-section">
                 <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact" data-option-slider>
                     <label asp-for="SelectedPortionSize">Portion size</label>
                     <input type="hidden" name="Request.PortionSize" value="@Model.SelectedPortionSize" data-option-slider-hidden />
                     <div class="aislepilot-slider-track-line">
                         <span class="aislepilot-slider-boundary">@Model.PortionSizeOptions.First()</span>
                         <input type="range"
+                               id="aislepilot-portion-size"
+                               autofocus="@(firstValidationTargetId == "aislepilot-portion-size")"
+                               aria-describedby="aislepilot-portion-size-error"
                                min="0"
                                max="@Math.Max(0, Model.PortionSizeOptions.Length - 1)"
                                step="1"
@@ -57,18 +70,16 @@
                     <div class="aislepilot-slider-meta">
                         <span class="aislepilot-slider-value" data-option-slider-value>@Model.SelectedPortionSize</span>
                     </div>
-                    <span asp-validation-for="SelectedPortionSize" class="text-danger" data-valmsg-for="Request.PortionSize"></span>
+                    <span id="aislepilot-portion-size-error" asp-validation-for="SelectedPortionSize" class="text-danger" data-valmsg-for="Request.PortionSize"></span>
                 </div>
-            </div>
-        </fieldset>
-    </details>
+            </fieldset>
 
     <details class="aislepilot-collapsible" @(Model.DietaryDetailsOpen ? "open" : null)>
         <summary>
             <span class="aislepilot-collapsible-title">Dietary requirements</span>
             <span class="aislepilot-collapsible-value" data-dietary-summary>@Model.DietarySummaryText</span>
         </summary>
-        <fieldset class="aislepilot-checkboxes aislepilot-setup-section"
+        <fieldset id="aislepilot-dietary-modes" class="aislepilot-checkboxes aislepilot-setup-section" aria-describedby="aislepilot-dietary-modes-error"
                   data-dietary-selector
                   data-dietary-max-selections="@Model.DietarySelectionRules.MaxSelections"
                   data-dietary-max-message="@Model.DietarySelectionRules.MaxSelectionsMessage">
@@ -84,11 +95,11 @@
                         <label class="aislepilot-mode-option">
                             @if (isChecked)
                             {
-                                <input type="checkbox" name="Request.DietaryModes" value="@mode" data-dietary-group="core" checked />
+                                <input type="checkbox" name="Request.DietaryModes" value="@mode" data-dietary-group="core" checked autofocus="@(firstValidationTargetId == "aislepilot-dietary-modes" && mode == coreModes.First())" />
                             }
                             else
                             {
-                                <input type="checkbox" name="Request.DietaryModes" value="@mode" data-dietary-group="core" />
+                                <input type="checkbox" name="Request.DietaryModes" value="@mode" data-dietary-group="core" autofocus="@(firstValidationTargetId == "aislepilot-dietary-modes" && mode == coreModes.First())" />
                             }
                             <span>@mode.Trim().ToUpperInvariant()</span>
                         </label>
@@ -115,7 +126,7 @@
                     }
                 </div>
             </div>
-            <span class="text-danger" data-valmsg-for="Request.DietaryModes"></span>
+            <span id="aislepilot-dietary-modes-error" class="text-danger" data-valmsg-for="Request.DietaryModes"></span>
         </fieldset>
     </details>
 
@@ -136,16 +147,18 @@
             <div class="aislepilot-field aislepilot-field-chip aislepilot-slider-field aislepilot-slider-field--compact aislepilot-slider-field--plan-basics-frame"
                  data-saved-repeat-rate-field
                  hidden="@(!Model.EnableSavedMealRepeats)">
-                <label asp-for="SavedMealRepeatRatePercent">Repeat strength</label>
+                <label asp-for="SavedMealRepeatRatePercent">How often to reuse saved meals</label>
                 <div class="aislepilot-slider-track-line">
                     <span class="aislepilot-slider-boundary">10%</span>
                     <input asp-for="SavedMealRepeatRatePercent"
+                           autofocus="@(firstValidationTargetId == "Request_SavedMealRepeatRatePercent")"
+                           aria-describedby="aislepilot-saved-repeat-error"
                            type="range"
                            min="10"
                            max="100"
                            step="5"
                            class="aislepilot-slider-input"
-                           aria-label="Saved meal repeat strength"
+                           aria-label="How often to reuse saved meals"
                            data-number-slider-range
                            data-number-slider-suffix="%"
                            data-number-slider-decimals="0"
@@ -155,7 +168,7 @@
                 <div class="aislepilot-slider-meta">
                     <span class="aislepilot-slider-value" data-number-slider-value>@Model.SavedMealRepeatRatePercent%</span>
                 </div>
-                <span asp-validation-for="SavedMealRepeatRatePercent" class="text-danger" data-valmsg-for="Request.SavedMealRepeatRatePercent"></span>
+                <span id="aislepilot-saved-repeat-error" asp-validation-for="SavedMealRepeatRatePercent" class="text-danger" data-valmsg-for="Request.SavedMealRepeatRatePercent"></span>
             </div>
         </fieldset>
     </details>
@@ -171,10 +184,14 @@
             <div class="aislepilot-field aislepilot-field-optional">
                 <label asp-for="DislikesOrAllergens">Dislikes/allergens</label>
                 <input asp-for="DislikesOrAllergens"
+                       autofocus="@(firstValidationTargetId == "Request_DislikesOrAllergens")"
+                       aria-describedby="aislepilot-exclusions-error"
                        name="Request.DislikesOrAllergens"
                        placeholder="Example: peanuts, mushrooms, shellfish" />
-                <span asp-validation-for="DislikesOrAllergens" class="text-danger" data-valmsg-for="Request.DislikesOrAllergens"></span>
+                <span id="aislepilot-exclusions-error" asp-validation-for="DislikesOrAllergens" class="text-danger" data-valmsg-for="Request.DislikesOrAllergens"></span>
             </div>
         </fieldset>
+    </details>
+        </div>
     </details>
 </div>

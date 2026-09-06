@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("Tests", "E2E", "PreDeploy", "ModerationEval")]
+    [ValidateSet("Tests", "E2E", "Lighthouse", "PreDeploy", "ModerationEval")]
     [string]$Mode = "PreDeploy",
     [switch]$SkipBrowserInstall,
     [switch]$FullPreDeployE2E,
@@ -58,8 +58,16 @@ try {
             -AllowListPath ".\scripts\oversized-files-allowlist.txt"
     }
 
+    Invoke-Step -Name "Checking AislePilot asset budgets" -Action {
+        powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\check-aislepilot-asset-budgets.ps1" -RepoRoot $root
+    }
+
     if ($Mode -eq "Tests" -or $Mode -eq "PreDeploy") {
         Stop-LocalMyBlogHosts
+
+        Invoke-Step -Name "Testing deployment version probe" -Action {
+            powershell -NoProfile -ExecutionPolicy Bypass -File ".\Deployment\tests\app-version-probe.tests.ps1"
+        }
 
         $testArgs = @("test", $testProject)
         if (-not $hasOpenAiKey) {
@@ -96,6 +104,13 @@ try {
             }
 
             dotnet test $testProject --filter $e2eFilter
+        }
+    }
+
+    if ($Mode -eq "Lighthouse" -or $Mode -eq "PreDeploy") {
+        Stop-LocalMyBlogHosts
+        Invoke-Step -Name "Running AislePilot Lighthouse budgets (mobile + desktop)" -Action {
+            powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\run-aislepilot-lighthouse.ps1"
         }
     }
 

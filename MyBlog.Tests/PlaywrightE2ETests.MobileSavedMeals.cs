@@ -25,26 +25,9 @@ public sealed partial class PlaywrightE2ETests
         });
 
         var activeMealCard = page.Locator("[data-day-meal-card]:has(.aislepilot-day-meal-panel[aria-hidden='false'])").First;
-        var moreActionsSummary = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        var saveButton = activeMealCard.Locator(
-            "[data-day-card-header-actions].is-active [data-card-more-actions] .aislepilot-favorite-form button[type='submit']").First;
+        var saveButton = activeMealPanel.Locator(".aislepilot-meal-primary-action[form^='meal-save-']").First;
         var toasts = page.Locator(".aislepilot-toast");
 
-        await moreActionsSummary.EvaluateAsync("element => element instanceof HTMLElement && element.scrollIntoView({ block: 'center' })");
-        await moreActionsSummary.ClickAsync(new LocatorClickOptions { Force = true });
-        await activeMealCard.EvaluateAsync(
-            """
-            card => {
-                if (!(card instanceof HTMLElement)) {
-                    return;
-                }
-
-                const details = card.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions]");
-                if (details instanceof HTMLDetailsElement && !details.open) {
-                    details.open = true;
-                }
-            }
-            """);
         await saveButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -54,7 +37,7 @@ public sealed partial class PlaywrightE2ETests
         var mealName = (await activeMealCard.Locator(".aislepilot-favorite-form input[name='mealName']").First.InputValueAsync()).Trim();
 
         var initiallySaved = await saveButton.EvaluateAsync<bool>(
-            "button => button instanceof HTMLButtonElement && button.classList.contains('is-saved-meal')");
+            "button => button instanceof HTMLButtonElement && button.classList.contains('is-saved')");
         var shouldBeSavedAfterFirstSubmit = !initiallySaved;
         var expectedFirstToast = initiallySaved
             ? "Meal removed from saved meals."
@@ -83,10 +66,10 @@ public sealed partial class PlaywrightE2ETests
         await page.WaitForFunctionAsync(
             """
             expectedSaved => {
-                const button = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] .aislepilot-favorite-form button[type='submit']");
+                const button = document.querySelector("[data-day-meal-panel][aria-hidden='false'] .aislepilot-meal-primary-action[form^='meal-save-']");
                 return button instanceof HTMLButtonElement &&
-                    button.classList.contains("is-saved-meal") === expectedSaved &&
-                    (button.getAttribute("title") ?? "") === (expectedSaved ? "Unsave meal" : "Save meal");
+                    button.classList.contains("is-saved") === expectedSaved &&
+                    (button.getAttribute("aria-label") ?? "") === (expectedSaved ? "Unsave meal" : "Save meal");
             }
             """,
             shouldBeSavedAfterFirstSubmit,
@@ -115,21 +98,6 @@ public sealed partial class PlaywrightE2ETests
         Assert.Equal(shouldBeSavedAfterFirstSubmit, savedMealVisibleAfterFirstSubmit);
         await headMenuTrigger.ClickAsync();
 
-        await moreActionsSummary.EvaluateAsync("element => element instanceof HTMLElement && element.scrollIntoView({ block: 'center' })");
-        await moreActionsSummary.ClickAsync(new LocatorClickOptions { Force = true });
-        await activeMealCard.EvaluateAsync(
-            """
-            card => {
-                if (!(card instanceof HTMLElement)) {
-                    return;
-                }
-
-                const details = card.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions]");
-                if (details instanceof HTMLDetailsElement && !details.open) {
-                    details.open = true;
-                }
-            }
-            """);
         await saveButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -156,10 +124,10 @@ public sealed partial class PlaywrightE2ETests
         await page.WaitForFunctionAsync(
             """
             expectedSaved => {
-                const button = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] .aislepilot-favorite-form button[type='submit']");
+                const button = document.querySelector("[data-day-meal-panel][aria-hidden='false'] .aislepilot-meal-primary-action[form^='meal-save-']");
                 return button instanceof HTMLButtonElement &&
-                    button.classList.contains("is-saved-meal") === expectedSaved &&
-                    (button.getAttribute("title") ?? "") === (expectedSaved ? "Unsave meal" : "Save meal");
+                    button.classList.contains("is-saved") === expectedSaved &&
+                    (button.getAttribute("aria-label") ?? "") === (expectedSaved ? "Unsave meal" : "Save meal");
             }
             """,
             initiallySaved,

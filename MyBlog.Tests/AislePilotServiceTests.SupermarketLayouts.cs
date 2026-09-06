@@ -35,6 +35,7 @@ public partial class AislePilotServiceTests
 
         var result = _service.BuildPlan(request);
 
+        AssertValidCorePlan(result, expectedMealCount: 7);
         Assert.Equal("Curated chain default", result.LayoutInsight.SourceLabel);
         Assert.True(result.LayoutInsight.NeedsReview);
         Assert.NotEmpty(result.AisleOrderUsed);

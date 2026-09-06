@@ -44,8 +44,9 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(2, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", result.PlanSourceLabel);
         Assert.Equal(7, result.MealPlan.Count);
+        AssertValidCorePlan(result, expectedMealCount: 7);
     }
 
     [Fact]
@@ -182,7 +183,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(1, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", result.PlanSourceLabel);
         Assert.Equal(4, lunchMeals.Count);
         Assert.True(
             maxLunchRepeatCount <= 2,
@@ -219,25 +220,31 @@ public partial class AislePilotServiceTests
             new { name = "Bell peppers", department = "Produce", quantityForTwo = 2m, unit = "pcs", estimatedCostForTwo = 1.2m }
         ];
 
-        static string BuildChatCompletionResponse(IEnumerable<object> meals)
+        static string BuildResponsesApiResponse(IEnumerable<object> meals)
         {
             var payloadContent = JsonSerializer.Serialize(new { meals });
             return JsonSerializer.Serialize(new
             {
-                choices = new[]
+                output = new[]
                 {
                     new
                     {
-                        message = new
+                        type = "message",
+                        content = new[]
                         {
-                            content = payloadContent
+                            new
+                            {
+                                type = "output_text",
+                                text = payloadContent
+                            }
                         }
                     }
-                }
+                },
+                usage = new { input_tokens = 120, output_tokens = 240 }
             });
         }
 
-        var primaryAttemptPayload = BuildChatCompletionResponse(
+        var primaryAttemptPayload = BuildResponsesApiResponse(
         [
             new
             {
@@ -277,7 +284,7 @@ public partial class AislePilotServiceTests
             }
         ]);
 
-        var compactPayload = BuildChatCompletionResponse(
+        var compactPayload = BuildResponsesApiResponse(
         [
             new
             {
@@ -301,7 +308,7 @@ public partial class AislePilotServiceTests
 
         using var handler = new RequestAwareResponseHandler(requestBody =>
         {
-            if (requestBody.Contains("\"max_tokens\":3400", StringComparison.Ordinal))
+            if (requestBody.Contains("\"max_output_tokens\":3400", StringComparison.Ordinal))
             {
                 return (HttpStatusCode.OK, primaryAttemptPayload);
             }
@@ -327,8 +334,12 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(1, handler.CallCount);
         Assert.Single(handler.RequestBodies);
-        Assert.Contains("\"max_tokens\":2200", handler.RequestBodies[0], StringComparison.Ordinal);
-        Assert.DoesNotContain("\"max_tokens\":3400", handler.RequestBodies[0], StringComparison.Ordinal);
+        Assert.Equal("https://api.openai.com/v1/responses", handler.RequestUris[0]?.ToString());
+        Assert.Contains("\"model\":\"gpt-5.6-terra\"", handler.RequestBodies[0], StringComparison.Ordinal);
+        Assert.Contains("\"effort\":\"low\"", handler.RequestBodies[0], StringComparison.Ordinal);
+        Assert.Contains("\"max_output_tokens\":2200", handler.RequestBodies[0], StringComparison.Ordinal);
+        Assert.Contains("\"type\":\"json_object\"", handler.RequestBodies[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("\"max_output_tokens\":3400", handler.RequestBodies[0], StringComparison.Ordinal);
         Assert.True(result.UsedAiGeneratedMeals);
         Assert.Equal(2, result.MealPlan.Count);
         Assert.All(
@@ -460,7 +471,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(2, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", result.PlanSourceLabel);
         Assert.Equal(2, result.MealPlan.Count);
     }
 
@@ -534,7 +545,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(2, handler.CallCount);
         Assert.False(result.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", result.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", result.PlanSourceLabel);
     }
 
     [Fact]
@@ -862,6 +873,14 @@ public partial class AislePilotServiceTests
         Assert.True(handler.CallCount >= 1);
         Assert.True(result.UsedAiGeneratedMeals);
         Assert.True(AiPoolContains("Runtime pool test meal"));
+
+        var callsAfterGeneration = handler.CallCount;
+        var cachedResult = service.BuildPlan(request);
+
+        Assert.Equal(callsAfterGeneration, handler.CallCount);
+        Assert.True(cachedResult.UsedAiGeneratedMeals);
+        Assert.Equal("Personalised meal plan", cachedResult.PlanSourceLabel);
+        Assert.Equal("Runtime pool test meal", cachedResult.MealPlan[0].MealName);
     }
 
     [Fact]
@@ -975,7 +994,7 @@ public partial class AislePilotServiceTests
             }
         });
 
-        using var handler = new StaticResponseHandler(HttpStatusCode.OK, responseBody);
+        using var handler = new RequestAwareResponseHandler(_ => (HttpStatusCode.OK, responseBody));
         using var httpClient = new HttpClient(handler);
         var service = new AislePilotService(httpClient, configuration);
 
@@ -989,6 +1008,8 @@ public partial class AislePilotServiceTests
             Assert.Equal(1, handler.CallCount);
             Assert.Equal(1, warmup.GeneratedCount);
             Assert.Contains(mealName, warmup.GeneratedMealNames, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains("\"model\":\"gpt-5.6-luna\"", handler.RequestBodies[0], StringComparison.Ordinal);
+            Assert.Contains("\"effort\":\"none\"", handler.RequestBodies[0], StringComparison.Ordinal);
         }
         finally
         {
@@ -1003,6 +1024,7 @@ public partial class AislePilotServiceTests
         private readonly Func<string, (HttpStatusCode StatusCode, string ResponseBody)> _responseFactory = responseFactory;
 
         public List<string> RequestBodies { get; } = [];
+        public List<Uri?> RequestUris { get; } = [];
         public int CallCount { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -1012,6 +1034,7 @@ public partial class AislePilotServiceTests
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken);
             RequestBodies.Add(requestBody);
+            RequestUris.Add(request.RequestUri);
             var response = _responseFactory(requestBody);
 
             return new HttpResponseMessage(response.StatusCode)

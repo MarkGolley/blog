@@ -124,6 +124,72 @@ public sealed partial class AislePilotService
         return BuildFallbackSupermarketLayoutResolution(supermarket);
     }
 
+    internal SupermarketLayoutResolution ResolveSupermarketLayoutForInteractiveRequest(
+        string supermarket,
+        string customAisleOrder)
+    {
+        if (supermarket.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            var customResolution = TryBuildCustomSupermarketLayoutResolution(customAisleOrder);
+            if (customResolution is not null)
+            {
+                return customResolution;
+            }
+        }
+
+        if (SupermarketLayoutCache.TryGetValue(supermarket, out var cachedLayout) &&
+            cachedLayout.AisleOrder.Count >= 3)
+        {
+            if (IsSupermarketLayoutStale(cachedLayout.UpdatedAtUtc))
+            {
+                QueueSupermarketLayoutRefresh(supermarket);
+            }
+
+            return BuildCachedSupermarketLayoutResolution(cachedLayout);
+        }
+
+        QueueSupermarketLayoutCacheHydration(supermarket);
+        return BuildFallbackSupermarketLayoutResolution(supermarket);
+    }
+
+    private void QueueSupermarketLayoutCacheHydration(string supermarket)
+    {
+        const string hydrationKey = "layout_cache";
+        if (!SupermarketLayoutHydrationQueued.TryAdd(hydrationKey, 1))
+        {
+            return;
+        }
+        if (_backgroundTaskQueue is null)
+        {
+            SupermarketLayoutHydrationQueued.TryRemove(hydrationKey, out _);
+            return;
+        }
+
+        var queued = _backgroundTaskQueue.TryEnqueue("supermarket_layout_hydration", async stoppingToken =>
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                await EnsureSupermarketLayoutCacheHydratedAsync(stoppingToken);
+                QueueSupermarketLayoutRefresh(supermarket);
+                RecordAislePilotBackgroundJob("supermarket_layout_hydration", stopwatch, success: true);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to hydrate supermarket layouts in the background.");
+                RecordAislePilotBackgroundJob("supermarket_layout_hydration", stopwatch, success: false, ex);
+                throw;
+            }
+        }, () => SupermarketLayoutHydrationQueued.TryRemove(hydrationKey, out _));
+        if (!queued)
+        {
+            SupermarketLayoutHydrationQueued.TryRemove(hydrationKey, out _);
+            _logger?.LogWarning(
+                "AislePilot supermarket-layout hydration was not queued because the bounded background queue is full. Capacity={Capacity}",
+                _backgroundTaskQueue.Capacity);
+        }
+    }
+
     private static SupermarketLayoutResolution? TryBuildCustomSupermarketLayoutResolution(string customAisleOrder)
     {
         var custom = customAisleOrder
@@ -286,11 +352,13 @@ public sealed partial class AislePilotService
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 LogFirestoreReadTimeout("supermarket layout cache hydration");
+                AislePilotTelemetry.RecordCacheRefresh("supermarket_layouts", success: false);
                 return;
             }
             catch (Exception ex)
             {
                 LogFirestoreReadFailure(ex, "supermarket layout cache hydration");
+                AislePilotTelemetry.RecordCacheRefresh("supermarket_layouts", success: false);
                 return;
             }
             foreach (var doc in snapshot.Documents)
@@ -354,6 +422,7 @@ public sealed partial class AislePilotService
             }
 
             _lastSupermarketLayoutCacheRefreshUtc = DateTime.UtcNow;
+            AislePilotTelemetry.RecordCacheRefresh("supermarket_layouts", success: true);
         }
         finally
         {
@@ -462,7 +531,17 @@ public sealed partial class AislePilotService
             return;
         }
 
-        _ = Task.Run(async () =>
+        if (!SupermarketLayoutRefreshQueued.TryAdd(normalizedSupermarket, 1))
+        {
+            return;
+        }
+        if (_backgroundTaskQueue is null)
+        {
+            SupermarketLayoutRefreshQueued.TryRemove(normalizedSupermarket, out _);
+            return;
+        }
+
+        var queued = _backgroundTaskQueue.TryEnqueue("supermarket_layout_refresh", async stoppingToken =>
         {
             var jobStopwatch = Stopwatch.StartNew();
             try
@@ -470,7 +549,7 @@ public sealed partial class AislePilotService
                 var refreshedLayout = await TryRefreshSupermarketLayoutAsync(
                     normalizedSupermarket,
                     force: false,
-                    CancellationToken.None);
+                    stoppingToken);
                 RecordAislePilotBackgroundJob(
                     "supermarket_layout_refresh",
                     jobStopwatch,
@@ -484,8 +563,16 @@ public sealed partial class AislePilotService
                     jobStopwatch,
                     success: false,
                     ex);
+                throw;
             }
-        });
+        }, () => SupermarketLayoutRefreshQueued.TryRemove(normalizedSupermarket, out _));
+        if (!queued)
+        {
+            SupermarketLayoutRefreshQueued.TryRemove(normalizedSupermarket, out _);
+            _logger?.LogWarning(
+                "AislePilot supermarket-layout refresh was not queued because the bounded background queue is full. Capacity={Capacity}",
+                _backgroundTaskQueue.Capacity);
+        }
     }
 
     private async Task<SupermarketLayoutResolution?> TryDiscoverSupermarketLayoutWithAiAsync(
@@ -512,12 +599,13 @@ public sealed partial class AislePilotService
 
         var requestBody = new
         {
-            model = _model,
+            model = _utilityModel,
+            reasoning = new { effort = _utilityReasoningEffort },
             tools = new object[]
             {
                 new
                 {
-                    type = "web_search_preview",
+                    type = "web_search",
                     search_context_size = "medium"
                 }
             },
@@ -542,7 +630,7 @@ public sealed partial class AislePilotService
             {
                 RecordAislePilotAiRequest(
                     operation: "supermarket_layout_discovery",
-                    model: _model,
+                    model: _utilityModel,
                     duration: requestStopwatch.Elapsed,
                     success: false,
                     responseContent: responseContent,
@@ -559,7 +647,7 @@ public sealed partial class AislePilotService
 
             RecordAislePilotAiRequest(
                 operation: "supermarket_layout_discovery",
-                model: _model,
+                model: _utilityModel,
                 duration: requestStopwatch.Elapsed,
                 success: true,
                 responseContent: responseContent,
@@ -571,7 +659,7 @@ public sealed partial class AislePilotService
         {
             RecordAislePilotAiRequest(
                 operation: "supermarket_layout_discovery",
-                model: _model,
+                model: _utilityModel,
                 duration: requestStopwatch.Elapsed,
                 success: false,
                 promptText: inputPrompt,

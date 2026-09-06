@@ -53,6 +53,15 @@ public sealed partial class AislePilotService : IAislePilotService
                !string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath);
     }
 
+    public async Task WarmRuntimeCachesAsync(CancellationToken cancellationToken = default)
+    {
+        await Task.WhenAll(
+            EnsureAiMealPoolHydratedAsync(cancellationToken),
+            EnsureDessertAddOnPoolHydratedAsync(cancellationToken),
+            EnsureSupermarketLayoutCacheHydratedAsync(cancellationToken));
+        await CleanupMealImagesIfDueAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> GetMealImageUrlsAsync(
         IReadOnlyList<string> mealNames,
         CancellationToken cancellationToken = default)
@@ -228,11 +237,13 @@ public sealed partial class AislePilotService : IAislePilotService
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 LogFirestoreReadTimeout("dessert add-on pool hydration");
+                AislePilotTelemetry.RecordCacheRefresh("dessert_addon_pool", success: false);
                 return;
             }
             catch (Exception ex)
             {
                 LogFirestoreReadFailure(ex, "dessert add-on pool hydration");
+                AislePilotTelemetry.RecordCacheRefresh("dessert_addon_pool", success: false);
                 return;
             }
             DessertAddOnPool.Clear();
@@ -262,6 +273,7 @@ public sealed partial class AislePilotService : IAislePilotService
             }
 
             _lastDessertAddOnPoolRefreshUtc = DateTime.UtcNow;
+            AislePilotTelemetry.RecordCacheRefresh("dessert_addon_pool", success: true);
         }
         finally
         {
@@ -717,32 +729,18 @@ public sealed partial class AislePilotService : IAislePilotService
             requestedCount,
             excludedMealNames,
             generationNonce);
-        var requestBody = new
-        {
-            model = _model,
-            temperature = 0.85,
-            max_tokens = PrimaryAiMealPlanMaxTokens,
-            response_format = new { type = "json_object" },
-            messages = new object[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You generate practical UK pantry meal ideas. Prioritise pantry matching, avoid random substitutions, and return valid JSON only."
-                },
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+        var requestBody = BuildOpenAiJsonResponseRequest(
+            _utilityModel,
+            _utilityReasoningEffort,
+            "You generate practical UK pantry meal ideas. Prioritise pantry matching, avoid random substitutions, and return valid JSON only.",
+            prompt,
+            PrimaryAiMealPlanMaxTokens);
 
         var responseContent = await SendOpenAiRequestWithRetryAsync(
             requestBody,
             cancellationToken,
             operation: "pantry_suggestions",
-            model: _model);
+            model: _utilityModel);
         if (string.IsNullOrWhiteSpace(responseContent))
         {
             return [];
@@ -750,8 +748,7 @@ public sealed partial class AislePilotService : IAislePilotService
 
         try
         {
-            var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-            var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+            var rawJson = ExtractOpenAiResponseText(responseContent);
             if (string.IsNullOrWhiteSpace(rawJson))
             {
                 return [];

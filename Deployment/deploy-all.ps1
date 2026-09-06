@@ -21,6 +21,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+. (Join-Path $PSScriptRoot "app-version-probe.ps1")
+
 function Invoke-External {
     param(
         [Parameter(Mandatory = $true)]
@@ -95,31 +97,6 @@ function Get-CloudRunRevision {
     }
 
     return $json | ConvertFrom-Json
-}
-
-function Get-AppVersionFromUrl {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Url
-    )
-
-    $headers = & curl.exe -sD - -o NUL -L $Url
-    if ($LASTEXITCODE -ne 0) {
-        throw "Header request failed for '$Url'."
-    }
-
-    $versions = @()
-    foreach ($line in $headers) {
-        if ($line -match '^[xX]-app-version:\s*(.+)\s*$') {
-            $versions += $Matches[1].Trim()
-        }
-    }
-
-    if ($versions.Count -eq 0) {
-        throw "x-app-version header was not found for '$Url'."
-    }
-
-    return $versions[-1]
 }
 
 function Get-BaseUrl {

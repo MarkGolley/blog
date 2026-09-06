@@ -15,45 +15,26 @@ public sealed partial class PlaywrightE2ETests
 
         await using var context = await CreateMobileContextAsync();
         var page = await context.NewPageAsync();
-        var swapDebugLines = new List<string>();
+        var browserErrors = new List<string>();
+        page.PageError += (_, error) => browserErrors.Add(error);
         page.Console += (_, message) =>
         {
-            if (!string.Equals(message.Type, "info", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                browserErrors.Add(message.Text);
             }
-
-            if (!message.Text.Contains("[AislePilot swap debug]", StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            swapDebugLines.Add(message.Text);
         };
 
-        await GoToAislePilotAndGeneratePlanAsync(page);
-        await page.EvaluateAsync(
-            """
-            () => {
-                window.__swapDebugPayloads = [];
-                if (window.__swapDebugCaptureInstalled) {
-                    return;
-                }
-
-                const originalInfo = console.info.bind(console);
-                console.info = (...args) => {
-                    if (args[0] === "[AislePilot swap debug]") {
-                        window.__swapDebugPayloads.push({
-                            stage: args[1] ?? "",
-                            details: args[2] ?? null
-                        });
-                    }
-
-                    return originalInfo(...args);
-                };
-                window.__swapDebugCaptureInstalled = true;
-            }
-            """);
+        try
+        {
+            await GoToAislePilotAndGeneratePlanAsync(page);
+        }
+        catch (Exception ex)
+        {
+            throw new XunitException(
+                $"Could not reach a generated plan. URL={page.Url}. Browser errors: {string.Join(" || ", browserErrors)}",
+                ex);
+        }
 
         var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary:visible");
         var moreActionsTriggerCount = await moreActionsTriggers.CountAsync();
@@ -64,14 +45,30 @@ public sealed partial class PlaywrightE2ETests
         var targetCard = page.Locator("[data-day-meal-card]").Nth(targetIndex);
         var previousMealName = (await targetCard.Locator(".aislepilot-day-meal-panel[aria-hidden='false'] h3").First.InnerTextAsync()).Trim();
 
-        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
-        await targetTrigger.ScrollIntoViewIfNeededAsync();
-        await targetTrigger.ClickAsync();
+        var targetSwapButton = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-panel][1]").Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 10000
         });
+        var primarySwapState = await targetSwapButton.EvaluateAsync<string>(
+            """
+            button => {
+                const formId = button.getAttribute("form") ?? "";
+                const matchingForms = document.querySelectorAll(`form[id="${CSS.escape(formId)}"]`);
+                return JSON.stringify({
+                    formId,
+                    ownerId: button.form?.id ?? "",
+                    matchingFormCount: matchingForms.length,
+                    ownerConnected: button.form?.isConnected ?? false,
+                    ownerValid: button.form?.checkValidity() ?? false,
+                    ajaxWired: button.form?.dataset.ajaxSwapWired ?? "",
+                    loadingWired: button.form?.dataset.loadingWired ?? "",
+                    ajaxSubmitting: button.form?.dataset.ajaxSwapSubmitting ?? ""
+                });
+            }
+            """);
 
         var swapResponseTask = page.WaitForResponseAsync(response =>
             string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) &&
@@ -84,12 +81,10 @@ public sealed partial class PlaywrightE2ETests
         }
         catch (TimeoutException ex)
         {
-            var structuredDebugPayloads = await page.EvaluateAsync<string>(
-                """
-                () => JSON.stringify(window.__swapDebugPayloads ?? [])
-                """);
+            var postClickState = await targetSwapButton.EvaluateAsync<string>(
+                "button => JSON.stringify({ disabled: button.disabled, busy: button.getAttribute('aria-busy'), submitting: button.form?.dataset.isSubmitting ?? '', ajaxSubmitting: button.form?.dataset.ajaxSwapSubmitting ?? '' })");
             throw new XunitException(
-                $"Expected swap POST after tapping mobile sheet swap button. Captured debug lines: {string.Join(" || ", swapDebugLines)}. Structured debug: {structuredDebugPayloads}",
+                $"Expected swap POST after tapping the primary Swap button. State={primarySwapState}. PostClick={postClickState}. Browser errors: {string.Join(" || ", browserErrors)}",
                 ex);
         }
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -119,8 +114,8 @@ public sealed partial class PlaywrightE2ETests
             });
 
         var beforeCarouselStatus = (await page.Locator("[data-day-carousel-status]").First.InnerTextAsync()).Trim();
-        var nextButton = page.Locator("[data-day-carousel-next]").First;
-        await nextButton.ClickAsync();
+        var secondDayTab = page.Locator("[data-day-carousel-dot][data-day-carousel-target='1']").First;
+        await secondDayTab.ClickAsync();
 
         await page.WaitForFunctionAsync(
             """
@@ -161,6 +156,6 @@ public sealed partial class PlaywrightE2ETests
         Assert.NotEqual(previousMealName, stateParts[0]);
         Assert.Equal("aislepilot-meals", stateParts[1]);
         Assert.Equal("0", stateParts[2]);
-        Assert.Equal(afterCarouselStatus, stateParts[3]);
+        Assert.Equal(afterCarouselStatus, stateParts[3], ignoreCase: true);
     }
 }

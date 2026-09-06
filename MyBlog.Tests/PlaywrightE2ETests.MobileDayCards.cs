@@ -324,8 +324,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 10000
         });
 
-        var saveAction = page.Locator("[data-card-more-actions-panel].is-mobile-sheet .aislepilot-favorite-form button[type='submit']").First;
-        await saveAction.ClickAsync();
+        var secondaryAction = page.Locator("[data-card-more-actions-panel].is-mobile-sheet .aislepilot-ignore-form button[type='submit']").First;
+        await secondaryAction.ClickAsync();
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         var closedAfterAction = await page.EvaluateAsync<int[]>(
@@ -833,7 +833,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotQuickJumpTabs_SupportKeyboardNavigation()
+    public async Task Mobile_AislePilotPrimaryResultsTabs_SupportKeyboardNavigation()
     {
         if (!IsE2EEnabled())
         {
@@ -845,8 +845,14 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var shoppingJump = page.Locator(".aislepilot-mobile-context-jump[data-window-tab='aislepilot-shop']").First;
-        var exportsJump = page.Locator(".aislepilot-mobile-context-jump[data-window-tab='aislepilot-export']").First;
+        var resultsTablist = page.GetByRole(AriaRole.Tablist, new PageGetByRoleOptions { Name = "AislePilot weekly plan views" });
+        Assert.Equal(1, await resultsTablist.CountAsync());
+        Assert.Equal(0, await page.Locator(".aislepilot-mobile-context-jump").CountAsync());
+        var shoppingJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-shop']").First;
+        var exportsJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-export']").First;
+        var shoppingBox = await shoppingJump.BoundingBoxAsync();
+        Assert.NotNull(shoppingBox);
+        Assert.True(shoppingBox!.Height >= 44, $"Expected the shared mobile results tab to remain touch friendly. Height={shoppingBox.Height:F1}px.");
 
         await shoppingJump.FocusAsync();
         await page.Keyboard.PressAsync("ArrowRight");
@@ -858,7 +864,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         });
 
         await page.Keyboard.PressAsync("Home");
-        var mealsJump = page.Locator(".aislepilot-mobile-context-jump[data-window-tab='aislepilot-meals']").First;
+        var mealsJump = page.Locator(".aislepilot-window-tab[data-window-tab='aislepilot-meals']").First;
         Assert.Equal("true", await mealsJump.GetAttributeAsync("aria-selected"));
         await page.Locator("#aislepilot-meals[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
         {

@@ -83,4 +83,6 @@ artifacts/
 TestResults/
 playwright-report/
 .playwright/
+.lighthouseci/
 MyBlog/wwwroot/images/aislepilot-meals/
+MyBlog.Tests/codex-*-auditDebug/

@@ -10,12 +10,12 @@
 
 <div class="aislepilot-setup-mode-shell">
     <div class="aislepilot-setup-mode-lede">
-        <p class="aislepilot-setup-mode-kicker">Choose your output</p>
-        <p class="aislepilot-setup-mode-caption">Use planner mode for a full week, or switch to ideas when you only need one pantry-led meal suggestion.</p>
+        <p class="aislepilot-setup-mode-kicker">What would you like to do?</p>
+        <p class="aislepilot-setup-mode-caption">Plan a complete week and shopping list, or turn ingredients you already have into three meal ideas.</p>
     </div>
     <div class="aislepilot-setup-mode-switch"
          role="tablist"
-         aria-label="Settings mode"
+         aria-label="Choose what you want to do"
          data-setup-mode-switch
          data-setup-mode-default="@defaultSetupMode"
          data-setup-mode-force-default="@forceDefaultSetupMode">
@@ -25,7 +25,7 @@
                 aria-controls="aislepilot-planner-mode"
                 aria-selected="@plannerSelected"
                 data-setup-mode-toggle="planner">
-            <span class="aislepilot-setup-mode-toggle-kicker">Best for weekly shops</span>
+            <span class="aislepilot-setup-mode-toggle-kicker">A complete week</span>
             <span class="aislepilot-setup-mode-toggle-main">
                 <span class="aislepilot-setup-mode-toggle-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" focusable="false">
@@ -34,11 +34,11 @@
                     </svg>
                 </span>
                 <span class="aislepilot-setup-mode-toggle-copy">
-                    <span class="aislepilot-setup-mode-toggle-title">Meal planner</span>
-                    <span class="aislepilot-setup-mode-toggle-note">Multi-day output</span>
+                    <span class="aislepilot-setup-mode-toggle-title">Plan my week</span>
+                    <span class="aislepilot-setup-mode-toggle-note">Meals, recipes and shopping</span>
                 </span>
             </span>
-            <span class="aislepilot-setup-mode-toggle-detail">Build a week around budget, household size, and supermarket aisle order.</span>
+            <span class="aislepilot-setup-mode-toggle-detail">Starts with 7 days, 3 meals a day, Tesco and a £65 budget. Change any of them below.</span>
         </button>
         <button type="button"
                 class="@generatorToggleClass"
@@ -46,7 +46,7 @@
                 aria-controls="aislepilot-generator-mode"
                 aria-selected="@generatorSelected"
                 data-setup-mode-toggle="generator">
-            <span class="aislepilot-setup-mode-toggle-kicker">Best for use-what-you-have</span>
+            <span class="aislepilot-setup-mode-toggle-kicker">Ideas for today</span>
             <span class="aislepilot-setup-mode-toggle-main">
                 <span class="aislepilot-setup-mode-toggle-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" focusable="false">
@@ -62,11 +62,11 @@
                     </svg>
                 </span>
                 <span class="aislepilot-setup-mode-toggle-copy">
-                    <span class="aislepilot-setup-mode-toggle-title">Meal ideas</span>
-                    <span class="aislepilot-setup-mode-toggle-note">Single meal output</span>
+                    <span class="aislepilot-setup-mode-toggle-title">Use my ingredients</span>
+                    <span class="aislepilot-setup-mode-toggle-note">Three quick suggestions</span>
                 </span>
             </span>
-            <span class="aislepilot-setup-mode-toggle-detail">Turn pantry items and preferences into three fast ideas without planning a full week.</span>
+            <span class="aislepilot-setup-mode-toggle-detail">Starts flexible: add the foods you have, then choose whether every idea must use them.</span>
         </button>
     </div>
 </div>

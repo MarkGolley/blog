@@ -10,6 +10,7 @@ public interface IAislePilotService
     AislePilotDietarySelectionRules GetDietarySelectionRules();
     bool TryValidateDietaryModes(IReadOnlyList<string>? dietaryModes, out string errorMessage);
     bool CanGenerateMealImages();
+    Task WarmRuntimeCachesAsync(CancellationToken cancellationToken = default);
     bool HasCompatibleMeals(AislePilotRequestModel request);
     IReadOnlyList<AislePilotPantrySuggestionViewModel> SuggestMealsFromPantry(
         AislePilotRequestModel request,

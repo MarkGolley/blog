@@ -30,6 +30,8 @@ public partial class AislePilotIntegrationTests
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Contains("Curated chain default", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<details class=\"aislepilot-source-details\">", html, StringComparison.Ordinal);
+        Assert.Contains("<summary>How prices and aisle order are estimated</summary>", html, StringComparison.Ordinal);
         Assert.Contains("Branch aisle order can vary. Use Custom if the order looks wrong.", html, StringComparison.OrdinalIgnoreCase);
     }
 

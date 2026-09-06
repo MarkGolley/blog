@@ -16,7 +16,7 @@ public sealed class AislePilotRequestModel
     [Range(1, 7, ErrorMessage = "Choose between 1 and 7 cook days.")]
     public int CookDays { get; set; } = 7;
 
-    [Range(1, 7, ErrorMessage = "Choose a plan length between 1 and 7 days.")]
+    [Range(1, 7, ErrorMessage = "Choose between 1 and 7 days.")]
     public int PlanDays { get; set; } = 7;
 
     [Range(1, 3, ErrorMessage = "Choose between 1 and 3 meals per day.")]
@@ -55,7 +55,7 @@ public sealed class AislePilotRequestModel
 
     public bool EnableSavedMealRepeats { get; set; } = true;
 
-    [Range(10, 100, ErrorMessage = "Saved meal repeat strength must be between 10 and 100.")]
+    [Range(10, 100, ErrorMessage = "Saved-meal reuse must be between 10 and 100 percent.")]
     public int SavedMealRepeatRatePercent { get; set; } = 35;
 
     [StringLength(3200, ErrorMessage = "Saved meal list is too long.")]
@@ -63,7 +63,7 @@ public sealed class AislePilotRequestModel
 
     public bool IncludeSpecialTreatMeal { get; set; }
 
-    [Range(0, 6, ErrorMessage = "Choose a valid special treat day.")]
+    [Range(0, 6, ErrorMessage = "Choose a valid treat dinner day.")]
     public int? SelectedSpecialTreatCookDayIndex { get; set; }
 
     public bool IncludeDessertAddOn { get; set; }

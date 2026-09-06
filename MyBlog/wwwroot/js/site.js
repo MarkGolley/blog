@@ -1,4 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".post-content pre").forEach((codeBlock) => {
+        if (codeBlock instanceof HTMLElement && codeBlock.scrollWidth > codeBlock.clientWidth) {
+            codeBlock.tabIndex = 0;
+            codeBlock.setAttribute("aria-label", "Scrollable code example");
+        }
+    });
+
     const themeStorageKey = "myblog:theme";
     const themeMediaQuery =
         typeof window.matchMedia === "function"
@@ -239,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                             const isActive = dotIndex === safeIndex;
                             dot.classList.toggle("is-active", isActive);
-                            dot.setAttribute("aria-selected", String(isActive));
+                            dot.setAttribute("aria-pressed", String(isActive));
                         });
                     };
 

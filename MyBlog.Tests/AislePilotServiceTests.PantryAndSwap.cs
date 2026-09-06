@@ -303,6 +303,40 @@ public partial class AislePilotServiceTests
     }
 
     [Fact]
+    public void SwapMealForDay_WhenBreakfastPoolIsAlreadyUsed_AllowsSecondWeeklyOccurrence()
+    {
+        ClearAiPool();
+
+        var request = new AislePilotRequestModel
+        {
+            DietaryModes = ["Balanced"],
+            WeeklyBudget = 65m,
+            HouseholdSize = 2,
+            PlanDays = 7,
+            CookDays = 7,
+            MealsPerDay = 3,
+            SelectedMealTypes = ["Breakfast", "Lunch", "Dinner"]
+        };
+
+        var initialPlan = _service.BuildPlan(request);
+        Assert.Equal(21, initialPlan.MealPlan.Count);
+        var currentMealName = initialPlan.MealPlan[0].MealName;
+        var currentPlanMealNames = initialPlan.MealPlan.Select(meal => meal.MealName).ToList();
+
+        var swappedPlan = _service.SwapMealForDay(
+            request,
+            dayIndex: 0,
+            currentMealName,
+            currentPlanMealNames,
+            [currentMealName]);
+
+        var replacementName = swappedPlan.MealPlan[0].MealName;
+        Assert.NotEqual(currentMealName, replacementName);
+        Assert.Equal(2, swappedPlan.MealPlan.Count(meal =>
+            meal.MealName.Equals(replacementName, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
     public void SwapMealForDay_InvalidDay_ThrowsArgumentOutOfRangeException()
     {
         var request = new AislePilotRequestModel
@@ -606,7 +640,7 @@ public partial class AislePilotServiceTests
 
         Assert.Single(plan.MealPlan);
         Assert.Equal("Egg fried rice", plan.MealPlan[0].MealName);
-        Assert.Equal("AI meal pool", plan.PlanSourceLabel);
+        Assert.Equal("Personalised meal plan", plan.PlanSourceLabel);
     }
 
     [Fact]
@@ -636,7 +670,8 @@ public partial class AislePilotServiceTests
 
         Assert.Single(plan.MealPlan);
         Assert.False(plan.UsedAiGeneratedMeals);
-        Assert.Equal("Template fallback", plan.PlanSourceLabel);
+        Assert.Equal("AislePilot recipe plan", plan.PlanSourceLabel);
+        AssertValidCorePlan(plan, expectedMealCount: 1);
     }
 
     [Fact]
@@ -715,7 +750,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(0, handler.CallCount);
         Assert.NotEqual(currentMealName, swappedPlan.MealPlan[0].MealName);
-        Assert.Equal("Template swap", swappedPlan.PlanSourceLabel);
+        Assert.Equal("Updated meal choice", swappedPlan.PlanSourceLabel);
     }
 
     [Fact]
@@ -803,7 +838,7 @@ public partial class AislePilotServiceTests
 
         Assert.Equal(1, handler.CallCount);
         Assert.Equal(uniqueMealName, swappedPlan.MealPlan[0].MealName);
-        Assert.Equal("OpenAI swap", swappedPlan.PlanSourceLabel);
+        Assert.Equal("Fresh meal suggestion", swappedPlan.PlanSourceLabel);
     }
 
     [Fact]

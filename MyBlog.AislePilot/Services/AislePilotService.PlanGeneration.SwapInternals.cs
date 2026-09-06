@@ -80,26 +80,12 @@ public sealed partial class AislePilotService
             dayMultiplier,
             mealType,
             BuildMealTypeSlots(request).Count);
-        var requestBody = new
-        {
-            model = _model,
-            temperature = 0.9,
-            max_tokens = 1000,
-            response_format = new { type = "json_object" },
-            messages = new object[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You generate one practical replacement meal for a UK grocery-planning app. Always return valid JSON only. Use UK English."
-                },
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+        var requestBody = BuildOpenAiJsonResponseRequest(
+            _utilityModel,
+            _utilityReasoningEffort,
+            "You generate one practical replacement meal for a UK grocery-planning app. Always return valid JSON only. Use UK English.",
+            prompt,
+            1000);
 
         for (var attempt = 1; attempt <= maxSemanticGenerationAttempts; attempt++)
         {
@@ -109,14 +95,13 @@ public sealed partial class AislePilotService
                 requestBody,
                 cancellationToken,
                 operation: "meal_swap_generation",
-                model: _model);
+                model: _utilityModel);
             if (string.IsNullOrWhiteSpace(responseContent))
             {
                 continue;
             }
 
-            var payload = JsonSerializer.Deserialize<ChatCompletionResponse>(responseContent, JsonOptions);
-            var rawJson = payload?.Choices?.FirstOrDefault()?.Message?.Content;
+            var rawJson = ExtractOpenAiResponseText(responseContent);
             if (string.IsNullOrWhiteSpace(rawJson))
             {
                 continue;

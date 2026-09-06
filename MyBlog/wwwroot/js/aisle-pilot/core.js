@@ -10,6 +10,13 @@
         )
     );
     const getAislePilotForms = () => Array.from(document.querySelectorAll(".aislepilot-app form"));
+    document.addEventListener("blur", event => {
+        const validator = event.target?.form && window.jQuery?.(event.target.form).data("validator");
+        if (validator) {
+            validator.settings.onkeyup = false;
+            validator.element(event.target);
+        }
+    }, true);
     const supermarketSelectionStorageKey = "aislepilot:setup-supermarket";
     const submitLoadingDelayTimers = new WeakMap();
     const submitPlanSkeletonDelayTimers = new WeakMap();
@@ -54,7 +61,6 @@
                 });
             }
         } catch {
-            // Ignore debug transport failures.
         }
     };
 
@@ -215,7 +221,6 @@
             try {
                 input.select();
             } catch {
-                // Some input types may not support selection.
             }
         });
     };
@@ -620,7 +625,6 @@
 
     wireSubmitLoadingHandlers(document);
     wireExportThemeForms(document);
-
     const wirePlanBasicsSliders = scope => {
         const forms = scope instanceof Element
             ? Array.from(scope.querySelectorAll("form"))
@@ -1432,7 +1436,9 @@
                     return;
                 }
 
-                summaryOutput.textContent = getSummaryText(item);
+                const summaryText = getSummaryText(item);
+                summaryOutput.textContent = summaryText;
+                form.querySelectorAll(`[data-plan-basic-mirror='${item.dataset.planBasicItem}']`).forEach(output => output.textContent = summaryText);
             };
 
             const openOnlyItem = nextItem => {
@@ -1753,15 +1759,12 @@
             };
 
             const updateServingSummary = () => {
-                if (!(servingSummary instanceof HTMLElement)) {
-                    return;
-                }
-
                 const peopleValue = Number.parseInt(householdInput?.value ?? "2", 10);
                 const safePeople = Number.isInteger(peopleValue) ? Math.max(1, Math.min(8, peopleValue)) : 2;
                 const portionValue = (portionInput?.value ?? "Medium").trim() || "Medium";
                 const peopleLabel = safePeople === 1 ? "person" : "people";
-                servingSummary.textContent = `${safePeople} ${peopleLabel} - ${portionValue} portions`;
+                form.querySelectorAll("[data-serving-summary]").forEach(output => output.textContent = `${safePeople} ${peopleLabel} - ${portionValue} portions`);
+                form.querySelectorAll("[data-household-count]").forEach(output => output.textContent = `${safePeople} ${peopleLabel}`);
             };
 
             const getSelectedDietaryInputs = () => dietaryInputs.filter(input =>
@@ -1786,17 +1789,12 @@
             };
 
             const updateDietarySummary = () => {
-                if (!(dietarySummary instanceof HTMLElement)) {
-                    return;
-                }
-
                 const selectedModes = dietaryInputs
                     .filter(input => input instanceof HTMLInputElement && input.checked)
                     .map(input => input.value.trim())
                     .filter(value => value.length > 0);
-                dietarySummary.textContent = selectedModes.length > 0
-                    ? selectedModes.join(", ")
-                    : "No dietary filters";
+                const value = selectedModes.length > 0 ? selectedModes.join(", ") : "No dietary filters";
+                form.querySelectorAll("[data-dietary-summary]").forEach(output => output.textContent = value);
             };
 
             const handleDietaryModeChange = targetInput => {
@@ -1833,6 +1831,7 @@
                 }
 
                 const quickMealsSummary = quickMealsInput.checked ? "Quick meals on" : "Quick meals off";
+                form.querySelectorAll("[data-quick-meals-summary]").forEach(output => output.textContent = quickMealsSummary);
                 const savedRepeatsSummary = (() => {
                     if (!(savedMealRepeatsInput instanceof HTMLInputElement) || !savedMealRepeatsInput.checked) {
                         return "Saved repeats off";
@@ -1876,19 +1875,12 @@
             };
 
             const updatePantrySummary = () => {
-                if (!(pantrySummary instanceof HTMLElement)) {
-                    return;
-                }
-
                 const pantryValue = normalizeSummary(pantryInput?.value ?? "");
                 if (pantryValue.length > 0) {
-                    pantrySummary.textContent = pantryValue;
-                    pantrySummary.setAttribute("title", pantryValue);
+                    form.querySelectorAll("[data-pantry-summary]").forEach(output => { output.textContent = pantryValue; output.setAttribute("title", pantryValue); });
                     return;
                 }
-
-                pantrySummary.textContent = "No foods listed";
-                pantrySummary.removeAttribute("title");
+                form.querySelectorAll("[data-pantry-summary]").forEach(output => { output.textContent = "No foods listed"; output.removeAttribute("title"); });
             };
 
             const updateGeneratorCoreSummary = () => {
@@ -1896,9 +1888,10 @@
                     return;
                 }
 
-                generatorCoreSummary.textContent = strictCoreInput.checked
-                    ? "Strict core on"
-                    : "Strict core off";
+                const value = strictCoreInput.checked
+                    ? "Use every listed ingredient"
+                    : "Flexible ingredient matching";
+                form.querySelectorAll("[data-generator-core-summary]").forEach(output => output.textContent = value);
             };
 
             const updateSpecialOptionsSummary = () => {
@@ -1919,9 +1912,8 @@
                     options.push("Dessert add-on on");
                 }
 
-                specialOptionsSummary.textContent = options.length > 0
-                    ? options.join(", ")
-                    : "No extras";
+                const value = options.length > 0 ? options.join(", ") : "No extras";
+                form.querySelectorAll("[data-special-options-summary]").forEach(output => output.textContent = value);
             };
 
             if (form.dataset.sharedSummaryWired !== "true") {
@@ -2172,7 +2164,6 @@
         try {
             window.localStorage.setItem(supermarketSelectionStorageKey, normalizedValue);
         } catch {
-            // Ignore storage failures in private modes.
         }
     };
 
@@ -2432,7 +2423,6 @@
                     await navigator.clipboard.writeText(text);
                     return true;
                 } catch {
-                    // Fallback below.
                 }
             }
 
@@ -2716,7 +2706,6 @@
         mealImagePollingController.start();
     };
 
-    // Image polling must run for both planner and generator-only pages.
     startMealImagePolling();
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
@@ -2729,12 +2718,16 @@
         clearPersistedSwapScroll,
         clearRestorePending,
         clearSubmitLoadingDelay,
+        getSubmitButton,
         hidePlanLoadingShell,
+        showPlanLoadingShell,
         resetFormSubmittingState,
+        readExportDownloadFileName,
         schedulePlanBasicsSliderRefresh,
         setSubmitButtonLoadingState,
         showToast,
         startMealImagePolling,
+        triggerFileDownload,
         swapScrollRestoreDurationMs,
         syncMobileContextOffset,
         wireCustomAisleFieldVisibility,

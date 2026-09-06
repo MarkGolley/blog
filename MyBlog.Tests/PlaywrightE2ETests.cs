@@ -10,6 +10,7 @@ namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
     private const string E2EEnvVar = "RUN_PLAYWRIGHT_E2E";
+    private const string ExternalBaseUrlEnvVar = "PLAYWRIGHT_EXTERNAL_BASE_URL";
     private const string AdminUsername = "admin";
     private const string AdminPassword = "password";
     private const string ModerationBannerText =
@@ -26,7 +27,10 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             return;
         }
 
-        _appHost = await LocalAppHost.StartAsync();
+        var externalBaseUrl = Environment.GetEnvironmentVariable(ExternalBaseUrlEnvVar);
+        _appHost = Uri.TryCreate(externalBaseUrl, UriKind.Absolute, out var externalUri)
+            ? LocalAppHost.Connect(externalUri)
+            : await LocalAppHost.StartAsync();
         _playwright = await Playwright.CreateAsync();
         _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
@@ -115,9 +119,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         var targetIndex = Math.Min(3, moreActionsTriggerCount - 1);
         var targetTrigger = moreActionsTriggers.Nth(targetIndex);
-        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
-        await targetTrigger.ScrollIntoViewIfNeededAsync();
-        await targetTrigger.ClickAsync();
+        var targetMealPanel = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-panel][1]");
+        var targetSwapButton = targetMealPanel.Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -171,9 +175,18 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var targetIndex = Math.Min(2, moreActionsTriggerCount - 1);
         var targetTrigger = moreActionsTriggers.Nth(targetIndex);
         var targetCard = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-card][1]");
-        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
-        await targetTrigger.ScrollIntoViewIfNeededAsync();
-        await targetTrigger.ClickAsync();
+        await page.EvaluateAsync(
+            """
+            targetIndex => {
+                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                const unaffectedCard = cards.find((_, index) => index !== targetIndex);
+                window.__aislePilotUnaffectedCard = unaffectedCard ?? null;
+                window.__aislePilotUnaffectedImage = unaffectedCard?.querySelector("img[data-meal-image]") ?? null;
+            }
+            """,
+            targetIndex);
+        var targetSwapButton = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-panel][1]").Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -195,6 +208,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await targetSwapButton.ClickAsync();
         await page.WaitForTimeoutAsync(150);
+        var pendingScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
 
         var pendingState = await targetCard.EvaluateAsync<string>(
             """
@@ -212,25 +226,43 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         Assert.Contains("true|1|", pendingState, StringComparison.Ordinal);
         Assert.Contains("Loading new meal", pendingState, StringComparison.OrdinalIgnoreCase);
+        await WriteAislePilotStateScreenshotAsync(page, "swap-transition-pending-mobile-light", fullPage: false);
 
         _ = await swapResponseTask;
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await page.WaitForTimeoutAsync(1100);
+        await WriteAislePilotStateScreenshotAsync(page, "swap-transition-complete-mobile-light", fullPage: false);
+
+        var unaffectedCardStayedMounted = await page.EvaluateAsync<bool>(
+            """
+            () => {
+                const card = window.__aislePilotUnaffectedCard;
+                const image = window.__aislePilotUnaffectedImage;
+                return card instanceof HTMLElement &&
+                    card.isConnected &&
+                    image instanceof HTMLImageElement &&
+                    image.isConnected &&
+                    image.closest("[data-day-meal-card]") === card;
+            }
+            """);
+        Assert.True(
+            unaffectedCardStayedMounted,
+            "Expected an unaffected meal card and its image to remain mounted throughout the swap transition.");
 
         var afterScrollY = await page.EvaluateAsync<int>("() => Math.round(window.scrollY)");
-        var scrollDelta = Math.Abs(afterScrollY - beforeScrollY);
-        var upwardDelta = beforeScrollY - afterScrollY;
+        var scrollDelta = Math.Abs(afterScrollY - pendingScrollY);
+        var upwardDelta = pendingScrollY - afterScrollY;
 
         Assert.True(
             scrollDelta <= 8,
-            $"Expected swap viewport to stay anchored after showing pending state. Before={beforeScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
+            $"Expected the pending card to stay anchored while the swap response was applied. BeforeClick={beforeScrollY}, Pending={pendingScrollY}, After={afterScrollY}, Delta={scrollDelta}.");
         Assert.True(
             upwardDelta <= 4,
-            $"Expected pending-state swap not to pull the viewport upward. Before={beforeScrollY}, After={afterScrollY}, UpwardDelta={upwardDelta}.");
+            $"Expected the swap response not to pull the pending card upward. Pending={pendingScrollY}, After={afterScrollY}, UpwardDelta={upwardDelta}.");
     }
 
     [Fact]
-    public async Task Mobile_AislePilotSwap_ClosesActionsSheetAndPreservesActiveDayAndSlot()
+    public async Task Mobile_AislePilotPrimarySwap_PreservesActiveDayAndSlot()
     {
         if (!IsE2EEnabled())
         {
@@ -280,10 +312,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var activeMealPanel = targetCard.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
         var previousMealName = (await activeMealPanel.Locator("h3").First.InnerTextAsync()).Trim();
 
-        var targetMoreActionsSummary = targetCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        var targetSwapButton = page.Locator("[data-card-more-actions-panel].is-mobile-sheet button[aria-label='Swap meal']").First;
-        await targetMoreActionsSummary.ScrollIntoViewIfNeededAsync();
-        await targetMoreActionsSummary.ClickAsync();
+        var targetSwapButton = activeMealPanel.Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
+        await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -428,6 +458,13 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 10000
         });
         Assert.True(await loadingShell.IsVisibleAsync());
+        await loadingShell.ScrollIntoViewIfNeededAsync();
+        await WriteAislePilotStateScreenshotAsync(page, "meal-image-loading-mobile-light", fullPage: false);
+        var artifactRoot = Environment.GetEnvironmentVariable("PUBLIC_UI_ARTIFACT_ROOT") ??
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "artifacts", "public-ui"));
+        var stateRoot = Path.Combine(artifactRoot, "aislepilot-states");
+        Directory.CreateDirectory(stateRoot);
+        await loadingShell.ScreenshotAsync(new() { Path = Path.Combine(stateRoot, "meal-image-loader-mobile-light.png") });
     }
 
     [Fact]
@@ -519,6 +556,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var fetchCalled = await page.EvaluateAsync<bool>("() => window.__aislePilotFetchCalled?.() === true");
         Assert.False(fetchCalled);
     }
+
+
 
     [Fact]
     public async Task Mobile_AislePilotViewDetails_KeepsActionRowStable()
@@ -1092,10 +1131,10 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
     private sealed class LocalAppHost : IAsyncDisposable
     {
-        private readonly Process _process;
+        private readonly Process? _process;
         private readonly StringBuilder _output;
 
-        private LocalAppHost(Process process, string baseUrl, StringBuilder output)
+        private LocalAppHost(Process? process, string baseUrl, StringBuilder output)
         {
             _process = process;
             BaseUrl = baseUrl;
@@ -1104,19 +1143,26 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         public string BaseUrl { get; }
 
-        public static async Task<LocalAppHost> StartAsync()
+        public static LocalAppHost Connect(Uri baseUri)
+        {
+            return new LocalAppHost(null, baseUri.ToString().TrimEnd('/'), new StringBuilder());
+        }
+
+        public static async Task<LocalAppHost> StartAsync(
+            IReadOnlyDictionary<string, string?>? environmentOverrides = null)
         {
             var port = GetFreePort();
             var baseUrl = $"http://127.0.0.1:{port}";
             var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-            var projectPath = Path.Combine(repoRoot, "MyBlog", "MyBlog.csproj");
+            var appContentRoot = Path.Combine(repoRoot, "MyBlog");
+            var appAssemblyPath = Path.Combine(AppContext.BaseDirectory, "MyBlog.dll");
             var output = new StringBuilder();
 
             var startInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"run --project \"{projectPath}\"",
-                WorkingDirectory = repoRoot,
+                Arguments = $"\"{appAssemblyPath}\"",
+                WorkingDirectory = appContentRoot,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -1125,10 +1171,19 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
             startInfo.Environment["PORT"] = port.ToString();
             startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
+            startInfo.Environment["ASPNETCORE_CONTENTROOT"] = appContentRoot;
+            startInfo.Environment["ASPNETCORE_WEBROOT"] = Path.Combine(appContentRoot, "wwwroot");
             startInfo.Environment["ADMIN_USERNAME"] = AdminUsername;
             startInfo.Environment["ADMIN_PASSWORD"] = AdminPassword;
             startInfo.Environment["SUBSCRIBER_NOTIFY_KEY"] = "integration-notify-key";
             startInfo.Environment["OPENAI_API_KEY"] = string.Empty;
+            if (environmentOverrides is not null)
+            {
+                foreach (var (key, value) in environmentOverrides)
+                {
+                    startInfo.Environment[key] = value;
+                }
+            }
 
             var process = new Process
             {
@@ -1162,6 +1217,11 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         public async ValueTask DisposeAsync()
         {
+            if (_process is null)
+            {
+                return;
+            }
+
             if (_process.HasExited)
             {
                 _process.Dispose();

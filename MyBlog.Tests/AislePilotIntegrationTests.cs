@@ -1049,8 +1049,8 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("2 day(s)", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-mobile-context-meta-values\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Makes extra for", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Plan snapshot", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("data-overview-content hidden", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Your weekly plan", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-overview-content hidden=\"hidden\"", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1078,29 +1078,12 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         var budgetDifferenceText = ExtractOverviewBudgetDifferenceText(html);
         var weeklySummaryText = ExtractWeeklyBudgetSummaryText(html);
 
+        Assert.Equal(budgetDifferenceText, weeklySummaryText, ignoreCase: true);
         Assert.True(
-            decimal.TryParse(
-                budgetDifferenceText.Replace("\u00A0", " "),
-                NumberStyles.Currency,
-                CultureInfo.GetCultureInfo("en-GB"),
-                out var budgetDifferenceValue),
-            $"Could not parse budget difference value '{budgetDifferenceText}'.");
-
-        if (budgetDifferenceValue < 0m)
-        {
-            Assert.Contains("over", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("under", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
-            return;
-        }
-
-        if (budgetDifferenceValue > 0m)
-        {
-            Assert.Contains("under", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("over", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
-            return;
-        }
-
-        Assert.Contains("on budget", weeklySummaryText, StringComparison.OrdinalIgnoreCase);
+            budgetDifferenceText.Contains("over budget", StringComparison.OrdinalIgnoreCase) ||
+            budgetDifferenceText.Contains("left in budget", StringComparison.OrdinalIgnoreCase) ||
+            budgetDifferenceText.Contains("on budget", StringComparison.OrdinalIgnoreCase),
+            $"Expected a plain-language budget direction, received '{budgetDifferenceText}'.");
     }
 
     [Fact]
@@ -1288,7 +1271,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
     {
         var match = Regex.Match(
             html,
-            @"<span class=""aislepilot-mobile-context-budget-status[^""]*"">\s*(?<value>[^<]+)\s*</span>",
+            @"<p class=""aislepilot-overview-caption"">\s*[^<]+\s*<span[^>]*>[^<]*</span>\s*(?<value>[^<]+)\s*</p>",
             RegexOptions.IgnoreCase);
         Assert.True(match.Success, "Could not find weekly summary budget text.");
         var raw = WebUtility.HtmlDecode(match.Groups["value"].Value);

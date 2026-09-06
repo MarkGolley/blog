@@ -1,35 +1,35 @@
 @model AislePilotPlannerSetupSummaryViewModel
-<p class="aislepilot-setup-summary-kicker">Plan snapshot</p>
-<h3 id="aislepilot-setup-summary-title" class="aislepilot-setup-summary-title">Ready to generate</h3>
-<p class="aislepilot-setup-summary-copy">This summary updates as you change the setup, so you can see the shape of the week before generating it.</p>
+<p class="aislepilot-setup-summary-kicker">Your weekly plan</p>
+<h3 id="aislepilot-setup-summary-title" class="aislepilot-setup-summary-title">Your selections</h3>
+<p class="aislepilot-setup-summary-copy">Review the week, recipes and shopping list AislePilot will prepare.</p>
 <dl class="aislepilot-setup-summary-list">
     <div class="aislepilot-setup-summary-item">
         <dt>Cooking for</dt>
-        <dd>@Model.ServingSummaryText</dd>
+        <dd data-serving-summary>@Model.ServingSummaryText</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
         <dt>Dietary</dt>
-        <dd>@Model.DietarySummaryText</dd>
+        <dd data-dietary-summary>@Model.DietarySummaryText</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
         <dt>Store</dt>
-        <dd>@Model.SelectedSupermarketLabel</dd>
+        <dd data-plan-basic-mirror="supermarket">@Model.SelectedSupermarketLabel</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
         <dt>Meal slots</dt>
-        <dd>@Model.MealTypesSummaryText</dd>
+        <dd data-plan-basic-mirror="meal-types">@Model.MealTypesSummaryText</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
-        <dt>Plan length</dt>
-        <dd>@Model.PlanLengthText</dd>
+        <dt>Number of days</dt>
+        <dd data-plan-basic-mirror="plan-days">@Model.PlanLengthText</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
         <dt>Budget</dt>
-        <dd>@Model.BudgetText</dd>
+        <dd data-plan-basic-mirror="budget">@Model.BudgetText</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
         <dt>Extras</dt>
-        <dd>@Model.SpecialOptionsSummaryText</dd>
+        <dd data-special-options-summary>@Model.SpecialOptionsSummaryText</dd>
     </div>
 </dl>
 <p class="aislepilot-setup-summary-note">Generate the plan when the budget, meal cadence, and extras look right.</p>

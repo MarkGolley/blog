@@ -10,6 +10,7 @@
     var ukCulture = CultureInfo.GetCultureInfo("en-GB");
     var fallbackMealImageUrl = AislePilotMealImageUrlResolver.ResolveClientMealImageUrl("/images/aislepilot-icon.svg");
     var mealImagesPollUrl = Url.Action("MealImages", "AislePilot") ?? "/projects/aisle-pilot/meal-images";
+    const string mealImageSizes = "(max-width: 760px) calc(100vw - 2rem), (max-width: 1100px) 48vw, 36rem";
     var aisleRank = result.AisleOrderUsed
         .Select((department, index) => new { department, index })
         .ToDictionary(x => x.department, x => x.index, StringComparer.OrdinalIgnoreCase);
@@ -101,8 +102,8 @@
     var householdLabel = safeHouseholdSize == 1 ? "person" : "people";
     var budgetDeltaSummaryText = result.BudgetDelta switch
     {
-        > 0m => $"{result.BudgetDelta.ToString("C", ukCulture)} under",
-        < 0m => $"{Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over",
+        > 0m => $"{result.BudgetDelta.ToString("C", ukCulture)} left in budget",
+        < 0m => $"{Math.Abs(result.BudgetDelta).ToString("C", ukCulture)} over budget",
         _ => "On budget"
     };
     var layoutInsight = result.LayoutInsight ?? new AislePilotSupermarketLayoutInsightViewModel();
@@ -189,7 +190,7 @@
                         <circle cx="12" cy="12" r="2.5"></circle>
                     </svg>
                 </span>
-                <span>Recipe</span>
+                <span>View recipe</span>
             </span>
             <span class="aislepilot-meal-image-hint-chips">
                 @if (includeMacros)
@@ -242,13 +243,26 @@
         </span>
         <span class="sr-only">@screenReaderLabel</span>
     }
-    <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-reveal>
+    <section id="aislepilot-overview" aria-labelledby="aislepilot-budget-title" class="aislepilot-shell" data-results-stage="weekly-status" data-reveal>
         <div class="aislepilot-section-head aislepilot-overview-head">
             <div class="aislepilot-overview-title-row">
                 <div>
-                    <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Plan snapshot</h2>
-                    <p class="aislepilot-overview-caption">Budget, spend, and weekly structure at a glance.</p>
+                    <h2 id="aislepilot-budget-title" class="aislepilot-section-title">Weekly status</h2>
+                    <p class="aislepilot-overview-caption">
+                        @result.EstimatedTotalCost.ToString("C", ukCulture) meal estimate
+                        <span aria-hidden="true">&middot;</span>
+                        @budgetDeltaSummaryText
+                    </p>
                 </div>
+                <button type="button"
+                        class="aislepilot-overview-details-toggle"
+                        data-overview-toggle
+                        data-overview-toggle-collapsed-label="Plan details"
+                        data-overview-toggle-expanded-label="Hide details"
+                        aria-controls="aislepilot-overview-content"
+                        aria-expanded="false">
+                    <span data-overview-toggle-label>Plan details</span>
+                </button>
             </div>
             <div class="aislepilot-overview-actions">
                 <div class="aislepilot-overview-actions-inline">
@@ -356,33 +370,33 @@
                 </details>
             </div>
         </div>
-        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content>
-            @if (result.IsOverBudget)
-            {
-                <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
-                    <p class="aislepilot-overbudget-title">
-                        This plan is @Math.Abs(result.BudgetDelta).ToString("C", ukCulture) over your weekly budget.
-                    </p>
-                    <p class="aislepilot-overbudget-note">
-                        @(string.IsNullOrWhiteSpace(result.BudgetRebalanceStatusMessage)
-                            ? "Keep this plan if you are happy to spend more, or refresh with a lower-cost mix."
-                            : result.BudgetRebalanceStatusMessage)
-                    </p>
-                    <form method="post"
-                          action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"
-                          class="aislepilot-overview-regenerate-form">
-                        @Html.AntiForgeryToken()
-                        <partial name="_AislePilotHiddenRequestFields"
-                                 model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
-                        <button type="submit"
-                                class="aislepilot-overview-regenerate-btn"
-                                data-loading-label="Refreshing lower-cost plan..."
-                                data-show-plan-skeleton>
-                            Refresh lower-cost plan
-                        </button>
-                    </form>
-                </div>
-            }
+        @if (result.IsOverBudget)
+        {
+            <div class="aislepilot-overbudget-flag" role="status" aria-live="polite">
+                <p class="aislepilot-overbudget-title">
+                    This plan is @Math.Abs(result.BudgetDelta).ToString("C", ukCulture) over your weekly budget.
+                </p>
+                <p class="aislepilot-overbudget-note">
+                    @(string.IsNullOrWhiteSpace(result.BudgetRebalanceStatusMessage)
+                        ? "Keep this plan if you are happy to spend more, or refresh with a lower-cost mix."
+                        : result.BudgetRebalanceStatusMessage)
+                </p>
+                <form method="post"
+                      action="@Url.Action("RebalanceBudget", "AislePilot")#aislepilot-overview"
+                      class="aislepilot-overview-regenerate-form">
+                    @Html.AntiForgeryToken()
+                    <partial name="_AislePilotHiddenRequestFields"
+                             model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
+                    <button type="submit"
+                            class="aislepilot-overview-regenerate-btn"
+                            data-loading-label="Refreshing lower-cost plan..."
+                            data-show-plan-skeleton>
+                        Refresh lower-cost plan
+                    </button>
+                </form>
+            </div>
+        }
+        <div id="aislepilot-overview-content" class="aislepilot-overview-content" data-overview-content hidden="hidden">
             <div class="aislepilot-budget-grid aislepilot-budget-grid--primary"
                  data-overview-primary-grid>
                 <article class="aislepilot-stat-card aislepilot-stat-card--meta aislepilot-stat-card--supermarket"
@@ -409,7 +423,7 @@
                 <article class="aislepilot-stat-card aislepilot-stat-card--status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
                     <p class="aislepilot-stat-label">Budget difference</p>
                     <p class="aislepilot-stat-value @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">
-                        @result.BudgetDelta.ToString("C", ukCulture)
+                        @budgetDeltaSummaryText
                     </p>
                 </article>
             </div>
@@ -444,74 +458,17 @@
                 <p class="aislepilot-mobile-context-meta">
                     <span class="aislepilot-mobile-context-title">Weekly plan</span>
                     <span class="aislepilot-mobile-context-meta-values">
-                        <span>Meal est. @result.EstimatedTotalCost.ToString("C", ukCulture)</span>
+                        <span>@result.PlanDays day plan</span>
                         <span aria-hidden="true">&middot;</span>
-                        <span class="aislepilot-mobile-context-budget-status @(result.IsOverBudget ? "is-over-budget" : "is-on-budget")">@budgetDeltaSummaryText</span>
+                        <span>@result.MealsPerDay meal@(result.MealsPerDay == 1 ? string.Empty : "s") per day</span>
                     </span>
                 </p>
-            </div>
-            <div class="aislepilot-mobile-context-jumps" role="tablist" aria-label="Jump to section">
-                <button type="button"
-                        class="aislepilot-mobile-context-jump is-active"
-                        data-window-tab="aislepilot-meals"
-                        role="tab"
-                        aria-controls="aislepilot-meals"
-                        aria-selected="true"
-                        aria-current="page"
-                        aria-label="Show meals"
-                        title="Show meals">
-                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" focusable="false">
-                            <circle cx="5" cy="7" r="1"></circle>
-                            <circle cx="5" cy="12" r="1"></circle>
-                            <circle cx="5" cy="17" r="1"></circle>
-                            <path d="M8 7h11M8 12h11M8 17h11"></path>
-                        </svg>
-                    </span>
-                    <span class="aislepilot-mobile-context-jump-text">Meals</span>
-                </button>
-                <button type="button"
-                        class="aislepilot-mobile-context-jump"
-                        data-window-tab="aislepilot-shop"
-                        role="tab"
-                        aria-controls="aislepilot-shop"
-                        aria-selected="false"
-                        aria-current="false"
-                        aria-label="Show shopping list"
-                        title="Show shopping list">
-                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" focusable="false">
-                            <circle cx="9" cy="19" r="1.5"></circle>
-                            <circle cx="17" cy="19" r="1.5"></circle>
-                            <path d="M3 4h2l2.4 10h10.8l1.8-7H7"></path>
-                        </svg>
-                    </span>
-                    <span class="aislepilot-mobile-context-jump-text">Shop</span>
-                </button>
-                <button type="button"
-                        class="aislepilot-mobile-context-jump"
-                        data-window-tab="aislepilot-export"
-                        role="tab"
-                        aria-controls="aislepilot-export"
-                        aria-selected="false"
-                        aria-current="false"
-                        aria-label="Show exports"
-                        title="Show exports">
-                    <span class="aislepilot-symbol-glyph" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" focusable="false">
-                            <path d="M12 16V6"></path>
-                            <path d="m8 10 4-4 4 4"></path>
-                            <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
-                        </svg>
-                    </span>
-                    <span class="aislepilot-mobile-context-jump-text">Export</span>
-                </button>
             </div>
         </div>
         <div class="aislepilot-window-head">
             <h2 id="aislepilot-window-title" class="sr-only">Plan results</h2>
             <div class="aislepilot-window-nav">
-                <p class="aislepilot-window-nav-hint" data-window-hint>Use tabs to switch between meals, shopping, and exports.</p>
+                <p class="aislepilot-window-nav-hint" data-window-hint>Review days and meals first, then open shopping or exports.</p>
                 <div class="aislepilot-window-tabs" role="tablist" aria-label="AislePilot weekly plan views">
                     <button type="button"
                             id="aislepilot-tab-meals"
@@ -614,9 +571,10 @@
                     }
                     <section class="aislepilot-day-carousel"
                              data-day-card-carousel
-                             aria-label="Meal plan day cards"
+                             data-results-stage="selected-day"
+                             aria-label="Meal plan by day"
                              data-day-card-count="@dayMealGroups.Count" data-day-stacked-status="Stacked view: all days visible."
-                             data-day-reorder-status="Reorder mode: drag a day card onto another day to swap days.">
+                             data-day-reorder-status="Reorder mode: use Move earlier or Move later. You can also drag a day card onto another day.">
                         <div class="aislepilot-day-carousel-header">
                             <div class="aislepilot-day-carousel-status"
                                  aria-live="polite"
@@ -628,24 +586,6 @@
                             {
                                 <div class="aislepilot-day-carousel-header-actions">
                                     <partial name="_AislePilotDayReorderToggle" />
-                                </div>
-                            }
-                            @if (dayMealGroups.Count > 1)
-                            {
-                                <div class="aislepilot-day-carousel-controls">
-                                    <button type="button"
-                                            class="aislepilot-day-carousel-arrow"
-                                            data-day-carousel-prev
-                                            aria-label="Show previous day"
-                                            disabled>
-                                        <span aria-hidden="true">&#8249;</span>
-                                    </button>
-                                    <button type="button"
-                                            class="aislepilot-day-carousel-arrow"
-                                            data-day-carousel-next
-                                            aria-label="Show next day">
-                                        <span aria-hidden="true">&#8250;</span>
-                                    </button>
                                 </div>
                             }
                         </div>
@@ -719,7 +659,7 @@
                                     <div class="aislepilot-day-card-head-side">
                                         @if (canReorderDayCards)
                                         {
-                                            <partial name="_AislePilotDayReorderHandle" model="dayGroup.Day" />
+                                            <partial name="_AislePilotDayReorderHandle" model="(dayGroup.Day, dayGroupIndex > 0, dayGroupIndex < dayMealGroups.Count - 1)" />
                                         }
                                         @if (result.PlanDays > 1)
                                         {
@@ -737,7 +677,7 @@
                                     {
                                         var reorderMeal = slotEntry.meal;
                                         var reorderMealIsIgnored = ignoredMealSlotIndexes.Contains(slotEntry.index) || reorderMeal.IsIgnored;
-                                        <div class="aislepilot-day-reorder-meal-item@(reorderMealIsIgnored ? " is-ignored" : string.Empty)" data-day-reorder-meal-item><img class="aislepilot-day-reorder-meal-thumbnail" data-day-reorder-meal-thumbnail src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(reorderMeal.MealImageUrl)" alt="" loading="lazy" decoding="async" /><span class="aislepilot-day-reorder-meal-type">@reorderMeal.MealType</span><span class="aislepilot-day-reorder-meal-name">@reorderMeal.MealName</span></div>
+                                        <div class="aislepilot-day-reorder-meal-item@(reorderMealIsIgnored ? " is-ignored" : string.Empty)" data-day-reorder-meal-item><img class="aislepilot-day-reorder-meal-thumbnail" data-day-reorder-meal-thumbnail src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(reorderMeal.MealImageUrl)" alt="" width="32" height="32" loading="lazy" decoding="async" /><span class="aislepilot-day-reorder-meal-type">@reorderMeal.MealType</span><span class="aislepilot-day-reorder-meal-name">@reorderMeal.MealName</span></div>
                                     }
                                 </div>
                                 @if (dayGroup.Entries.Count > 1)
@@ -783,11 +723,18 @@
                                             var detailsPanelId = $"meal-details-{mealIndex}";
                                             var slotMoreActionsMenuId = $"meal-actions-{mealIndex}-{slotIndex}";
                                             var slotMoreActionsTitleId = $"meal-actions-title-{mealIndex}-{slotIndex}";
+                                            var swapFormId = $"meal-swap-{mealIndex}-{slotIndex}";
+                                            var saveFormId = $"meal-save-{mealIndex}-{slotIndex}";
                                             var shouldPrioritizeImage = slotIndex == 0 && dayGroupIndex < 2;
                                             var mealDetailsTriggerLabel = "View meal details: macros, ingredients and method";
+                                            var saveActionLabel = isSavedMeal ? "Unsave meal" : "Save meal";
+                                            var saveButtonClass = isSavedMeal
+                                                ? "aislepilot-swap-btn is-secondary is-saved-meal is-compact"
+                                                : "aislepilot-swap-btn is-secondary is-compact";
                                             <section id="@($"{tabPrefix}-panel-{slotIndex}")"
                                                      class="aislepilot-day-meal-panel@(isIgnored ? " is-ignored" : string.Empty)"
                                                      data-day-meal-panel
+                                                     data-results-stage="meal-details"
                                                      role="tabpanel"
                                                      aria-labelledby="@panelLabelledBy"
                                                      aria-hidden="@(slotIndex == 0 ? "false" : "true")">
@@ -816,7 +763,7 @@
                                                              title="@mealDetailsTriggerLabel">
                                                         <div class="aislepilot-meal-image-shell" data-day-meal-swipe-surface>
                                                             <img class="aislepilot-meal-image"
-                                                                 src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl)"
+                                                                 src="@(AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl))" srcset="@($"{AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(meal.MealImageUrl)} 1024w")" sizes="@mealImageSizes" width="1024" height="1024"
                                                                  data-meal-image
                                                                  data-meal-name="@meal.MealName"
                                                                  alt="@($"{meal.MealName} plated meal")"
@@ -827,6 +774,18 @@
                                                         </div>
                                                     </summary>
                                                 </details>
+                                                @if (!isIgnored)
+                                                {
+                                                    <div class="aislepilot-meal-primary-actions" data-meal-primary-actions aria-label="Primary meal actions">
+                                                        <button type="button"
+                                                                class="aislepilot-meal-primary-action is-recipe"
+                                                                data-recipe-details-trigger
+                                                                aria-controls="@detailsPanelId"
+                                                                aria-expanded="false">Recipe</button>
+                                                        <button type="submit" form="@swapFormId" class="aislepilot-meal-primary-action" aria-label="Swap meal">Swap</button>
+                                                        <button type="submit" form="@saveFormId" class="aislepilot-meal-primary-action@(isSavedMeal ? " is-saved" : string.Empty)" aria-label="@saveActionLabel">@(isSavedMeal ? "Unsave" : "Save")</button>
+                                                    </div>
+                                                }
                                                 <div class="aislepilot-card-action-row is-inline-actions aislepilot-day-card-header-actions aislepilot-meal-panel-image-actions@(slotIndex == 0 ? " is-active" : string.Empty)"
                                                      data-day-card-header-actions
                                                      data-slot-index="@slotIndex"
@@ -836,8 +795,8 @@
                                                                  aria-controls="@slotMoreActionsMenuId"
                                                                  aria-expanded="false"
                                                                  aria-haspopup="dialog"
-                                                                 aria-label="Meal actions"
-                                                                 title="Meal actions">
+                                                                 aria-label="More meal actions"
+                                                                 title="More meal actions">
                                                             <span class="aislepilot-symbol-glyph" aria-hidden="true">
                                                                 <svg viewBox="0 0 24 24" focusable="false">
                                                                     <circle cx="6" cy="12" r="1.6"></circle>
@@ -845,12 +804,12 @@
                                                                     <circle cx="18" cy="12" r="1.6"></circle>
                                                                 </svg>
                                                             </span>
-                                                            <span class="aislepilot-swap-action-label">Actions</span>
+                                                            <span class="aislepilot-swap-action-label">More</span>
                                                         </summary>
                                                         <div id="@slotMoreActionsMenuId"
                                                              class="aislepilot-card-more-actions-menu"
                                                              role="group"
-                                                             aria-label="Meal actions"
+                                                             aria-label="More meal actions"
                                                              aria-labelledby="@slotMoreActionsTitleId"
                                                              data-card-more-actions-panel>
                                                             <div class="aislepilot-mobile-meal-sheet-head">
@@ -867,8 +826,10 @@
                                                                 </div>
                                                             </div>
                                                             <form method="post"
+                                                                  id="@swapFormId"
+                                                                  hidden
                                                                   action="@Url.Action("SwapMeal", "AislePilot")#aislepilot-meals"
-                                                                  class="aislepilot-swap-form aislepilot-card-more-action-form"
+                                                                  class="aislepilot-swap-form"
                                                                   data-preserve-scroll-form
                                                                   data-ajax-swap-form>
                                                                 @Html.AntiForgeryToken()
@@ -897,6 +858,8 @@
                                                             </form>
 
                                                             <form method="post"
+                                                                  id="@saveFormId"
+                                                                  hidden
                                                                   action="@Url.Action("ToggleEnjoyedMeal", "AislePilot")#aislepilot-meals"
                                                                   class="aislepilot-swap-form aislepilot-favorite-form aislepilot-card-more-action-form"
                                                                   data-preserve-scroll-form
@@ -907,12 +870,6 @@
                                                                          model="BuildHiddenRequestFields(includeCurrentPlanMealNames: true)" />
                                                                 <input type="hidden" name="dayIndex" value="@mealIndex" />
                                                                 <input type="hidden" name="mealName" value="@meal.MealName" />
-                                                                @{
-                                                                    var saveActionLabel = isSavedMeal ? "Unsave meal" : "Save meal";
-                                                                    var saveButtonClass = isSavedMeal
-                                                                        ? "aislepilot-swap-btn is-secondary is-saved-meal is-compact"
-                                                                        : "aislepilot-swap-btn is-secondary is-compact";
-                                                                }
                                                                 <button type="submit"
                                                                         class="@saveButtonClass"
                                                                         aria-label="@saveActionLabel"
@@ -1029,7 +986,7 @@
                         </div>
                         @if (dayMealGroups.Count > 1)
                         {
-                            <div class="aislepilot-day-carousel-pagination" data-day-carousel-pagination role="tablist" aria-label="Choose a day card">
+                            <div class="aislepilot-day-carousel-pagination" data-day-carousel-pagination role="tablist" aria-label="Choose a day">
                                 @{ var dayDotIndex = 0; }
                                 @foreach (var dayGroup in dayMealGroups)
                                 {
@@ -1065,6 +1022,7 @@
                                     <div class="aislepilot-day-meal-track" data-day-meal-track>
                                         <section class="aislepilot-day-meal-panel"
                                                  data-day-meal-panel
+                                                 data-results-stage="meal-details"
                                                  role="tabpanel"
                                                  aria-hidden="false">
                                             <div class="aislepilot-card-head aislepilot-card-head-with-title aislepilot-card-head-with-actions">
@@ -1108,7 +1066,7 @@
                                                          title="@dessertDetailsTriggerLabel">
                                                     <div class="aislepilot-meal-image-shell" data-day-meal-swipe-surface>
                                                         <img class="aislepilot-meal-image"
-                                                             src="@fallbackMealImageUrl"
+                                                             src="@fallbackMealImageUrl" srcset="@($"{fallbackMealImageUrl} 512w")" sizes="@mealImageSizes" width="1024" height="1024"
                                                              data-meal-image
                                                              data-meal-name="@result.DessertAddOnName"
                                                              alt="@($"{result.DessertAddOnName} plated dessert")"
@@ -1161,10 +1119,24 @@
                         }
                 </section>
 
-                <section id="aislepilot-shop" aria-label="Shopping" role="tabpanel" aria-labelledby="aislepilot-tab-shop" class="aislepilot-window-panel aislepilot-shop-panel" data-window-name="Shopping">
+                <section id="aislepilot-shop" aria-label="Shopping" role="tabpanel" aria-labelledby="aislepilot-tab-shop" class="aislepilot-window-panel aislepilot-shop-panel" data-window-name="Shopping" data-results-stage="shopping">
                     <p class="aislepilot-window-meta">
                         @mealIngredientEstimateLabel: @result.EstimatedTotalCost.ToString("C", ukCulture). @shoppingEstimateDisclaimer
                     </p>
+                    <p class="aislepilot-shopping-instruction">Tick items you have or have picked up. This does not change the plan estimate.</p>
+                    <div class="aislepilot-shopping-toolbar">
+                        <p class="aislepilot-shopping-progress" data-shopping-progress role="status" aria-live="polite"></p>
+                        <label class="aislepilot-shopping-filter">
+                            <input type="checkbox" data-shopping-hide-checked />
+                            <span data-shopping-filter-label>Hide checked items</span>
+                        </label>
+                        <button type="button" class="aislepilot-shopping-reset" data-shopping-reset>Reset checks</button>
+                        <div class="aislepilot-shopping-reset-confirm" data-shopping-reset-confirm hidden>
+                            <span>Clear all checks from this list?</span>
+                            <button type="button" data-shopping-reset-accept>Reset</button>
+                            <button type="button" data-shopping-reset-cancel>Cancel</button>
+                        </div>
+                    </div>
                     @if (result.IncludeDessertAddOn)
                     {
                         <p class="aislepilot-window-meta">
@@ -1174,10 +1146,10 @@
                     <div class="aislepilot-shopping-grid">
                         @foreach (var department in groupedItems)
                         {
-                            <article class="aislepilot-card aislepilot-shop-card">
+                            <article class="aislepilot-card aislepilot-shop-card" data-shopping-department>
                                 <div class="aislepilot-shop-card-head">
                                     <h3>@department.Key</h3>
-                                    <span class="aislepilot-shop-card-count">@department.Count() item(s)</span>
+                                    <span class="aislepilot-shop-card-count" data-shopping-department-count>@department.Count() item(s)</span>
                                 </div>
                                 <ul class="aislepilot-shop-list">
                                     @foreach (var item in department)
@@ -1189,8 +1161,12 @@
                                                    data-shopping-item-key="@shoppingItemKey">
                                                 <input type="checkbox"
                                                        data-shopping-item-input
-                                                       aria-label="Mark @item.Name as already have this ingredient" />
-                                                <span data-shopping-item-text>@item.Name (@item.QuantityDisplay) - Est. @item.EstimatedCost.ToString("C", ukCulture)</span>
+                                                       aria-label="Mark @item.Name as picked up or already available" />
+                                                <span class="aislepilot-shopping-item-content">
+                                                    <span class="aislepilot-shopping-item-name" data-shopping-item-text>@item.Name</span>
+                                                    <span class="aislepilot-shopping-item-quantity">@item.QuantityDisplay</span>
+                                                    <span class="aislepilot-shopping-item-price">Est. @item.EstimatedCost.ToString("C", ukCulture)</span>
+                                                </span>
                                             </label>
                                         </li>
                                     }
@@ -1221,19 +1197,19 @@
                     </div>
                 </section>
 
-                <section id="aislepilot-export" aria-label="Exports" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel aislepilot-export-panel" data-window-name="Exports">
+                <section id="aislepilot-export" aria-label="Exports" role="tabpanel" aria-labelledby="aislepilot-tab-export" class="aislepilot-window-panel aislepilot-export-panel" data-window-name="Exports" data-results-stage="exports">
                     <div class="aislepilot-export-intro">
                         <p class="aislepilot-export-eyebrow">Take this plan with you</p>
-                        <h3 class="aislepilot-export-title">Start with the shopping list on your phone.</h3>
-                        <p class="aislepilot-export-copy">Share is the quickest option for supermarket trips. Download the PDF when you want the full week, and keep the text checklist as a lightweight backup.</p>
+                        <h3 class="aislepilot-export-title">Share or download your shopping list.</h3>
+                        <p class="aislepilot-export-copy">Share or copy your list into another app. Downloads and printing include the full list, including items currently hidden after being checked.</p>
                     </div>
 
                     <div class="aislepilot-export-actions">
                         <article class="aislepilot-export-action is-primary" data-notes-export-shell>
                             <div class="aislepilot-export-card-copy">
                                 <p class="aislepilot-export-card-kicker">Best for shopping now</p>
-                                <h4 class="aislepilot-export-card-title">Share to your phone</h4>
-                                <p class="aislepilot-export-card-description">Opens the share sheet on supported devices and can fall back to copying the list when sharing is unavailable.</p>
+                                <h4 class="aislepilot-export-card-title">Share shopping list</h4>
+                                <p class="aislepilot-export-card-description">Opens your device share sheet, or copies the list when sharing is unavailable.</p>
                             </div>
                             <textarea hidden data-notes-export-content>@shoppingListNotesText</textarea>
                             <button type="button"
