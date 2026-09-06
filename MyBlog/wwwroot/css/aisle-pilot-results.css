@@ -1311,46 +1311,49 @@
     z-index: 1;
     pointer-events: none;
     background:
-        linear-gradient(
-            110deg,
-            rgba(255, 255, 255, 0) 20%,
-            rgba(255, 255, 255, 0.55) 50%,
-            rgba(255, 255, 255, 0) 80%
-        ),
-        linear-gradient(145deg, rgba(197, 218, 242, 0.55), rgba(231, 242, 255, 0.35));
-    background-size: 240% 100%, 100% 100%;
+        radial-gradient(circle at 50% 42%, transparent 0 2.7rem, rgba(38, 96, 68, 0.16) 2.75rem 2.9rem, transparent 2.95rem),
+        radial-gradient(circle at 50% 42%, rgba(255, 254, 250, 0.82) 0 2.55rem, transparent 2.6rem),
+        linear-gradient(110deg, transparent 24%, rgba(255, 255, 255, 0.58) 48%, transparent 72%),
+        linear-gradient(145deg, #dce9df, #eef1e8);
+    background-size: 100% 100%, 100% 100%, 240% 100%, 100% 100%;
     animation: aislepilot-meal-image-loading 1.15s linear infinite;
 }
 
 .aislepilot-meal-image-shell[data-meal-image-loading="true"]::after {
-    content: "Loading image...";
+    content: "Preparing meal photo";
     position: absolute;
-    left: 0.55rem;
-    bottom: 0.5rem;
+    left: 50%;
+    bottom: 22%;
+    transform: translateX(-50%);
     z-index: 2;
     pointer-events: none;
     padding: 0.14rem 0.4rem;
-    border: 1px solid rgba(16, 63, 101, 0.25);
+    border: 1px solid rgba(38, 96, 68, 0.22);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.88);
+    background: rgba(255, 254, 250, 0.9);
     font-size: 0.7rem;
     line-height: 1.15;
     letter-spacing: 0.02em;
     font-weight: 700;
-    color: rgba(16, 63, 101, 0.9);
+    color: #265f45;
+    white-space: nowrap;
 }
 
 .aislepilot-meal-image-shell[data-meal-image-loading="true"] .aislepilot-meal-image[src*="aislepilot-icon.svg"] {
-    opacity: 0.72;
+    opacity: 0;
+}
+
+.aislepilot-meal-image-shell[data-meal-image-loading="true"] .aislepilot-meal-image-hint {
+    opacity: 0;
 }
 
 @keyframes aislepilot-meal-image-loading {
     0% {
-        background-position: 130% 0, 0 0;
+        background-position: 0 0, 0 0, 130% 0, 0 0;
     }
 
     100% {
-        background-position: -130% 0, 0 0;
+        background-position: 0 0, 0 0, -130% 0, 0 0;
     }
 }
 

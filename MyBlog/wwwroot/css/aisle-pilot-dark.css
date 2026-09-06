@@ -850,19 +850,17 @@
 
 :root[data-theme="dark"] .aislepilot-meal-image-shell[data-meal-image-loading="true"]::before {
     background:
-        linear-gradient(
-            110deg,
-            rgba(255, 255, 255, 0) 20%,
-            rgba(124, 163, 209, 0.32) 50%,
-            rgba(255, 255, 255, 0) 80%
-        ),
-        linear-gradient(145deg, rgba(46, 67, 97, 0.5), rgba(29, 44, 66, 0.44));
+        radial-gradient(circle at 50% 42%, transparent 0 2.7rem, rgba(142, 168, 148, 0.28) 2.75rem 2.9rem, transparent 2.95rem),
+        radial-gradient(circle at 50% 42%, rgba(38, 55, 44, 0.88) 0 2.55rem, transparent 2.6rem),
+        linear-gradient(110deg, transparent 24%, rgba(184, 207, 190, 0.2) 48%, transparent 72%),
+        linear-gradient(145deg, #26372c, #1e2c23);
+    background-size: 100% 100%, 100% 100%, 240% 100%, 100% 100%;
 }
 
 :root[data-theme="dark"] .aislepilot-meal-image-shell[data-meal-image-loading="true"]::after {
-    border-color: rgba(124, 163, 209, 0.35);
-    background: rgba(12, 20, 32, 0.84);
-    color: #d8ebff;
+    border-color: rgba(142, 168, 148, 0.34);
+    background: rgba(23, 34, 28, 0.9);
+    color: #f0f2e9;
 }
 
 :root[data-theme="dark"] .aislepilot-alert-shell {

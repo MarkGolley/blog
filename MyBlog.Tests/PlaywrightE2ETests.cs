@@ -429,6 +429,13 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             Timeout = 10000
         });
         Assert.True(await loadingShell.IsVisibleAsync());
+        await loadingShell.ScrollIntoViewIfNeededAsync();
+        await WriteAislePilotStateScreenshotAsync(page, "meal-image-loading-mobile-light", fullPage: false);
+        var artifactRoot = Environment.GetEnvironmentVariable("PUBLIC_UI_ARTIFACT_ROOT") ??
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "artifacts", "public-ui"));
+        var stateRoot = Path.Combine(artifactRoot, "aislepilot-states");
+        Directory.CreateDirectory(stateRoot);
+        await loadingShell.ScreenshotAsync(new() { Path = Path.Combine(stateRoot, "meal-image-loader-mobile-light.png") });
     }
 
     [Fact]

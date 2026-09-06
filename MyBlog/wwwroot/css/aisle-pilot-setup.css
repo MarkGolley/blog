@@ -699,24 +699,31 @@ fieldset.aislepilot-core-choice {
 
 .aislepilot-slider-track-line {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
     align-items: center;
-    gap: 0.24rem;
+    row-gap: 0.32rem;
 }
 
 .aislepilot-slider-track-line .aislepilot-slider-boundary {
-    min-width: 1.08rem;
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
 }
 
 .aislepilot-slider-track-line .aislepilot-slider-boundary:first-child {
-    text-align: right;
-}
-
-.aislepilot-slider-track-line .aislepilot-slider-boundary:last-child {
+    justify-self: start;
     text-align: left;
 }
 
+.aislepilot-slider-track-line .aislepilot-slider-boundary:last-child {
+    justify-self: end;
+    text-align: right;
+}
+
 .aislepilot-slider-track-line .aislepilot-slider-input {
+    grid-column: 1;
+    grid-row: 1;
     width: 100%;
     min-width: 0;
 }

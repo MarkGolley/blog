@@ -2,7 +2,7 @@
     const createController = options => {
         const config = options && typeof options === "object" ? options : {};
         const documentRef = config.documentRef instanceof Document ? config.documentRef : document;
-        const pollIntervalMs = Number.isInteger(config.intervalMs) ? config.intervalMs : 5000;
+        const pollIntervalMs = Number.isInteger(config.intervalMs) ? config.intervalMs : 3000;
         const pollMaxAttempts = Number.isInteger(config.maxAttempts) ? config.maxAttempts : 48;
         const fastFollowupPollIntervalMs = 750;
         const mediumFollowupPollIntervalMs = 1500;
