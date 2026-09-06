@@ -20,6 +20,18 @@
     <div class="case-template-grid">
         <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
         {
+            Title = "WordGarden (Vocabulary + Memory)",
+            Status = "Working build",
+            OneLiner = "Grow a personal vocabulary with short reviews and a word-and-meaning matching game.",
+            WhyItMatters = "Turns words you encounter into a collection you can revisit and remember.",
+            TechnicalScope = new[] { "Flashcards with spaced review dates.", "Personal words, examples, and memory cues.", "Browser storage with portable JSON backups." },
+            WhatItShows = "A lightweight learning tool built into the blog, with no account required.",
+            CtaText = "Open WordGarden",
+            CtaController = "WordGarden",
+            CtaAction = "Index"
+        }' />
+        <partial name="_CaseStudyTemplate" model='new CaseStudyTemplateViewModel
+        {
             Title = "AislePilot (Meal Planning + Shopping Flow)",
             Status = aislePilotStatus,
             OneLiner = "Turn weekly meal planning into an aisle-ordered shopping flow tailored to each supermarket.",

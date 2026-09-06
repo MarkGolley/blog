@@ -355,6 +355,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains(".aislepilot-day-card-reorder-handle", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("display: none !important;", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("scroll-snap-type: x mandatory;", css, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("touch-action: pan-x pan-y pinch-zoom;", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("--ap-day-card-slide-width: min(100%, 33rem);", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("--ap-day-card-ghost-width: clamp(6.75rem, 13vw, 9.25rem);", css, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("--ap-day-carousel-stage-inset-inline: 1.2rem;", css, StringComparison.OrdinalIgnoreCase);
@@ -491,7 +492,8 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.DoesNotContain("data-day-view-toggle", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const setDropTargetIndicator = (targetCard, dropPosition) => {", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const swapCardMealPayloads = (firstCard, secondCard) => {", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("button.dataset.dayReorderMove === \"earlier\"?\"ArrowUp\":\"ArrowDown\"", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const moveDayMenu = (card, target) => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("moveDayMenu(card, button.dataset.dayReorderMove === \"earlier\" ? \"earlier\" : \"later\");", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("if (shouldEnable && !isDayStackedMode)", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("carousel.classList.toggle(\"is-day-reorder-dragging\", isDragging);", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Drop to swap with", script, StringComparison.OrdinalIgnoreCase);

@@ -122,7 +122,7 @@ public partial class AislePilotIntegrationTests
         Assert.Contains("\"dayCardHasSpecialTreat\"", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("const firstMealList = firstCard.querySelector(\"[data-day-reorder-meal-list]\");", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("firstMealList.innerHTML = secondMealList.innerHTML;", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("moved = swapCardMealPayloads(card, cards[currentIndex - 1]);", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("!swapCardMealPayloads(card, cards[targetIndex])", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("hasMoved = swapCardMealPayloads(activeCard, activeDropTargetCard);", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("const firstSummary = firstCard.querySelector(\"[data-day-card-summary]\");", script, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("const swapCards = (firstCard, secondCard) => {", script, StringComparison.OrdinalIgnoreCase);

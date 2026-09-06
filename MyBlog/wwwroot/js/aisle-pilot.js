@@ -3626,6 +3626,60 @@
                 return true;
             };
 
+            const submitDayReorder = card => {
+                const dayName = getCardDayName(card);
+                setReorderStatus(dayName.length > 0
+                    ? `${dayName} swapped. Saving day order...`
+                    : "Days swapped. Saving day order...");
+                pulseMovedCard(card);
+                if (!syncDayReorderFormState(form)) {
+                    return;
+                }
+
+                try {
+                    sessionStorage.setItem(dayReorderModeStorageKey, "true");
+                } catch {
+                    // Ignore storage failures in private modes.
+                }
+                persistSwapScrollPosition(form);
+                form.requestSubmit();
+            };
+
+            const moveDayMenu = (card, target) => {
+                if (!(card instanceof HTMLElement)
+                    || form.dataset.ajaxSwapSubmitting === "true"
+                    || !isReorderModeEnabled()) {
+                    return false;
+                }
+
+                const cards = getReorderableDayCards(root);
+                const currentIndex = cards.indexOf(card);
+                if (currentIndex < 0) {
+                    return false;
+                }
+
+                let targetIndex = currentIndex;
+                if (target === "earlier") {
+                    targetIndex = currentIndex - 1;
+                } else if (target === "later") {
+                    targetIndex = currentIndex + 1;
+                } else if (target === "first") {
+                    targetIndex = 0;
+                } else if (target === "last") {
+                    targetIndex = cards.length - 1;
+                }
+
+                if (targetIndex < 0
+                    || targetIndex >= cards.length
+                    || targetIndex === currentIndex
+                    || !swapCardMealPayloads(card, cards[targetIndex])) {
+                    return false;
+                }
+
+                submitDayReorder(card);
+                return true;
+            };
+
             const clearActivationTimer = () => {
                 if (typeof activationTimerId === "number") {
                     window.clearTimeout(activationTimerId);
@@ -3753,53 +3807,26 @@
                 });
 
                 handle.addEventListener("keydown", event => {
-                    if (form.dataset.ajaxSwapSubmitting === "true" || !isReorderModeEnabled()) {
-                        return;
-                    }
-
                     const card = handle.closest("[data-day-meal-card][data-day-card-meal-names]");
                     if (!(card instanceof HTMLElement)) {
                         return;
                     }
 
-                    const cards = getReorderableDayCards(root);
-                    const currentIndex = cards.indexOf(card);
-                    if (currentIndex < 0) {
-                        return;
-                    }
-
-                    let moved = false;
-                    if (event.key === "ArrowUp" && currentIndex > 0) {
-                        moved = swapCardMealPayloads(card, cards[currentIndex - 1]);
-                    } else if (event.key === "ArrowDown" && currentIndex < cards.length - 1) {
-                        moved = swapCardMealPayloads(card, cards[currentIndex + 1]);
-                    } else if (event.key === "Home" && currentIndex > 0) {
-                        moved = swapCardMealPayloads(card, cards[0]);
-                    } else if (event.key === "End" && currentIndex < cards.length - 1) {
-                        moved = swapCardMealPayloads(card, cards[cards.length - 1]);
-                    }
-
-                    if (!moved) {
+                    const target = event.key === "ArrowUp"
+                        ? "earlier"
+                        : event.key === "ArrowDown"
+                            ? "later"
+                            : event.key === "Home"
+                                ? "first"
+                                : event.key === "End"
+                                    ? "last"
+                                    : "";
+                    if (target.length === 0) {
                         return;
                     }
 
                     event.preventDefault();
-                    const dayName = getCardDayName(card);
-                    setReorderStatus(dayName.length > 0
-                        ? `${dayName} swapped. Saving day order...`
-                        : "Days swapped. Saving day order...");
-                    pulseMovedCard(card);
-                    if (!syncDayReorderFormState(form)) {
-                        return;
-                    }
-
-                    try {
-                        sessionStorage.setItem(dayReorderModeStorageKey, "true");
-                    } catch {
-                        // Ignore storage failures in private modes.
-                    }
-                    persistSwapScrollPosition(form);
-                    form.requestSubmit();
+                    moveDayMenu(card, target);
                 });
 
                 handle.addEventListener("pointerdown", event => {
@@ -3909,9 +3936,12 @@
                 });
             });
 
-            root.querySelectorAll("[data-day-reorder-move]").forEach(button => button.addEventListener("click", () =>
-                button.closest("article")?.querySelector("[data-day-reorder-handle]")?.dispatchEvent(
-                    new KeyboardEvent("keydown",{key:button.dataset.dayReorderMove === "earlier"?"ArrowUp":"ArrowDown"}))));
+            root.querySelectorAll("[data-day-reorder-move]").forEach(button => button.addEventListener("click", event => {
+                event.preventDefault();
+                event.stopPropagation();
+                const card = button.closest("[data-day-meal-card][data-day-card-meal-names]");
+                moveDayMenu(card, button.dataset.dayReorderMove === "earlier" ? "earlier" : "later");
+            }));
         });
     };
 

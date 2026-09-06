@@ -1,0 +1,59 @@
+@{
+    ViewData["Title"] = "WordGarden — Vocabulary & Memory";
+    ViewData["MetaDescription"] = "Grow your vocabulary with flashcards, spaced reviews, and a word matching game. Add your own words and keep your progress in your browser.";
+    ViewData["CanonicalPath"] = "/projects/word-garden";
+}
+@section Head {
+    <link rel="stylesheet" href="~/css/word-garden.css" asp-append-version="true" />
+}
+<div class="wg" id="word-garden">
+    <header class="wg-heading">
+        <div><a href="/projects" class="wg-back">← All projects</a><p class="wg-eyebrow">A little practice. A lasting vocabulary.</p>
+        <h1>WordGarden<span aria-hidden="true">.</span></h1><p>Discover a word. Make a connection. Come back and remember.</p></div>
+        <div class="wg-mark" aria-hidden="true">W<span>G</span></div>
+    </header>
+    <noscript><p>This app needs JavaScript to run flashcards and save your progress. Please enable it and reload.</p></noscript>
+    <p id="wg-storage" role="status" hidden></p>
+    <div class="wg-stats" aria-label="Your progress">
+        <div><strong id="wg-due">0</strong><span>ready to review</span></div>
+        <div><strong id="wg-total">0</strong><span>words in your garden</span></div>
+        <div><strong id="wg-learned">0</strong><span>on longer intervals</span></div>
+    </div>
+    <nav class="wg-tabs" aria-label="Practice modes">
+        <button type="button" data-mode="review" aria-pressed="true">Daily review</button>
+        <button type="button" data-mode="match" aria-pressed="false">Memory match</button>
+        <button type="button" data-mode="library" aria-pressed="false">My words</button>
+    </nav>
+    <section id="wg-review" aria-labelledby="wg-review-title">
+        <div class="wg-section-head"><div><p class="wg-eyebrow">RECALL BEFORE YOU REVEAL</p><h2 id="wg-review-title">Give your memory a moment.</h2></div><span id="wg-session"></span></div>
+        <div class="wg-study-layout">
+            <div class="wg-card" id="wg-card">
+                <p class="wg-eyebrow" id="wg-card-label">YOUR NEXT WORD</p><h3 id="wg-word"></h3>
+                <p id="wg-prompt">Say the meaning to yourself, then turn the card over.</p>
+                <div id="wg-answer" hidden><p id="wg-meaning"></p><blockquote id="wg-example"></blockquote><p id="wg-memory"></p></div>
+                <button type="button" id="wg-reveal" class="wg-primary">Reveal meaning</button>
+                <div id="wg-ratings" class="wg-actions" hidden><button type="button" data-rating="again">Again <small>1 minute</small></button><button type="button" data-rating="good">Remembered <small id="wg-good-time">1 day</small></button><button type="button" data-rating="easy">Easy <small id="wg-easy-time">3 days</small></button></div>
+            </div>
+            <aside class="wg-note"><span class="wg-note-number">01 / THE HABIT</span><h3>Small sessions.<br />Stronger connections.</h3><p>Try to retrieve the meaning before revealing it. Be honest about what you remembered.</p><hr /><p>Words you remember return later. Tricky words return sooner.</p><p class="wg-muted">Your collection and review dates stay in this browser. Export a backup from My words to keep them safe.</p></aside>
+        </div>
+    </section>
+    <section id="wg-match" aria-labelledby="wg-match-title" hidden>
+        <div class="wg-section-head"><div><p class="wg-eyebrow">CONNECT WORDS & MEANINGS</p><h2 id="wg-match-title">Find the matching pairs.</h2><p>Select a word and its meaning, in either order.</p></div><button type="button" id="wg-new-game">New round</button></div>
+        <p id="wg-match-status" role="status"></p><div id="wg-board" class="wg-board"></div>
+        <p class="wg-muted">A playful extra practice. Matching does not change your review schedule.</p>
+    </section>
+    <section id="wg-library" aria-labelledby="wg-library-title" hidden>
+        <div class="wg-section-head"><div><p class="wg-eyebrow">MAKE IT PERSONAL</p><h2 id="wg-library-title">Your growing collection.</h2></div><div class="wg-actions"><button type="button" id="wg-export">Export backup</button><label class="wg-file">Import backup<input type="file" id="wg-import" accept="application/json,.json" /></label></div></div>
+        <div class="wg-library-layout"><form id="wg-add" class="wg-note">
+            <h3>Add a word</h3><label for="wg-term">Word or phrase</label><input id="wg-term" required maxlength="100" autocomplete="off" />
+            <label for="wg-definition">Meaning</label><textarea id="wg-definition" required maxlength="500" rows="3"></textarea>
+            <label for="wg-sentence">Example <span>(optional)</span></label><textarea id="wg-sentence" maxlength="500" rows="2"></textarea>
+            <label for="wg-hint">Memory cue <span>(optional)</span></label><input id="wg-hint" maxlength="300" />
+            <button class="wg-primary" type="submit">Plant a word</button>
+        </form><div><label for="wg-search">Search your words</label><input id="wg-search" type="search" placeholder="Word or meaning…" /><div id="wg-word-list"></div></div></div>
+    </section>
+    <p id="wg-message" role="status" aria-live="polite"></p>
+</div>
+@section Scripts {
+    <script type="module" src="~/js/word-garden.js" asp-append-version="true"></script>
+}
