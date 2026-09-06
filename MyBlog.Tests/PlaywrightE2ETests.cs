@@ -514,12 +514,19 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     }));
 
                 const originalFetch = window.fetch.bind(window);
-                let fetchCalled = false;
+                let cachedMealRequested = false;
                 window.fetch = (...args) => {
-                    fetchCalled = true;
+                    const requestUrl = typeof args[0] === "string" ? args[0] : args[0]?.url ?? "";
+                    try {
+                        const request = new URL(requestUrl, window.location.origin);
+                        cachedMealRequested ||= request.searchParams.getAll("mealNames")
+                            .some(value => value.trim().toLowerCase() === mealKey);
+                    } catch {
+                        // Ignore unrelated requests that are not URLs.
+                    }
                     return originalFetch(...args);
                 };
-                window.__aislePilotFetchCalled = () => fetchCalled;
+                window.__aislePilotFetchCalled = () => cachedMealRequested;
 
                 const controller = window.AislePilotMealImagePolling?.createController({
                     documentRef: document,
@@ -690,91 +697,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.False(await methodSection.EvaluateAsync<bool>("details => details.open"));
     }
 
-    [Fact]
-    public async Task Mobile_AislePilotCarouselSections_CollapseAfterReturningFromStackedView()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
 
-        await using var context = await CreateMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var viewToggle = page.Locator("[data-day-view-toggle]").First;
-        await viewToggle.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var stackedModeEnabled = await page.EvaluateAsync<bool>(
-            """
-            () => {
-                const carousel = document.querySelector("[data-day-card-carousel]");
-                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
-            }
-            """);
-
-        if (!stackedModeEnabled)
-        {
-            await viewToggle.ClickAsync();
-        }
-
-        await page.WaitForFunctionAsync(
-            """
-            () => {
-                const carousel = document.querySelector("[data-day-card-carousel]");
-                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
-            }
-            """,
-            null,
-            new PageWaitForFunctionOptions { Timeout = 10000 });
-
-        await viewToggle.ClickAsync();
-        await page.WaitForFunctionAsync(
-            """
-            () => {
-                const carousel = document.querySelector("[data-day-card-carousel]");
-                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode !== "true";
-            }
-            """,
-            null,
-            new PageWaitForFunctionOptions { Timeout = 10000 });
-
-        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
-        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var viewSummaryButton = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
-        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
-        await viewSummaryButton.ScrollIntoViewIfNeededAsync();
-        await viewSummaryButton.ClickAsync();
-        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var nutritionSection = activeMealPanel.Locator("[data-meal-section='nutrition']").First;
-        var ingredientsSection = activeMealPanel.Locator("[data-meal-section='ingredients']").First;
-        var methodSection = activeMealPanel.Locator("[data-meal-section='method']").First;
-        var nutritionContent = nutritionSection.Locator("[data-meal-section-content]").First;
-        var ingredientsContent = ingredientsSection.Locator("[data-meal-section-content]").First;
-        var methodContent = methodSection.Locator("[data-meal-section-content]").First;
-
-        Assert.False(await nutritionSection.EvaluateAsync<bool>("details => details.open"));
-        Assert.False(await ingredientsSection.EvaluateAsync<bool>("details => details.open"));
-        Assert.False(await methodSection.EvaluateAsync<bool>("details => details.open"));
-        Assert.False(await nutritionContent.IsVisibleAsync());
-        Assert.False(await ingredientsContent.IsVisibleAsync());
-        Assert.False(await methodContent.IsVisibleAsync());
-    }
 
     [Fact]
     public async Task Mobile_AislePilotMoreActions_OpensWithoutViewingDetails()
@@ -807,8 +730,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
         var moreActionsHost = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions]").First;
         var moreActionsSummary = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        var moreActionsButton = activeMealCard.Locator(
-            "[data-card-more-actions] .aislepilot-card-more-actions-menu button[type='submit']").First;
+        var moreActionsButton = page.Locator(
+            "[data-card-more-actions-panel].is-mobile-sheet button[type='submit']:visible").First;
 
         await moreActionsSummary.ScrollIntoViewIfNeededAsync();
 
@@ -863,7 +786,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         var activeMealCard = page.Locator("[data-day-meal-card]:has(.aislepilot-day-meal-panel[aria-hidden='false'])").First;
         var moreActionsSummary = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        var moreActionsMenu = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] .aislepilot-card-more-actions-menu").First;
+        var moreActionsMenu = page.Locator("[data-card-more-actions-panel].is-mobile-sheet").First;
 
         await moreActionsSummary.ScrollIntoViewIfNeededAsync();
         await moreActionsSummary.EvaluateAsync(
@@ -884,11 +807,12 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             State = WaitForSelectorState.Visible,
             Timeout = 10000
         });
+        await page.WaitForTimeoutAsync(500);
 
         var viewportOverflow = await page.EvaluateAsync<double>(
             """
             () => {
-                const menu = document.querySelector("[data-card-more-actions][open] .aislepilot-card-more-actions-menu");
+                const menu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
                 if (!(menu instanceof HTMLElement)) {
                     return Number.POSITIVE_INFINITY;
                 }
@@ -897,8 +821,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const padding = 6;
                 const overflowLeft = Math.max(0, padding - rect.left);
                 const overflowRight = Math.max(0, rect.right - (window.innerWidth - padding));
-                const overflowTop = Math.max(0, padding - rect.top);
-                const overflowBottom = Math.max(0, rect.bottom - (window.innerHeight - padding));
+                const overflowTop = Math.max(0, -rect.top);
+                const overflowBottom = Math.max(0, rect.bottom - window.innerHeight);
                 return Math.max(overflowLeft, overflowRight, overflowTop, overflowBottom);
             }
             """);
@@ -907,30 +831,22 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             viewportOverflow <= 1.5,
             $"Expected More actions menu to stay inside viewport bounds. Overflow={viewportOverflow}px.");
 
-        var opensDownwardNearTop = await page.EvaluateAsync<bool>(
+        var sheetIsDockedToViewportBottom = await page.EvaluateAsync<bool>(
             """
             () => {
-                const summary = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] > summary");
-                const menu = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open] .aislepilot-card-more-actions-menu");
-                if (!(summary instanceof HTMLElement) || !(menu instanceof HTMLElement)) {
+                const menu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
+                if (!(menu instanceof HTMLElement)) {
                     return false;
                 }
-
-                const summaryRect = summary.getBoundingClientRect();
                 const menuRect = menu.getBoundingClientRect();
-                const triggerIsNearTop = summaryRect.top <= window.innerHeight * 0.55;
-                if (!triggerIsNearTop) {
-                    return true;
-                }
-
-                return menuRect.top >= summaryRect.bottom - 2;
+                return Math.abs(menuRect.bottom - window.innerHeight) <= 1.5;
             }
             """);
-        Assert.True(opensDownwardNearTop, "Expected More actions menu to open downward when trigger is in the upper viewport area.");
+        Assert.True(sheetIsDockedToViewportBottom, "Expected the mobile meal actions sheet to stay docked to the viewport bottom.");
     }
 
     [Fact]
-    public async Task Mobile_AislePilotFirstVisibleDayCardMoreActions_PrefersDropDown()
+    public async Task Mobile_AislePilotFirstVisibleDayCardMoreActions_UsesBottomSheet()
     {
         if (!IsE2EEnabled())
         {
@@ -951,29 +867,35 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
         await firstMoreActionsSummary.ScrollIntoViewIfNeededAsync();
         await firstMoreActionsSummary.ClickAsync();
+        await page.Locator("[data-card-more-actions-panel].is-mobile-sheet").First.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 10000
+        });
+        await page.WaitForTimeoutAsync(500);
 
         var directionMetrics = await page.EvaluateAsync<object[]>(
             """
             () => {
                 const openMenuHost = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open]");
                 const summary = openMenuHost?.querySelector("summary");
-                const menu = openMenuHost?.querySelector(".aislepilot-card-more-actions-menu");
+                const menu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
                 if (!(openMenuHost instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(menu instanceof HTMLElement)) {
                     return [1, Number.POSITIVE_INFINITY];
                 }
 
                 const summaryRect = summary.getBoundingClientRect();
                 const menuRect = menu.getBoundingClientRect();
-                const opensUpward = openMenuHost.classList.contains("is-drop-up") || menuRect.bottom <= summaryRect.top + 2;
-                return [opensUpward ? 1 : 0, summaryRect.top];
+                const usesMobileSheet = menu.classList.contains("is-mobile-sheet");
+                return [usesMobileSheet ? 1 : 0, Math.abs(menuRect.bottom - window.innerHeight)];
             }
             """);
 
         Assert.Equal(2, directionMetrics.Length);
-        Assert.Equal(0, Convert.ToInt32(directionMetrics[0]));
+        Assert.Equal(1, Convert.ToInt32(directionMetrics[0]));
         Assert.True(
-            Convert.ToDouble(directionMetrics[1]) < 620,
-            $"Expected first visible More actions trigger to remain in the upper viewport region. Top={directionMetrics[1]}.");
+            Convert.ToDouble(directionMetrics[1]) <= 1.5,
+            $"Expected the meal actions sheet to dock to the viewport bottom. Delta={directionMetrics[1]}.");
     }
 
     private static bool IsE2EEnabled()

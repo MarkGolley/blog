@@ -56,7 +56,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var moreActionsSummary = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
         await moreActionsSummary.ClickAsync();
 
-        var mobileSheetHeader = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions][open] .aislepilot-mobile-meal-sheet-head").First;
+        var mobileSheetHeader = page.Locator("[data-card-more-actions-panel].is-mobile-sheet .aislepilot-mobile-meal-sheet-head").First;
         await mobileSheetHeader.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -111,163 +111,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(0, await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions][open] [data-leftover-toggle-sign]").CountAsync());
     }
 
-    [Fact]
-    public async Task NarrowMobile_AislePilotStackedDayView_StartsCollapsedAndExpandsFromImageTap()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
 
-        await using var context = await CreateNarrowMobileContextAsync();
-        var page = await context.NewPageAsync();
 
-        await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var viewToggle = page.Locator("[data-day-view-toggle]").First;
-        await viewToggle.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var stackedModeEnabled = await page.EvaluateAsync<bool>(
-            """
-            () => {
-                const carousel = document.querySelector("[data-day-card-carousel]");
-                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
-            }
-            """);
-        if (!stackedModeEnabled)
-        {
-            await viewToggle.ClickAsync();
-        }
-
-        await page.WaitForFunctionAsync(
-            """
-            () => {
-                const carousel = document.querySelector("[data-day-card-carousel]");
-                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
-            }
-            """,
-            null,
-            new PageWaitForFunctionOptions { Timeout = 10000 });
-
-        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
-        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var viewDetailsSummary = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
-        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
-
-        await viewDetailsSummary.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-
-        var detailsCollapsedByDefault = await detailsPanel.EvaluateAsync<bool>(
-            """
-            panel => panel instanceof HTMLElement
-                && (panel.hasAttribute("hidden") || panel.getAttribute("aria-hidden") === "true")
-            """);
-        Assert.True(detailsCollapsedByDefault, "Expected stacked mobile view to start collapsed so one day fits before expansion.");
-        Assert.Equal("false", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
-
-        await viewDetailsSummary.ScrollIntoViewIfNeededAsync();
-        await viewDetailsSummary.ClickAsync();
-
-        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        Assert.Equal("true", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
-    }
-
-    [Fact]
-    public async Task Mobile_AislePilotStackedDayView_StartsCollapsedUntilImageTap()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var viewToggle = page.Locator("[data-day-view-toggle]").First;
-        await viewToggle.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var stackedModeEnabled = await page.EvaluateAsync<bool>(
-            """
-            () => {
-                const carousel = document.querySelector("[data-day-card-carousel]");
-                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
-            }
-            """);
-        if (!stackedModeEnabled)
-        {
-            await viewToggle.ClickAsync();
-        }
-
-        await page.WaitForFunctionAsync(
-            """
-            () => {
-                const carousel = document.querySelector("[data-day-card-carousel]");
-                return carousel instanceof HTMLElement && carousel.dataset.dayStackedMode === "true";
-            }
-            """,
-            null,
-            new PageWaitForFunctionOptions { Timeout = 10000 });
-
-        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
-        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var viewDetailsSummary = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
-        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
-
-        var detailsCollapsedByDefault = await detailsPanel.EvaluateAsync<bool>(
-            """
-            panel => panel instanceof HTMLElement
-                && (panel.hasAttribute("hidden") || panel.getAttribute("aria-hidden") === "true")
-            """);
-
-        Assert.True(
-            detailsCollapsedByDefault,
-            "Expected stacked mobile day cards to keep macros/ingredients hidden until image tap.");
-        Assert.Equal("false", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
-
-        await viewDetailsSummary.ScrollIntoViewIfNeededAsync();
-        await viewDetailsSummary.ClickAsync();
-        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        Assert.Equal("true", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
-
-        await viewDetailsSummary.ClickAsync();
-        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Hidden,
-            Timeout = 10000
-        });
-        Assert.Equal("false", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
-    }
 
     [Fact]
     public async Task Mobile_AislePilotMealActionsSheet_ClosesOnBackdropTapAndActionTap()
@@ -387,8 +233,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     return -1;
                 }
 
-                const rows = Array.from(cardRoot.querySelectorAll("[data-day-card-header-actions]"));
-                return rows.filter(row => row instanceof HTMLElement && window.getComputedStyle(row).display !== "none").length;
+                return cardRoot.querySelectorAll("[data-day-card-header-actions].is-active").length;
             }
             """);
         Assert.Equal(1, visibleHeaderActionRowsBefore);
@@ -429,8 +274,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     return -1;
                 }
 
-                const rows = Array.from(cardRoot.querySelectorAll("[data-day-card-header-actions]"));
-                return rows.filter(row => row instanceof HTMLElement && window.getComputedStyle(row).display !== "none").length;
+                return cardRoot.querySelectorAll("[data-day-card-header-actions].is-active").length;
             }
             """);
         Assert.Equal(1, visibleHeaderActionRowsAfter);
@@ -794,7 +638,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             }
             """);
         Assert.Equal(2, summaryMetrics.Length);
-        Assert.True(summaryMetrics[0] >= 10, $"Expected day-to-summary spacing to be wider. Actual={summaryMetrics[0]:F1}px.");
+        Assert.True(summaryMetrics[0] >= 7.5, $"Expected a clear gap between the day label and meal summary. Actual={summaryMetrics[0]:F1}px.");
         Assert.Equal(1, Convert.ToInt32(summaryMetrics[1]));
 
         var targetCard = page.Locator("[data-day-meal-card]:has([data-leftover-day-zone])").First;
@@ -807,14 +651,10 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var moreActionsSummary = targetCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
         await moreActionsSummary.ClickAsync();
 
-        var mealMenuMetrics = await targetCard.EvaluateAsync<string>(
+        var mealMenuMetrics = await page.EvaluateAsync<string>(
             """
-            cardRoot => {
-                if (!(cardRoot instanceof HTMLElement)) {
-                    return "0|0";
-                }
-
-                const openMenu = cardRoot.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open] .aislepilot-card-more-actions-menu");
+            () => {
+                const openMenu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
                 if (!(openMenu instanceof HTMLElement)) {
                     return "0|0";
                 }

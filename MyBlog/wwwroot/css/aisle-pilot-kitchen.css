@@ -121,6 +121,7 @@ border-color: var(--ap-refresh-primary);
 .aislepilot-app .aislepilot-setup-mode-toggle-detail { display: none; }
 .aislepilot-app .aislepilot-setup-mode-toggle-title { font-size: 1rem; }
 .aislepilot-app .aislepilot-setup-mode-toggle-note { font-weight: 400; }
+.aislepilot-app .aislepilot-outcome-summary .aislepilot-outcome-kicker { color: var(--ap-refresh-accent); }
 .aislepilot-app .aislepilot-setup-mode-toggle-icon { border: 0; border-radius: 8px; }
 .aislepilot-app .aislepilot-setup-workspace { gap: 1.75rem; margin-top: 0.75rem; }
 .aislepilot-app .aislepilot-setup-step {

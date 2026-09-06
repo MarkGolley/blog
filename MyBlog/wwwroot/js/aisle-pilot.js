@@ -209,7 +209,6 @@
     const panels = Array.from(root.querySelectorAll(".aislepilot-window-panel"));
     const tabHint = root.querySelector("[data-window-hint]");
     const tabHintSeenStorageKey = "aislepilot:tab-hint-seen";
-    const dayStackedModeStorageKey = "aislepilot:day-stacked-mode";
     const dayReorderModeStorageKey = "aislepilot:day-reorder-mode";
     const shoppingItemStateStorageKey = "aislepilot:shopping-item-state";
     const customShoppingItemsStorageKey = "aislepilot:custom-shopping-items";
@@ -3931,10 +3930,6 @@
             const status = carousel.querySelector("[data-day-carousel-status]");
             const pagination = carousel.querySelector("[data-day-carousel-pagination]");
             const dots = Array.from(carousel.querySelectorAll("[data-day-carousel-dot]"));
-            const viewToggle = carousel.querySelector("[data-day-view-toggle]");
-            const viewToggleLabel = viewToggle instanceof HTMLButtonElement
-                ? viewToggle.querySelector("[data-day-view-toggle-label]")
-                : null;
             const reorderToggle = carousel.querySelector("[data-day-reorder-toggle]");
             const reorderToggleLabel = reorderToggle instanceof HTMLButtonElement
                 ? reorderToggle.querySelector("[data-day-reorder-toggle-label]")
@@ -3949,58 +3944,27 @@
             let motionTimer = 0;
             let scrollSettleTimer = 0;
             let suppressScrollChromeSync = false;
-            let isDayStackedMode = false;
             let isDayReorderMode = false;
             let reorderModeStartActiveIndex = 0;
             const prefersReducedMotion = typeof window.matchMedia === "function"
                 && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-            const defaultViewToggleLabel = viewToggle instanceof HTMLButtonElement
-                ? (viewToggle.dataset.dayViewDefaultLabel ?? "Stacked view").trim()
-                : "Stacked view";
-            const activeViewToggleLabel = viewToggle instanceof HTMLButtonElement
-                ? (viewToggle.dataset.dayViewActiveLabel ?? "Carousel view").trim()
-                : "Carousel view";
             const defaultReorderToggleLabel = reorderToggle instanceof HTMLButtonElement
                 ? (reorderToggle.dataset.dayReorderDefaultLabel ?? "Swap days").trim()
                 : "Swap days";
             const activeReorderToggleLabel = reorderToggle instanceof HTMLButtonElement
                 ? (reorderToggle.dataset.dayReorderActiveLabel ?? "Done").trim()
                 : "Done";
-            const stackedModeStatusLabel = (carousel.dataset.dayStackedStatus ?? "").trim().length > 0
-                ? (carousel.dataset.dayStackedStatus ?? "").trim()
-                : "Stacked view: all days visible.";
             const reorderModeStatusLabel = (carousel.dataset.dayReorderStatus ?? "").trim().length > 0
                 ? (carousel.dataset.dayReorderStatus ?? "").trim()
                 : "Reorder mode: drag a day card onto another day to swap days.";
 
-            const isStackedPresentationMode = () => isDayStackedMode || isDayReorderMode;
-
-            const readPersistedDayStackedMode = () => {
-                try {
-                    return sessionStorage.getItem(dayStackedModeStorageKey) === "true";
-                } catch {
-                    return false;
-                }
-            };
+            const isStackedPresentationMode = () => isDayReorderMode;
 
             const readPersistedDayReorderMode = () => {
                 try {
                     return sessionStorage.getItem(dayReorderModeStorageKey) === "true";
                 } catch {
                     return false;
-                }
-            };
-
-            const persistDayStackedMode = isEnabled => {
-                try {
-                    if (isEnabled) {
-                        sessionStorage.setItem(dayStackedModeStorageKey, "true");
-                        return;
-                    }
-
-                    sessionStorage.removeItem(dayStackedModeStorageKey);
-                } catch {
-                    // Ignore storage failures in private modes.
                 }
             };
 
@@ -4014,22 +3978,6 @@
                     sessionStorage.removeItem(dayReorderModeStorageKey);
                 } catch {
                     // Ignore storage failures in private modes.
-                }
-            };
-
-            const syncViewToggleState = () => {
-                if (!(viewToggle instanceof HTMLButtonElement)) {
-                    return;
-                }
-
-                const nextLabel = isDayStackedMode ? activeViewToggleLabel : defaultViewToggleLabel;
-                viewToggle.setAttribute("aria-pressed", isDayStackedMode ? "true" : "false");
-                viewToggle.setAttribute("aria-label", nextLabel);
-                viewToggle.setAttribute("title", nextLabel);
-                if (viewToggleLabel instanceof HTMLElement) {
-                    viewToggleLabel.textContent = nextLabel;
-                } else {
-                    viewToggle.textContent = nextLabel;
                 }
             };
 
@@ -4237,9 +4185,7 @@
                     });
 
                     if (status instanceof HTMLElement) {
-                        status.textContent = isDayReorderMode
-                            ? reorderModeStatusLabel
-                            : stackedModeStatusLabel;
+                        status.textContent = reorderModeStatusLabel;
                     }
 
                     return;
@@ -4573,8 +4519,6 @@
                 suppressScrollChromeSync = false;
                 const isStacked = isStackedPresentationMode();
                 carousel.classList.toggle("is-day-reorder-mode", isStacked);
-                carousel.classList.toggle("is-day-stacked-mode", isDayStackedMode);
-                carousel.dataset.dayStackedMode = isDayStackedMode ? "true" : "false";
                 carousel.dataset.dayReorderMode = isDayReorderMode ? "true" : "false";
                 setElementHidden(pagination, isStacked);
                 if (isStacked) {
@@ -4601,34 +4545,7 @@
                     scrollToIndex(clampIndex(restoredIndex), options.behavior === "smooth" ? "smooth" : "auto");
                 }
 
-                syncViewToggleState();
                 syncReorderToggleState();
-            };
-
-            const setDayStackedMode = (nextValue, options = {}) => {
-                const slides = getSlides();
-                const shouldEnable = nextValue === true && slides.length > 1;
-                if (shouldEnable === isDayStackedMode && options.force !== true) {
-                    syncViewToggleState();
-                    return;
-                }
-
-                const wasDayStackedModeEnabled = isDayStackedMode;
-                if (shouldEnable && wasDayStackedModeEnabled !== true) {
-                    resetRememberedDayMealExpandedState(carousel);
-                }
-
-                isDayStackedMode = shouldEnable;
-                persistDayStackedMode(isDayStackedMode);
-                if (!isDayStackedMode && isDayReorderMode) {
-                    isDayReorderMode = false;
-                    persistDayReorderMode(false);
-                }
-
-                applyDayViewModes(options);
-                if (options.focusToggle === true && viewToggle instanceof HTMLButtonElement) {
-                    viewToggle.focus({ preventScroll: true });
-                }
             };
 
             const setDayReorderMode = (nextValue, options = {}) => {
@@ -4647,14 +4564,6 @@
                 }
             };
 
-            if (viewToggle instanceof HTMLButtonElement) {
-                viewToggle.addEventListener("click", () => {
-                    setDayStackedMode(!isDayStackedMode, { focusToggle: true });
-                });
-            } else {
-                persistDayStackedMode(false);
-            }
-
             if (reorderToggle instanceof HTMLButtonElement) {
                 reorderToggle.addEventListener("click", () => {
                     setDayReorderMode(!isDayReorderMode, { focusToggle: true });
@@ -4671,12 +4580,6 @@
                 if (isDayReorderMode) {
                     event.preventDefault();
                     setDayReorderMode(false, { focusToggle: true });
-                    return;
-                }
-
-                if (isDayStackedMode) {
-                    event.preventDefault();
-                    setDayStackedMode(false, { focusToggle: true });
                 }
             });
 
@@ -4687,15 +4590,7 @@
             const initialActiveIndex = initialSlides.findIndex(slide =>
                 slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
             updateChrome(initialActiveIndex >= 0 ? initialActiveIndex : 0, { forcePaginationSync: true });
-            syncViewToggleState();
             syncReorderToggleState();
-
-            const shouldRestoreStackedMode = readPersistedDayStackedMode();
-            if (viewToggle instanceof HTMLButtonElement && shouldRestoreStackedMode) {
-                setDayStackedMode(true, { force: true });
-            } else if (!isDayStackedMode) {
-                persistDayStackedMode(false);
-            }
 
             if (reorderToggle instanceof HTMLButtonElement && readPersistedDayReorderMode()) {
                 setDayReorderMode(true, { force: true });

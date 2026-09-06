@@ -586,11 +586,13 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const viewportTop = viewport.getBoundingClientRect().top;
                 return [
                     previousSlide.getBoundingClientRect().top - viewportTop,
-                    nextSlide.getBoundingClientRect().top - viewportTop
+                    nextSlide.getBoundingClientRect().top - viewportTop,
+                    previousSlide.getBoundingClientRect().height,
+                    nextSlide.getBoundingClientRect().height
                 ];
             }
             """);
-        Assert.Equal(2, previewTopsBeforeExpand.Length);
+        Assert.Equal(4, previewTopsBeforeExpand.Length);
 
         var pagePositionBeforeExpand = await page.EvaluateAsync<double[]>(
             """
@@ -724,7 +726,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(driftMetrics[3] < 2.5, $"Expected page scroll to stay stable while opening details. Drift={driftMetrics[3]}px.");
         Assert.True(expandedMetrics[0] > expandedMetrics[1] + 40);
         Assert.True(expandedMetrics[0] > expandedMetrics[2] + 40);
-        Assert.True(Math.Abs(expandedMetrics[1] - expandedMetrics[2]) < 24);
+        Assert.True(Math.Abs(expandedMetrics[1] - previewTopsBeforeExpand[2]) < 2.5);
+        Assert.True(Math.Abs(expandedMetrics[2] - previewTopsBeforeExpand[3]) < 2.5);
         Assert.True(Math.Abs(expandedMetrics[3] - previewTopsBeforeExpand[0]) < 2.5);
         Assert.True(Math.Abs(expandedMetrics[4] - previewTopsBeforeExpand[1]) < 2.5);
     }
@@ -1216,76 +1219,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(0, snapshotMetrics[8]);
     }
 
-    [Fact]
-    public async Task Desktop_AislePilotStackedLayout_KeepsBalancedCardSizingAndControlAlignment()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
 
-        await using var context = await CreateDesktopContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var metrics = await page.EvaluateAsync<double[]>(
-            """
-            () => {
-                const activeCard = document.querySelector("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])");
-                const tabs = activeCard?.querySelector(".aislepilot-day-meal-tabs");
-                const mealPanel = activeCard?.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']");
-                const imageShell = mealPanel?.querySelector(".aislepilot-meal-image-shell");
-                const detailsPanel = mealPanel?.querySelector(".aislepilot-meal-details-panel");
-                const status = document.querySelector("[data-day-carousel-status]");
-                const reorderToggle = document.querySelector(".aislepilot-day-reorder-toggle");
-                const viewToggle = document.querySelector(".aislepilot-day-view-toggle");
-
-                if (!(activeCard instanceof HTMLElement) ||
-                    !(tabs instanceof HTMLElement) ||
-                    !(mealPanel instanceof HTMLElement) ||
-                    !(imageShell instanceof HTMLElement) ||
-                    !(detailsPanel instanceof HTMLElement) ||
-                    !(status instanceof HTMLElement) ||
-                    !(reorderToggle instanceof HTMLElement) ||
-                    !(viewToggle instanceof HTMLElement)) {
-                    return [-1, -1, -1, -1, -1, -1];
-                }
-
-                const cardRect = activeCard.getBoundingClientRect();
-                const tabsRect = tabs.getBoundingClientRect();
-                const imageRect = imageShell.getBoundingClientRect();
-                const detailsRect = detailsPanel.getBoundingClientRect();
-                const statusRect = status.getBoundingClientRect();
-                const reorderRect = reorderToggle.getBoundingClientRect();
-                const viewRect = viewToggle.getBoundingClientRect();
-
-                return [
-                    imageRect.width / Math.max(cardRect.width, 1),
-                    detailsRect.top - tabsRect.bottom,
-                    Math.abs(imageRect.top - detailsRect.top),
-                    Math.abs(statusRect.top - reorderRect.top),
-                    reorderRect.height,
-                    viewRect.height
-                ];
-            }
-            """);
-
-        Assert.Equal(6, metrics.Length);
-        Assert.InRange(metrics[0], 0.18, 0.34);
-        Assert.InRange(metrics[1], -2, 18);
-        Assert.True(
-            metrics[2] <= 16,
-            $"Expected stacked details panel to align closely with the recipe image top edge. Delta={metrics[2]:F1}px.");
-        Assert.True(
-            metrics[3] <= 12,
-            $"Expected stacked status text and day controls to share a consistent row alignment. Delta={metrics[3]:F1}px.");
-        Assert.True(
-            metrics[4] >= 35,
-            $"Expected reorder control to keep a desktop hit-area near 35px+. Height={metrics[4]:F1}px.");
-        Assert.True(
-            metrics[5] >= 35,
-            $"Expected stacked view toggle to keep a desktop hit-area near 35px+. Height={metrics[5]:F1}px.");
-    }
 
 }
