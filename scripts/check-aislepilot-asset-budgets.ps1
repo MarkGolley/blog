@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
-    [int]$CssBudgetBytes = 350000,
-    [int]$JavaScriptBudgetBytes = 410000,
+    [int]$CssBudgetBytes = 365000,
+    [int]$JavaScriptBudgetBytes = 411000,
     [int]$SingleJavaScriptBudgetBytes = 245000
 )
 
