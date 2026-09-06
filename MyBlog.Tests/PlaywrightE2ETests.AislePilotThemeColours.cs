@@ -35,6 +35,14 @@ public sealed partial class PlaywrightE2ETests
         Assert.Equal("rgba(0, 0, 0, 0)", await people.EvaluateAsync<string>("e => getComputedStyle(e).backgroundColor"));
         Assert.Equal("1", await people.EvaluateAsync<string>("e => getComputedStyle(e, '::-webkit-slider-thumb').opacity"));
         var budget = page.Locator("[data-budget-slider]");
+        var sliderWidths = await page.EvaluateAsync<double[]>(
+            """
+            () => [
+                document.querySelector("#aislepilot-household-size")?.getBoundingClientRect().width ?? 0,
+                document.querySelector("[data-budget-slider]")?.getBoundingClientRect().width ?? 0
+            ]
+            """);
+        Assert.InRange(Math.Abs(sliderWidths[0] - sliderWidths[1]), 0, 1);
         await budget.PressAsync("End");
         Assert.Equal("250", await budget.InputValueAsync());
         Assert.Contains("250", await page.Locator(".aislepilot-budget-slider-field [data-number-slider-value]").InnerTextAsync());

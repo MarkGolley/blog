@@ -671,12 +671,6 @@ fieldset.aislepilot-core-choice {
     padding: 0.16rem 0.46rem;
 }
 
-.aislepilot-budget-slider-field .aislepilot-slider-input {
-    width: calc(100% - 2rem);
-    margin-left: 1rem;
-    margin-right: 1rem;
-}
-
 .aislepilot-slider-field--compact {
     --slider-value-edge-start-px: 0px;
     --slider-value-edge-end-px: calc(var(--slider-value-width-px) * 0.5);

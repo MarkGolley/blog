@@ -887,12 +887,6 @@
         min-height: 2.08rem !important;
     }
 
-    .aislepilot-budget-slider-field .aislepilot-slider-input {
-        width: calc(100% - 1.7rem);
-        margin-left: 0.85rem;
-        margin-right: 0.85rem;
-    }
-
     .aislepilot-slider-input::-webkit-slider-runnable-track {
         height: 0.46rem;
     }
