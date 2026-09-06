@@ -54,6 +54,12 @@ public partial class AislePilotIntegrationTests
         Assert.Matches(
             new Regex(@"class=""aislepilot-outcome-summary""[^>]*>[\s\S]*?Three practical meal ideas[\s\S]*?</div>\s*<button[\s\S]*?data-setup-mode-submit=""generator""", RegexOptions.IgnoreCase),
             html);
+        Assert.Contains("data-household-count", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-plan-basic-mirror=\"meal-types\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("aiming for your", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Your selections", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-plan-basic-mirror=\"budget\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-pantry-summary", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

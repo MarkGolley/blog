@@ -783,8 +783,8 @@
                 <div class="aislepilot-submit-actions">
                     <div class="aislepilot-outcome-summary" aria-labelledby="aislepilot-planner-outcome-title">
                         <p class="aislepilot-outcome-kicker">What you will get</p>
-                        <h4 id="aislepilot-planner-outcome-title">A complete @selectedPlanDays-day plan</h4>
-                        <p>@selectedMealTypesSummaryText for @safeHouseholdSize, recipes and a @FormatSupermarketLabel(selectedSupermarket)-ordered shopping list within your @Model.Request.WeeklyBudget.ToString("C0", ukCulture) budget.</p>
+                        <h4 id="aislepilot-planner-outcome-title">Complete plan for <span data-plan-basic-mirror="plan-days">@selectedPlanDays days</span></h4>
+                        <p><span data-plan-basic-mirror="meal-types">@selectedMealTypesSummaryText</span> for <span data-household-count>@safeHouseholdSize</span>, recipes and a <span data-plan-basic-mirror="supermarket">@FormatSupermarketLabel(selectedSupermarket)</span>-ordered shopping list aiming for your <span data-plan-basic-mirror="budget">@Model.Request.WeeklyBudget.ToString("C0", ukCulture)</span> budget.</p>
                     </div>
                     <button type="submit"
                             data-loading-label="Generating plan..."

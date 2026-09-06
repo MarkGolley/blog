@@ -91,7 +91,7 @@ public partial class AislePilotIntegrationTests : IClassFixture<TestWebApplicati
         Assert.Contains("Shape your week", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"aislepilot-setup-summary\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Your weekly plan", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Ready to generate", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Your selections", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

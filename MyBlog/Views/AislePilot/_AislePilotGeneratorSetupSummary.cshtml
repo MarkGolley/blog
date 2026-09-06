@@ -5,19 +5,19 @@
 <dl class="aislepilot-setup-summary-list">
     <div class="aislepilot-setup-summary-item">
         <dt>Pantry status</dt>
-        <dd>@Model.PantrySummaryText</dd>
+        <dd data-pantry-summary>@Model.PantrySummaryText</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
         <dt>Dietary</dt>
-        <dd>@Model.DietarySummaryText</dd>
+        <dd data-dietary-summary>@Model.DietarySummaryText</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
         <dt>Ingredient use</dt>
-        <dd>@Model.GeneratorCoreSummaryText</dd>
+        <dd data-generator-core-summary>@Model.GeneratorCoreSummaryText</dd>
     </div>
     <div class="aislepilot-setup-summary-item">
         <dt>Speed bias</dt>
-        <dd>@(Model.PreferQuickMeals ? "Quick meals on" : "Quick meals off")</dd>
+        <dd data-quick-meals-summary>@(Model.PreferQuickMeals ? "Quick meals on" : "Quick meals off")</dd>
     </div>
 </dl>
 <p class="aislepilot-setup-summary-note">Generate ideas when the pantry list reflects what you actually want to cook from.</p>
