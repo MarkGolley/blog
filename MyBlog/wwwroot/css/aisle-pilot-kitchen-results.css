@@ -101,18 +101,29 @@ border-radius: 8px;
 .aislepilot-shopping-instruction{margin:.25rem 0;color:var(--ap-refresh-text-muted);font-size:.9rem}
 .aislepilot-shopping-toolbar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin:.6rem 0 1rem;padding:.6rem .75rem;border:1px solid var(--ap-refresh-border);border-radius:10px;background:var(--ap-refresh-surface-strong)}
 .aislepilot-shopping-progress{margin:0;color:var(--ap-refresh-text);font-weight:700}
+.aislepilot-shopping-search{flex:1 1 15rem;min-width:min(100%,15rem)}
+.aislepilot-shopping-search input{width:100%;min-height:44px;padding:.55rem .75rem;border:1px solid var(--ap-refresh-border);border-radius:8px;background:var(--ap-refresh-surface);color:var(--ap-refresh-text);font:inherit}
+.aislepilot-shopping-search input::placeholder{color:var(--ap-refresh-text-muted)}
+.aislepilot-shopping-search input:focus-visible{outline:2px solid var(--ap-refresh-accent);outline-offset:2px}
 .aislepilot-shopping-filter{display:flex;align-items:center;gap:.5rem;min-height:44px;cursor:pointer;font-weight:600;color:var(--ap-refresh-text)}
 .aislepilot-shopping-filter input{width:1.15rem;height:1.15rem}
 .aislepilot-shopping-reset{min-height:44px;padding:.45rem .7rem;border:1px solid var(--ap-refresh-border);border-radius:8px;background:transparent;color:var(--ap-refresh-text);font:inherit;font-weight:600;cursor:pointer}
 .aislepilot-shopping-reset-confirm{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;width:100%;color:var(--ap-refresh-text)}
 .aislepilot-shopping-reset-confirm[hidden]{display:none}
 .aislepilot-shopping-reset-confirm button{min-height:44px;padding:.45rem .7rem;border-radius:8px}
+.aislepilot-shopping-filter-empty{margin:.75rem 0;padding:.8rem;border:1px dashed var(--ap-refresh-border-strong);border-radius:10px;color:var(--ap-refresh-text-muted);text-align:center}
+.aislepilot-shop-card>summary{list-style:none;cursor:pointer;min-height:44px;margin-bottom:0}
+.aislepilot-shop-card>summary::-webkit-details-marker{display:none}
+.aislepilot-shop-card>summary::after{content:"";width:.55rem;height:.55rem;margin-left:.1rem;border-right:2px solid var(--ap-refresh-text-muted);border-bottom:2px solid var(--ap-refresh-text-muted);transform:rotate(45deg) translateY(-.15rem);transition:transform .16s ease;flex:0 0 auto}
+.aislepilot-shop-card:not([open])>summary::after{transform:rotate(-45deg) translate(-.1rem,.1rem)}
+.aislepilot-shop-card[open]>.aislepilot-shop-list{margin-top:.56rem}
+.aislepilot-shop-card>summary:focus-visible{outline:2px solid var(--ap-refresh-accent);outline-offset:4px;border-radius:6px}
 .aislepilot-shop-list .aislepilot-checkbox-item{min-height:44px;align-items:start}
 .aislepilot-shopping-item-content{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:.35rem .7rem;width:100%;min-width:0}
 .aislepilot-shopping-item-name{min-width:0;overflow-wrap:anywhere;color:var(--ap-refresh-text)}
 .aislepilot-shopping-item-quantity{color:var(--ap-refresh-text-muted)}
 .aislepilot-shopping-item-price{color:var(--ap-refresh-text-muted);text-align:right;white-space:nowrap}
-@media(max-width:600px){.aislepilot-shopping-item-name{grid-column:1/-1}.aislepilot-shopping-item-content{grid-template-columns:minmax(0,1fr) auto}.aislepilot-shopping-toolbar{align-items:stretch}.aislepilot-shopping-filter{width:100%}}
+@media(max-width:600px){.aislepilot-window-shell[data-window-active='aislepilot-shop'] .aislepilot-window-viewport{overflow-x:clip;overflow-y:visible}.aislepilot-shopping-item-name{grid-column:1/-1}.aislepilot-shopping-item-content{grid-template-columns:minmax(0,1fr) auto}.aislepilot-shopping-toolbar{position:sticky;top:.5rem;z-index:12;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.35rem .6rem;padding:.55rem;box-shadow:0 10px 24px rgb(15 35 28 / .12)}.aislepilot-shopping-progress{grid-column:1/-1;font-size:.82rem}.aislepilot-shopping-search{grid-column:1/-1;min-width:0}.aislepilot-shopping-search input{min-height:42px}.aislepilot-shopping-filter{width:auto;min-height:40px;font-size:.82rem}.aislepilot-shopping-reset{min-height:40px;font-size:.82rem}.aislepilot-shopping-reset-confirm{grid-column:1/-1}.aislepilot-shop-card{padding:.75rem}.aislepilot-shop-card:not([open]){padding-bottom:.75rem}}
 :root[data-theme] .aislepilot-app :is(.aislepilot-window-tab,.aislepilot-day-carousel-dot,.aislepilot-day-meal-tab)[aria-selected='true'] {
 background: var(--ap-refresh-primary);
 color: #fff;
@@ -271,14 +282,70 @@ border-radius: 10px; padding: .85rem; background: var(--ap-refresh-surface); bor
 :root[data-theme] .aislepilot-app .aislepilot-day-carousel[data-day-reorder-mode='true'] .aislepilot-day-card-head {
 align-items: flex-start; margin-bottom: .65rem;
 }
-:root[data-theme] .aislepilot-app .aislepilot-day-card-reorder-handle {
-min-height: 44px; padding: .45rem .65rem; border: 1px solid var(--ap-refresh-border-strong);
-border-radius: 8px; background: var(--ap-refresh-surface-strong); color: var(--ap-refresh-accent); box-shadow: none;
+:root[data-theme] .aislepilot-app .aislepilot-meal-organizer-move {
+border-color: var(--ap-refresh-border-strong); border-radius: 8px;
+background: var(--ap-refresh-surface-strong); color: var(--ap-refresh-text); box-shadow: none;
 }
-:root[data-theme] .aislepilot-app .aislepilot-day-card-reorder-handle-glyph { color: currentColor; }
-:root[data-theme] .aislepilot-app .aislepilot-day-reorder-move-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .5rem; margin-top: .7rem; }
-:root[data-theme] .aislepilot-app .aislepilot-day-reorder-move {
-min-height: 44px; border: 1px solid var(--ap-refresh-border-strong); border-radius: 8px;
-background: var(--ap-refresh-surface-strong); color: var(--ap-refresh-text); font-weight: 700;
+:root[data-theme] .aislepilot-app .aislepilot-day-reorder-meal-item.is-selected {
+background: color-mix(in srgb,var(--ap-refresh-accent) 10%,var(--ap-refresh-surface));
+box-shadow: inset 0 0 0 1px var(--ap-refresh-accent);
 }
-:root[data-theme] .aislepilot-app .aislepilot-day-reorder-move:disabled { opacity: .42; cursor: not-allowed; }
+:root[data-theme] .aislepilot-app .aislepilot-day-reorder-meal-item.is-destination .aislepilot-meal-organizer-move {
+background: var(--ap-refresh-primary); border-color: var(--ap-refresh-primary); color: #fff;
+}
+
+/* The weekly status below carries these result facts with useful actions. */
+:root[data-theme] .aislepilot-app.has-results .aislepilot-app-head.is-compact .aislepilot-app-highlights {
+    display: none;
+}
+
+/* Keep the desktop meal workspace focused on the selected day. */
+@media (min-width: 981px) {
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) {
+        --ap-day-card-slide-width: min(100%, 35rem);
+        --ap-day-carousel-stage-inset-inline: 0;
+    }
+
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true'])::before,
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-meal-grid::before,
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-meal-grid::after {
+        display: none;
+    }
+
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-meal-grid {
+        padding-top: .2rem;
+        padding-bottom: .7rem;
+    }
+
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-day-carousel-track {
+        gap: 1rem;
+        perspective: none;
+    }
+
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-day-card.is-carousel-ghost {
+        display: none;
+    }
+
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-day-card[data-day-carousel-position] {
+        opacity: 0;
+        transform: none;
+        pointer-events: none;
+    }
+
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-day-card[data-day-carousel-position='active'] {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-meal-image-shell,
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-meal-image {
+        width: 100%;
+        height: auto;
+        max-height: none;
+        aspect-ratio: 16 / 9;
+    }
+
+    :root[data-theme] .aislepilot-app .aislepilot-day-carousel:not([data-day-stacked-mode='true']):not([data-day-reorder-mode='true']) .aislepilot-day-carousel-pagination {
+        width: min(100%, 34rem);
+    }
+}

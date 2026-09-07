@@ -10,8 +10,11 @@ const labels=Array.from(shop.querySelectorAll("[data-shopping-item-label]"));
 const checked=labels.filter(label=>label.querySelector("[data-shopping-item-input]")?.checked);
 const hideToggle=shop.querySelector("[data-shopping-hide-checked]");
 const hideChecked=hideToggle instanceof HTMLInputElement && hideToggle.checked;
+const searchInput=shop.querySelector("[data-shopping-search]");
+const searchQuery=searchInput instanceof HTMLInputElement ? searchInput.value.trim().toLocaleLowerCase() : "";
 const progress=shop.querySelector("[data-shopping-progress]");
 const filterLabel=shop.querySelector("[data-shopping-filter-label]");
+const emptyState=shop.querySelector("[data-shopping-filter-empty]");
 if (progress instanceof HTMLElement) {
 progress.textContent=labels.length > 0 && checked.length===labels.length
 ? "All items checked"
@@ -22,15 +25,27 @@ filterLabel.textContent=hideChecked ? "Show all items" : "Hide checked items";
 }
 labels.forEach(label=>{
 const item=label.closest("li");
-if (item instanceof HTMLElement) item.hidden=hideChecked && checked.includes(label);
+const itemText=(label.querySelector("[data-shopping-item-text]")?.textContent ?? "").toLocaleLowerCase();
+const hiddenByCheck=hideChecked && checked.includes(label);
+const hiddenBySearch=searchQuery.length > 0 && !itemText.includes(searchQuery);
+if (item instanceof HTMLElement) item.hidden=hiddenByCheck || hiddenBySearch;
 });
 shop.querySelectorAll("[data-shopping-department]").forEach(department=>{
 const departmentLabels=Array.from(department.querySelectorAll("[data-shopping-item-label]"));
 const remaining=departmentLabels.filter(label=>!label.querySelector("[data-shopping-item-input]")?.checked).length;
+const visible=departmentLabels.filter(label=>!label.closest("li")?.hidden).length;
 const count=department.querySelector("[data-shopping-department-count]");
 if (count instanceof HTMLElement) count.textContent=`${remaining} of ${departmentLabels.length} left`;
-if (department instanceof HTMLElement) department.hidden=hideChecked && remaining===0;
+if (department instanceof HTMLElement) department.hidden=visible===0;
 });
+if (emptyState instanceof HTMLElement) {
+const visibleDepartments=Array.from(shop.querySelectorAll("[data-shopping-department]"))
+.some(department=>department instanceof HTMLElement && !department.hidden);
+emptyState.hidden=visibleDepartments || (searchQuery.length===0 && !hideChecked);
+emptyState.textContent=searchQuery.length > 0
+? `No items match “${searchInput.value.trim()}”.`
+: "Everything on the generated list is checked.";
+}
 };
 const readShoppingItemState=()=>{
 if (shoppingItemStateCache && typeof shoppingItemStateCache==="object") {
@@ -301,10 +316,27 @@ renderCustomShoppingList(shell);
 };
 const wireShoppingFilter=()=>{
 const toggle=document.querySelector("[data-shopping-hide-checked]");
-if (!(toggle instanceof HTMLInputElement) || toggle.dataset.shoppingFilterWired==="true") return;
+const search=document.querySelector("[data-shopping-search]");
+if (toggle instanceof HTMLInputElement && toggle.dataset.shoppingFilterWired!=="true") {
 toggle.dataset.shoppingFilterWired="true";
 toggle.addEventListener("change", syncShoppingChecklistStatus);
+}
+if (search instanceof HTMLInputElement && search.dataset.shoppingSearchWired!=="true") {
+search.dataset.shoppingSearchWired="true";
+search.addEventListener("input", syncShoppingChecklistStatus);
+}
 syncShoppingChecklistStatus();
+};
+const wireShoppingDepartments=scope=>{
+const departments=scope instanceof Element
+? Array.from(scope.querySelectorAll("[data-shopping-department]"))
+: Array.from(document.querySelectorAll("[data-shopping-department]"));
+const compactViewport=window.matchMedia("(max-width: 767px)").matches;
+departments.forEach((department,index)=>{
+if (!(department instanceof HTMLDetailsElement) || department.dataset.shoppingDepartmentWired==="true") return;
+department.dataset.shoppingDepartmentWired="true";
+if (compactViewport && index > 0) department.open=false;
+});
 };
 const wireShoppingReset=()=>{
 const reset=document.querySelector("[data-shopping-reset]");
@@ -338,6 +370,7 @@ window.AislePilotShopping={
 wireCustomShoppingList,
 wireShoppingChecklist,
 wireShoppingFilter,
+wireShoppingDepartments,
 wireShoppingReset
 };
 })();

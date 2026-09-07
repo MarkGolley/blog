@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
     if (window.__aislePilotScriptWired === true) {
         return;
     }
@@ -876,6 +876,7 @@
         currentIndex = ((nextIndex % panelCount) + panelCount) % panelCount;
 
         track.style.transform = `translateX(-${currentIndex * 100}%)`;
+        root.dataset.windowActive = panels[currentIndex].id;
 
         panels.forEach((panel, index) => {
             const isActive = index === currentIndex;
@@ -3305,154 +3306,6 @@
         });
     };
 
-    const parseDayCardJsonArray = (serializedValue, itemMapper) => {
-        if (typeof serializedValue !== "string" || serializedValue.trim().length === 0) {
-            return [];
-        }
-
-        try {
-            const parsed = JSON.parse(serializedValue);
-            if (!Array.isArray(parsed)) {
-                return [];
-            }
-
-            return typeof itemMapper === "function"
-                ? parsed.map(itemMapper)
-                : parsed;
-        } catch {
-            return [];
-        }
-    };
-
-    const readDayCardMealNames = card => {
-        if (!(card instanceof HTMLElement)) {
-            return [];
-        }
-
-        return parseDayCardJsonArray(card.dataset.dayCardMealNames, value =>
-            typeof value === "string" ? value.trim() : "").filter(value => value.length > 0);
-    };
-
-    const readDayCardIgnoredFlags = card => {
-        if (!(card instanceof HTMLElement)) {
-            return [];
-        }
-
-        const mealNames = readDayCardMealNames(card);
-        const parsedFlags = parseDayCardJsonArray(card.dataset.dayCardIgnoredFlags, value => value === true);
-        if (parsedFlags.length === mealNames.length) {
-            return parsedFlags;
-        }
-
-        return mealNames.map(() => false);
-    };
-
-    const getReorderableDayCards = scope => {
-        const root = scope instanceof Element ? scope : document;
-        return Array.from(root.querySelectorAll("[data-day-meal-card][data-day-card-meal-names]"))
-            .filter(card => card instanceof HTMLElement);
-    };
-
-    const buildDayCardCurrentPlanMealNames = cards => {
-        const mealNames = [];
-        cards.forEach(card => {
-            readDayCardMealNames(card).forEach(mealName => {
-                if (mealName.length > 0) {
-                    mealNames.push(mealName);
-                }
-            });
-        });
-        return mealNames;
-    };
-
-    const buildDayCardIgnoredIndexesCsv = cards => {
-        const ignoredIndexes = [];
-        let slotIndex = 0;
-        cards.forEach(card => {
-            readDayCardIgnoredFlags(card).forEach(isIgnored => {
-                if (isIgnored) {
-                    ignoredIndexes.push(slotIndex);
-                }
-
-                slotIndex += 1;
-            });
-        });
-
-        return ignoredIndexes.join(",");
-    };
-
-    const buildDayCardLeftoverSourceIndexesCsv = cards => {
-        const sourceIndexes = [];
-        let weekDayIndex = 0;
-        cards.forEach(card => {
-            if (!(card instanceof HTMLElement)) {
-                return;
-            }
-
-            const leftoverCount = Number.parseInt(card.dataset.dayCardLeftoverCount ?? "0", 10);
-            const safeLeftoverCount = Number.isInteger(leftoverCount)
-                ? Math.max(0, leftoverCount)
-                : 0;
-            for (let index = 0; index < safeLeftoverCount; index += 1) {
-                sourceIndexes.push(weekDayIndex);
-            }
-
-            weekDayIndex += Math.max(1, safeLeftoverCount + 1);
-        });
-
-        return sourceIndexes.join(",");
-    };
-
-    const syncDayReorderFormState = form => {
-        if (!(form instanceof HTMLFormElement)) {
-            return false;
-        }
-
-        const cards = getReorderableDayCards(form.parentElement ?? document);
-        const reorderedMealNames = buildDayCardCurrentPlanMealNames(cards);
-        if (reorderedMealNames.length <= 1) {
-            return false;
-        }
-
-        const leftoverInput = form.querySelector("input[name='Request.LeftoverCookDayIndexesCsv']");
-        if (leftoverInput instanceof HTMLInputElement) {
-            leftoverInput.value = buildDayCardLeftoverSourceIndexesCsv(cards);
-        }
-
-        const ignoredInput = form.querySelector("input[name='Request.IgnoredMealSlotIndexesCsv']");
-        if (ignoredInput instanceof HTMLInputElement) {
-            ignoredInput.value = buildDayCardIgnoredIndexesCsv(cards);
-        }
-
-        const swapHistoryInput = form.querySelector("input[name='Request.SwapHistoryState']");
-        if (swapHistoryInput instanceof HTMLInputElement) {
-            swapHistoryInput.value = "";
-        }
-
-        const specialTreatInput = form.querySelector("input[name='Request.SelectedSpecialTreatCookDayIndex']");
-        if (specialTreatInput instanceof HTMLInputElement) {
-            const specialTreatCardIndex = cards.findIndex(card =>
-                card instanceof HTMLElement && card.dataset.dayCardHasSpecialTreat === "true");
-            if (specialTreatCardIndex >= 0) {
-                specialTreatInput.value = `${specialTreatCardIndex}`;
-            }
-        }
-
-        Array.from(form.querySelectorAll("input[name='currentPlanMealNames']")).forEach(input => {
-            input.remove();
-        });
-
-        reorderedMealNames.forEach(mealName => {
-            const hiddenInput = document.createElement("input");
-            hiddenInput.type = "hidden";
-            hiddenInput.name = "currentPlanMealNames";
-            hiddenInput.value = mealName;
-            form.append(hiddenInput);
-        });
-
-        return true;
-    };
-
     const wireDayCardReorder = scope => {
         const forms = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-day-reorder-form]"))
@@ -3464,487 +3317,149 @@
             }
 
             const root = form.parentElement;
-            if (!(root instanceof Element)) {
+            const carousel = root instanceof Element ? root.querySelector("[data-day-card-carousel]") : null;
+            const status = carousel instanceof HTMLElement ? carousel.querySelector("[data-day-carousel-status]") : null;
+            if (!(root instanceof Element) || !(carousel instanceof HTMLElement)) {
                 return;
             }
-            const carousel = root.querySelector("[data-day-card-carousel]");
-            const reorderStatus = carousel instanceof HTMLElement
-                ? carousel.querySelector("[data-day-carousel-status]")
-                : null;
-            const reorderModeStatusLabel = carousel instanceof HTMLElement
-                ? ((carousel.dataset.dayReorderStatus ?? "").trim().length > 0
-                    ? (carousel.dataset.dayReorderStatus ?? "").trim()
-                    : "Reorder mode: drag a day card onto another day to swap days.")
-                : "Reorder mode: drag a day card onto another day to swap days.";
 
-            const isReorderModeEnabled = () => {
-                return carousel instanceof HTMLElement && carousel.dataset.dayReorderMode === "true";
+            const getRows = () => Array.from(root.querySelectorAll("[data-meal-organizer-slot][data-meal-organizer-name]"))
+                .filter(row => row instanceof HTMLElement)
+                .sort((first, second) => Number(first.dataset.mealOrganizerSlot) - Number(second.dataset.mealOrganizerSlot));
+            let selectedRow = null;
+
+            const setStatus = message => {
+                if (status instanceof HTMLElement) {
+                    status.textContent = message;
+                }
             };
 
-            const handles = Array.from(root.querySelectorAll("[data-day-reorder-handle]"));
-            if (handles.length === 0) {
-                return;
-            }
+            const clearSelection = () => {
+                getRows().forEach(row => {
+                    row.classList.remove("is-selected", "is-destination");
+                    const button = row.querySelector("[data-meal-organizer-move]");
+                    if (button instanceof HTMLButtonElement) {
+                        button.textContent = "Move";
+                        button.setAttribute("aria-pressed", "false");
+                        button.setAttribute("aria-label", `Move ${row.dataset.mealOrganizerName ?? "meal"}`);
+                    }
+                });
+                selectedRow = null;
+                setStatus((carousel.dataset.dayReorderStatus ?? "Choose a meal to move, then choose its new slot.").trim());
+            };
+
+            const syncOrganizerForm = rows => {
+                const mealNames = rows.map(row => (row.dataset.mealOrganizerName ?? "").trim());
+                if (mealNames.length <= 1 || mealNames.some(name => name.length === 0)) {
+                    return false;
+                }
+
+                form.querySelectorAll("input[name='currentPlanMealNames']").forEach(input => input.remove());
+                mealNames.forEach(mealName => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = "currentPlanMealNames";
+                    input.value = mealName;
+                    form.append(input);
+                });
+
+                const ignoredInput = form.querySelector("input[name='Request.IgnoredMealSlotIndexesCsv']");
+                if (ignoredInput instanceof HTMLInputElement) {
+                    ignoredInput.value = rows
+                        .filter(row => row.classList.contains("is-ignored"))
+                        .map(row => row.dataset.mealOrganizerSlot)
+                        .join(",");
+                }
+
+                const treatRow = rows.find(row => row.dataset.mealOrganizerSpecialTreat === "true");
+                const treatInput = form.querySelector("input[name='Request.SelectedSpecialTreatCookDayIndex']");
+                if (treatRow instanceof HTMLElement && treatInput instanceof HTMLInputElement) {
+                    treatInput.value = treatRow.dataset.mealOrganizerDayIndex ?? treatInput.value;
+                }
+
+                const historyInput = form.querySelector("input[name='Request.SwapHistoryState']");
+                if (historyInput instanceof HTMLInputElement) {
+                    historyInput.value = "";
+                }
+                return true;
+            };
+
+            const swapMealRows = (first, second) => {
+                const firstContent = first.querySelector("[data-meal-organizer-content]");
+                const secondContent = second.querySelector("[data-meal-organizer-content]");
+                if (!(firstContent instanceof HTMLElement) || !(secondContent instanceof HTMLElement)) {
+                    return false;
+                }
+
+                const firstName = first.dataset.mealOrganizerName ?? "";
+                const firstTreat = first.dataset.mealOrganizerSpecialTreat ?? "false";
+                const firstIgnored = first.classList.contains("is-ignored");
+                first.dataset.mealOrganizerName = second.dataset.mealOrganizerName ?? "";
+                first.dataset.mealOrganizerSpecialTreat = second.dataset.mealOrganizerSpecialTreat ?? "false";
+                first.classList.toggle("is-ignored", second.classList.contains("is-ignored"));
+                second.dataset.mealOrganizerName = firstName;
+                second.dataset.mealOrganizerSpecialTreat = firstTreat;
+                second.classList.toggle("is-ignored", firstIgnored);
+                const markup = firstContent.innerHTML;
+                firstContent.innerHTML = secondContent.innerHTML;
+                secondContent.innerHTML = markup;
+                return true;
+            };
 
             form.dataset.dayReorderWired = "true";
-            let activePointerId = null;
-            let activeHandle = null;
-            let activeCard = null;
-            let pointerStartY = 0;
-            let hasMoved = false;
-            let activationTimerId = null;
-            let reorderActivated = false;
-            let activeDropTargetCard = null;
-            let movementPulseTimerId = null;
-
-            const getCardDayName = card => {
-                if (!(card instanceof HTMLElement)) {
-                    return "";
-                }
-
-                return (card.dataset.dayCardDayName ?? "").trim();
-            };
-
-            const setReorderStatus = message => {
-                if (!(reorderStatus instanceof HTMLElement)) {
-                    return;
-                }
-
-                const nextMessage = typeof message === "string" && message.trim().length > 0
-                    ? message.trim()
-                    : reorderModeStatusLabel;
-                reorderStatus.textContent = nextMessage;
-            };
-
-            const setDraggingState = isDragging => {
-                if (!(carousel instanceof HTMLElement)) {
-                    return;
-                }
-
-                carousel.classList.toggle("is-day-reorder-dragging", isDragging);
-            };
-
-            const clearDropTargetIndicator = () => {
-                if (activeDropTargetCard instanceof HTMLElement) {
-                    activeDropTargetCard.classList.remove("is-reorder-drop-target");
-                    activeDropTargetCard.removeAttribute("data-reorder-drop-position");
-                }
-
-                activeDropTargetCard = null;
-            };
-
-            const setDropTargetIndicator = (targetCard, dropPosition) => {
-                if (!(targetCard instanceof HTMLElement)
-                    || (dropPosition !== "before" && dropPosition !== "after" && dropPosition !== "swap")) {
-                    clearDropTargetIndicator();
-                    return;
-                }
-
-                if (activeDropTargetCard === targetCard
-                    && targetCard.dataset.reorderDropPosition === dropPosition) {
-                    return;
-                }
-
-                clearDropTargetIndicator();
-                targetCard.classList.add("is-reorder-drop-target");
-                targetCard.dataset.reorderDropPosition = dropPosition;
-                activeDropTargetCard = targetCard;
-            };
-
-            const clearMovementPulse = () => {
-                if (typeof movementPulseTimerId === "number") {
-                    window.clearTimeout(movementPulseTimerId);
-                }
-
-                movementPulseTimerId = null;
-                getReorderableDayCards(root).forEach(card => {
-                    if (card instanceof HTMLElement) {
-                        card.classList.remove("is-reorder-just-moved");
-                    }
-                });
-            };
-
-            const pulseMovedCard = card => {
-                if (!(card instanceof HTMLElement)) {
-                    return;
-                }
-
-                clearMovementPulse();
-                card.classList.add("is-reorder-just-moved");
-                movementPulseTimerId = window.setTimeout(() => {
-                    card.classList.remove("is-reorder-just-moved");
-                    movementPulseTimerId = null;
-                }, 240);
-            };
-
-            const setCardDatasetValue = (card, key, value) => {
-                if (!(card instanceof HTMLElement) || typeof key !== "string" || key.length === 0) {
-                    return;
-                }
-
-                const normalizedValue = typeof value === "string" ? value : "";
-                if (normalizedValue.length > 0) {
-                    card.dataset[key] = normalizedValue;
-                    return;
-                }
-
-                delete card.dataset[key];
-            };
-
-            const swapCardMealPayloads = (firstCard, secondCard) => {
-                if (!(firstCard instanceof HTMLElement)
-                    || !(secondCard instanceof HTMLElement)
-                    || firstCard === secondCard) {
-                    return false;
-                }
-
-                const parent = firstCard.parentElement;
-                if (!(parent instanceof HTMLElement) || secondCard.parentElement !== parent) {
-                    return false;
-                }
-
-                const payloadKeys = [
-                    "dayCardMealNames",
-                    "dayCardIgnoredFlags",
-                    "dayCardHasSpecialTreat"
-                ];
-                payloadKeys.forEach(key => {
-                    const firstValue = firstCard.dataset[key] ?? "";
-                    const secondValue = secondCard.dataset[key] ?? "";
-                    setCardDatasetValue(firstCard, key, secondValue);
-                    setCardDatasetValue(secondCard, key, firstValue);
-                });
-
-                const firstMealList = firstCard.querySelector("[data-day-reorder-meal-list]");
-                const secondMealList = secondCard.querySelector("[data-day-reorder-meal-list]");
-                if (firstMealList instanceof HTMLElement && secondMealList instanceof HTMLElement) {
-                    const firstListMarkup = firstMealList.innerHTML;
-                    firstMealList.innerHTML = secondMealList.innerHTML;
-                    secondMealList.innerHTML = firstListMarkup;
-                }
-
-                return true;
-            };
-
-            const submitDayReorder = card => {
-                const dayName = getCardDayName(card);
-                setReorderStatus(dayName.length > 0
-                    ? `${dayName} swapped. Saving day order...`
-                    : "Days swapped. Saving day order...");
-                pulseMovedCard(card);
-                if (!syncDayReorderFormState(form)) {
-                    return;
-                }
-
-                try {
-                    sessionStorage.setItem(dayReorderModeStorageKey, "true");
-                } catch {
-                    // Ignore storage failures in private modes.
-                }
-                persistSwapScrollPosition(form);
-                form.requestSubmit();
-            };
-
-            const moveDayMenu = (card, target) => {
-                if (!(card instanceof HTMLElement)
-                    || form.dataset.ajaxSwapSubmitting === "true"
-                    || !isReorderModeEnabled()) {
-                    return false;
-                }
-
-                const cards = getReorderableDayCards(root);
-                const currentIndex = cards.indexOf(card);
-                if (currentIndex < 0) {
-                    return false;
-                }
-
-                let targetIndex = currentIndex;
-                if (target === "earlier") {
-                    targetIndex = currentIndex - 1;
-                } else if (target === "later") {
-                    targetIndex = currentIndex + 1;
-                } else if (target === "first") {
-                    targetIndex = 0;
-                } else if (target === "last") {
-                    targetIndex = cards.length - 1;
-                }
-
-                if (targetIndex < 0
-                    || targetIndex >= cards.length
-                    || targetIndex === currentIndex
-                    || !swapCardMealPayloads(card, cards[targetIndex])) {
-                    return false;
-                }
-
-                submitDayReorder(card);
-                return true;
-            };
-
-            const clearActivationTimer = () => {
-                if (typeof activationTimerId === "number") {
-                    window.clearTimeout(activationTimerId);
-                }
-
-                activationTimerId = null;
-            };
-
-            const activateReorder = () => {
-                if (!(activeCard instanceof HTMLElement) || !(activeHandle instanceof HTMLElement) || reorderActivated) {
-                    return;
-                }
-
-                reorderActivated = true;
-                activeCard.classList.add("is-reorder-active");
-                activeHandle.classList.add("is-reorder-active");
-                activeHandle.setAttribute("aria-grabbed", "true");
-                setDraggingState(true);
-                const dayName = getCardDayName(activeCard);
-                setReorderStatus(dayName.length > 0
-                    ? `Dragging ${dayName}. Drop on another day to swap days.`
-                    : "Dragging day card. Drop on another day to swap days.");
-            };
-
-            const cleanupReorder = shouldSubmit => {
-                clearActivationTimer();
-                clearDropTargetIndicator();
-                clearMovementPulse();
-                setDraggingState(false);
-                setReorderStatus("");
-                if (activeCard instanceof HTMLElement) {
-                    activeCard.classList.remove("is-reorder-active");
-                }
-
-                if (activeHandle instanceof HTMLElement) {
-                    activeHandle.classList.remove("is-reorder-active");
-                    activeHandle.removeAttribute("aria-grabbed");
-                }
-
-                const reorderChanged = hasMoved;
-                activePointerId = null;
-                activeHandle = null;
-                activeCard = null;
-                hasMoved = false;
-                reorderActivated = false;
-
-                if (!shouldSubmit || !reorderChanged || form.dataset.ajaxSwapSubmitting === "true") {
-                    return;
-                }
-
-                if (!syncDayReorderFormState(form)) {
-                    return;
-                }
-
-                try {
-                    sessionStorage.setItem(dayReorderModeStorageKey, "true");
-                } catch {
-                    // Ignore storage failures in private modes.
-                }
-                persistSwapScrollPosition(form);
-                form.requestSubmit();
-            };
-
-            const getSwapTargetForDirection = direction => {
-                if (!(activeCard instanceof HTMLElement)) {
-                    return null;
-                }
-
-                const cards = getReorderableDayCards(root);
-                const currentIndex = cards.indexOf(activeCard);
-                if (currentIndex < 0) {
-                    return null;
-                }
-
-                if (direction < 0 && currentIndex > 0) {
-                    const targetCard = cards[currentIndex - 1];
-                    const targetDayName = getCardDayName(targetCard);
-                    return { targetCard, targetDayName, dropPosition: "swap" };
-                }
-
-                if (direction > 0 && currentIndex < cards.length - 1) {
-                    const targetCard = cards[currentIndex + 1];
-                    const targetDayName = getCardDayName(targetCard);
-                    return { targetCard, targetDayName, dropPosition: "swap" };
-                }
-
-                return null;
-            };
-
-            const getSwapTargetFromPointer = (clientX, clientY) => {
-                if (!(activeCard instanceof HTMLElement)) {
-                    return null;
-                }
-
-                const elementUnderPointer = document.elementFromPoint(clientX, clientY);
-                const pointerCard = elementUnderPointer instanceof Element
-                    ? elementUnderPointer.closest("[data-day-meal-card][data-day-card-meal-names]")
-                    : null;
-                if (pointerCard instanceof HTMLElement && pointerCard !== activeCard) {
-                    return {
-                        targetCard: pointerCard,
-                        targetDayName: getCardDayName(pointerCard),
-                        dropPosition: "swap"
-                    };
-                }
-
-                const activeRect = activeCard.getBoundingClientRect();
-                const deltaY = clientY - (activeRect.top + (activeRect.height / 2));
-                if (Math.abs(deltaY) < 8) {
-                    return null;
-                }
-
-                return getSwapTargetForDirection(deltaY < 0 ? -1 : 1);
-            };
-
-            handles.forEach(handle => {
-                if (!(handle instanceof HTMLElement) || handle.dataset.dayReorderHandleWired === "true") {
-                    return;
-                }
-
-                handle.dataset.dayReorderHandleWired = "true";
-                handle.addEventListener("click", event => {
+            root.querySelectorAll("[data-meal-organizer-move]").forEach(button => {
+                button.addEventListener("click", event => {
                     event.preventDefault();
-                    event.stopPropagation();
-                });
-
-                handle.addEventListener("keydown", event => {
-                    const card = handle.closest("[data-day-meal-card][data-day-card-meal-names]");
-                    if (!(card instanceof HTMLElement)) {
+                    const row = button.closest("[data-meal-organizer-slot]");
+                    if (!(row instanceof HTMLElement) || form.dataset.ajaxSwapSubmitting === "true") {
                         return;
                     }
 
-                    const target = event.key === "ArrowUp"
-                        ? "earlier"
-                        : event.key === "ArrowDown"
-                            ? "later"
-                            : event.key === "Home"
-                                ? "first"
-                                : event.key === "End"
-                                    ? "last"
-                                    : "";
-                    if (target.length === 0) {
-                        return;
-                    }
-
-                    event.preventDefault();
-                    moveDayMenu(card, target);
-                });
-
-                handle.addEventListener("pointerdown", event => {
-                    if (form.dataset.ajaxSwapSubmitting === "true" || !isReorderModeEnabled()) {
-                        return;
-                    }
-
-                    if (event.pointerType === "mouse" && event.button !== 0) {
-                        return;
-                    }
-
-                    const card = handle.closest("[data-day-meal-card][data-day-card-meal-names]");
-                    if (!(card instanceof HTMLElement)) {
-                        return;
-                    }
-
-                    activePointerId = event.pointerId;
-                    activeHandle = handle;
-                    activeCard = card;
-                    pointerStartY = event.clientY;
-                    hasMoved = false;
-                    reorderActivated = false;
-                    clearDropTargetIndicator();
-                    clearActivationTimer();
-                    activationTimerId = window.setTimeout(() => {
-                        activateReorder();
-                    }, 140);
-                    handle.setPointerCapture(event.pointerId);
-                    event.preventDefault();
-                    event.stopPropagation();
-                });
-
-                handle.addEventListener("pointermove", event => {
-                    if (activePointerId === null || event.pointerId !== activePointerId) {
-                        return;
-                    }
-
-                    if (!reorderActivated && Math.abs(event.clientY - pointerStartY) >= 8) {
-                        activateReorder();
-                    }
-
-                    if (!reorderActivated) {
-                        event.preventDefault();
-                        return;
-                    }
-
-                    const activeDayName = getCardDayName(activeCard);
-                    const preview = getSwapTargetFromPointer(event.clientX, event.clientY);
-                    if (preview && preview.targetCard instanceof HTMLElement) {
-                        setDropTargetIndicator(preview.targetCard, preview.dropPosition);
-                        if (activeDayName.length > 0 && preview.targetDayName.length > 0) {
-                            setReorderStatus(`Dragging ${activeDayName}. Drop to swap with ${preview.targetDayName}.`);
-                        } else if (activeDayName.length > 0) {
-                            setReorderStatus(`Dragging ${activeDayName}. Drop to swap days.`);
-                        }
-                    } else {
-                        clearDropTargetIndicator();
-                        if (activeDayName.length > 0) {
-                            setReorderStatus(`Dragging ${activeDayName}. Drop on another day to swap days.`);
-                        }
-                    }
-
-                    event.preventDefault();
-                });
-
-                handle.addEventListener("pointerup", event => {
-                    if (activePointerId === null || event.pointerId !== activePointerId) {
-                        return;
-                    }
-
-                    try {
-                        handle.releasePointerCapture(event.pointerId);
-                    } catch {
-                        // Pointer capture can already be released if the browser cancels the gesture.
-                    }
-
-                    if (reorderActivated
-                        && activeCard instanceof HTMLElement
-                        && activeDropTargetCard instanceof HTMLElement
-                        && activeDropTargetCard !== activeCard) {
-                        const sourceDayName = getCardDayName(activeCard);
-                        const targetDayName = getCardDayName(activeDropTargetCard);
-                        hasMoved = swapCardMealPayloads(activeCard, activeDropTargetCard);
-                        if (hasMoved) {
-                            pulseMovedCard(activeCard);
-                            if (sourceDayName.length > 0 && targetDayName.length > 0) {
-                                setReorderStatus(`${sourceDayName} swapped with ${targetDayName}.`);
+                    if (!(selectedRow instanceof HTMLElement)) {
+                        selectedRow = row;
+                        row.classList.add("is-selected");
+                        getRows().forEach(candidate => {
+                            const candidateButton = candidate.querySelector("[data-meal-organizer-move]");
+                            if (!(candidateButton instanceof HTMLButtonElement)) return;
+                            if (candidate === row) {
+                                candidateButton.textContent = "Cancel";
+                                candidateButton.setAttribute("aria-pressed", "true");
+                                candidateButton.setAttribute("aria-label", `Cancel moving ${row.dataset.mealOrganizerName ?? "meal"}`);
+                            } else {
+                                candidate.classList.add("is-destination");
+                                candidateButton.textContent = "Move here";
+                                candidateButton.setAttribute("aria-label", `Move ${row.dataset.mealOrganizerName ?? "meal"} to ${candidate.dataset.mealOrganizerDay ?? "this day"}, ${candidate.dataset.mealOrganizerType ?? "this slot"}`);
                             }
-                        }
-                    }
-
-                    event.preventDefault();
-                    cleanupReorder(true);
-                });
-
-                handle.addEventListener("pointercancel", event => {
-                    if (activePointerId === null || event.pointerId !== activePointerId) {
+                        });
+                        setStatus(`Moving ${row.dataset.mealOrganizerName ?? "meal"}. Choose its new slot.`);
                         return;
                     }
 
-                    try {
-                        handle.releasePointerCapture(event.pointerId);
-                    } catch {
-                        // Pointer capture can already be released if the browser cancels the gesture.
+                    if (selectedRow === row) {
+                        clearSelection();
+                        return;
                     }
-                    cleanupReorder(false);
+
+                    const movedMealName = selectedRow.dataset.mealOrganizerName ?? "Meal";
+                    if (!swapMealRows(selectedRow, row)) {
+                        clearSelection();
+                        return;
+                    }
+                    const rows = getRows();
+                    clearSelection();
+                    if (!syncOrganizerForm(rows)) {
+                        return;
+                    }
+                    setStatus(`${movedMealName} moved. Saving your plan...`);
+                    try {
+                        sessionStorage.setItem(dayReorderModeStorageKey, "true");
+                    } catch { }
+                    persistSwapScrollPosition(form);
+                    form.requestSubmit();
                 });
             });
-
-            root.querySelectorAll("[data-day-reorder-move]").forEach(button => button.addEventListener("click", event => {
-                event.preventDefault();
-                event.stopPropagation();
-                const card = button.closest("[data-day-meal-card][data-day-card-meal-names]");
-                moveDayMenu(card, button.dataset.dayReorderMove === "earlier" ? "earlier" : "later");
-            }));
         });
     };
-
     const wireDayCardCarousel = scope => {
         const carousels = scope instanceof Element
             ? Array.from(scope.querySelectorAll("[data-day-card-carousel]"))
@@ -3980,14 +3495,14 @@
             const prefersReducedMotion = typeof window.matchMedia === "function"
                 && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
             const defaultReorderToggleLabel = reorderToggle instanceof HTMLButtonElement
-                ? (reorderToggle.dataset.dayReorderDefaultLabel ?? "Swap days").trim()
-                : "Swap days";
+                ? (reorderToggle.dataset.dayReorderDefaultLabel ?? "Organise meals").trim()
+                : "Organise meals";
             const activeReorderToggleLabel = reorderToggle instanceof HTMLButtonElement
                 ? (reorderToggle.dataset.dayReorderActiveLabel ?? "Done").trim()
                 : "Done";
             const reorderModeStatusLabel = (carousel.dataset.dayReorderStatus ?? "").trim().length > 0
                 ? (carousel.dataset.dayReorderStatus ?? "").trim()
-                : "Reorder mode: drag a day card onto another day to swap days.";
+                : "Choose a meal to move, then choose its new slot.";
 
             const isStackedPresentationMode = () => isDayReorderMode;
 
@@ -5671,6 +5186,7 @@
         window.AislePilotShopping?.wireShoppingChecklist(scope);
         window.AislePilotShopping?.wireCustomShoppingList(scope);
         window.AislePilotShopping?.wireShoppingFilter();
+        window.AislePilotShopping?.wireShoppingDepartments(scope);
         window.AislePilotShopping?.wireShoppingReset();
         wireAjaxSwapHandlers(scope);
     };

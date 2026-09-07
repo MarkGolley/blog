@@ -178,20 +178,11 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeRect = activeSlide.getBoundingClientRect();
                 const centerDelta = Math.abs((activeRect.left + (activeRect.width / 2)) - (viewportRect.left + (viewportRect.width / 2)));
                 const trailingGhost = document.querySelector("[data-day-carousel-ghost-side='trailing']");
-                const ghostRect = trailingGhost instanceof HTMLElement ? trailingGhost.getBoundingClientRect() : null;
-                const ghostVisibleWidth = ghostRect
-                    ? Math.max(0, Math.min(ghostRect.right, viewportRect.right) - Math.max(ghostRect.left, viewportRect.left))
-                    : 0;
-                const ghostPlaceholder = trailingGhost instanceof HTMLElement
-                    ? trailingGhost.querySelector(".aislepilot-day-card-ghost-panel")
-                    : null;
-                const ghostTitle = trailingGhost instanceof HTMLElement ? trailingGhost.querySelector("h3") : null;
+                const ghostHidden = !(trailingGhost instanceof HTMLElement) || getComputedStyle(trailingGhost).display === "none";
                 return activeIndex === 6 &&
                     /Sunday/i.test(status.textContent || "") &&
                     centerDelta <= 12 &&
-                    ghostVisibleWidth >= 28 &&
-                    ghostPlaceholder instanceof HTMLElement &&
-                    !(ghostTitle instanceof HTMLElement);
+                    ghostHidden;
             }
             """);
 
@@ -214,20 +205,11 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const activeRect = activeSlide.getBoundingClientRect();
                 const centerDelta = Math.abs((activeRect.left + (activeRect.width / 2)) - (viewportRect.left + (viewportRect.width / 2)));
                 const leadingGhost = document.querySelector("[data-day-carousel-ghost-side='leading']");
-                const ghostRect = leadingGhost instanceof HTMLElement ? leadingGhost.getBoundingClientRect() : null;
-                const ghostVisibleWidth = ghostRect
-                    ? Math.max(0, Math.min(ghostRect.right, viewportRect.right) - Math.max(ghostRect.left, viewportRect.left))
-                    : 0;
-                const ghostPlaceholder = leadingGhost instanceof HTMLElement
-                    ? leadingGhost.querySelector(".aislepilot-day-card-ghost-panel")
-                    : null;
-                const ghostTitle = leadingGhost instanceof HTMLElement ? leadingGhost.querySelector("h3") : null;
+                const ghostHidden = !(leadingGhost instanceof HTMLElement) || getComputedStyle(leadingGhost).display === "none";
                 return activeIndex === 0 &&
                     /Monday/i.test(status.textContent || "") &&
                     centerDelta <= 12 &&
-                    ghostVisibleWidth >= 28 &&
-                    ghostPlaceholder instanceof HTMLElement &&
-                    !(ghostTitle instanceof HTMLElement);
+                    ghostHidden;
             }
             """);
     }

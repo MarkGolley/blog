@@ -34,9 +34,9 @@ public sealed partial class PlaywrightE2ETests
                 () => {
                     const setup = document.querySelector('#aislepilot-setup');
                     const review = document.querySelector('#aislepilot-planner-mode .aislepilot-outcome-summary');
-                    const action = document.querySelector("#aislepilot-planner-mode [data-setup-mode-submit='planner']");
+                    const action = document.querySelector("[data-mobile-setup-submit='planner']");
                     const detailedSummary = document.querySelector('.aislepilot-setup-summary:not(.is-generator)');
-                    const visibleSubmits = [...document.querySelectorAll('[data-setup-mode-submit]')]
+                    const visibleSubmits = [...document.querySelectorAll('[data-mobile-setup-submit]')]
                         .filter(element => {
                             const rect = element.getBoundingClientRect();
                             const style = getComputedStyle(element);
@@ -46,7 +46,7 @@ public sealed partial class PlaywrightE2ETests
                         || !(action instanceof HTMLElement) || !(detailedSummary instanceof HTMLElement)) return [-1, -1, -1, -1];
                     return [
                         setup.getBoundingClientRect().height,
-                        action.getBoundingClientRect().top - review.getBoundingClientRect().bottom,
+                        action.getBoundingClientRect().height,
                         getComputedStyle(detailedSummary).display === 'none' ? 1 : 0,
                         visibleSubmits.length
                     ];
@@ -54,9 +54,17 @@ public sealed partial class PlaywrightE2ETests
                 """);
 
             Assert.True(metrics[0] <= 2234, $"Expected compact setup at or below 2,234px. Height={metrics[0]:F1}px.");
-            Assert.True(metrics[1] >= 7, $"Expected review immediately before action with at least 8px separation. Gap={metrics[1]:F1}px.");
+            Assert.True(metrics[1] >= 47, $"Expected a persistent mobile generate action. Height={metrics[1]:F1}px.");
             Assert.Equal(1, metrics[2]);
             Assert.Equal(1, metrics[3]);
+            Assert.True(await page.Locator("details[data-plan-basic-item='meal-types']").GetAttributeAsync("open") is not null);
+            Assert.True(await page.Locator("details[data-plan-basic-item='plan-days']").GetAttributeAsync("open") is null);
+            Assert.True(await page.Locator("details[data-plan-basic-item='budget']").GetAttributeAsync("open") is null);
+            Assert.True(await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Generate plan now", Exact = true }).IsVisibleAsync());
+
+            await page.Locator("[data-setup-mode-toggle='generator']").ClickAsync();
+            Assert.True(await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Find meal ideas now", Exact = true }).IsVisibleAsync());
+            Assert.True(await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Generate plan now", Exact = true }).IsHiddenAsync());
         }
 
         await using (var desktopContext = await CreateDesktopContextAsync())
@@ -181,7 +189,7 @@ public sealed partial class PlaywrightE2ETests
         await coreIngredients.FocusAsync();
         await page.Keyboard.PressAsync("Space");
         Assert.True(await coreIngredients.IsCheckedAsync());
-        var submit = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Generate 3 meal ideas" });
+        var submit = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Find meal ideas now" });
         await submit.FocusAsync();
         await page.Keyboard.PressAsync("Enter");
 
@@ -325,7 +333,7 @@ public sealed partial class PlaywrightE2ETests
         Assert.False(await page.Locator("[data-planner-only-preference]").First.IsVisibleAsync());
         Assert.True(await page.Locator("[data-generator-only-preference]").First.IsVisibleAsync());
         Assert.True(await page.Locator("#aislepilot-generator-mode .aislepilot-outcome-summary").IsVisibleAsync());
-        Assert.True(await page.Locator("#aislepilot-generator-mode [data-setup-mode-submit='generator']").IsVisibleAsync());
+        Assert.True(await page.Locator("[data-mobile-setup-submit='generator']").IsVisibleAsync());
         Assert.False(await page.Locator("input[type='checkbox'][name='Request.RequireCorePantryIngredients']").IsDisabledAsync());
 
         await page.ReloadAsync();
@@ -373,7 +381,7 @@ public sealed partial class PlaywrightE2ETests
             """
             () => {
                 const outcome = document.querySelector("#aislepilot-planner-mode .aislepilot-outcome-summary");
-                const action = document.querySelector("#aislepilot-planner-mode [data-setup-mode-submit='planner']");
+                const action = document.querySelector("[data-mobile-setup-submit='planner']");
                 const summary = document.querySelector("details[data-planner-personalise] > summary");
                 if (!(outcome instanceof HTMLElement) || !(action instanceof HTMLElement) || !(summary instanceof HTMLElement)) {
                     return [-1, -1, -1, -1];
@@ -381,11 +389,12 @@ public sealed partial class PlaywrightE2ETests
                 const outcomeRect = outcome.getBoundingClientRect();
                 const actionRect = action.getBoundingClientRect();
                 const summaryRect = summary.getBoundingClientRect();
-                return [outcomeRect.bottom, actionRect.top, summaryRect.height, document.documentElement.scrollWidth - window.innerWidth];
+                return [outcomeRect.height, actionRect.height, summaryRect.height, document.documentElement.scrollWidth - window.innerWidth];
             }
             """);
 
-        Assert.True(layout[1] >= layout[0] + 7, $"Expected at least 8px between outcome and action. Gap={layout[1] - layout[0]:F1}px.");
+        Assert.True(layout[0] > 0, $"Expected the outcome summary to remain available. Height={layout[0]:F1}px.");
+        Assert.True(layout[1] >= 47, $"Expected the persistent action to remain touch friendly. Height={layout[1]:F1}px.");
         Assert.True(layout[2] >= 44, $"Expected Personalise summary to be at least 44px tall. Height={layout[2]:F1}px.");
         Assert.True(layout[3] <= 1, $"Expected no horizontal overflow. Overflow={layout[3]:F1}px.");
     }

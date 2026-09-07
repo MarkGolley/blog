@@ -122,4 +122,41 @@ public sealed partial class PlaywrightE2ETests
         Assert.True(metrics[1] <= 1, $"Expected long item inside viewport. Overflow={metrics[1]:F1}px.");
         Assert.True(metrics[2] >= 44, $"Expected at least a 44px row target. Height={metrics[2]:F1}px.");
     }
+
+    [Fact]
+    public async Task Mobile_AislePilotShoppingChecklist_SearchesAndCollapsesDepartmentsWithStickyControls()
+    {
+        if (!IsE2EEnabled()) return;
+        await using var context = await CreateMobileContextAsync();
+        var page = await context.NewPageAsync();
+        await GoToAislePilotAndGeneratePlanAsync(page);
+        await page.Locator("[data-window-tab='aislepilot-shop']").ClickAsync();
+
+        var departments = page.Locator("[data-shopping-department]");
+        Assert.True(await departments.CountAsync() > 1);
+        Assert.True(await departments.First.GetAttributeAsync("open") is not null);
+        Assert.True(await departments.Nth(1).GetAttributeAsync("open") is null);
+
+        await departments.Nth(1).Locator("summary").ClickAsync();
+        Assert.True(await departments.Nth(1).GetAttributeAsync("open") is not null);
+
+        var firstItem = page.Locator("[data-shopping-department] [data-shopping-item-text]").First;
+        var itemName = (await firstItem.TextContentAsync())?.Trim();
+        Assert.False(string.IsNullOrWhiteSpace(itemName));
+        await page.Locator("[data-shopping-search]").FillAsync(itemName!);
+
+        Assert.True(await page.Locator("[data-shopping-department]:visible").CountAsync() >= 1);
+        Assert.Equal(
+            0,
+            await page.Locator("[data-shopping-department] li:visible [data-shopping-item-text]")
+                .EvaluateAllAsync<int>("(items, query) => items.filter(item => !(item.textContent || '').toLocaleLowerCase().includes(query)).length", itemName!.ToLowerInvariant()));
+
+        await page.Locator("[data-shopping-search]").FillAsync("an item that is not on this list");
+        Assert.True(await page.Locator("[data-shopping-filter-empty]").IsVisibleAsync());
+
+        await page.Locator("[data-shopping-search]").FillAsync(string.Empty);
+        await departments.Last.Locator("summary").ScrollIntoViewIfNeededAsync();
+        var toolbarTop = await page.Locator(".aislepilot-shopping-toolbar").EvaluateAsync<double>("toolbar => toolbar.getBoundingClientRect().top");
+        Assert.InRange(toolbarTop, 0, 20);
+    }
 }

@@ -81,6 +81,8 @@ public partial class AislePilotIntegrationTests
 
         Assert.Contains("const pollBatchSize = 3;", script, StringComparison.Ordinal);
         Assert.Contains("Array.from(pendingByMealName.keys()).slice(0, pollBatchSize)", script, StringComparison.Ordinal);
+        Assert.Contains("const priority = panelIsActive && slideIsActive ? 0 : panelIsActive ? 1 : slideIsActive ? 2 : 3;", script, StringComparison.Ordinal);
+        Assert.Contains(".sort((first, second) => first.priority - second.priority || first.documentIndex - second.documentIndex)", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -92,7 +94,7 @@ public partial class AislePilotIntegrationTests
 
         Assert.Contains("imageElement.srcset = `${pollContext.fallbackUrl} 512w`;", script, StringComparison.Ordinal);
         Assert.Contains("imageElement.srcset = `${cachedImageUrl} 1024w`;", script, StringComparison.Ordinal);
-        Assert.Contains("imageElement.srcset = `${cacheBustedUrl} 1024w`;", script, StringComparison.Ordinal);
+        Assert.Contains("imageElement.srcset = `${nextImageUrl} 1024w`;", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -110,21 +112,16 @@ public partial class AislePilotIntegrationTests
     }
 
     [Fact]
-    public async Task AislePilotScript_DayCardReorder_SwapsMealPayloadsWithoutMovingDayCards()
+    public async Task AislePilotScript_MealOrganizer_SwapsIndividualSlotsAndSavesPlanOrder()
     {
         using var client = CreateClient(allowAutoRedirect: true);
 
         var script = await GetCombinedAislePilotScriptAsync(client);
 
-        Assert.Contains("const swapCardMealPayloads = (firstCard, secondCard) => {", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("\"dayCardMealNames\"", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("\"dayCardIgnoredFlags\"", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("\"dayCardHasSpecialTreat\"", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("const firstMealList = firstCard.querySelector(\"[data-day-reorder-meal-list]\");", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("firstMealList.innerHTML = secondMealList.innerHTML;", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("!swapCardMealPayloads(card, cards[targetIndex])", script, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("hasMoved = swapCardMealPayloads(activeCard, activeDropTargetCard);", script, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("const firstSummary = firstCard.querySelector(\"[data-day-card-summary]\");", script, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("const swapCards = (firstCard, secondCard) => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("const swapMealRows = (first, second) => {", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-meal-organizer-slot", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("candidateButton.textContent = \"Move here\";", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("form.requestSubmit();", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dispatchEvent(new KeyboardEvent", script, StringComparison.OrdinalIgnoreCase);
     }
 }

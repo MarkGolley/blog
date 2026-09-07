@@ -176,6 +176,48 @@ background: transparent;
 :root[data-theme] .aislepilot-app .aislepilot-personalise-content {
 background: var(--ap-refresh-surface);
 border-color: var(--ap-refresh-border);
+gap: .5rem;
+}
+
+.aislepilot-mobile-generate-dock {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .aislepilot-app #aislepilot-setup:not([hidden]) {
+        padding-bottom: 5.6rem;
+    }
+
+    .aislepilot-mobile-generate-dock {
+        position: fixed;
+        left: 50%;
+        bottom: max(.65rem, env(safe-area-inset-bottom));
+        z-index: 45;
+        display: block;
+        width: min(calc(100vw - 1rem), 28rem);
+        padding: .48rem;
+        border: 1px solid var(--ap-refresh-border-strong);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--ap-refresh-surface) 94%, transparent);
+        box-shadow: 0 14px 32px rgb(15 35 28 / .2);
+        backdrop-filter: blur(16px);
+        transform: translateX(-50%);
+    }
+
+    .aislepilot-mobile-generate-dock button {
+        width: 100%;
+        min-height: 48px;
+        justify-content: center;
+        border-radius: 8px;
+    }
+
+    .aislepilot-mobile-generate-dock button[hidden] {
+        display: none;
+    }
+
+    .aislepilot-submit-actions > button[data-setup-mode-submit] {
+        display: none;
+    }
 }
 :root[data-theme] .aislepilot-app .aislepilot-setup-mode-switch {
 background: transparent;

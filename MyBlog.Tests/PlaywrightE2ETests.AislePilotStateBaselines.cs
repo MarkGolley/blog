@@ -195,7 +195,8 @@ public sealed partial class PlaywrightE2ETests
 
     private static ILocator GetAislePilotGenerateButton(IPage page) =>
         page.Locator(
-            "form.aislepilot-form button[type='submit']:has-text('Generate weekly plan')");
+            "form.aislepilot-form button[data-mobile-setup-submit='planner']:visible, " +
+            "form.aislepilot-form button[data-setup-mode-submit='planner']:visible").First;
 
     private static async Task WriteAislePilotStateScreenshotAsync(
         IPage page,

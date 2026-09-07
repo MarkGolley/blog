@@ -17,15 +17,18 @@ public sealed partial class PlaywrightE2ETests
         await GoToAislePilotSetupAsync(page);
 
         var form = page.Locator("#aislepilot-setup-form");
-        var budget = form.Locator("input[name='Request.WeeklyBudget']").First;
+        var budget = form.Locator("details[data-plan-basic-item='budget'] input[name='Request.WeeklyBudget']");
         await AssertAllSummaryValuesAsync(form, "budget", $"£{await budget.InputValueAsync()}");
 
-        await form.Locator("[data-budget-precision-trigger]").EvaluateAsync("button => button.click()");
-        await form.Locator("[data-budget-precision-input]").FillAsync("110");
-        await form.Locator("[data-budget-precision-input]").DispatchEventAsync("change");
+        await form.Locator("details[data-plan-basic-item='budget'], details[data-plan-basic-item='plan-days']")
+            .EvaluateAllAsync<int>("details => { details.forEach(item => item.open = true); return details.length; }");
+        await budget.EvaluateAsync(
+            "input => { input.value = '110'; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); }");
         await form.Locator("input[name='Request.HouseholdSize']").FillAsync("3");
-        await form.Locator("input[name='Request.PlanDays']").First.FillAsync("5");
-        await form.Locator("input[name='Request.SelectedMealTypes'][value='Breakfast']").UncheckAsync(new LocatorUncheckOptions { Force = true });
+        await form.Locator("details[data-plan-basic-item='plan-days'] input[name='Request.PlanDays']").EvaluateAsync(
+            "input => { input.value = '5'; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); }");
+        await form.Locator("input[name='Request.SelectedMealTypes'][value='Breakfast']").EvaluateAsync(
+            "input => { input.checked = false; input.dispatchEvent(new Event('change', { bubbles: true })); }");
         await form.Locator("input[name='Request.Supermarket'][value='Aldi']:not(:disabled)").EvaluateAsync(
             "input => { input.checked = true; input.dispatchEvent(new Event('change', { bubbles: true })); }");
 
@@ -101,12 +104,13 @@ public sealed partial class PlaywrightE2ETests
             await mealTypes.First.UncheckAsync(new LocatorUncheckOptions { Force = true });
         }
 
-        await page.Locator("[data-setup-mode-submit='planner']").ClickAsync(new LocatorClickOptions { Force = true });
+        await page.Locator("[data-mobile-setup-submit='planner']").ClickAsync();
         await page.Locator("[data-validation-summary]").WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 15000
         });
+        Assert.Single(await page.Locator("[data-validation-summary] a[href='#aislepilot-meal-types']").AllAsync());
 
         var form = page.Locator("#aislepilot-setup-form");
         var budget = await form.Locator("input[name='Request.WeeklyBudget']").First.InputValueAsync();

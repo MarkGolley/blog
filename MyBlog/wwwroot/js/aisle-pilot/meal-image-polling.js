@@ -8,7 +8,7 @@ const fastFollowupPollIntervalMs = 750;
 const mediumFollowupPollIntervalMs = 1500;
 const pollBatchSize = 3;
 const mealImageCacheStorageKey = "aislepilot:meal-image-cache";
-const mealImageCacheTtlMs = Number.isInteger(config.cacheTtlMs) ? config.cacheTtlMs : 1000 * 60 * 60 * 12;
+const mealImageCacheTtlMs = Number.isInteger(config.cacheTtlMs) ? config.cacheTtlMs : 1000 * 60 * 60 * 24 * 30;
 let pollTimerId = null;
 let pollLoopActive = false;
 let pollInFlight = false;
@@ -45,7 +45,7 @@ return;
 }
 mealImageCacheLoaded = true;
 try {
-const raw = sessionStorage.getItem(mealImageCacheStorageKey);
+const raw = localStorage.getItem(mealImageCacheStorageKey);
 if (!raw) {
 return;
 }
@@ -88,7 +88,7 @@ url: value.url,
 at: value.at
 };
 });
-sessionStorage.setItem(mealImageCacheStorageKey, JSON.stringify(payload));
+localStorage.setItem(mealImageCacheStorageKey, JSON.stringify(payload));
 } catch {
 // Ignore storage issues in private browsing modes.
 }
@@ -291,7 +291,18 @@ const pendingByMealName = new Map();
 if (!pollContext) {
 return pendingByMealName;
 }
-pollContext.imageElements.forEach(imageElement => {
+const orderedImageElements = pollContext.imageElements
+.map((imageElement, documentIndex) => {
+const panel = imageElement.closest("[data-day-meal-panel]");
+const slide = imageElement.closest("[data-day-card-slide]");
+const panelIsActive = !(panel instanceof HTMLElement) || panel.getAttribute("aria-hidden") !== "true";
+const slideIsActive = !(slide instanceof HTMLElement) || slide.getAttribute("aria-hidden") !== "true";
+const priority = panelIsActive && slideIsActive ? 0 : panelIsActive ? 1 : slideIsActive ? 2 : 3;
+return { imageElement, documentIndex, priority };
+})
+.sort((first, second) => first.priority - second.priority || first.documentIndex - second.documentIndex)
+.map(entry => entry.imageElement);
+orderedImageElements.forEach(imageElement => {
 if (!(imageElement instanceof HTMLImageElement)) {
 return;
 }
@@ -401,7 +412,6 @@ return;
 }
 imageUrlByMealName.set(mealName, imageUrl);
 });
-const cacheVersionToken = Date.now();
 const applyUpdateTasks = Array.from(pendingByMealName.entries()).map(async ([mealName, imageElements]) => {
 const nextImageUrl = imageUrlByMealName.get(mealName);
 if (!nextImageUrl) {
@@ -410,15 +420,14 @@ return;
 if (normalizeImagePath(nextImageUrl) === pollContext.fallbackPath) {
 return;
 }
-const cacheBustedUrl = `${nextImageUrl}${nextImageUrl.includes("?") ? "&" : "?"}v=${cacheVersionToken}`;
-const didLoad = await preloadImage(cacheBustedUrl);
+const didLoad = await preloadImage(nextImageUrl);
 if (!didLoad) {
 return;
 }
 setCachedMealImageUrl(mealName, nextImageUrl);
 imageElements.forEach(imageElement => {
 if (imageElement instanceof HTMLImageElement) {
-imageElement.src = cacheBustedUrl; imageElement.srcset = `${cacheBustedUrl} 1024w`;
+imageElement.src = nextImageUrl; imageElement.srcset = `${nextImageUrl} 1024w`;
 setMealImageLoadingState(imageElement, false);
 window.AislePilotPerformance?.reportDuration(
 "image_placeholder_to_image", imageStarts.get(imageElement));

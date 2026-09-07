@@ -574,7 +574,7 @@
                              data-results-stage="selected-day"
                              aria-label="Meal plan by day"
                              data-day-card-count="@dayMealGroups.Count"
-                             data-day-reorder-status="Rearrange your week. Use Earlier or Later, or drag a menu onto another day.">
+                             data-day-reorder-status="Choose a meal to move, then choose its new slot.">
                         <div class="aislepilot-day-carousel-header">
                             <div class="aislepilot-day-carousel-status"
                                  aria-live="polite"
@@ -590,8 +590,8 @@
                              }
                          </div>
                          <div class="aislepilot-day-reorder-guide" data-day-reorder-guide aria-hidden="true">
-                             <strong>Rearrange your week</strong>
-                             <span>Move a complete day’s menu earlier or later. Your weekday labels stay in place.</span>
+                             <strong>Organise your meals</strong>
+                             <span>Tap Move on a meal, then choose another slot. The two meals will swap places.</span>
                          </div>
                         <div class="aislepilot-meal-grid"
                              data-day-carousel-viewport
@@ -620,11 +620,6 @@
                                     var dayWeekIndex = weekDayLookup.TryGetValue(dayGroup.Day, out var resolvedWeekDayIndex)
                                         ? resolvedWeekDayIndex
                                         : Math.Clamp(dayGroupIndex, 0, Math.Max(0, result.PlanDays - 1));
-                                    var serializedDayMealNames = JsonSerializer.Serialize(dayGroup.Entries.Select(entry => entry.meal.MealName).ToList());
-                                    var serializedIgnoredFlags = JsonSerializer.Serialize(dayGroup.Entries
-                                        .Select(entry => ignoredMealSlotIndexes.Contains(entry.index) || entry.meal.IsIgnored)
-                                        .ToList());
-                                    var dayGroupHasSpecialTreat = dayGroup.Entries.Any(entry => entry.meal.IsSpecialTreat);
                                     var dayCardHeadingId = $"day-card-heading-{firstMealIndex}";
                                     <article class="@mealCardClass"
                                              id="@($"day-card-{firstMealIndex}")"
@@ -633,12 +628,9 @@
                                              data-day-meal-card
                                              data-day-card-order="@dayGroupIndex"
                                              data-day-card-leftover-count="@dayGroup.LeftoverDaysCovered"
-                                             data-day-card-meal-names="@serializedDayMealNames"
-                                             data-day-card-ignored-flags="@serializedIgnoredFlags"
                                              data-day-card-day-name="@dayGroup.Day"
                                              data-day-card-day-position="@(dayGroupIndex + 1)"
                                              data-day-card-total-days="@dayMealGroups.Count"
-                                             data-day-card-has-special-treat="@(dayGroupHasSpecialTreat ? "true" : "false")"
                                              data-day-card-slide
                                              aria-labelledby="@dayCardHeadingId"
                                              aria-roledescription="slide"
@@ -661,10 +653,6 @@
                                         }
                                     </div>
                                     <div class="aislepilot-day-card-head-side">
-                                        @if (canReorderDayCards)
-                                        {
-                                            <partial name="_AislePilotDayReorderHandle" model="(dayGroup.Day, dayGroupIndex > 0, dayGroupIndex < dayMealGroups.Count - 1)" />
-                                        }
                                         @if (result.PlanDays > 1)
                                         {
                                             var dayAllocationAriaLabel = dayGroup.LeftoverDaysCovered > 0 ? $"{dayGroup.Day}: cook-extra x{dayGroup.LeftoverDaysCovered}" : $"{dayGroup.Day}: no cook-extra";
@@ -681,7 +669,21 @@
                                     {
                                         var reorderMeal = slotEntry.meal;
                                         var reorderMealIsIgnored = ignoredMealSlotIndexes.Contains(slotEntry.index) || reorderMeal.IsIgnored;
-                                        <div class="aislepilot-day-reorder-meal-item@(reorderMealIsIgnored ? " is-ignored" : string.Empty)" data-day-reorder-meal-item><img class="aislepilot-day-reorder-meal-thumbnail" data-day-reorder-meal-thumbnail src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(reorderMeal.MealImageUrl)" alt="" width="32" height="32" loading="lazy" decoding="async" /><span class="aislepilot-day-reorder-meal-type">@reorderMeal.MealType</span><span class="aislepilot-day-reorder-meal-name">@reorderMeal.MealName</span></div>
+                                        <div class="aislepilot-day-reorder-meal-item@(reorderMealIsIgnored ? " is-ignored" : string.Empty)"
+                                             data-day-reorder-meal-item
+                                             data-meal-organizer-slot="@slotEntry.index"
+                                             data-meal-organizer-name="@reorderMeal.MealName"
+                                             data-meal-organizer-special-treat="@(reorderMeal.IsSpecialTreat ? "true" : "false")"
+                                             data-meal-organizer-day-index="@dayGroupIndex"
+                                             data-meal-organizer-day="@dayGroup.Day"
+                                             data-meal-organizer-type="@reorderMeal.MealType">
+                                            <span class="aislepilot-meal-organizer-content" data-meal-organizer-content>
+                                                <img class="aislepilot-day-reorder-meal-thumbnail" data-day-reorder-meal-thumbnail src="@AislePilotMealImageUrlResolver.ResolveClientMealImageUrl(reorderMeal.MealImageUrl)" alt="" width="32" height="32" loading="lazy" decoding="async" />
+                                                <span class="aislepilot-day-reorder-meal-name">@reorderMeal.MealName</span>
+                                            </span>
+                                            <span class="aislepilot-day-reorder-meal-type">@reorderMeal.MealType</span>
+                                            <button type="button" class="aislepilot-meal-organizer-move" data-meal-organizer-move aria-label="Move @reorderMeal.MealName">Move</button>
+                                        </div>
                                     }
                                 </div>
                                 @if (dayGroup.Entries.Count > 1)
@@ -1139,6 +1141,14 @@
                     <p class="aislepilot-shopping-instruction">Tick items you have or have picked up. This does not change the plan estimate.</p>
                     <div class="aislepilot-shopping-toolbar">
                         <p class="aislepilot-shopping-progress" data-shopping-progress role="status" aria-live="polite"></p>
+                        <label class="aislepilot-shopping-search">
+                            <span class="sr-only">Find an item in this shopping list</span>
+                            <input type="search"
+                                   inputmode="search"
+                                   autocomplete="off"
+                                   placeholder="Find an item"
+                                   data-shopping-search />
+                        </label>
                         <label class="aislepilot-shopping-filter">
                             <input type="checkbox" data-shopping-hide-checked />
                             <span data-shopping-filter-label>Hide checked items</span>
@@ -1150,6 +1160,7 @@
                             <button type="button" data-shopping-reset-cancel>Cancel</button>
                         </div>
                     </div>
+                    <p class="aislepilot-shopping-filter-empty" data-shopping-filter-empty hidden>No matching items.</p>
                     @if (result.IncludeDessertAddOn)
                     {
                         <p class="aislepilot-window-meta">
@@ -1159,11 +1170,11 @@
                     <div class="aislepilot-shopping-grid">
                         @foreach (var department in groupedItems)
                         {
-                            <article class="aislepilot-card aislepilot-shop-card" data-shopping-department>
-                                <div class="aislepilot-shop-card-head">
+                            <details class="aislepilot-card aislepilot-shop-card" data-shopping-department open>
+                                <summary class="aislepilot-shop-card-head">
                                     <h3>@department.Key</h3>
                                     <span class="aislepilot-shop-card-count" data-shopping-department-count>@department.Count() item(s)</span>
-                                </div>
+                                </summary>
                                 <ul class="aislepilot-shop-list">
                                     @foreach (var item in department)
                                     {
@@ -1184,7 +1195,7 @@
                                         </li>
                                     }
                                 </ul>
-                            </article>
+                            </details>
                         }
                         <article class="aislepilot-card aislepilot-shop-card aislepilot-shop-card-custom"
                                  data-custom-shopping-shell>

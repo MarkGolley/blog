@@ -33,6 +33,6 @@ public partial class AislePilotIntegrationTests
 
         Assert.Contains("data-special-treat-badge", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Treat meal", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-day-card-has-special-treat=\"true\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-meal-organizer-special-treat=\"true\"", html, StringComparison.OrdinalIgnoreCase);
     }
 }

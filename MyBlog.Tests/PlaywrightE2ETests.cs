@@ -424,7 +424,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 }
 
                 pollRoot.dataset.mealImagePollEnabled = "true";
-                window.sessionStorage.removeItem("aislepilot:meal-image-cache");
+                window.localStorage.removeItem("aislepilot:meal-image-cache");
                 const fallbackImageUrl = pollRoot.dataset.fallbackMealImageUrl?.trim() || "/projects/aisle-pilot/images/aislepilot-icon.svg";
                 targetImage.src = fallbackImageUrl;
 
@@ -468,7 +468,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotMealImagePolling_UsesSessionCacheBeforePolling()
+    public async Task Mobile_AislePilotMealImagePolling_UsesPersistentCacheBeforePolling()
     {
         if (!IsE2EEnabled())
         {
@@ -504,7 +504,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
                 const mealKey = mealName.toLowerCase();
                 const cachedImageUrl = "/projects/aisle-pilot/images/aislepilot-meals/egg-fried-rice.png";
-                window.sessionStorage.setItem(
+                window.localStorage.setItem(
                     "aislepilot:meal-image-cache",
                     JSON.stringify({
                         [mealKey]: {

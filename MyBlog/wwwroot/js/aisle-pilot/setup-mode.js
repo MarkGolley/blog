@@ -26,6 +26,8 @@
             }
             const modeSubmitButtons = Array.from(panelScope.querySelectorAll("button[type='submit'][data-setup-mode-submit]"))
                 .filter(button => button instanceof HTMLButtonElement);
+            const mobileSubmitButtons = Array.from(panelScope.querySelectorAll("button[type='submit'][data-mobile-setup-submit]"))
+                .filter(button => button instanceof HTMLButtonElement);
             const modeValueInput = panelScope.querySelector("[data-setup-mode-value]");
             const modeIds = buttons
                 .map(button => button.dataset.setupModeToggle?.trim() ?? "")
@@ -72,6 +74,14 @@
                         panel.setAttribute("hidden", "hidden");
                         panel.setAttribute("aria-hidden", "true");
                     }
+                });
+
+                mobileSubmitButtons.forEach(button => {
+                    if (!(button instanceof HTMLButtonElement)) {
+                        return;
+                    }
+
+                    button.hidden = button.dataset.mobileSetupSubmit !== nextMode;
                 });
 
                 if (modeValueInput instanceof HTMLInputElement) {
@@ -204,6 +214,17 @@
 
             const initialMode = forceDefault ? visibleMode ?? defaultMode : storedMode ?? visibleMode ?? defaultMode;
             applyMode(initialMode, { persist: false });
+
+            if (window.matchMedia("(max-width: 767px)").matches) {
+                panelScope.querySelectorAll("details[data-plan-basic-item='plan-days'], details[data-plan-basic-item='budget']")
+                    .forEach(details => {
+                        if (!(details instanceof HTMLDetailsElement) || details.querySelector(".text-danger:not(:empty)")) {
+                            return;
+                        }
+
+                        details.open = false;
+                    });
+            }
             modeSwitch.dataset.setupModeWired = "true";
         });
     };

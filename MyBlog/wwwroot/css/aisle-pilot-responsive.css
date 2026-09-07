@@ -286,17 +286,6 @@
         gap: 0.58rem;
     }
 
-    .aislepilot-day-carousel.is-day-reorder-mode[data-day-reorder-mode="true"] .aislepilot-day-card-reorder-handle,
-    .aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-day-card-reorder-handle {
-        height: 2rem;
-        min-width: 4.6rem;
-        padding-inline: 0.42rem;
-    }
-
-    .aislepilot-day-card-reorder-handle-label {
-        font-size: 0.6rem;
-    }
-
     .aislepilot-day-carousel[data-day-reorder-mode="true"] .aislepilot-day-meal-track > .aislepilot-day-meal-panel:first-child {
         grid-template-columns: minmax(0, 1fr) 5.05rem;
         column-gap: 0.5rem;

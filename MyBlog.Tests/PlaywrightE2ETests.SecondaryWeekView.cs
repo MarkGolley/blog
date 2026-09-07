@@ -5,7 +5,7 @@ namespace MyBlog.Tests;
 public sealed partial class PlaywrightE2ETests
 {
     [Fact]
-    public async Task AislePilot_UsesSwapDaysAsItsOnlySecondaryWeekView()
+    public async Task AislePilot_MealOrganizer_MovesMealBetweenDaySlots()
     {
         if (!IsE2EEnabled()) return;
         await using var context = await CreateDesktopContextAsync();
@@ -13,42 +13,46 @@ public sealed partial class PlaywrightE2ETests
         await GoToAislePilotAndGeneratePlanAsync(page);
 
         Assert.Equal(0, await page.Locator("[data-day-view-toggle]").CountAsync());
-        var swapDays = page.Locator("[data-day-reorder-toggle]").First;
-        Assert.Equal("Swap days", (await swapDays.InnerTextAsync()).Trim());
-        await swapDays.ClickAsync();
+        var organizerToggle = page.Locator("[data-day-reorder-toggle]").First;
+        Assert.Equal("Organise meals", (await organizerToggle.InnerTextAsync()).Trim());
+        await organizerToggle.ClickAsync();
 
         await page.WaitForFunctionAsync("""
             () => document.querySelector("[data-day-card-carousel]")?.getAttribute("data-day-reorder-mode") === "true"
         """);
         Assert.True(await page.Locator("[data-day-carousel-pagination]").IsHiddenAsync());
         Assert.Equal(0, await page.Locator("[data-day-card-slide]:not([data-day-carousel-ghost='true'])[aria-hidden='true']").CountAsync());
-        Assert.Equal("Done", (await swapDays.InnerTextAsync()).Trim());
+        Assert.Equal("Done", (await organizerToggle.InnerTextAsync()).Trim());
         var guide = page.Locator("[data-day-reorder-guide]");
         Assert.True(await guide.IsVisibleAsync());
         Assert.Equal("false", await guide.GetAttributeAsync("aria-hidden"));
-        Assert.True(await page.Locator("[data-day-reorder-handle]").First.IsVisibleAsync());
-        Assert.True(await page.Locator("[data-day-reorder-move='later']").First.IsVisibleAsync());
+        Assert.Equal(0, await page.Locator("[data-day-reorder-handle], [data-day-reorder-move]").CountAsync());
 
-        var dayCards = page.Locator("[data-day-meal-card][data-day-card-meal-names]");
-        var secondDayMeals = await dayCards.Nth(1).GetAttributeAsync("data-day-card-meal-names");
-        Assert.False(string.IsNullOrWhiteSpace(secondDayMeals));
-        await dayCards.Nth(0).Locator("[data-day-reorder-move='later']").ClickAsync();
+        var organizerRows = page.Locator("[data-meal-organizer-slot][data-meal-organizer-name]");
+        Assert.True(await organizerRows.CountAsync() > 3);
+        var destinationIndex = 3;
+        var destinationMeal = await organizerRows.Nth(destinationIndex).GetAttributeAsync("data-meal-organizer-name");
+        Assert.False(string.IsNullOrWhiteSpace(destinationMeal));
+        await organizerRows.Nth(0).Locator("[data-meal-organizer-move]").ClickAsync();
+        Assert.Equal("Cancel", (await organizerRows.Nth(0).Locator("[data-meal-organizer-move]").InnerTextAsync()).Trim());
+        Assert.Equal("Move here", (await organizerRows.Nth(destinationIndex).Locator("[data-meal-organizer-move]").InnerTextAsync()).Trim());
+        await organizerRows.Nth(destinationIndex).Locator("[data-meal-organizer-move]").ClickAsync();
         await page.WaitForFunctionAsync(
             """
-            expectedMeals => {
-                const cards = document.querySelectorAll("[data-day-meal-card][data-day-card-meal-names]");
+            expectedMeal => {
+                const rows = document.querySelectorAll("[data-meal-organizer-slot][data-meal-organizer-name]");
                 const form = document.querySelector("[data-day-reorder-form]");
-                return cards.length > 1
-                    && cards[0].getAttribute("data-day-card-meal-names") === expectedMeals
+                return rows.length > 3
+                    && rows[0].getAttribute("data-meal-organizer-name") === expectedMeal
                     && form?.getAttribute("data-ajax-swap-submitting") !== "true";
             }
             """,
-            secondDayMeals);
+            destinationMeal);
 
         Assert.Equal(1, await page.Locator("[data-day-reorder-toggle]").CountAsync());
-        Assert.Equal("Done", (await swapDays.InnerTextAsync()).Trim());
+        Assert.Equal("Done", (await organizerToggle.InnerTextAsync()).Trim());
 
-        await swapDays.ClickAsync();
+        await organizerToggle.ClickAsync();
         await page.WaitForFunctionAsync("""
             () => document.querySelector("[data-day-card-carousel]")?.getAttribute("data-day-reorder-mode") === "false"
         """);

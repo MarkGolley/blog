@@ -6,7 +6,7 @@ namespace MyBlog.Tests;
 public partial class AislePilotIntegrationTests
 {
     [Fact]
-    public async Task Index_Post_WithThreeMealsPerDay_RendersFullDayMealListForReorderMode()
+    public async Task Index_Post_WithThreeMealsPerDay_RendersMealOrganizerSlots()
     {
         using var client = CreateClient(allowAutoRedirect: true);
         var antiForgeryToken = await GetAntiForgeryTokenAsync(client, "/projects/aisle-pilot");
@@ -38,14 +38,14 @@ public partial class AislePilotIntegrationTests
         Assert.Contains("data-day-reorder-meal-thumbnail", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-day-reorder-meal-type", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("aislepilot-day-reorder-meal-name", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-day-reorder-default-label=\"Swap days\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-day-reorder-move=\"earlier\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("data-day-reorder-move=\"later\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("aria-label=\"Move Monday menu earlier\" disabled", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("aria-label=\"Move Tuesday menu later\" disabled", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Use Earlier or Later", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-day-reorder-default-label=\"Organise meals\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-meal-organizer-slot=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-meal-organizer-name=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-meal-organizer-move", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-day-reorder-move=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-day-reorder-handle", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-day-reorder-guide", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Your weekday labels stay in place", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("The two meals will swap places", html, StringComparison.OrdinalIgnoreCase);
 
         var reorderMealItemCount = Regex.Matches(html, "data-day-reorder-meal-item", RegexOptions.IgnoreCase).Count;
         Assert.True(reorderMealItemCount >= 6, $"Expected at least 6 reorder meal items for 2 days x 3 meals, but found {reorderMealItemCount}.");

@@ -234,7 +234,10 @@
         .Select(error => validationTargets.TryGetValue(error.Key, out var target)
             ? new AislePilotAlertItemViewModel(error.Message!, target.Id, target.Label)
             : new AislePilotAlertItemViewModel(error.Message!, null, null))
-        .DistinctBy(error => new { error.Message, error.TargetId })
+        .GroupBy(
+            error => error.TargetId is null ? $"message:{error.Message}" : $"target:{error.TargetId}",
+            StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First())
         .ToList();
     var hasModelErrors = modelErrors.Count > 0;
     var firstValidationTargetId = modelErrors.FirstOrDefault(error => error.TargetId is not null)?.TargetId;
@@ -336,6 +339,23 @@
                          ["GeneratorSelected"] = shouldShowGeneratorMode ? "true" : "false"
                      }' />
 
+            <div class="aislepilot-mobile-generate-dock" aria-label="Generate meal plan">
+                <button type="submit"
+                        data-mobile-setup-submit="planner"
+                        data-loading-label="Generating plan..."
+                        data-show-plan-skeleton
+                        @(shouldShowGeneratorMode ? "hidden" : null)>
+                    Generate plan now
+                </button>
+                <button type="submit"
+                        data-mobile-setup-submit="generator"
+                        data-loading-label="Finding 3 meals..."
+                        formaction="@Url.Action("SuggestFromPantry", "AislePilot")"
+                        @(!shouldShowGeneratorMode ? "hidden" : null)>
+                    Find meal ideas now
+                </button>
+            </div>
+
             <div class="aislepilot-setup-workspace">
                 <div class="aislepilot-setup-primary">
                     <section class="aislepilot-setup-step">
@@ -399,7 +419,7 @@
                             <span class="aislepilot-collapsible-title">Meal slots</span>
                             <span class="aislepilot-collapsible-value" data-plan-basic-summary>@selectedMealTypesSummaryText</span>
                         </summary>
-                        <fieldset id="aislepilot-meal-types" class="aislepilot-checkboxes aislepilot-setup-section" aria-describedby="aislepilot-meal-types-error aislepilot-meals-per-day-error">
+                        <fieldset id="aislepilot-meal-types" class="aislepilot-checkboxes aislepilot-setup-section" aria-describedby="aislepilot-meal-types-error">
                             <label asp-for="Request.MealsPerDay" class="sr-only">Meal slots</label>
                             <input asp-for="Request.MealsPerDay" type="hidden" value="@selectedMealsPerDay" />
                             <input type="hidden" name="Request.SelectedMealTypes" value="" />
@@ -439,7 +459,6 @@
                                 </label>
                             </div>
                             <span id="aislepilot-meal-types-error" asp-validation-for="Request.SelectedMealTypes" class="text-danger"></span>
-                            <span id="aislepilot-meals-per-day-error" asp-validation-for="Request.MealsPerDay" class="text-danger"></span>
                         </fieldset>
                     </details>
 
