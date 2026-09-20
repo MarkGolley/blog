@@ -340,7 +340,7 @@
                 ? setupModeValueInput.value.trim().toLowerCase()
                 : "";
             const submitterMode = submitButton instanceof HTMLButtonElement
-                ? (submitButton.dataset.setupModeSubmit ?? "").trim().toLowerCase()
+                ? (submitButton.dataset.setupModeSubmit ?? submitButton.dataset.mobileSetupSubmit ?? "").trim().toLowerCase()
                 : "";
             writeSetupDebug("setup-submit-handler-enter", {
                 formId: targetForm.id ?? "",
@@ -2391,26 +2391,13 @@
             ? Array.from(scope.querySelectorAll("[data-notes-export-shell]"))
             : Array.from(document.querySelectorAll("[data-notes-export-shell]"));
 
-        const setTemporaryButtonLabel = (button, label) => {
-            if (!(button instanceof HTMLButtonElement)) {
+        const setStatus = (status, message, state = "") => {
+            if (!(status instanceof HTMLElement)) {
                 return;
             }
 
-            const defaultLabel = button.dataset.notesDefaultLabel?.trim()
-                || button.dataset.originalLabel?.trim()
-                || button.textContent?.trim()
-                || "Share shopping list to iPhone Notes";
-            button.textContent = label;
-
-            const timeoutRaw = button.dataset.notesLabelTimeoutMs ?? "2400";
-            const timeoutMs = Number.parseInt(timeoutRaw, 10);
-            const safeTimeout = Number.isInteger(timeoutMs) ? Math.max(800, Math.min(6000, timeoutMs)) : 2400;
-
-            window.setTimeout(() => {
-                if (button.isConnected) {
-                    button.textContent = defaultLabel;
-                }
-            }, safeTimeout);
+            status.textContent = message;
+            status.dataset.state = state;
         };
 
         const copyTextToClipboard = async text => {
@@ -2451,6 +2438,7 @@
 
             const trigger = shell.querySelector("[data-notes-export-trigger]");
             const contentField = shell.querySelector("[data-notes-export-content]");
+            const status = shell.querySelector("[data-notes-export-status]");
             if (!(trigger instanceof HTMLButtonElement) || !(contentField instanceof HTMLTextAreaElement)) {
                 return;
             }
@@ -2460,17 +2448,14 @@
             }
 
             trigger.dataset.notesExportWired = "true";
-            const defaultLabel = trigger.dataset.notesDefaultLabel?.trim()
-                || trigger.textContent?.trim()
-                || "Share shopping list to iPhone Notes";
-            trigger.dataset.originalLabel = defaultLabel;
-            trigger.textContent = defaultLabel;
-
             trigger.addEventListener("click", async () => {
+                setStatus(status, "Opening sharing options…");
+                trigger.setAttribute("aria-busy", "true");
                 const notesText = contentField.value?.trim() ?? "";
                 if (notesText.length === 0) {
                     const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not prepare shopping list. Try again.";
-                    setTemporaryButtonLabel(trigger, failedLabel);
+                    setStatus(status, failedLabel, "error");
+                    trigger.removeAttribute("aria-busy");
                     return;
                 }
 
@@ -2481,10 +2466,13 @@
                             text: notesText
                         });
                         const sharedLabel = trigger.dataset.notesSharedLabel?.trim() || "Share sheet opened. Choose Notes.";
-                        setTemporaryButtonLabel(trigger, sharedLabel);
+                        setStatus(status, sharedLabel, "success");
+                        trigger.removeAttribute("aria-busy");
                         return;
                     } catch (error) {
                         if (error instanceof DOMException && error.name === "AbortError") {
+                            setStatus(status, "");
+                            trigger.removeAttribute("aria-busy");
                             return;
                         }
                     }
@@ -2493,12 +2481,14 @@
                 const copied = await copyTextToClipboard(notesText);
                 if (copied) {
                     const copiedLabel = trigger.dataset.notesCopiedLabel?.trim() || "Shopping list copied. Paste into Notes.";
-                    setTemporaryButtonLabel(trigger, copiedLabel);
+                    setStatus(status, copiedLabel, "success");
+                    trigger.removeAttribute("aria-busy");
                     return;
                 }
 
                 const failedLabel = trigger.dataset.notesFailedLabel?.trim() || "Could not share. Try again.";
-                setTemporaryButtonLabel(trigger, failedLabel);
+                setStatus(status, failedLabel, "error");
+                trigger.removeAttribute("aria-busy");
             });
         });
     };

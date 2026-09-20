@@ -966,7 +966,29 @@ body.aislepilot-mobile-meal-sheet-open {
 }
 
 .aislepilot-export-actions form {
+    display: grid;
+    gap: 0.45rem;
     margin: 0;
+}
+
+.aislepilot-export-status {
+    min-height: 1.25rem;
+    margin: 0;
+    color: var(--ap-refresh-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.aislepilot-export-status:empty {
+    min-height: 0;
+}
+
+.aislepilot-export-status[data-state="success"] {
+    color: var(--ap-success-text, #18724a);
+}
+
+.aislepilot-export-status[data-state="error"] {
+    color: var(--ap-danger-text, #a33a32);
 }
 
 .aislepilot-export-btn {

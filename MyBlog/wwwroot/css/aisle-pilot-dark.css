@@ -151,66 +151,6 @@
     border-color: var(--line);
 }
 
-:root[data-theme="dark"] .aislepilot-head-menu-trigger {
-    background: transparent;
-    color: #fff;
-}
-
-:root[data-theme="dark"] .aislepilot-head-menu-trigger .aislepilot-symbol-glyph {
-    border: none;
-    background: transparent;
-    color: #fff;
-}
-
-:root[data-theme="dark"] .aislepilot-head-menu-panel {
-    background: linear-gradient(160deg, rgba(19, 32, 49, 0.98), rgba(14, 25, 40, 0.96));
-    border-color: var(--line);
-}
-
-:root[data-theme="dark"] .aislepilot-head-menu-item {
-    background: rgba(21, 34, 52, 0.96);
-    border-color: var(--line);
-    color: #deefff;
-}
-
-:root[data-theme="dark"] .aislepilot-head-menu-item.is-disabled {
-    color: rgba(183, 203, 229, 0.82);
-}
-
-:root[data-theme="dark"] .aislepilot-head-menu-section-title {
-    color: rgba(183, 203, 229, 0.84);
-}
-
-:root[data-theme="dark"] .aislepilot-head-week-row {
-    background: rgba(21, 34, 52, 0.96);
-    border-color: var(--line);
-}
-
-:root[data-theme="dark"] .aislepilot-head-saved-meal-row {
-    background: rgba(21, 34, 52, 0.96);
-    border-color: var(--line);
-}
-
-:root[data-theme="dark"] .aislepilot-head-week-date {
-    color: #deefff;
-}
-
-:root[data-theme="dark"] .aislepilot-head-saved-meal-name {
-    color: #deefff;
-}
-
-:root[data-theme="dark"] .aislepilot-head-week-action-btn {
-    background: rgba(21, 34, 52, 0.96);
-    border-color: var(--line);
-    color: #deefff;
-}
-
-:root[data-theme="dark"] .aislepilot-head-week-action-btn .aislepilot-symbol-glyph {
-    border-color: rgba(125, 167, 213, 0.44);
-    background: rgba(125, 167, 213, 0.16);
-    color: #deefff;
-}
-
 :root[data-theme="dark"] .aislepilot-overview-regenerate-btn.is-secondary {
     background: rgba(21, 34, 52, 0.96);
     border-color: var(--line);

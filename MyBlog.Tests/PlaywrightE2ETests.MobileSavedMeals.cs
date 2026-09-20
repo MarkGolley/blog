@@ -17,14 +17,14 @@ public sealed partial class PlaywrightE2ETests
 
         await GoToAislePilotAndGeneratePlanAsync(page);
 
-        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
+        var activeMealPanel = page.Locator("[data-day-card-slide][aria-hidden='false'] .aislepilot-day-meal-panel[aria-hidden='false']").First;
         await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
             Timeout = 15000
         });
 
-        var activeMealCard = page.Locator("[data-day-meal-card]:has(.aislepilot-day-meal-panel[aria-hidden='false'])").First;
+        var activeMealCard = page.Locator("[data-day-card-slide][aria-hidden='false'][data-day-meal-card]:has(.aislepilot-day-meal-panel[aria-hidden='false'])").First;
         var saveButton = activeMealPanel.Locator(".aislepilot-meal-primary-action[form^='meal-save-']").First;
         var toasts = page.Locator(".aislepilot-toast");
 

@@ -1,4 +1,4 @@
-﻿@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce) {
     .aislepilot-card.is-swap-fading-out {
         opacity: 0.74;
         transform: none;
@@ -113,7 +113,16 @@
         letter-spacing: 0.09em;
     }
 
+    .aislepilot-window-shell {
+        overflow-x: clip;
+    }
+
     .aislepilot-mobile-context {
+        width: auto;
+        justify-self: stretch;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
         position: sticky;
         top: var(--ap-mobile-context-top);
         z-index: 12;
@@ -238,16 +247,14 @@
         justify-self: end;
     }
 
-    .aislepilot-day-reorder-toggle,
-    .aislepilot-day-view-toggle {
+    .aislepilot-day-reorder-toggle {
         min-height: 1.9rem;
         padding: 0.2rem 0.58rem;
         gap: 0.24rem;
         font-size: 0.64rem;
     }
 
-    .aislepilot-day-reorder-toggle .aislepilot-symbol-glyph,
-    .aislepilot-day-view-toggle .aislepilot-symbol-glyph {
+    .aislepilot-day-reorder-toggle .aislepilot-symbol-glyph {
         width: 0.8rem;
         height: 0.8rem;
     }
@@ -746,6 +753,8 @@
     }
 
     .aislepilot-window-tab {
+        min-width: 0;
+        padding-inline: 0.42rem;
         min-height: 2.75rem;
         font-size: 0.9rem;
     }
@@ -1335,4 +1344,3 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
-

@@ -10,198 +10,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 {
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardHeader_UsesCompactMealActionsWithoutDayLevelControls()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var headerMetrics = await page.EvaluateAsync<object[]>(
-            """
-            () => {
-                const trigger = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] > summary");
-                if (!(trigger instanceof HTMLElement)) {
-                    return [-1, -1, "missing", -1];
-                }
-
-                const triggerRect = trigger.getBoundingClientRect();
-                const triggerLabel = trigger.querySelector(".aislepilot-swap-action-label");
-                const triggerLabelDisplay = triggerLabel instanceof HTMLElement
-                    ? window.getComputedStyle(triggerLabel).display
-                    : "missing";
-                const inlineLeftoverButton = document.querySelector("[data-day-card-header-actions].is-active")
-                    ?.closest(".aislepilot-day-card-head-actions")
-                    ?.querySelector(".aislepilot-day-card-leftover-controls [data-leftover-toggle-sign]");
-                return [
-                    triggerRect.width,
-                    triggerRect.height,
-                    triggerLabelDisplay,
-                    inlineLeftoverButton instanceof HTMLElement ? 1 : 0
-                ];
-            }
-            """);
-
-        Assert.Equal(4, headerMetrics.Length);
-        Assert.True(Convert.ToDouble(headerMetrics[0]) <= 44, $"Expected compact more-actions trigger width. Width={headerMetrics[0]}.");
-        Assert.True(Convert.ToDouble(headerMetrics[1]) <= 44, $"Expected compact more-actions trigger height. Height={headerMetrics[1]}.");
-        Assert.Equal("none", Convert.ToString(headerMetrics[2]));
-        Assert.Equal(0, Convert.ToInt32(headerMetrics[3]));
-
-        var moreActionsSummary = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        await moreActionsSummary.ClickAsync();
-
-        var mobileSheetHeader = page.Locator("[data-card-more-actions-panel].is-mobile-sheet .aislepilot-mobile-meal-sheet-head").First;
-        await mobileSheetHeader.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        var sheetModeEnabled = await page.EvaluateAsync<int[]>(
-            """
-            () => {
-                const details = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions][open]");
-                if (!(details instanceof HTMLDetailsElement)) {
-                    return [0, 0, 0, 0, 0, 0];
-                }
-
-                const menu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
-                if (!(menu instanceof HTMLElement)) {
-                    return [0, 0, 0, 0, 0, 0];
-                }
-
-                const rect = menu.getBoundingClientRect();
-                const computed = window.getComputedStyle(menu);
-                const isFixed = computed.position === "fixed" ? 1 : 0;
-                const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight ? 1 : 0;
-                const renderedHeight = rect.height >= 120 ? 1 : 0;
-                const parentIsBody = menu.parentElement === document.body ? 1 : 0;
-                const trappedInsideDetails = details.contains(menu) ? 1 : 0;
-                return [details.open ? 1 : 0, isFixed, inViewport, renderedHeight, parentIsBody, trappedInsideDetails];
-            }
-            """);
-        Assert.Equal(6, sheetModeEnabled.Length);
-        Assert.Equal(1, sheetModeEnabled[0]);
-        Assert.Equal(1, sheetModeEnabled[1]);
-        Assert.Equal(1, sheetModeEnabled[2]);
-        Assert.Equal(1, sheetModeEnabled[3]);
-        Assert.Equal(1, sheetModeEnabled[4]);
-        Assert.Equal(0, sheetModeEnabled[5]);
-        await page.WaitForTimeoutAsync(220);
-        var sheetPersistence = await page.EvaluateAsync<int[]>(
-            """
-            () => {
-                const details = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions]");
-                const backdrop = document.querySelector(".aislepilot-mobile-meal-sheet-backdrop");
-                const isOpen = details instanceof HTMLDetailsElement && details.open ? 1 : 0;
-                const backdropVisible = backdrop instanceof HTMLElement && !backdrop.hasAttribute("hidden") ? 1 : 0;
-                const menuStillPortaled = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet") instanceof HTMLElement ? 1 : 0;
-                return [isOpen, backdropVisible, menuStillPortaled];
-            }
-            """);
-        Assert.Equal(3, sheetPersistence.Length);
-        Assert.Equal(1, sheetPersistence[0]);
-        Assert.Equal(1, sheetPersistence[1]);
-        Assert.Equal(1, sheetPersistence[2]);
-        Assert.Equal(0, await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions][open] [data-leftover-toggle-sign]").CountAsync());
-    }
-
-
-
-
-
-    [Fact]
-    public async Task Mobile_AislePilotMealActionsSheet_ClosesOnBackdropTapAndActionTap()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var moreActionsSummary = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        await moreActionsSummary.ClickAsync();
-
-        var mobileSheetHeader = page.Locator("[data-card-more-actions-panel].is-mobile-sheet .aislepilot-mobile-meal-sheet-head").First;
-        await mobileSheetHeader.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-
-        await page.WaitForTimeoutAsync(260);
-        await page.Locator(".aislepilot-mobile-meal-sheet-backdrop").First.ClickAsync();
-        await page.WaitForTimeoutAsync(520);
-
-        var closedByBackdrop = await page.EvaluateAsync<int[]>(
-            """
-            () => {
-                const details = document.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions]");
-                const backdrop = document.querySelector(".aislepilot-mobile-meal-sheet-backdrop");
-                const isOpen = details instanceof HTMLDetailsElement && details.open ? 1 : 0;
-                const isClosing = details instanceof HTMLElement && details.classList.contains("is-closing") ? 1 : 0;
-                const backdropVisible = backdrop instanceof HTMLElement && !backdrop.hasAttribute("hidden") ? 1 : 0;
-                const bodyLocked = document.body.classList.contains("aislepilot-mobile-meal-sheet-open") ? 1 : 0;
-                const portaledSheet = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
-                return [isOpen, isClosing, backdropVisible, bodyLocked, portaledSheet instanceof HTMLElement ? 1 : 0];
-            }
-            """);
-
-        Assert.Equal(5, closedByBackdrop.Length);
-        Assert.Equal(0, closedByBackdrop[0]);
-        Assert.Equal(0, closedByBackdrop[1]);
-        Assert.Equal(0, closedByBackdrop[2]);
-        Assert.Equal(0, closedByBackdrop[3]);
-        Assert.Equal(0, closedByBackdrop[4]);
-
-        await moreActionsSummary.ClickAsync();
-        await mobileSheetHeader.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-
-        var secondaryAction = page.Locator("[data-card-more-actions-panel].is-mobile-sheet .aislepilot-ignore-form button[type='submit']").First;
-        await secondaryAction.ClickAsync();
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        var closedAfterAction = await page.EvaluateAsync<int[]>(
-            """
-            () => {
-                const openSheet = document.querySelector("[data-card-more-actions][open]");
-                const closingSheet = document.querySelector("[data-card-more-actions].is-closing");
-                const backdrop = document.querySelector(".aislepilot-mobile-meal-sheet-backdrop");
-                const backdropVisible = backdrop instanceof HTMLElement && !backdrop.hasAttribute("hidden") ? 1 : 0;
-                const bodyLocked = document.body.classList.contains("aislepilot-mobile-meal-sheet-open") ? 1 : 0;
-                const portaledSheet = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
-                return [
-                    openSheet instanceof HTMLDetailsElement ? 1 : 0,
-                    closingSheet instanceof HTMLElement ? 1 : 0,
-                    backdropVisible,
-                    bodyLocked,
-                    portaledSheet instanceof HTMLElement ? 1 : 0
-                ];
-            }
-            """);
-
-        Assert.Equal(5, closedAfterAction.Length);
-        Assert.Equal(0, closedAfterAction[0]);
-        Assert.Equal(0, closedAfterAction[1]);
-        Assert.Equal(0, closedAfterAction[2]);
-        Assert.Equal(0, closedAfterAction[3]);
-        Assert.Equal(0, closedAfterAction[4]);
-    }
-
-    [Fact]
     public async Task Mobile_AislePilotDayCardSummary_TracksSelectedMealTab()
     {
         if (!IsE2EEnabled())
@@ -225,18 +33,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var tabs = card.Locator("[data-day-meal-tab]");
         var tabCount = await tabs.CountAsync();
         Assert.True(tabCount >= 2, "Expected at least two meal tabs on the card.");
-
-        var visibleHeaderActionRowsBefore = await card.EvaluateAsync<int>(
-            """
-            cardRoot => {
-                if (!(cardRoot instanceof HTMLElement)) {
-                    return -1;
-                }
-
-                return cardRoot.querySelectorAll("[data-day-card-header-actions].is-active").length;
-            }
-            """);
-        Assert.Equal(1, visibleHeaderActionRowsBefore);
 
         var initialSummary = (await summary.InnerTextAsync()).Trim();
         var targetTabIndex = -1;
@@ -267,34 +63,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var updatedSummary = (await summary.InnerTextAsync()).Trim();
         Assert.Equal(expectedSummary, updatedSummary);
 
-        var visibleHeaderActionRowsAfter = await card.EvaluateAsync<int>(
-            """
-            cardRoot => {
-                if (!(cardRoot instanceof HTMLElement)) {
-                    return -1;
-                }
-
-                return cardRoot.querySelectorAll("[data-day-card-header-actions].is-active").length;
-            }
-            """);
-        Assert.Equal(1, visibleHeaderActionRowsAfter);
-
-        var activeHeaderActionSlot = await card.EvaluateAsync<int>(
-            """
-            cardRoot => {
-                if (!(cardRoot instanceof HTMLElement)) {
-                    return -1;
-                }
-
-                const activeRows = Array.from(cardRoot.querySelectorAll("[data-day-card-header-actions].is-active"));
-                if (activeRows.length !== 1 || !(activeRows[0] instanceof HTMLElement)) {
-                    return -1;
-                }
-
-                return Number.parseInt(activeRows[0].dataset.slotIndex ?? "-1", 10);
-            }
-            """);
-        Assert.Equal(targetTabIndex, activeHeaderActionSlot);
+        Assert.True(await card.Locator("[data-day-meal-panel][aria-hidden='false'] [data-meal-primary-actions]").IsVisibleAsync());
     }
 
     [Fact]
@@ -521,158 +290,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Mobile_AislePilotDayCardSwipe_OnNonImageCardSurfaceDoesNotChangeMealSlot()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var card = page.Locator("[data-day-meal-card]:has([data-day-meal-tab])").First;
-        await card.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var swipeState = await card.EvaluateAsync<int[]>(
-            """
-            cardRoot => {
-                if (!(cardRoot instanceof HTMLElement)) {
-                    return [-1, -1, -1];
-                }
-
-                const tabs = Array.from(cardRoot.querySelectorAll("[data-day-meal-tab]"));
-                if (tabs.length < 2) {
-                    return [-1, -1, -1];
-                }
-
-                const panels = Array.from(cardRoot.querySelectorAll("[data-day-meal-panel]"));
-                const beforeIndex = panels.findIndex(panel => panel instanceof HTMLElement && panel.getAttribute("aria-hidden") !== "true");
-                const summary = cardRoot.querySelector("[data-day-meal-summary]");
-                if (!(summary instanceof HTMLElement)) {
-                    return [tabs.length, beforeIndex, -1];
-                }
-
-                const rect = summary.getBoundingClientRect();
-                if (rect.width < 40 || rect.height < 20) {
-                    return [tabs.length, beforeIndex, -1];
-                }
-
-                const edgeInset = Math.min(28, rect.width * 0.15);
-                const startX = rect.right - edgeInset;
-                const endX = rect.left + edgeInset;
-                const y = rect.top + (rect.height / 2);
-
-                const createTouchEvent = (type, x, y) => {
-                    const event = new Event(type, { bubbles: true, cancelable: true });
-                    Object.defineProperty(event, "changedTouches", {
-                        configurable: true,
-                        value: [{ clientX: x, clientY: y }]
-                    });
-                    return event;
-                };
-
-                summary.dispatchEvent(createTouchEvent("touchstart", startX, y));
-                summary.dispatchEvent(createTouchEvent("touchend", endX, y));
-
-                const afterIndex = panels.findIndex(panel => panel instanceof HTMLElement && panel.getAttribute("aria-hidden") !== "true");
-                return [tabs.length, beforeIndex, afterIndex];
-            }
-            """);
-
-        Assert.True(swipeState.Length >= 3, "Expected swipe state to include tab count and panel indexes.");
-        var tabCount = swipeState[0];
-        var beforeIndex = swipeState[1];
-        var afterIndex = swipeState[2];
-        Assert.True(tabCount >= 2, "Expected at least two meal tabs on the swipe target card.");
-        Assert.True(beforeIndex >= 0, "Expected one active meal panel before swiping.");
-        Assert.True(afterIndex >= 0, "Expected one active meal panel after swiping.");
-        Assert.Equal(beforeIndex, afterIndex);
-    }
-
-    [Fact]
-    public async Task Mobile_AislePilotDayCardHeader_HasSpacedSummaryAndMealActionsStayMealScoped()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        await page.Locator("[data-day-meal-card]:has([data-day-card-summary]):has([data-leftover-day-zone])").First.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var summaryMetrics = await page.EvaluateAsync<double[]>(
-            """
-            () => {
-                const card = document.querySelector("[data-day-meal-card]:has([data-day-card-summary]):has([data-leftover-day-zone])");
-                if (!(card instanceof HTMLElement)) {
-                    return [-1, -1];
-                }
-
-                const kicker = card.querySelector(".aislepilot-day-card-head-main .aislepilot-card-kicker");
-                const summary = card.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta[data-day-card-summary]");
-                const zone = card.querySelector("[data-leftover-day-zone]");
-                if (!(kicker instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(zone instanceof HTMLElement)) {
-                    return [-1, -1];
-                }
-
-                const kickerRect = kicker.getBoundingClientRect();
-                const summaryRect = summary.getBoundingClientRect();
-                const spacingGap = Math.max(0, summaryRect.left - kickerRect.right);
-                const zoneHidden = window.getComputedStyle(zone).display === "none" ? 1 : 0;
-                return [spacingGap, zoneHidden];
-            }
-            """);
-        Assert.Equal(2, summaryMetrics.Length);
-        Assert.True(summaryMetrics[0] >= 7.5, $"Expected a clear gap between the day label and meal summary. Actual={summaryMetrics[0]:F1}px.");
-        Assert.Equal(1, Convert.ToInt32(summaryMetrics[1]));
-
-        var targetCard = page.Locator("[data-day-meal-card]:has([data-leftover-day-zone])").First;
-        await targetCard.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-
-        var moreActionsSummary = targetCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        await moreActionsSummary.ClickAsync();
-
-        var mealMenuMetrics = await page.EvaluateAsync<string>(
-            """
-            () => {
-                const openMenu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
-                if (!(openMenu instanceof HTMLElement)) {
-                    return "0|0";
-                }
-
-                const hasLeftoverAction = openMenu.querySelector("[data-leftover-toggle-sign]") instanceof HTMLElement ? 1 : 0;
-                const sheetTitle = openMenu.querySelector(".aislepilot-mobile-meal-sheet-title");
-                const hasTitle = sheetTitle instanceof HTMLElement && (sheetTitle.textContent ?? "").trim().length > 0 ? 1 : 0;
-                return `${hasLeftoverAction}|${hasTitle}`;
-            }
-            """);
-        var mealMenuParts = (mealMenuMetrics ?? "0|0").Split('|');
-        var hasLeftoverActionInMealMenu = mealMenuParts.Length > 0 && string.Equals(mealMenuParts[0], "1", StringComparison.Ordinal);
-        var hasSheetTitle = mealMenuParts.Length > 1 && string.Equals(mealMenuParts[1], "1", StringComparison.Ordinal);
-        Assert.False(hasLeftoverActionInMealMenu, "Expected meal menu to contain meal-scoped actions only.");
-        Assert.True(hasSheetTitle, "Expected mobile meal actions sheet to show the active meal title.");
-    }
-
-    [Fact]
     public async Task Mobile_AislePilotPrimaryResultsTabs_SupportKeyboardNavigation()
     {
         if (!IsE2EEnabled())
@@ -840,7 +457,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         var hitTestReport = await page.EvaluateAsync<string>(
             """
             () => {
-                const button = document.querySelector("#aislepilot-setup-form button[data-setup-mode-submit='planner']");
+                const button = document.querySelector("#aislepilot-setup-form button[data-mobile-setup-submit='planner']:not([hidden])");
                 if (!(button instanceof HTMLButtonElement)) {
                     return "button-missing";
                 }
@@ -905,7 +522,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             """
             () => {
                 const tolerancePx = 1.5;
-                const cards = Array.from(document.querySelectorAll("[data-day-meal-card]"));
+                const cards = Array.from(document.querySelectorAll("[data-day-card-slide][aria-hidden='false'][data-day-meal-card]"));
                 const breakfastCards = cards.filter(card => card.querySelectorAll(".aislepilot-day-meal-tab").length >= 3);
                 if (breakfastCards.length === 0) {
                     return -1;

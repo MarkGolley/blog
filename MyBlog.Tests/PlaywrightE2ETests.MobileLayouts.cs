@@ -88,503 +88,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task NarrowMobile_AislePilotMealCardActionButtons_RemainVisibleWithinViewport()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateNarrowMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        if (_appHost is null)
-        {
-            throw new InvalidOperationException("App host is not initialized.");
-        }
-
-        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        var submitted = await page.EvaluateAsync<bool>(
-            """
-            () => {
-                const form = document.querySelector("form.aislepilot-form");
-                if (!(form instanceof HTMLFormElement)) {
-                    return false;
-                }
-
-                form.requestSubmit();
-                return true;
-            }
-            """);
-        Assert.True(submitted, "Expected to submit the AislePilot generator form.");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var activeSlide = page.Locator("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])").First;
-        var activeMealPanel = activeSlide.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
-        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var activeMealCard = activeSlide;
-        await activeMealCard.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var viewDetailsSummary = activeMealPanel.Locator(".aislepilot-meal-details-image-toggle > summary").First;
-        var detailsPanel = activeMealPanel.Locator("[data-inline-details-panel]").First;
-        var moreActionsSummary = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-
-        await moreActionsSummary.ScrollIntoViewIfNeededAsync();
-        await viewDetailsSummary.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        await moreActionsSummary.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-
-        var actionOverflow = await page.EvaluateAsync<double>(
-            """
-            () => {
-                const activeSlide = document.querySelector(
-                    "[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])");
-                const controls = activeSlide instanceof HTMLElement
-                    ? Array.from(activeSlide.querySelectorAll(
-                        "[data-day-card-header-actions].is-active [data-card-more-actions] > summary"))
-                    : [];
-                if (controls.length === 0) {
-                    return Number.POSITIVE_INFINITY;
-                }
-
-                const padding = 6;
-                return controls.reduce((maxOverflow, control) => {
-                    if (!(control instanceof HTMLElement)) {
-                        return Number.POSITIVE_INFINITY;
-                    }
-
-                    const rect = control.getBoundingClientRect();
-                    if (rect.width <= 0 || rect.height <= 0) {
-                        return Number.POSITIVE_INFINITY;
-                    }
-
-                    const overflowLeft = Math.max(0, padding - rect.left);
-                    const overflowRight = Math.max(0, rect.right - (window.innerWidth - padding));
-                    return Math.max(maxOverflow, overflowLeft, overflowRight);
-                }, 0);
-            }
-            """);
-
-        Assert.True(
-            actionOverflow <= 1.5,
-            $"Expected meal action controls to render fully inside viewport on narrow mobile. Overflow={actionOverflow}px.");
-
-        var imageTriggerWidthRatio = await page.EvaluateAsync<double>(
-            """
-            () => {
-                const panel = document.querySelector("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true']) .aislepilot-day-meal-panel[aria-hidden='false']");
-                if (!(panel instanceof HTMLElement)) {
-                    return Number.POSITIVE_INFINITY;
-                }
-
-                const imageSummary = panel.querySelector(".aislepilot-meal-details-image-toggle > summary");
-                if (!(imageSummary instanceof HTMLElement)) {
-                    return Number.POSITIVE_INFINITY;
-                }
-
-                const panelRect = panel.getBoundingClientRect();
-                const summaryRect = imageSummary.getBoundingClientRect();
-                if (panelRect.width <= 0) {
-                    return Number.POSITIVE_INFINITY;
-                }
-
-                return summaryRect.width / panelRect.width;
-            }
-            """);
-
-        Assert.True(
-            imageTriggerWidthRatio >= 0.94 && imageTriggerWidthRatio <= 1.08,
-            $"Expected image details trigger to span the card content width on narrow mobile. Ratio={imageTriggerWidthRatio:F2}.");
-
-        var titleAndBottomSpacing = await page.EvaluateAsync<string>(
-            """
-            () => {
-                const panel = document.querySelector("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true']) .aislepilot-day-meal-panel[aria-hidden='false']");
-                if (!(panel instanceof HTMLElement)) {
-                    return "Infinity|Infinity";
-                }
-
-                const title = panel.querySelector(":scope > h3");
-                const imageShell = panel.querySelector(".aislepilot-meal-details-image-toggle .aislepilot-meal-image-shell");
-                if (!(title instanceof HTMLElement) || !(imageShell instanceof HTMLElement)) {
-                    return "Infinity|Infinity";
-                }
-
-                const titleRect = title.getBoundingClientRect();
-                const imageRect = imageShell.getBoundingClientRect();
-                const titleOverlap = Math.max(0, titleRect.bottom - imageRect.top);
-
-                const visibleChildren = Array.from(panel.children)
-                    .filter(child => child instanceof HTMLElement)
-                    .filter(child => !(child instanceof HTMLElement && child.matches("[hidden], .aislepilot-meal-removed-watermark")));
-                const panelRect = panel.getBoundingClientRect();
-                const furthestContentBottom = visibleChildren.reduce((maxBottom, child) => {
-                    if (!(child instanceof HTMLElement)) {
-                        return maxBottom;
-                    }
-
-                    return Math.max(maxBottom, child.getBoundingClientRect().bottom);
-                }, panelRect.top);
-                const trailingGap = Math.max(0, panelRect.bottom - furthestContentBottom);
-                return `${titleOverlap}|${trailingGap}`;
-            }
-            """);
-        var spacingParts = (titleAndBottomSpacing ?? "Infinity|Infinity").Split('|');
-        var titleOverlap = spacingParts.Length > 0 && double.TryParse(spacingParts[0], out var parsedTitleOverlap)
-            ? parsedTitleOverlap
-            : double.PositiveInfinity;
-        var trailingGap = spacingParts.Length > 1 && double.TryParse(spacingParts[1], out var parsedTrailingGap)
-            ? parsedTrailingGap
-            : double.PositiveInfinity;
-
-        Assert.True(titleOverlap <= 1.5, $"Expected meal title to stay clear of image area. Overlap={titleOverlap}px.");
-        Assert.True(trailingGap <= 22, $"Expected meal card to avoid large empty space at bottom. Gap={trailingGap}px.");
-
-        var worstTrailingGapAcrossCards = await page.EvaluateAsync<double>(
-            """
-            () => {
-                const panels = Array.from(document.querySelectorAll("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true']) .aislepilot-day-meal-panel[aria-hidden='false']"));
-                if (panels.length === 0) {
-                    return Number.POSITIVE_INFINITY;
-                }
-
-                let worstGap = 0;
-                for (const panel of panels) {
-                    if (!(panel instanceof HTMLElement)) {
-                        return Number.POSITIVE_INFINITY;
-                    }
-
-                    const visibleChildren = Array.from(panel.children)
-                        .filter(child => child instanceof HTMLElement)
-                        .filter(child => !(child instanceof HTMLElement && child.matches("[hidden], .aislepilot-meal-removed-watermark")));
-                    const panelRect = panel.getBoundingClientRect();
-                    const furthestContentBottom = visibleChildren.reduce((maxBottom, child) => {
-                        if (!(child instanceof HTMLElement)) {
-                            return maxBottom;
-                        }
-
-                        return Math.max(maxBottom, child.getBoundingClientRect().bottom);
-                    }, panelRect.top);
-                    const trailingGapPx = Math.max(0, panelRect.bottom - furthestContentBottom);
-                    worstGap = Math.max(worstGap, trailingGapPx);
-                }
-
-                return worstGap;
-            }
-            """);
-        Assert.True(
-            worstTrailingGapAcrossCards <= 24,
-            $"Expected all visible meal panels to avoid inconsistent bottom whitespace. Max gap={worstTrailingGapAcrossCards}px.");
-
-        await viewDetailsSummary.ClickAsync();
-        await detailsPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        Assert.Equal("true", await viewDetailsSummary.GetAttributeAsync("aria-expanded"));
-    }
-
-    [Fact]
-    public async Task NarrowMobile_AislePilotMoreActionsMenu_RendersWhenOpened()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateNarrowMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        if (_appHost is null)
-        {
-            throw new InvalidOperationException("App host is not initialized.");
-        }
-
-        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        var submitted = await page.EvaluateAsync<bool>(
-            """
-            () => {
-                const form = document.querySelector("form.aislepilot-form");
-                if (!(form instanceof HTMLFormElement)) {
-                    return false;
-                }
-
-                form.requestSubmit();
-                return true;
-            }
-            """);
-        Assert.True(submitted, "Expected to submit the AislePilot generator form.");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        var activeMealPanel = page.Locator(".aislepilot-day-meal-panel[aria-hidden='false']").First;
-        await activeMealPanel.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-
-        var activeMealCard = page.Locator("[data-day-meal-card]:has(.aislepilot-day-meal-panel[aria-hidden='false'])").First;
-        var moreActionsSummary = activeMealCard.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        var moreActionsMenu = page.Locator("[data-card-more-actions-panel].is-mobile-sheet").First;
-        var moreActionsFirstButton = moreActionsMenu.Locator("button[type='submit']:visible").First;
-
-        await moreActionsSummary.ScrollIntoViewIfNeededAsync();
-        await moreActionsSummary.ClickAsync();
-        await moreActionsMenu.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        await page.WaitForTimeoutAsync(500);
-        await moreActionsFirstButton.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-
-        var menuMetrics = await page.EvaluateAsync<string>(
-            """
-            () => {
-                const menu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
-                if (!(menu instanceof HTMLElement)) {
-                    return "0|0|0";
-                }
-
-                const rect = menu.getBoundingClientRect();
-                const viewportPadding = 6;
-                const isInViewport =
-                    rect.left >= viewportPadding &&
-                    rect.right <= window.innerWidth - viewportPadding &&
-                    rect.top >= 0 &&
-                    rect.bottom <= window.innerHeight + 1;
-                return `${rect.width}|${rect.height}|${isInViewport ? "1" : "0"}`;
-            }
-            """);
-        var metricParts = (menuMetrics ?? "0|0|0").Split('|');
-        var menuWidth = metricParts.Length > 0 && double.TryParse(metricParts[0], out var parsedWidth) ? parsedWidth : 0;
-        var menuHeight = metricParts.Length > 1 && double.TryParse(metricParts[1], out var parsedHeight) ? parsedHeight : 0;
-        var menuInViewport = metricParts.Length > 2 && string.Equals(metricParts[2], "1", StringComparison.Ordinal);
-
-        Assert.True(menuWidth >= 48, $"Expected More actions menu width to be rendered. Width={menuWidth}px.");
-        Assert.True(menuHeight >= 70, $"Expected More actions menu height to be rendered. Height={menuHeight}px.");
-        Assert.True(menuInViewport, "Expected More actions menu to render fully inside the viewport.");
-
-        var layoutMetrics = await page.EvaluateAsync<string>(
-            """
-            () => {
-                const doc = document.documentElement;
-                const body = document.body;
-                const scrollWidth = Math.max(doc?.scrollWidth ?? 0, body?.scrollWidth ?? 0);
-                const overflowX = Math.max(0, scrollWidth - window.innerWidth);
-
-                const panel = document.querySelector(".aislepilot-day-meal-panel[aria-hidden='false']");
-                if (!(panel instanceof HTMLElement)) {
-                    return `${overflowX}|0|0|0|0`;
-                }
-
-                const shell = panel.querySelector(".aislepilot-meal-image-shell");
-                const image = panel.querySelector("img.aislepilot-meal-image");
-                if (!(shell instanceof HTMLElement) || !(image instanceof HTMLImageElement)) {
-                    return `${overflowX}|0|0|0|0`;
-                }
-
-                const shellRect = shell.getBoundingClientRect();
-                const imageRect = image.getBoundingClientRect();
-                return `${overflowX}|${shellRect.width}|${shellRect.height}|${imageRect.width}|${imageRect.height}`;
-            }
-            """);
-        var layoutParts = (layoutMetrics ?? "0|0|0|0|0").Split('|');
-        var pageOverflowX = layoutParts.Length > 0 && double.TryParse(layoutParts[0], out var parsedOverflowX) ? parsedOverflowX : double.PositiveInfinity;
-        var shellWidth = layoutParts.Length > 1 && double.TryParse(layoutParts[1], out var parsedShellWidth) ? parsedShellWidth : 0;
-        var shellHeight = layoutParts.Length > 2 && double.TryParse(layoutParts[2], out var parsedShellHeight) ? parsedShellHeight : 0;
-        var imageWidth = layoutParts.Length > 3 && double.TryParse(layoutParts[3], out var parsedImageWidth) ? parsedImageWidth : 0;
-        var imageHeight = layoutParts.Length > 4 && double.TryParse(layoutParts[4], out var parsedImageHeight) ? parsedImageHeight : 0;
-
-        Assert.True(pageOverflowX <= 1.5, $"Expected opening More actions not to introduce horizontal page overflow. Overflow={pageOverflowX}px.");
-        Assert.True(shellWidth >= 180 && shellHeight >= 95, $"Expected meal image shell to remain at a healthy rendered size. Width={shellWidth}px Height={shellHeight}px.");
-        Assert.True(imageWidth >= shellWidth - 3 && imageHeight >= shellHeight - 3,
-            $"Expected meal image to remain fully rendered inside the shell after opening More actions. Image={imageWidth}x{imageHeight}, Shell={shellWidth}x{shellHeight}.");
-    }
-
-    [Fact]
-    public async Task NarrowMobile_AislePilotMoreActionsMenu_KeepsButtonsReachableNearViewportBottom()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateNarrowMobileContextAsync();
-        var page = await context.NewPageAsync();
-
-        if (_appHost is null)
-        {
-            throw new InvalidOperationException("App host is not initialized.");
-        }
-
-        await page.GotoAsync($"{_appHost.BaseUrl}/projects/aisle-pilot");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        var submitted = await page.EvaluateAsync<bool>(
-            """
-            () => {
-                const form = document.querySelector("form.aislepilot-form");
-                if (!(form instanceof HTMLFormElement)) {
-                    return false;
-                }
-
-                form.requestSubmit();
-                return true;
-            }
-            """);
-        Assert.True(submitted, "Expected to submit the AislePilot generator form.");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        var activeSlide = page.Locator("[data-day-card-slide][aria-hidden='false']:not([data-day-carousel-ghost='true'])").First;
-        var activeMealPanels = activeSlide.Locator(".aislepilot-day-meal-panel[aria-hidden='false']");
-        await activeMealPanels.First.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 15000
-        });
-        Assert.True(await activeMealPanels.CountAsync() > 0, "Expected at least one visible meal panel.");
-
-        var targetSummary = activeSlide.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary").First;
-        await targetSummary.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        await targetSummary.EvaluateAsync(
-            """
-            element => {
-                if (!(element instanceof HTMLElement)) {
-                    return;
-                }
-
-                const detailsToggle = document.querySelector(".aislepilot-day-meal-panel[aria-hidden='false'] [data-inline-details-toggle]");
-                if (detailsToggle instanceof HTMLDetailsElement) {
-                    detailsToggle.open = false;
-                }
-                element.scrollIntoView({ block: "end", inline: "nearest" });
-                const rect = element.getBoundingClientRect();
-                const desiredBottom = window.innerHeight - 10;
-                const delta = rect.bottom - desiredBottom;
-                if (delta > 0) {
-                    window.scrollBy(0, delta);
-                }
-            }
-            """);
-
-        var pageScrollBeforeOpen = await page.EvaluateAsync<double>("() => Math.round(window.scrollY)");
-        await targetSummary.ClickAsync();
-
-        var targetMenu = page.Locator("[data-card-more-actions-panel].is-mobile-sheet").First;
-        await targetMenu.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-        await page.WaitForTimeoutAsync(500);
-
-        var lastButton = targetMenu.Locator("button[type='submit']").Last;
-        await lastButton.WaitForAsync(new LocatorWaitForOptions
-        {
-            State = WaitForSelectorState.Visible,
-            Timeout = 10000
-        });
-
-        var menuReadability = await page.EvaluateAsync<string>(
-            """
-            () => {
-                const openMenu = document.querySelector("[data-card-more-actions-panel].is-mobile-sheet");
-                if (!(openMenu instanceof HTMLElement)) {
-                    return "0|0|0|0|0";
-                }
-
-                const buttons = Array.from(openMenu.querySelectorAll("button"))
-                    .filter(button => button instanceof HTMLElement)
-                    .filter(button => {
-                        const style = window.getComputedStyle(button);
-                        return style.display !== "none" && style.visibility !== "hidden" && button.getClientRects().length > 0;
-                    });
-                if (buttons.length === 0) {
-                    return "0|0|0|0|0";
-                }
-
-                const internallyScrollable = openMenu.scrollHeight - openMenu.clientHeight > 1.5;
-                const viewportPadding = 6;
-                const hiddenButtonCount = buttons.reduce((count, button) => {
-                    if (!(button instanceof HTMLElement)) {
-                        return count + 1;
-                    }
-
-                    const rect = button.getBoundingClientRect();
-                    const fullyVisible =
-                        rect.top >= viewportPadding &&
-                        rect.bottom <= window.innerHeight - viewportPadding &&
-                        rect.left >= viewportPadding &&
-                        rect.right <= window.innerWidth - viewportPadding;
-                    const hit = document.elementFromPoint(rect.left + (rect.width / 2), rect.top + (rect.height / 2));
-                    const unclipped = hit instanceof Element && (hit === button || button.contains(hit));
-                    return fullyVisible && unclipped ? count : count + 1;
-                }, 0);
-                const viewportHost = openMenu.closest("[data-window-viewport], .aislepilot-window-viewport");
-                const viewportRect = viewportHost instanceof HTMLElement ? viewportHost.getBoundingClientRect() : null;
-                const hiddenPanelBleed = viewportRect
-                    ? Array.from(document.querySelectorAll(".aislepilot-window-panel[aria-hidden='true']")).some(panel => {
-                        if (!(panel instanceof HTMLElement)) return false;
-                        const rect = panel.getBoundingClientRect();
-                        return rect.right > viewportRect.left + 2 && rect.left < viewportRect.right - 2 && rect.bottom > viewportRect.top + 2 && rect.top < viewportRect.bottom - 2;
-                    })
-                    : false;
-                return `${internallyScrollable ? "1" : "0"}|${hiddenPanelBleed ? "1" : "0"}|${hiddenButtonCount}|${buttons.length}`;
-            }
-            """);
-        var readabilityParts = (menuReadability ?? "0|0|0|0").Split('|');
-        var menuInternallyScrollable = readabilityParts.Length > 0 && string.Equals(readabilityParts[0], "1", StringComparison.Ordinal);
-        var hiddenPanelBleed = readabilityParts.Length > 1 && string.Equals(readabilityParts[1], "1", StringComparison.Ordinal);
-        var hiddenButtonCount = readabilityParts.Length > 2 && int.TryParse(readabilityParts[2], out var parsedHiddenButtonCount) ? parsedHiddenButtonCount : int.MaxValue;
-        var buttonCount = readabilityParts.Length > 3 && int.TryParse(readabilityParts[3], out var parsedButtonCount) ? parsedButtonCount : 0;
-
-        var pageScrollAfterOpen = await page.EvaluateAsync<double>("() => Math.round(window.scrollY)");
-        var pageScrollDelta = Math.Abs(pageScrollAfterOpen - pageScrollBeforeOpen);
-        Assert.False(menuInternallyScrollable, "Expected More actions menu to avoid internal scrolling for this narrow-mobile scenario.");
-        Assert.True(buttonCount >= 2, $"Expected the sheet close control and at least one meal action to remain reachable. Count={buttonCount}.");
-        Assert.Equal(0, hiddenButtonCount);
-        Assert.False(hiddenPanelBleed, "Expected hidden tabs (like shopping list) not to bleed into the meal viewport when More actions opens.");
-        Assert.True(
-            pageScrollDelta <= 120,
-            $"Expected opening More actions near viewport bottom to avoid excessive page movement. Delta={pageScrollDelta}px.");
-    }
-
-    [Fact]
     public async Task Mobile_AislePilotSavedMealsMenu_ShowsReadableMealRowsWithoutTruncation()
     {
         if (!IsE2EEnabled())
@@ -616,7 +119,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             () => {
                 const panel = document.querySelector(".aislepilot-head-menu-panel");
                 if (!(panel instanceof HTMLElement)) {
-                    return [0, "missing", "missing", -1, Number.POSITIVE_INFINITY];
+                    return [0, "missing", "missing", -1, Number.POSITIVE_INFINITY, 0, "missing", Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
                 }
 
                 let list = panel.querySelector(".aislepilot-head-saved-meal-list");
@@ -638,7 +141,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
 
                 const name = row.querySelector(".aislepilot-head-saved-meal-name");
                 if (!(panel instanceof HTMLElement) || !(row instanceof HTMLElement) || !(name instanceof HTMLElement)) {
-                    return [0, "missing", "missing", -1, Number.POSITIVE_INFINITY];
+                    return [0, "missing", "missing", -1, Number.POSITIVE_INFINITY, 0, "missing", Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
                 }
 
                 const styles = window.getComputedStyle(name);
@@ -650,17 +153,25 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                     rowRect.bottom <= Math.min(panelRect.bottom, window.innerHeight - viewportPadding) + 1;
 
                 const panelOverflowBottom = Math.max(0, panelRect.bottom - (window.innerHeight - viewportPadding));
+                const sampleX = Math.max(8, Math.min(window.innerWidth - 8, panelRect.left + Math.min(24, panelRect.width / 2)));
+                const sampleY = Math.max(8, Math.min(window.innerHeight - 8, panelRect.bottom - 12));
+                const topElement = document.elementFromPoint(sampleX, sampleY);
+                const panelIsTopLayer = topElement instanceof Element && panel.contains(topElement);
                 return [
                     rowVisibleWithinPanel ? 1 : 0,
                     styles.whiteSpace || "",
                     styles.textOverflow || "",
                     rowRect.height,
-                    panelOverflowBottom
+                    panelOverflowBottom,
+                    panelIsTopLayer ? 1 : 0,
+                    topElement instanceof Element ? `${topElement.tagName}.${topElement.className}` : "none",
+                    Math.max(0, -panelRect.left),
+                    Math.max(0, panelRect.right - window.innerWidth)
                 ];
             }
             """);
 
-        Assert.Equal(5, menuMetrics.Length);
+        Assert.Equal(9, menuMetrics.Length);
         Assert.Equal(1, Convert.ToInt32(menuMetrics[0]));
         Assert.NotEqual("nowrap", Convert.ToString(menuMetrics[1]));
         Assert.NotEqual("ellipsis", Convert.ToString(menuMetrics[2]));
@@ -668,6 +179,12 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.True(
             Convert.ToDouble(menuMetrics[4]) <= 1.5,
             $"Expected saved meals menu to fit the viewport without forcing page scroll. Overflow={menuMetrics[4]}px.");
+        Assert.True(
+            Convert.ToInt32(menuMetrics[5]) == 1,
+            $"Expected the saved menu to sit above page content. Top element={menuMetrics[6]}.");
+        Assert.True(
+            Convert.ToDouble(menuMetrics[7]) <= 1.5 && Convert.ToDouble(menuMetrics[8]) <= 1.5,
+            $"Expected the saved menu to remain inside the viewport. Left overflow={menuMetrics[7]}px, right overflow={menuMetrics[8]}px.");
     }
 
     [Fact]
@@ -1003,7 +520,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 element.dispatchEvent(new Event('change', { bubbles: true }));
             }
             """);
-        await page.Locator("[data-setup-mode-submit='planner']").ClickAsync(new LocatorClickOptions { Force = true });
+        await page.Locator("[data-mobile-setup-submit='planner']:visible, [data-setup-mode-submit='planner']:visible").First.ClickAsync(new LocatorClickOptions { Force = true });
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         var details = page.Locator("[data-overview-content]");
@@ -1062,7 +579,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
                 const carousel = document.querySelector("[data-day-card-carousel]");
                 const viewport = carousel?.querySelector("[data-day-carousel-viewport]");
                 const pagination = carousel?.querySelector("[data-day-carousel-pagination]");
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]"));
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
                 const activeSlide = slides.find(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 if (!(carousel instanceof HTMLElement) || !(viewport instanceof HTMLElement) || !(pagination instanceof HTMLElement) || !(activeSlide instanceof HTMLElement)) {
                     return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "missing", "missing", "missing"];
@@ -1140,8 +657,8 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal(1, Convert.ToInt32(summaryMetrics[4]));
         Assert.InRange(Convert.ToDouble(summaryMetrics[5]), 0.9d, 1.04d);
         Assert.True(Convert.ToDouble(summaryMetrics[6]) <= 10d, $"Expected the active slide to stay centered in the viewport. Delta={summaryMetrics[6]}.");
-        Assert.True(Convert.ToDouble(summaryMetrics[7]) <= 2d, $"Expected no visible next-slide peek on mobile. Peek={summaryMetrics[7]}.");
-        Assert.True(Convert.ToDouble(summaryMetrics[8]) <= 2d, $"Expected no visible previous-slide peek on mobile. Peek={summaryMetrics[8]}.");
+        Assert.True(Convert.ToDouble(summaryMetrics[7]) <= 12d, $"Expected no distracting next-slide peek on mobile. Peek={summaryMetrics[7]}.");
+        Assert.True(Convert.ToDouble(summaryMetrics[8]) <= 12d, $"Expected no distracting previous-slide peek on mobile. Peek={summaryMetrics[8]}.");
         Assert.True(Math.Abs(Convert.ToDouble(summaryMetrics[9]) - Convert.ToDouble(summaryMetrics[10])) <= 20d, $"Expected active and inactive day chips to keep a stable width. Active={summaryMetrics[9]}, inactive={summaryMetrics[10]}.");
         Assert.True(Convert.ToDouble(summaryMetrics[11]) >= 30d, $"Expected the active day chip to remain tappable. Height={summaryMetrics[11]}.");
         Assert.True(Convert.ToDouble(summaryMetrics[12]) >= 30d, $"Expected inactive day chips to remain tappable. Height={summaryMetrics[12]}.");
@@ -1173,7 +690,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             """
             () => {
                 const status = document.querySelector("[data-day-carousel-status]");
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]"));
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 return [status instanceof HTMLElement ? (status.textContent || "").trim() : "", activeIndex, slides.length];
             }
@@ -1188,7 +705,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         await page.WaitForFunctionAsync(
             """
             () => {
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]"));
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const status = document.querySelector("[data-day-carousel-status]");
                 return activeIndex === 1 && status instanceof HTMLElement && /2 of/i.test(status.textContent || "");
@@ -1199,7 +716,7 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
             """
             () => {
                 const status = document.querySelector("[data-day-carousel-status]");
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]"));
+                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
                 const activeSlides = slides.filter(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
                 const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");

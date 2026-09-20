@@ -38,18 +38,29 @@
                             <span class="sr-only">Menu</span>
                         </span>
                     </summary>
-                    <div class="aislepilot-head-menu-panel" role="menu" aria-label="AislePilot quick menu">
-                        <p class="aislepilot-head-menu-section-title">Saved in this browser</p>
-                        <p class="aislepilot-head-menu-section-title">Saved weeks</p>
+                    <div class="aislepilot-head-menu-panel" aria-label="AislePilot saved items">
+                        <header class="aislepilot-head-menu-header">
+                            <span class="aislepilot-head-menu-kicker">Saved in this browser</span>
+                            <strong class="aislepilot-head-menu-title">Your saved plans</strong>
+                            <span class="aislepilot-head-menu-intro">Open a previous week or manage meals you would happily make again.</span>
+                        </header>
+                        <div class="aislepilot-head-menu-section-heading">
+                            <p class="aislepilot-head-menu-section-title">Saved weeks</p>
+                            <span class="aislepilot-head-menu-count">@Model.SavedWeeks.Count</span>
+                        </div>
                         @if (hasSavedWeeks)
                         {
                             <ul class="aislepilot-head-week-list">
                                 @foreach (var savedWeek in Model.SavedWeeks.Take(6))
                                 {
                                     var savedAtLocal = savedWeek.SavedAtUtc.ToLocalTime();
+                                    var weekDisplayLabel = string.IsNullOrWhiteSpace(savedWeek.Label)
+                                        ? $"Week saved {savedAtLocal.ToString("d MMM", ukCulture)}"
+                                        : savedWeek.Label;
                                     <li class="aislepilot-head-week-row">
-                                        <span class="aislepilot-head-week-date">
-                                            Saved @savedAtLocal.ToString("d MMM yyyy", ukCulture)
+                                        <span class="aislepilot-head-week-copy">
+                                            <strong class="aislepilot-head-week-title">@weekDisplayLabel</strong>
+                                            <span class="aislepilot-head-week-date">@savedWeek.PlanDays days · @savedWeek.MealCount meals · @FormatSupermarketLabel(savedWeek.Supermarket)</span>
                                         </span>
                                         <div class="aislepilot-head-week-actions">
                                             <form method="post"
@@ -62,8 +73,8 @@
                                                         class="aislepilot-head-week-action-btn"
                                                         data-loading-label="Opening week..."
                                                         data-show-plan-skeleton
-                                                        aria-label="Open week"
-                                                        title="Open week">
+                                                        aria-label="Open @weekDisplayLabel"
+                                                        title="Open @weekDisplayLabel">
                                                     <span class="aislepilot-symbol-glyph" aria-hidden="true">
                                                         <svg viewBox="0 0 24 24" focusable="false">
                                                             <path d="M12 3v11"></path>
@@ -83,8 +94,8 @@
                                                 <button type="submit"
                                                         class="aislepilot-head-week-action-btn is-danger"
                                                         data-loading-label="Deleting week..."
-                                                        aria-label="Delete week"
-                                                        title="Delete week">
+                                                        aria-label="Delete @weekDisplayLabel"
+                                                        title="Delete @weekDisplayLabel">
                                                     <span class="aislepilot-symbol-glyph" aria-hidden="true">
                                                         <svg viewBox="0 0 24 24" focusable="false">
                                                             <path d="M4 7h16"></path>
@@ -104,11 +115,14 @@
                         }
                         else
                         {
-                            <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true">No saved weeks yet</p>
+                            <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true"><strong>No saved weeks yet</strong><span>Save a plan from the weekly actions to find it here.</span></p>
                         }
 
                         <div data-saved-meals-menu-section>
-                            <p class="aislepilot-head-menu-section-title">Saved meals</p>
+                            <div class="aislepilot-head-menu-section-heading">
+                                <p class="aislepilot-head-menu-section-title">Saved meals</p>
+                                <span class="aislepilot-head-menu-count">@Model.SavedMeals.Count</span>
+                            </div>
                             @if (hasSavedMeals)
                             {
                                 <ul class="aislepilot-head-saved-meal-list">
@@ -145,7 +159,7 @@
                             }
                             else
                             {
-                                <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true">No saved meals yet</p>
+                                <p class="aislepilot-head-menu-item is-disabled" aria-disabled="true"><strong>No saved meals yet</strong><span>Tap Save on a meal card to build your favourites.</span></p>
                             }
                         </div>
                     </div>

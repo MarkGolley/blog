@@ -881,6 +881,7 @@
         panels.forEach((panel, index) => {
             const isActive = index === currentIndex;
             panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+            panel.toggleAttribute("inert", !isActive);
             panel.setAttribute("tabindex", isActive ? "0" : "-1");
         });
 
@@ -3716,6 +3717,7 @@
                         }
 
                         slide.setAttribute("aria-hidden", "false");
+                        slide.removeAttribute("inert");
                         slide.dataset.dayCarouselPosition = "active";
                     });
 
@@ -3754,6 +3756,7 @@
                     }
 
                     slide.setAttribute("aria-hidden", isActive ? "false" : "true");
+                    slide.toggleAttribute("inert", !isActive);
                     slide.dataset.dayCarouselPosition = position;
                 });
 
@@ -4343,24 +4346,17 @@
             }
 
             const mealNameInput = form.querySelector("input[name='mealName']");
-            const submitButton = form.querySelector("button[type='submit']");
-            const label = submitButton?.querySelector(".aislepilot-swap-action-label");
-            if (!(mealNameInput instanceof HTMLInputElement) || !(submitButton instanceof HTMLButtonElement) || !(label instanceof HTMLElement)) {
+            const primaryButton = document.querySelector(`.aislepilot-meal-primary-action[form='${form.id}']`);
+            if (!(mealNameInput instanceof HTMLInputElement) || !(primaryButton instanceof HTMLButtonElement)) {
                 return;
             }
 
             const mealName = mealNameInput.value.trim();
             const isSavedMeal = mealName.length > 0 && savedMealNameSet.has(mealName.toLowerCase());
-            submitButton.classList.toggle("is-saved-meal", isSavedMeal);
-            submitButton.setAttribute("aria-label", isSavedMeal ? "Unsave meal" : "Save meal");
-            submitButton.setAttribute("title", isSavedMeal ? "Unsave meal" : "Save meal");
-            label.textContent = isSavedMeal ? "Unsave" : "Save";
-            const primaryButton = document.querySelector(`.aislepilot-meal-primary-action[form='${form.id}']`);
-            if (primaryButton instanceof HTMLButtonElement) {
-                primaryButton.classList.toggle("is-saved", isSavedMeal);
-                primaryButton.setAttribute("aria-label", isSavedMeal ? "Unsave meal" : "Save meal");
-                primaryButton.textContent = isSavedMeal ? "Unsave" : "Save";
-            }
+            primaryButton.classList.toggle("is-saved", isSavedMeal);
+            primaryButton.setAttribute("aria-label", isSavedMeal ? "Unsave meal" : "Save meal");
+            primaryButton.setAttribute("title", isSavedMeal ? "Unsave meal" : "Save meal");
+            primaryButton.textContent = isSavedMeal ? "Unsave" : "Save";
             syncedButtons += 1;
         });
 
@@ -4382,22 +4378,36 @@
         }
 
         const savedMealNames = readSavedMealNamesFromHiddenState();
-        const title = section.querySelector(".aislepilot-head-menu-section-title");
+        const heading = section.querySelector(".aislepilot-head-menu-section-heading");
         section.replaceChildren();
-        if (title instanceof HTMLElement) {
-            section.appendChild(title);
+        if (heading instanceof HTMLElement) {
+            const count = heading.querySelector(".aislepilot-head-menu-count");
+            if (count instanceof HTMLElement) {
+                count.textContent = String(savedMealNames.length);
+            }
+            section.appendChild(heading);
         } else {
+            const nextHeading = document.createElement("div");
+            nextHeading.className = "aislepilot-head-menu-section-heading";
             const nextTitle = document.createElement("p");
             nextTitle.className = "aislepilot-head-menu-section-title";
             nextTitle.textContent = "Saved meals";
-            section.appendChild(nextTitle);
+            const nextCount = document.createElement("span");
+            nextCount.className = "aislepilot-head-menu-count";
+            nextCount.textContent = String(savedMealNames.length);
+            nextHeading.append(nextTitle, nextCount);
+            section.appendChild(nextHeading);
         }
 
         if (savedMealNames.length === 0) {
             const emptyState = document.createElement("p");
             emptyState.className = "aislepilot-head-menu-item is-disabled";
             emptyState.setAttribute("aria-disabled", "true");
-            emptyState.textContent = "No saved meals yet";
+            const emptyTitle = document.createElement("strong");
+            emptyTitle.textContent = "No saved meals yet";
+            const emptyHelp = document.createElement("span");
+            emptyHelp.textContent = "Tap Save on a meal card to build your favourites.";
+            emptyState.append(emptyTitle, emptyHelp);
             section.appendChild(emptyState);
             return true;
         }
@@ -4766,6 +4776,14 @@
                 }
 
                 exportForm.dataset.exportDownloadSubmitting = "true";
+                const status = exportForm.querySelector("[data-export-download-status]");
+                const setExportStatus = (message, state = "") => {
+                    if (status instanceof HTMLElement) {
+                        status.textContent = message;
+                        status.dataset.state = state;
+                    }
+                };
+                setExportStatus(submitButton.dataset.loadingLabel?.trim() || "Preparing download…");
                 const exportStartedAt = performance.now();
                 clearSubmitLoadingDelay(exportForm);
                 setSubmitButtonLoadingState(submitButton);
@@ -4797,22 +4815,28 @@
                             return;
                         }
 
-                        showToast(readExportFailureMessage(responseText, contentType), "warning");
+                        const failureMessage = readExportFailureMessage(responseText, contentType);
+                        showToast(failureMessage, "warning");
+                        setExportStatus(failureMessage, "error");
                         resetFormSubmittingState(exportForm);
                         return;
                     }
 
                     if (!response.ok) {
                         const responseText = await response.text();
-                        showToast(readExportFailureMessage(responseText, contentType), "warning");
+                        const failureMessage = readExportFailureMessage(responseText, contentType);
+                        showToast(failureMessage, "warning");
+                        setExportStatus(failureMessage, "error");
                         resetFormSubmittingState(exportForm);
                         return;
                     }
 
                     const blob = await response.blob();
                     triggerFileDownload(blob, readExportDownloadFileName(response, exportForm));
+                    setExportStatus("Download ready.", "success");
                     resetFormSubmittingState(exportForm);
                 } catch {
+                    setExportStatus("Your browser is continuing the download.");
                     delete exportForm.dataset.exportDownloadSubmitting;
                     HTMLFormElement.prototype.submit.call(exportForm);
                     return;

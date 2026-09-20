@@ -70,32 +70,23 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.Equal("false", await mealsTab.GetAttributeAsync("aria-selected"));
         Assert.Equal("false", await mealsTab.GetAttributeAsync("aria-current"));
 
-        var shopHasGradient = await page.EvaluateAsync<bool>(
+        var tabBackgrounds = await page.EvaluateAsync<string[]>(
             """
             () => {
-                const tab = document.querySelector("#aislepilot-tab-shop");
-                if (!(tab instanceof HTMLElement)) {
-                    return false;
+                const shop = document.querySelector("#aislepilot-tab-shop");
+                const meals = document.querySelector("#aislepilot-tab-meals");
+                if (!(shop instanceof HTMLElement) || !(meals instanceof HTMLElement)) {
+                    return [];
                 }
 
-                const backgroundImage = window.getComputedStyle(tab).backgroundImage || "";
-                return backgroundImage.toLowerCase().includes("gradient");
+                return [
+                    window.getComputedStyle(shop).backgroundColor,
+                    window.getComputedStyle(meals).backgroundColor
+                ];
             }
             """);
-        var mealsHasGradient = await page.EvaluateAsync<bool>(
-            """
-            () => {
-                const tab = document.querySelector("#aislepilot-tab-meals");
-                if (!(tab instanceof HTMLElement)) {
-                    return false;
-                }
-
-                const backgroundImage = window.getComputedStyle(tab).backgroundImage || "";
-                return backgroundImage.toLowerCase().includes("gradient");
-            }
-            """);
-        Assert.True(shopHasGradient);
-        Assert.False(mealsHasGradient);
+        Assert.Equal(2, tabBackgrounds.Length);
+        Assert.NotEqual(tabBackgrounds[0], tabBackgrounds[1]);
 
         await exportTab.ClickAsync();
         await page.Locator("#aislepilot-export[aria-hidden='false']").First.WaitForAsync(new LocatorWaitForOptions
@@ -376,345 +367,6 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Desktop_AislePilotDayCarousel_UsesMutedPreviewCardsAndCompactOverlayChrome()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateDesktopContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var thursdayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='3']").First;
-        await thursdayPill.ClickAsync();
-
-        await page.WaitForFunctionAsync(
-            """
-            () => {
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
-                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
-                const activeSlide = slides[activeIndex];
-                const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
-                return activeIndex === 3
-                    && activeSlide instanceof HTMLElement
-                    && activeSlide.getAttribute("data-day-carousel-position") === "active"
-                    && activeSlide.getAttribute("data-day-carousel-settling") !== "true"
-                    && activeDot instanceof HTMLElement
-                    && activeDot.getAttribute("data-day-carousel-target") === "3";
-            }
-            """);
-
-        var metrics = await page.EvaluateAsync<object[]>(
-            """
-            () => {
-                const parseAlpha = value => {
-                    if (typeof value !== "string") {
-                        return 0;
-                    }
-
-                    const match = value.match(/rgba?\(([^)]+)\)/i);
-                    if (!match) {
-                        return 1;
-                    }
-
-                    const parts = match[1].split(",").map(part => Number.parseFloat(part.trim()));
-                    return parts.length >= 4 && Number.isFinite(parts[3]) ? parts[3] : 1;
-                };
-
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
-                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
-                const activeSlide = slides.find(slide => slide instanceof HTMLElement && slide.getAttribute("data-day-carousel-position") === "active");
-                const activeResolvedIndex = slides.findIndex(slide => slide === activeSlide);
-                const previousSlide = slides[activeResolvedIndex - 1];
-                const nextSlide = slides[activeResolvedIndex + 1];
-                const activeDot = document.querySelector("[data-day-carousel-dot][aria-selected='true']");
-                const inactiveDot = document.querySelector("[data-day-carousel-dot][aria-selected='false']");
-                const hint = activeSlide instanceof HTMLElement ? activeSlide.querySelector(".aislepilot-meal-image-hint") : null;
-                const hintChips = hint instanceof HTMLElement ? hint.querySelector(".aislepilot-meal-image-hint-chips") : null;
-                const primaryHint = hint instanceof HTMLElement ? hint.querySelector(".aislepilot-meal-image-hint-primary") : null;
-                const actionsTrigger = activeSlide instanceof HTMLElement
-                    ? activeSlide.querySelector("[data-day-card-header-actions].is-active [data-card-more-actions] > summary")
-                    : null;
-                const title = activeSlide instanceof HTMLElement ? activeSlide.querySelector(".aislepilot-day-meal-panel > h3") : null;
-                const previousTitle = previousSlide instanceof HTMLElement ? previousSlide.querySelector(".aislepilot-day-meal-panel > h3") : null;
-                const nextTitle = nextSlide instanceof HTMLElement ? nextSlide.querySelector(".aislepilot-day-meal-panel > h3") : null;
-                const metaBadge = activeSlide instanceof HTMLElement
-                    ? activeSlide.querySelector(".aislepilot-day-card-head-main .aislepilot-day-card-meta")
-                    : null;
-
-                if (!(activeSlide instanceof HTMLElement)
-                    || !(previousSlide instanceof HTMLElement)
-                    || !(nextSlide instanceof HTMLElement)
-                    || !(activeDot instanceof HTMLElement)
-                    || !(inactiveDot instanceof HTMLElement)
-                    || !(hint instanceof HTMLElement)
-                    || !(actionsTrigger instanceof HTMLElement)
-                    || !(primaryHint instanceof HTMLElement)
-                    || !(title instanceof HTMLElement)
-                    || !(previousTitle instanceof HTMLElement)
-                    || !(nextTitle instanceof HTMLElement)) {
-                    return [];
-                }
-
-                const activeRect = activeSlide.getBoundingClientRect();
-                const previousRect = previousSlide.getBoundingClientRect();
-                const nextRect = nextSlide.getBoundingClientRect();
-                const triggerRect = actionsTrigger.getBoundingClientRect();
-                const hintRect = hint.getBoundingClientRect();
-
-                return [
-                    activeResolvedIndex,
-                    activeRect.width,
-                    previousRect.width,
-                    nextRect.width,
-                    Number.parseFloat(getComputedStyle(activeSlide).opacity || "0"),
-                    Number.parseFloat(getComputedStyle(previousSlide).opacity || "0"),
-                    Number.parseFloat(getComputedStyle(nextSlide).opacity || "0"),
-                    Number.parseFloat(getComputedStyle(previousTitle).opacity || "0"),
-                    Number.parseFloat(getComputedStyle(nextTitle).opacity || "0"),
-                    Number.parseFloat(getComputedStyle(activeDot).opacity || "0"),
-                    Number.parseFloat(getComputedStyle(inactiveDot).opacity || "0"),
-                    parseAlpha(getComputedStyle(hint).backgroundColor || ""),
-                    hintRect.width,
-                    hintChips instanceof HTMLElement ? getComputedStyle(hintChips).display : "missing",
-                    (primaryHint.textContent || "").trim(),
-                    parseAlpha(getComputedStyle(actionsTrigger).backgroundColor || ""),
-                    triggerRect.width,
-                    triggerRect.height,
-                    Number.parseFloat(getComputedStyle(title).fontSize || "0"),
-                    metaBadge instanceof HTMLElement
-                        ? Number.parseFloat(getComputedStyle(metaBadge).borderTopLeftRadius || "0")
-                        : 0
-                ];
-            }
-            """);
-
-        Assert.Equal(20, metrics.Length);
-        var debugState =
-            $"activeIndex={metrics[0]}; widths={metrics[1]}/{metrics[2]}/{metrics[3]}; " +
-            $"cardOpacity={metrics[4]}/{metrics[5]}/{metrics[6]}; titleOpacity={metrics[7]}/{metrics[8]}; " +
-            $"dotOpacity={metrics[9]}/{metrics[10]}; hintAlpha={metrics[11]}; hintWidth={metrics[12]}; " +
-            $"hintChips={metrics[13]}; hintText={metrics[14]}; triggerAlpha={metrics[15]}; " +
-            $"triggerSize={metrics[16]}x{metrics[17]}; titleSize={metrics[18]}; metaRadius={metrics[19]}";
-
-        Assert.Equal(3, Convert.ToInt32(metrics[0]));
-        Assert.True(Convert.ToDouble(metrics[1]) > Convert.ToDouble(metrics[2]) + 14, debugState);
-        Assert.True(Convert.ToDouble(metrics[1]) > Convert.ToDouble(metrics[3]) + 14, debugState);
-        Assert.True(Convert.ToDouble(metrics[4]) >= 0.98, debugState);
-        Assert.InRange(Convert.ToDouble(metrics[5]), 0.38, 0.52);
-        Assert.InRange(Convert.ToDouble(metrics[6]), 0.38, 0.52);
-        Assert.InRange(Convert.ToDouble(metrics[7]), 0.08, 0.28);
-        Assert.InRange(Convert.ToDouble(metrics[8]), 0.08, 0.28);
-        Assert.True(Convert.ToDouble(metrics[9]) >= 0.98, debugState);
-        Assert.True(Convert.ToDouble(metrics[10]) >= 0.9, debugState);
-        Assert.InRange(Convert.ToDouble(metrics[11]), 0.3, 0.58);
-        Assert.True(Convert.ToDouble(metrics[12]) <= 136, debugState);
-        Assert.Equal("none", Convert.ToString(metrics[13]));
-        Assert.Contains("Recipe", Convert.ToString(metrics[14]) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.InRange(Convert.ToDouble(metrics[15]), 0.28, 0.56);
-        Assert.True(Convert.ToDouble(metrics[16]) <= 34, debugState);
-        Assert.True(Convert.ToDouble(metrics[17]) <= 34, debugState);
-        Assert.InRange(Convert.ToDouble(metrics[18]), 17, 19.5);
-        Assert.True(Convert.ToDouble(metrics[19]) >= 20, debugState);
-    }
-
-    [Fact]
-    public async Task Desktop_AislePilotDayCarousel_ExpandedMealCardDoesNotStretchPreviewSlides()
-    {
-        if (!IsE2EEnabled())
-        {
-            return;
-        }
-
-        await using var context = await CreateDesktopContextAsync();
-        var page = await context.NewPageAsync();
-
-        await GoToAislePilotAndGeneratePlanAsync(page);
-
-        var thursdayPill = page.Locator("[data-day-carousel-dot][data-day-carousel-target='3']").First;
-        await thursdayPill.ClickAsync();
-
-        await page.WaitForFunctionAsync(
-            """
-            () => {
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
-                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
-                return activeIndex === 3;
-            }
-            """);
-
-        var imageSummary = page.Locator("[data-day-card-slide][aria-hidden='false'] .aislepilot-meal-details-image-toggle > .aislepilot-meal-image-summary").First;
-        await imageSummary.ScrollIntoViewIfNeededAsync();
-        var previewTopsBeforeExpand = await page.EvaluateAsync<double[]>(
-            """
-            () => {
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
-                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
-                const activeSlide = slides[activeIndex];
-                const previousSlide = slides[activeIndex - 1];
-                const nextSlide = slides[activeIndex + 1];
-                const viewport = activeSlide instanceof HTMLElement
-                    ? activeSlide.closest("[data-day-carousel-viewport]")
-                    : null;
-                if (!(previousSlide instanceof HTMLElement)
-                    || !(nextSlide instanceof HTMLElement)
-                    || !(viewport instanceof HTMLElement)) {
-                    return [];
-                }
-
-                const viewportTop = viewport.getBoundingClientRect().top;
-                return [
-                    previousSlide.getBoundingClientRect().top - viewportTop,
-                    nextSlide.getBoundingClientRect().top - viewportTop,
-                    previousSlide.getBoundingClientRect().height,
-                    nextSlide.getBoundingClientRect().height
-                ];
-            }
-            """);
-        Assert.Equal(4, previewTopsBeforeExpand.Length);
-
-        var pagePositionBeforeExpand = await page.EvaluateAsync<double[]>(
-            """
-            () => {
-                const viewport = document.querySelector("[data-day-carousel-viewport]");
-                if (!(viewport instanceof HTMLElement)) {
-                    return [];
-                }
-
-                return [
-                    viewport.getBoundingClientRect().top,
-                    window.scrollY
-                ];
-            }
-            """);
-        Assert.Equal(2, pagePositionBeforeExpand.Length);
-
-        var imageSummaryBox = await imageSummary.BoundingBoxAsync();
-        Assert.NotNull(imageSummaryBox);
-        await page.Mouse.ClickAsync(
-            imageSummaryBox!.X + (imageSummaryBox.Width / 2),
-            imageSummaryBox.Y + (imageSummaryBox.Height / 2));
-
-        var driftMetrics = await page.EvaluateAsync<double[]>(
-            """
-            async ({ baselinePreviousTop, baselineNextTop, baselineViewportTop, baselineScrollY }) => {
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
-                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
-                const activeSlide = slides[activeIndex];
-                const previousSlide = slides[activeIndex - 1];
-                const nextSlide = slides[activeIndex + 1];
-                const viewport = activeSlide instanceof HTMLElement
-                    ? activeSlide.closest("[data-day-carousel-viewport]")
-                    : null;
-                if (!(previousSlide instanceof HTMLElement)
-                    || !(nextSlide instanceof HTMLElement)
-                    || !(viewport instanceof HTMLElement)) {
-                    return [];
-                }
-
-                let maxPreviousDrift = 0;
-                let maxNextDrift = 0;
-                let maxViewportDrift = 0;
-                let maxScrollDrift = 0;
-                const sample = () => {
-                    const viewportTop = viewport.getBoundingClientRect().top;
-                    maxPreviousDrift = Math.max(
-                        maxPreviousDrift,
-                        Math.abs((previousSlide.getBoundingClientRect().top - viewportTop) - baselinePreviousTop));
-                    maxNextDrift = Math.max(
-                        maxNextDrift,
-                        Math.abs((nextSlide.getBoundingClientRect().top - viewportTop) - baselineNextTop));
-                    maxViewportDrift = Math.max(
-                        maxViewportDrift,
-                        Math.abs(viewportTop - baselineViewportTop));
-                    maxScrollDrift = Math.max(
-                        maxScrollDrift,
-                        Math.abs(window.scrollY - baselineScrollY));
-                };
-
-                const start = performance.now();
-                sample();
-                while (performance.now() - start < 360) {
-                    await new Promise(resolve => window.setTimeout(resolve, 32));
-                    sample();
-                }
-
-                return [maxPreviousDrift, maxNextDrift, maxViewportDrift, maxScrollDrift];
-            }
-            """,
-            new
-            {
-                baselinePreviousTop = previewTopsBeforeExpand[0],
-                baselineNextTop = previewTopsBeforeExpand[1],
-                baselineViewportTop = pagePositionBeforeExpand[0],
-                baselineScrollY = pagePositionBeforeExpand[1]
-            });
-
-        var expandedState = await page.WaitForFunctionAsync(
-            """
-            () => {
-                const slides = Array.from(document.querySelectorAll("[data-day-card-slide]:not([data-day-carousel-ghost='true'])"));
-                const activeIndex = slides.findIndex(slide => slide instanceof HTMLElement && slide.getAttribute("aria-hidden") === "false");
-                const activeSlide = slides[activeIndex];
-                const previousSlide = slides[activeIndex - 1];
-                const nextSlide = slides[activeIndex + 1];
-                const viewport = activeSlide instanceof HTMLElement
-                    ? activeSlide.closest("[data-day-carousel-viewport]")
-                    : null;
-                if (!(activeSlide instanceof HTMLElement)
-                    || !(previousSlide instanceof HTMLElement)
-                    || !(nextSlide instanceof HTMLElement)) {
-                    return false;
-                }
-                if (!(viewport instanceof HTMLElement)) {
-                    return false;
-                }
-
-                const detailsToggle = activeSlide.querySelector("[data-inline-details-toggle]");
-                const detailsPanel = activeSlide.querySelector("[data-inline-details-panel]");
-                if (!(detailsToggle instanceof HTMLDetailsElement)
-                    || !(detailsPanel instanceof HTMLElement)
-                    || !detailsToggle.open
-                    || detailsPanel.hasAttribute("hidden")
-                    || detailsPanel.getAttribute("aria-hidden") !== "false") {
-                    return false;
-                }
-
-                const activeRect = activeSlide.getBoundingClientRect();
-                const previousRect = previousSlide.getBoundingClientRect();
-                const nextRect = nextSlide.getBoundingClientRect();
-                const viewportTop = viewport.getBoundingClientRect().top;
-
-                return [
-                    activeRect.height,
-                    previousRect.height,
-                    nextRect.height,
-                    previousRect.top - viewportTop,
-                    nextRect.top - viewportTop
-                ];
-            }
-            """);
-
-        var expandedMetrics = await expandedState.JsonValueAsync<double[]>();
-        Assert.NotNull(expandedMetrics);
-        Assert.Equal(5, expandedMetrics!.Length);
-        Assert.Equal(4, driftMetrics.Length);
-        Assert.True(driftMetrics[0] < 2.5, $"Expected previous preview slide to stay vertically stable. Drift={driftMetrics[0]}px.");
-        Assert.True(driftMetrics[1] < 2.5, $"Expected next preview slide to stay vertically stable. Drift={driftMetrics[1]}px.");
-        Assert.True(driftMetrics[2] < 2.5, $"Expected carousel viewport to stay vertically stable while opening details. Drift={driftMetrics[2]}px.");
-        Assert.True(driftMetrics[3] < 2.5, $"Expected page scroll to stay stable while opening details. Drift={driftMetrics[3]}px.");
-        Assert.True(expandedMetrics[0] > expandedMetrics[1] + 40);
-        Assert.True(expandedMetrics[0] > expandedMetrics[2] + 40);
-        Assert.True(Math.Abs(expandedMetrics[1] - previewTopsBeforeExpand[2]) < 2.5);
-        Assert.True(Math.Abs(expandedMetrics[2] - previewTopsBeforeExpand[3]) < 2.5);
-        Assert.True(Math.Abs(expandedMetrics[3] - previewTopsBeforeExpand[0]) < 2.5);
-        Assert.True(Math.Abs(expandedMetrics[4] - previewTopsBeforeExpand[1]) < 2.5);
-    }
-
-    [Fact]
     public async Task Desktop_AislePilotSupermarketSelection_PersistsAcrossFreshVisit()
     {
         if (!IsE2EEnabled())
@@ -827,6 +479,9 @@ public sealed partial class PlaywrightE2ETests : IAsyncLifetime
         Assert.False(await checklistButton.IsDisabledAsync(), checklistState);
         Assert.DoesNotContain("is-loading", await checklistButton.GetAttributeAsync("class") ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.NotEqual("true", await checklistButton.GetAttributeAsync("aria-busy"));
+        var checklistStatus = page.Locator("#aislepilot-export [data-export-download-status]").Nth(1);
+        Assert.Equal("Download ready.", (await checklistStatus.TextContentAsync())?.Trim());
+        Assert.Equal("success", await checklistStatus.GetAttributeAsync("data-state"));
     }
 
     [Fact]

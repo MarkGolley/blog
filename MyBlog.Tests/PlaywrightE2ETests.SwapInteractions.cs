@@ -36,16 +36,15 @@ public sealed partial class PlaywrightE2ETests
                 ex);
         }
 
-        var moreActionsTriggers = page.Locator("[data-day-card-header-actions].is-active [data-card-more-actions] > summary:visible");
-        var moreActionsTriggerCount = await moreActionsTriggers.CountAsync();
-        Assert.True(moreActionsTriggerCount > 1, $"Expected multiple meal cards to be rendered. Actual trigger count={moreActionsTriggerCount}.");
+        var swapButtons = page.Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']:visible");
+        var swapButtonCount = await swapButtons.CountAsync();
+        Assert.True(swapButtonCount > 0, $"Expected visible primary Swap actions. Actual count={swapButtonCount}.");
 
-        var targetIndex = Math.Min(2, moreActionsTriggerCount - 1);
-        var targetTrigger = moreActionsTriggers.Nth(targetIndex);
-        var targetCard = page.Locator("[data-day-meal-card]").Nth(targetIndex);
+        var targetIndex = Math.Min(2, swapButtonCount - 1);
+        var targetSwapButton = swapButtons.Nth(targetIndex);
+        var targetCard = targetSwapButton.Locator("xpath=ancestor::*[@data-day-meal-card][1]");
         var previousMealName = (await targetCard.Locator(".aislepilot-day-meal-panel[aria-hidden='false'] h3").First.InnerTextAsync()).Trim();
 
-        var targetSwapButton = targetTrigger.Locator("xpath=ancestor::*[@data-day-meal-panel][1]").Locator(".aislepilot-meal-primary-action[aria-label='Swap meal']");
         await targetSwapButton.ScrollIntoViewIfNeededAsync();
         await targetSwapButton.WaitForAsync(new LocatorWaitForOptions
         {
@@ -103,7 +102,6 @@ public sealed partial class PlaywrightE2ETests
                 return currentMealName.length > 0 &&
                     currentMealName !== priorMealName &&
                     activePanel?.id === "aislepilot-meals" &&
-                    document.querySelectorAll("[data-card-more-actions][open]").length === 0 &&
                     currentMealName !== priorMealName;
             }
             """,

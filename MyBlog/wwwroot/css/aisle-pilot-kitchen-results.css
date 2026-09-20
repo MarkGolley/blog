@@ -58,6 +58,17 @@ color: var(--ap-refresh-accent);
 outline: 3px solid color-mix(in srgb, var(--ap-refresh-accent) 48%, transparent);
 outline-offset: 2px;
 }
+:root[data-theme] .aislepilot-app .aislepilot-overview-actions-menu {
+border-color: var(--ap-refresh-border-strong);
+background: var(--ap-refresh-surface);
+box-shadow: 0 14px 28px rgb(15 35 28 / .16);
+}
+:root[data-theme] .aislepilot-app .aislepilot-overview-actions-menu .aislepilot-overview-regenerate-btn.is-secondary {
+border-color: var(--ap-refresh-border);
+background: var(--ap-refresh-surface-strong);
+color: var(--ap-refresh-text);
+box-shadow: none;
+}
 .aislepilot-app .aislepilot-stat-label { font-size: 0.75rem; letter-spacing: 0.04em; }
 .aislepilot-app .aislepilot-stat-value { font-size: 1.1rem; }
 .aislepilot-app .aislepilot-budget-grid--primary {

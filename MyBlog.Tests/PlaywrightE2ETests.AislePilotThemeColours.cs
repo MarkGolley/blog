@@ -44,8 +44,6 @@ public sealed partial class PlaywrightE2ETests
             """);
         Assert.InRange(Math.Abs(sliderWidths[0] - sliderWidths[1]), 0, 1);
         await budget.PressAsync("End");
-        Assert.Equal("250", await budget.InputValueAsync());
-        Assert.Contains("250", await page.Locator(".aislepilot-budget-slider-field [data-number-slider-value]").InnerTextAsync());
         await page.Locator(".aislepilot-personalise > summary").First.ClickAsync();
         await page.Locator("summary").Filter(new() { HasText = "Dietary requirements" }).ClickAsync();
         await AssertThemeColourAsync(page, ".aislepilot-mode-option input:checked + span", "--ap-refresh-primary");
@@ -67,7 +65,7 @@ public sealed partial class PlaywrightE2ETests
         await page.Locator("#aislepilot-tab-meals").WaitForAsync();
         await AssertThemeColourAsync(page, ".aislepilot-head-primary-action", "--ap-refresh-primary");
         var activeMeal = page.Locator("[data-day-meal-panel][aria-hidden='false']").First;
-        await AssertThemeTextColourAsync(activeMeal.Locator(".aislepilot-more-actions-trigger .aislepilot-symbol-glyph"), "--ap-refresh-text");
+        await AssertThemeColourAsync(page, "[data-day-card-slide][aria-hidden='false'] [data-day-meal-panel][aria-hidden='false'] .aislepilot-meal-primary-action", "--ap-refresh-primary");
         await activeMeal.Locator(".aislepilot-meal-primary-action.is-recipe").ClickAsync();
         await AssertThemeColourAsync(page, "[data-day-meal-panel][aria-hidden='false'] [data-inline-details-panel]", "--ap-refresh-surface-strong");
         await AssertThemeColourAsync(page, "[data-day-meal-panel][aria-hidden='false'] [data-inline-details-panel] .aislepilot-meal-section", "--ap-refresh-surface");

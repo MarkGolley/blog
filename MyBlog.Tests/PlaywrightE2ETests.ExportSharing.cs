@@ -13,32 +13,32 @@ public sealed partial class PlaywrightE2ETests
         await GoToAislePilotAndGeneratePlanAsync(page);
         await page.Locator("[data-window-tab='aislepilot-export']").ClickAsync();
         var button = page.Locator("[data-notes-export-trigger]");
-        await button.EvaluateAsync("element => element.dataset.notesLabelTimeoutMs = '800'");
+        var status = page.Locator("[data-notes-export-status]");
 
         await SetShareMocksAsync(page, "success");
         await button.ClickAsync();
-        await page.WaitForFunctionAsync("() => document.querySelector('[data-notes-export-trigger]')?.textContent?.includes('Share sheet opened')");
+        await status.Filter(new LocatorFilterOptions { HasText = "Share sheet opened" }).WaitForAsync();
+        Assert.Equal("Share shopping list", (await button.TextContentAsync())?.Trim());
         Assert.Equal(new[] { 1, 0 }, await ReadShareCountsAsync(page));
-        await page.WaitForTimeoutAsync(850);
 
         await SetShareMocksAsync(page, "abort");
         await button.ClickAsync();
         await page.WaitForTimeoutAsync(100);
+        Assert.Equal(string.Empty, (await status.TextContentAsync())?.Trim());
         Assert.Equal("Share shopping list", (await button.TextContentAsync())?.Trim());
         Assert.Equal(new[] { 1, 0 }, await ReadShareCountsAsync(page));
 
         await SetShareMocksAsync(page, "clipboard");
         await button.ClickAsync();
-        await page.WaitForFunctionAsync("() => document.querySelector('[data-notes-export-trigger]')?.textContent?.includes('copied')");
+        await status.Filter(new LocatorFilterOptions { HasText = "copied" }).WaitForAsync();
         Assert.Equal(new[] { 0, 1 }, await ReadShareCountsAsync(page));
-        await page.WaitForTimeoutAsync(850);
 
         await SetShareMocksAsync(page, "failure");
         await button.ClickAsync();
-        await page.WaitForFunctionAsync("() => document.querySelector('[data-notes-export-trigger]')?.textContent?.includes('Could not share')");
+        await status.Filter(new LocatorFilterOptions { HasText = "Could not share" }).WaitForAsync();
         Assert.Equal(new[] { 1, 1 }, await ReadShareCountsAsync(page));
-        await page.WaitForTimeoutAsync(850);
         Assert.Equal("Share shopping list", (await button.TextContentAsync())?.Trim());
+        Assert.Equal("error", await status.GetAttributeAsync("data-state"));
 
         await page.Locator("[data-window-tab='aislepilot-shop']").ClickAsync();
         var firstItem = page.Locator("[data-shopping-department] [data-shopping-item-label]").First;

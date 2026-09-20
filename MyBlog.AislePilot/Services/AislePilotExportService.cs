@@ -13,30 +13,30 @@ public sealed class AislePilotExportService : IAislePilotExportService
     private const string ShoppingEstimateDisclaimer = "This estimate covers the ingredients used in these meals. Actual checkout can be higher if shops only sell larger packs or bags.";
     private const string AislePilotMarkSvg = """
         <svg width="128" height="128" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-          <g fill="none" stroke="#103F65" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+          <g fill="none" stroke="#285840" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
             <path d="M120 180 H320 L360 300 H160 Z" />
-            <circle cx="200" cy="360" r="20" fill="#103F65" />
-            <circle cx="320" cy="360" r="20" fill="#103F65" />
+            <circle cx="200" cy="360" r="20" fill="#285840" />
+            <circle cx="320" cy="360" r="20" fill="#285840" />
           </g>
-          <rect x="98" y="220" width="90" height="12" rx="6" fill="#0F6D78" />
-          <rect x="86" y="250" width="108" height="12" rx="6" fill="#0F6D78" />
-          <rect x="170" y="220" width="120" height="12" rx="6" fill="#0F6D78" />
-          <rect x="180" y="250" width="100" height="12" rx="6" fill="#0F6D78" />
-          <path d="M260 260 L360 220 L360 300 Z" fill="#E39C41" />
+          <rect x="98" y="220" width="90" height="12" rx="6" fill="#7D9582" />
+          <rect x="86" y="250" width="108" height="12" rx="6" fill="#7D9582" />
+          <rect x="170" y="220" width="120" height="12" rx="6" fill="#7D9582" />
+          <rect x="180" y="250" width="100" height="12" rx="6" fill="#7D9582" />
+          <path d="M260 260 L360 220 L360 300 Z" fill="#B6D6B4" />
         </svg>
         """;
     private const string AislePilotMarkSvgDark = """
         <svg width="128" height="128" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-          <g fill="none" stroke="#A8DAFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+          <g fill="none" stroke="#B6D6B4" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
             <path d="M120 180 H320 L360 300 H160 Z" />
-            <circle cx="200" cy="360" r="20" fill="#A8DAFF" />
-            <circle cx="320" cy="360" r="20" fill="#A8DAFF" />
+            <circle cx="200" cy="360" r="20" fill="#B6D6B4" />
+            <circle cx="320" cy="360" r="20" fill="#B6D6B4" />
           </g>
-          <rect x="98" y="220" width="90" height="12" rx="6" fill="#78D0CC" />
-          <rect x="86" y="250" width="108" height="12" rx="6" fill="#78D0CC" />
-          <rect x="170" y="220" width="120" height="12" rx="6" fill="#78D0CC" />
-          <rect x="180" y="250" width="100" height="12" rx="6" fill="#78D0CC" />
-          <path d="M260 260 L360 220 L360 300 Z" fill="#F6BE77" />
+          <rect x="98" y="220" width="90" height="12" rx="6" fill="#8EA894" />
+          <rect x="86" y="250" width="108" height="12" rx="6" fill="#8EA894" />
+          <rect x="170" y="220" width="120" height="12" rx="6" fill="#8EA894" />
+          <rect x="180" y="250" width="100" height="12" rx="6" fill="#8EA894" />
+          <path d="M260 260 L360 220 L360 300 Z" fill="#F0F2E9" />
         </svg>
         """;
 
@@ -51,18 +51,18 @@ public sealed class AislePilotExportService : IAislePilotExportService
         bool useDarkTheme)
     {
         var ukCulture = CultureInfo.GetCultureInfo("en-GB");
-        var ink = useDarkTheme ? "#E7EFFD" : "#142033";
-        var inkSoft = useDarkTheme ? "#B7C7DE" : "#45556D";
-        var brandDeep = useDarkTheme ? "#9ED4FF" : "#103F65";
-        var panel = useDarkTheme ? "#131D2A" : "#FFFFFF";
-        var panelSoft = useDarkTheme ? "#1A2738" : "#F0F6FF";
-        var line = useDarkTheme ? "#2B3D55" : "#D8E3EF";
-        var lineStrong = useDarkTheme ? "#35506D" : "#C9D8E8";
-        var ok = useDarkTheme ? "#8AE5BB" : "#166247";
-        var okSoft = useDarkTheme ? "#1B3A2D" : "#EAF7EF";
+        var ink = useDarkTheme ? "#F0F2E9" : "#233D32";
+        var inkSoft = useDarkTheme ? "#B8C5B8" : "#58645B";
+        var brandDeep = useDarkTheme ? "#B6D6B4" : "#285840";
+        var panel = useDarkTheme ? "#1E2C23" : "#FFFEFA";
+        var panelSoft = useDarkTheme ? "#26372C" : "#F4F5EF";
+        var line = useDarkTheme ? "#405146" : "#D9DED4";
+        var lineStrong = useDarkTheme ? "#8EA894" : "#7D9582";
+        var ok = useDarkTheme ? "#B6D6B4" : "#285840";
+        var okSoft = useDarkTheme ? "#26372C" : "#E8F0E8";
         var danger = useDarkTheme ? "#FF9E98" : "#92261F";
         var dangerSoft = useDarkTheme ? "#3A2125" : "#FCEDEC";
-        var pageSurface = useDarkTheme ? "#0B1320" : "#FFFFFF";
+        var pageSurface = useDarkTheme ? "#162019" : "#F8F7F1";
         var markSvg = useDarkTheme ? AislePilotMarkSvgDark : AislePilotMarkSvg;
 
         var generatedAt = DateTime.Now;
@@ -113,6 +113,11 @@ public sealed class AislePilotExportService : IAislePilotExportService
             overviewRows.Add(("Dislikes/allergens", request.DislikesOrAllergens));
         }
 
+        if (!string.IsNullOrWhiteSpace(result.PriceInsight?.SourceLabel))
+        {
+            overviewRows.Add(("Store pricing", result.PriceInsight.SourceLabel));
+        }
+
         var leftOverviewRows = overviewRows
             .Where((_, index) => index % 2 == 0)
             .ToList();
@@ -151,8 +156,8 @@ public sealed class AislePilotExportService : IAislePilotExportService
                                 row.RelativeItem().Column(column =>
                                 {
                                     column.Spacing(1);
-                                    column.Item().Text("Aisle Pilot").FontSize(15.5f).SemiBold().FontColor(brandDeep);
-                                    column.Item().Text("Weekly meal plan, aisle-sorted shopping, and practical recipes")
+                                    column.Item().Text("AislePilot").FontSize(16.5f).SemiBold().FontColor(brandDeep);
+                                    column.Item().Text("Your week, ready to cook and shop")
                                         .FontSize(8.2f)
                                         .FontColor(inkSoft);
                                 });
@@ -161,7 +166,8 @@ public sealed class AislePilotExportService : IAislePilotExportService
                                     .PaddingVertical(4).PaddingHorizontal(6).Column(meta =>
                                     {
                                         meta.Spacing(1);
-                                        meta.Item().Text(generatedAt.ToString("dd MMM yyyy, HH:mm", ukCulture)).FontSize(8.1f)
+                                        meta.Item().Text("PLAN PACK").FontSize(6.8f).SemiBold().FontColor(inkSoft);
+                                        meta.Item().Text(generatedAt.ToString("dd MMM yyyy", ukCulture)).FontSize(8.1f)
                                             .SemiBold().FontColor(brandDeep);
                                     });
                             });
@@ -174,7 +180,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
                         content.Item().Section("toc").Column(toc =>
                         {
                             toc.Spacing(4);
-                            toc.Item().Text("Quick links").FontSize(11.5f).SemiBold().FontColor(brandDeep);
+                            toc.Item().Text("In this pack").FontSize(11.5f).SemiBold().FontColor(brandDeep);
                             toc.Item().Row(row =>
                             {
                                 row.Spacing(9);
@@ -189,7 +195,8 @@ public sealed class AislePilotExportService : IAislePilotExportService
                         content.Item().Section("overview").Border(0.7f).BorderColor(line).Background(panel).Padding(11).Column(section =>
                         {
                             section.Spacing(7);
-                            section.Item().Text("Plan overview").FontSize(13.5f).SemiBold().FontColor(brandDeep);
+                            section.Item().Text("YOUR WEEK").FontSize(7.5f).SemiBold().FontColor(inkSoft);
+                            section.Item().Text("Plan overview").FontSize(14.5f).SemiBold().FontColor(brandDeep);
 
                             section.Item().Row(row =>
                             {
@@ -283,7 +290,8 @@ public sealed class AislePilotExportService : IAislePilotExportService
                         content.Item().Section("shopping").Border(0.7f).BorderColor(line).Background(panel).Padding(11).Column(section =>
                         {
                             section.Spacing(7);
-                            section.Item().Text("Shopping list").FontSize(13.5f).SemiBold().FontColor(brandDeep);
+                            section.Item().Text("SHOP IN AISLE ORDER").FontSize(7.5f).SemiBold().FontColor(inkSoft);
+                            section.Item().Text("Shopping list").FontSize(14.5f).SemiBold().FontColor(brandDeep);
                             section.Item().Text(ShoppingEstimateDisclaimer).FontSize(8.8f).FontColor(inkSoft);
 
                             section.Item().MultiColumn(columns =>
@@ -373,20 +381,22 @@ public sealed class AislePilotExportService : IAislePilotExportService
                             });
                         });
 
+                        content.Item().PageBreak();
                         content.Item().Section("meals").Column(section =>
                         {
                             section.Spacing(8);
-                            section.Item().Text("Weekly meals and recipes").FontSize(14).SemiBold().FontColor(brandDeep);
+                            section.Item().Text("COOK THROUGH THE WEEK").FontSize(7.5f).SemiBold().FontColor(inkSoft);
+                            section.Item().Text("Meals and recipes").FontSize(15).SemiBold().FontColor(brandDeep);
 
                             foreach (var meal in result.MealPlan)
                             {
-                                section.Item().Border(0.7f).BorderColor(line).Background(panel).Padding(9).Column(card =>
-                                {
-                                    card.Spacing(5);
-                                    var mealHeading = meal.IsIgnored
-                                        ? $"{meal.Day} - {meal.MealType}: {meal.MealName} (Ignored)"
-                                        : $"{meal.Day} - {meal.MealType}: {meal.MealName}";
-                                    card.Item().Text(mealHeading).FontSize(11.5f).SemiBold().FontColor(brandDeep);
+                                section.Item().ShowEntire().Border(0.7f).BorderColor(line).Background(panel).Padding(9).Column(card =>
+                                    {
+                                        card.Spacing(5);
+                                        var mealHeading = meal.IsIgnored
+                                            ? $"{meal.Day} - {meal.MealType}: {meal.MealName} (Ignored)"
+                                            : $"{meal.Day} - {meal.MealType}: {meal.MealName}";
+                                        card.Item().Text(mealHeading).FontSize(11.5f).SemiBold().FontColor(brandDeep);
 
                                     card.Item().Row(meta =>
                                     {
@@ -400,6 +410,12 @@ public sealed class AislePilotExportService : IAislePilotExportService
                                         {
                                             meta.AutoItem().Background(okSoft).PaddingVertical(2).PaddingHorizontal(6)
                                                 .Text($"Covers {meal.LeftoverDaysCovered} leftover day(s)").FontSize(8.5f).SemiBold().FontColor(ok);
+                                        }
+
+                                        if (meal.CaloriesPerServing > 0)
+                                        {
+                                            meta.AutoItem().Background(panelSoft).PaddingVertical(2).PaddingHorizontal(6)
+                                                .Text($"{meal.CaloriesPerServing} kcal").FontSize(8.5f).SemiBold().FontColor(inkSoft);
                                         }
                                     });
 
@@ -450,7 +466,7 @@ public sealed class AislePilotExportService : IAislePilotExportService
 
                             row.RelativeItem().DefaultTextStyle(style => style.FontSize(8.5f)).Text(text =>
                             {
-                                text.Span("Aisle Pilot").SemiBold().FontColor(brandDeep);
+                                text.Span("AislePilot").SemiBold().FontColor(brandDeep);
                                 text.Span(" | ").FontColor(inkSoft);
                                 text.Span(result.Supermarket).FontColor(inkSoft);
                             });
