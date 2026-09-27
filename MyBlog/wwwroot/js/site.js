@@ -128,6 +128,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 closeNav();
             }
         });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape" || !navMenu.classList.contains("is-open")) {
+                return;
+            }
+
+            closeNav();
+            navToggle.focus();
+        });
     }
 
     const navCapsule = document.querySelector("[data-nav-capsule]");
@@ -571,7 +580,13 @@ document.addEventListener("submit", async (event) => {
         }
 
         button.classList.toggle("liked", payload.isLiked === true);
-        button.setAttribute("aria-label", payload.isLiked ? "Unlike this post" : "Like this post");
+        button.setAttribute("aria-pressed", payload.isLiked ? "true" : "false");
+        const likeCount = Number(payload.count ?? 0);
+        const likeLabel = likeCount === 1 ? "like" : "likes";
+        button.setAttribute(
+            "aria-label",
+            `${payload.isLiked ? "Unlike" : "Like"} this post. ${likeCount} ${likeLabel}`
+        );
     } finally {
         button.disabled = false;
     }

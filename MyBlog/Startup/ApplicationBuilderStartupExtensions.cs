@@ -82,7 +82,7 @@ internal static class ApplicationBuilderStartupExtensions
 
         app.UseStaticFiles(new StaticFileOptions
         {
-            OnPrepareResponse = ApplyAislePilotMealImageCachePolicy
+            OnPrepareResponse = ApplyStaticAssetCachePolicy
         });
         if (!string.IsNullOrWhiteSpace(app.Environment.WebRootPath))
         {
@@ -93,7 +93,7 @@ internal static class ApplicationBuilderStartupExtensions
                 {
                     FileProvider = new PhysicalFileProvider(aislePilotImageRoot),
                     RequestPath = "/projects/aisle-pilot/images",
-                    OnPrepareResponse = ApplyAislePilotMealImageCachePolicy
+                    OnPrepareResponse = ApplyStaticAssetCachePolicy
                 });
             }
         }
@@ -157,8 +157,16 @@ internal static class ApplicationBuilderStartupExtensions
         return app;
     }
 
-    private static void ApplyAislePilotMealImageCachePolicy(StaticFileResponseContext context)
+    private static void ApplyStaticAssetCachePolicy(StaticFileResponseContext context)
     {
+        var versionedAssetCacheControl = AppRequestPolicies.ResolveStaticAssetCacheControl(
+            context.Context.Request);
+        if (!string.IsNullOrWhiteSpace(versionedAssetCacheControl))
+        {
+            context.Context.Response.Headers.CacheControl = versionedAssetCacheControl;
+            return;
+        }
+
         var cacheControl = AppRequestPolicies.ResolveAislePilotMealImageCacheControl(
             context.Context.Request.Path);
         if (!string.IsNullOrWhiteSpace(cacheControl))
