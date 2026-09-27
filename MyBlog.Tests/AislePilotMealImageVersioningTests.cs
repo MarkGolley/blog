@@ -1,5 +1,6 @@
 using MyBlog.Services;
 using MyBlog.Startup;
+using Microsoft.AspNetCore.Http;
 
 namespace MyBlog.Tests;
 
@@ -28,5 +29,21 @@ public sealed class AislePilotMealImageVersioningTests
         string? expected)
     {
         Assert.Equal(expected, AppRequestPolicies.ResolveAislePilotMealImageCacheControl(path));
+    }
+
+    [Theory]
+    [InlineData("/css/site.css", "?v=content-hash", "public, max-age=31536000, immutable")]
+    [InlineData("/js/site.js", "", null)]
+    [InlineData("/blog", "?v=content-hash", null)]
+    public void ResolveStaticAssetCacheControl_CachesOnlyVersionedStaticAssets(
+        string path,
+        string query,
+        string? expected)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = path;
+        context.Request.QueryString = new QueryString(query);
+
+        Assert.Equal(expected, AppRequestPolicies.ResolveStaticAssetCacheControl(context.Request));
     }
 }

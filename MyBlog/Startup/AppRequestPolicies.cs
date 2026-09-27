@@ -5,6 +5,16 @@ namespace MyBlog.Startup;
 
 internal static class AppRequestPolicies
 {
+    public static string? ResolveStaticAssetCacheControl(HttpRequest request)
+    {
+        if (!IsStaticAssetPath(request.Path) || !request.Query.ContainsKey("v"))
+        {
+            return null;
+        }
+
+        return "public, max-age=31536000, immutable";
+    }
+
     public static string? ResolveAislePilotMealImageCacheControl(PathString path)
     {
         var value = path.Value;

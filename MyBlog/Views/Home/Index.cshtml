@@ -12,14 +12,13 @@
     var aislePilotLocalEnabled = ViewData["AislePilotLocalEnabled"] as bool? ?? true;
 }
 
-<section id="hero" class="home-hero" data-reveal>
+<section id="hero" class="home-hero">
     <div class="home-hero-grid">
         <div class="hero-copy">
             <p class="hero-kicker">Mark Golley · C#/.NET Engineer · Burley in Wharfedale, UK</p>
-            <h1 class="hero-title">I build reliable ASP.NET Core and Python software with clear architecture, testing, and practical delivery.</h1>
+            <h1 class="hero-title">Reliable software, explained through real delivery.</h1>
             <p class="hero-lead">
-                This site is both portfolio and working product: case studies, engineering writing, and the platform
-                features behind them. It is designed to show how I think, how I build, and what I ship.
+                I build ASP.NET Core and Python products, then write about the architecture, testing, and tradeoffs behind them.
             </p>
             <div class="hero-actions">
                 <a class="btn btn-primary" asp-controller="Projects" asp-action="Index">View selected work</a>
@@ -65,7 +64,13 @@
         </div>
         <aside class="hero-portrait" aria-label="Profile highlights">
             <div class="hero-portrait-frame">
-                <img src="~/images/me.jpg" alt="Portrait of Mark" />
+                <picture>
+                    <source
+                        type="image/jpeg"
+                        srcset="/images/me-480.jpg 480w, /images/me-768.jpg 768w, /images/me.jpg 993w"
+                        sizes="(max-width: 760px) calc(100vw - 2.2rem), 340px" />
+                    <img src="~/images/me-480.jpg" alt="Portrait of Mark" width="993" height="1000" loading="lazy" decoding="async" />
+                </picture>
             </div>
             <section class="hero-spotlight" aria-label="Delivery highlights" data-focus-carousel>
                 <div class="hero-spotlight-head">
@@ -127,6 +132,50 @@
         </aside>
     </div>
 </section>
+<section aria-labelledby="featured-writing-title" class="showcase-section featured-writing-section">
+    <div class="section-heading-row">
+        <div>
+            <p class="hero-kicker">From the blog</p>
+            <h2 id="featured-writing-title">Featured writing</h2>
+        </div>
+        <a class="section-heading-link" asp-controller="Blog" asp-action="Index">Browse all articles</a>
+    </div>
+    <p class="section-intro">Practical notes on testing, reliability, applied AI, and the decisions behind shipped software.</p>
+
+    @if (Model.FeaturedPosts.Any())
+    {
+        <div class="focus-grid featured-writing-grid">
+            @foreach (var post in Model.FeaturedPosts)
+            {
+                <a class="focus-card" asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">
+                    <p class="focus-title">@post.Title</p>
+                    <div class="post-meta">
+                        @post.DatePosted.ToString("dd MMMM yyyy")
+                        <span class="meta-dot">•</span>
+                        @post.ReadingTimeMinutes min read
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(post.Summary))
+                    {
+                        <p class="featured-writing-summary">@post.Summary</p>
+                    }
+                    @if (post.Tags.Any())
+                    {
+                        <div class="tag-list">
+                            @foreach (var tag in post.Tags.Take(3))
+                            {
+                                <span class="tag-chip">@tag</span>
+                            }
+                        </div>
+                    }
+                </a>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="section-intro">Featured articles will appear here as the writing library grows.</p>
+    }
+</section>
 
 <section aria-labelledby="quick-bits-title" class="showcase-section" data-reveal>
     <h2 id="quick-bits-title">How I work</h2>
@@ -170,39 +219,4 @@
             <p>Email, LinkedIn, and GitHub links for roles, collaborations, or technical conversations.</p>
         </a>
     </div>
-</section>
-
-<section aria-labelledby="featured-writing-title" class="showcase-section" data-reveal>
-    <h2 id="featured-writing-title">Featured writing</h2>
-    <p class="section-intro">A few articles that best show how I think about testing, reliability, and practical engineering decisions.</p>
-
-    @if (Model.FeaturedPosts.Any())
-    {
-        <div class="focus-grid">
-            @foreach (var post in Model.FeaturedPosts)
-            {
-                <a class="focus-card" asp-controller="Blog" asp-action="Post" asp-route-slug="@post.Id">
-                    <p class="focus-title">@post.Title</p>
-                    <div class="post-meta">
-                        @post.DatePosted.ToString("dd MMMM yyyy")
-                        <span class="meta-dot">•</span>
-                        @post.ReadingTimeMinutes min read
-                    </div>
-                    @if (post.Tags.Any())
-                    {
-                        <div class="tag-list">
-                            @foreach (var tag in post.Tags.Take(3))
-                            {
-                                <span class="tag-chip">@tag</span>
-                            }
-                        </div>
-                    }
-                </a>
-            }
-        </div>
-    }
-    else
-    {
-        <p class="section-intro">Featured articles will appear here as the writing library grows.</p>
-    }
 </section>

@@ -91,6 +91,7 @@
     <meta name="twitter:description" content="@metaDescription"/>
     <meta name="twitter:image" content="@ogImageUrl"/>
     <script>
+        document.documentElement.classList.add("js");
         (() => {
             try {
                 const storageKey = "myblog:theme";
@@ -114,12 +115,13 @@
           onload="this.onload=null;this.media='all'" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=optional" /></noscript>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true"/>
+    <link rel="stylesheet" href="~/css/main-site-polish.css" asp-append-version="true"/>
     @await RenderSectionAsync("Head", required: false)
 </head>
 @{
     var routeController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
     var routeAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
-    var bodyClassParts = new List<string>();
+    var bodyClassParts = new List<string> { "main-site" };
 
     if (!string.IsNullOrWhiteSpace(routeController))
     {
@@ -151,15 +153,18 @@
                && string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase);
     }
 
-    try
+    if (!IsController("Blog"))
     {
-        navCapsule = await DailyCodingCapsuleService.GetCapsuleForCurrentDayAsync(Context.RequestAborted);
-        previousNavCapsule = await DailyCodingCapsuleService.TryGetStoredCapsuleForOffsetDaysAsync(-1, Context.RequestAborted);
-    }
-    catch
-    {
-        navCapsule = null;
-        previousNavCapsule = null;
+        try
+        {
+            navCapsule = await DailyCodingCapsuleService.GetCapsuleForCurrentDayAsync(Context.RequestAborted);
+            previousNavCapsule = await DailyCodingCapsuleService.TryGetStoredCapsuleForOffsetDaysAsync(-1, Context.RequestAborted);
+        }
+        catch
+        {
+            navCapsule = null;
+            previousNavCapsule = null;
+        }
     }
 }
 
@@ -271,11 +276,11 @@
         </div>
 
         <nav id="primary-nav" class="nav-links" aria-label="Primary" data-nav-menu>
-            <a class="nav-link @(IsActive("Home") ? "is-active" : string.Empty)" asp-controller="Home" asp-action="Index">Home</a>
-            <a class="nav-link @(IsController("Projects") ? "is-active" : string.Empty)" asp-controller="Projects" asp-action="Index">Projects</a>
-            <a class="nav-link @(IsController("Blog") ? "is-active" : string.Empty)" asp-controller="Blog" asp-action="Index">Articles</a>
-            <a class="nav-link @(IsActive("About") ? "is-active" : string.Empty)" asp-controller="About" asp-action="Index">About</a>
-            <a class="nav-link @(IsActive("Contact") ? "is-active" : string.Empty)" asp-controller="Contact" asp-action="Index">Contact</a>
+            <a class="nav-link @(IsActive("Home") ? "is-active" : string.Empty)" aria-current="@(IsActive("Home") ? "page" : "false")" asp-controller="Home" asp-action="Index">Home</a>
+            <a class="nav-link @(IsController("Projects") ? "is-active" : string.Empty)" aria-current="@(IsController("Projects") ? "page" : "false")" asp-controller="Projects" asp-action="Index">Projects</a>
+            <a class="nav-link @(IsController("Blog") ? "is-active" : string.Empty)" aria-current="@(IsController("Blog") ? "page" : "false")" asp-controller="Blog" asp-action="Index">Articles</a>
+            <a class="nav-link @(IsActive("About") ? "is-active" : string.Empty)" aria-current="@(IsActive("About") ? "page" : "false")" asp-controller="About" asp-action="Index">About</a>
+            <a class="nav-link @(IsActive("Contact") ? "is-active" : string.Empty)" aria-current="@(IsActive("Contact") ? "page" : "false")" asp-controller="Contact" asp-action="Index">Contact</a>
         </nav>
     </div>
 </header>
@@ -291,7 +296,7 @@
     </div>
 </footer>
 
-<script src="~/js/site.js" asp-append-version="true"></script>
+<script src="~/js/site.js" asp-append-version="true" defer></script>
 @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

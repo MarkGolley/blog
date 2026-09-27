@@ -3,8 +3,13 @@
     "collect": {
       "startServerCommand": "dotnet run --project MyBlog/MyBlog.csproj --no-launch-profile --urls http://127.0.0.1:5087",
       "startServerReadyPattern": "Now listening on",
-      "url": ["http://127.0.0.1:5087/projects/aisle-pilot"],
-      "numberOfRuns": 1,
+      "url": [
+        "http://127.0.0.1:5087/",
+        "http://127.0.0.1:5087/blog",
+        "http://127.0.0.1:5087/blog/Why_AI_Permission_Popups_Matter",
+        "http://127.0.0.1:5087/projects/aisle-pilot"
+      ],
+      "numberOfRuns": 3,
       "settings": {
         "preset": "perf",
         "port": 9222,

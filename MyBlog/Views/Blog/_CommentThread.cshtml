@@ -19,8 +19,9 @@
                 <button
                     type="submit"
                     class="like-btn icon-like-btn like-btn-sm @(Model.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
-                    aria-label="@(Model.IsLikedByCurrentVisitor ? "Unlike this comment" : "Like this comment")">
-                    <span class="like-symbol">@Html.Raw(Model.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+                    aria-label="@(Model.IsLikedByCurrentVisitor ? $"Unlike this comment. {Model.LikeCount} {(Model.LikeCount == 1 ? "like" : "likes")}" : $"Like this comment. {Model.LikeCount} {(Model.LikeCount == 1 ? "like" : "likes")}")"
+                    aria-pressed="@(Model.IsLikedByCurrentVisitor ? "true" : "false")">
+                    <span class="like-symbol" aria-hidden="true">@Html.Raw(Model.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
                     <span class="like-count">@Model.LikeCount</span>
                 </button>
             </form>
