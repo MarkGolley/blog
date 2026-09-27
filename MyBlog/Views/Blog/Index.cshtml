@@ -18,20 +18,6 @@
             <span aria-hidden="true">•</span>
             @Model.AvailableTags.Count topics
         </p>
-        <div class="blog-stat-grid">
-            <article class="metric-card">
-                <p class="metric-value">@Model.TotalPostCount</p>
-                <p class="metric-label">Total published posts</p>
-            </article>
-            <article class="metric-card">
-                <p class="metric-value">@Model.FilteredPostCount</p>
-                <p class="metric-label">Matching current filter</p>
-            </article>
-            <article class="metric-card">
-                <p class="metric-value">@Model.AvailableTags.Count</p>
-                <p class="metric-label">Topics you can explore</p>
-            </article>
-        </div>
     </header>
 
     <form method="get" asp-controller="Blog" asp-action="Index" class="blog-filter-form blog-filter-card" data-reveal>
@@ -71,7 +57,7 @@
     </p>
 
     <div class="pinned-posts-block" data-reveal>
-        <h3 class="blog-subtitle">Featured articles</h3>
+        <h2 class="blog-subtitle">Featured articles</h2>
         @if (Model.FeaturedPosts.Any())
         {
             <div class="blog-list pinned-blog-list">
@@ -122,8 +108,9 @@
                                 <button
                                     type="submit"
                                     class="like-btn icon-like-btn like-btn-sm @(item.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
-                                    aria-label="@(item.IsLikedByCurrentVisitor ? "Unlike this post" : "Like this post")">
-                                    <span class="like-symbol">@Html.Raw(item.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+                                    aria-label="@(item.IsLikedByCurrentVisitor ? $"Unlike this post. {item.LikeCount} {(item.LikeCount == 1 ? "like" : "likes")}" : $"Like this post. {item.LikeCount} {(item.LikeCount == 1 ? "like" : "likes")}")"
+                                    aria-pressed="@(item.IsLikedByCurrentVisitor ? "true" : "false")">
+                                    <span class="like-symbol" aria-hidden="true">@Html.Raw(item.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
                                     <span class="like-count">@item.LikeCount</span>
                                 </button>
                             </form>
@@ -138,7 +125,7 @@
         }
     </div>
 
-    <h3 class="blog-subtitle" data-reveal>All articles</h3>
+    <h2 class="blog-subtitle" data-reveal>More articles</h2>
 
     <div class="blog-list">
         @if (Model.Posts.Any())
@@ -189,8 +176,9 @@
                             <button
                                 type="submit"
                                 class="like-btn icon-like-btn like-btn-sm @(item.IsLikedByCurrentVisitor ? "liked" : string.Empty)"
-                                aria-label="@(item.IsLikedByCurrentVisitor ? "Unlike this post" : "Like this post")">
-                                <span class="like-symbol">@Html.Raw(item.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+                                aria-label="@(item.IsLikedByCurrentVisitor ? $"Unlike this post. {item.LikeCount} {(item.LikeCount == 1 ? "like" : "likes")}" : $"Like this post. {item.LikeCount} {(item.LikeCount == 1 ? "like" : "likes")}")"
+                                aria-pressed="@(item.IsLikedByCurrentVisitor ? "true" : "false")">
+                                <span class="like-symbol" aria-hidden="true">@Html.Raw(item.IsLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
                                 <span class="like-count">@item.LikeCount</span>
                             </button>
                         </form>
@@ -200,7 +188,11 @@
         }
         else
         {
-            <p>No blog posts found.</p>
+            <div class="blog-empty-state">
+                <h2>No articles match these filters</h2>
+                <p>Try a broader search or clear the topic filter to see the full archive.</p>
+                <a class="btn btn-secondary" asp-controller="Blog" asp-action="Index">Clear filters</a>
+            </div>
         }
     </div>
 

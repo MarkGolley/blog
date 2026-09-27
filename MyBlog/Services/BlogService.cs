@@ -9,15 +9,18 @@ public class BlogService
     private static readonly Regex HtmlBodyRegex = new(
         "<body[^>]*>(?<body>.*)</body>",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex HtmlHeadRegex = new(
+        "<head[^>]*>(?<head>.*?)</head>",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
     private static readonly Regex StyleOrScriptRegex = new(
         "<(script|style)[^>]*>.*?</\\1>",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex LeadingHeadingRegex = new(
+        @"^\s*<h1\b[^>]*>.*?</h1>\s*",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
     private static readonly Regex HtmlTagRegex = new("<[^>]*>", RegexOptions.Compiled);
     private static readonly Regex WordRegex = new(@"[A-Za-z0-9#\+]+", RegexOptions.Compiled);
     private static readonly Regex CollapseWhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
-    private static readonly Regex FirstImageSrcRegex = new(
-        "<img[^>]*\\ssrc\\s*=\\s*[\"'](?<src>[^\"']+)[\"'][^>]*>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex LegacyStaticAssetPathRegex = new(
         "(?<prefix>\\b(?:href|src)\\s*=\\s*[\"'])(?<path>(?:\\.\\./)+wwwroot/|/wwwroot/|wwwroot/)(?<rest>[^\"']+)(?<suffix>[\"'])",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -255,13 +258,14 @@ public class BlogService
         var posts = (from file in Directory.GetFiles(postsPath, "*.html")
                      let fileName = Path.GetFileName(file)
                      let id = Path.GetFileNameWithoutExtension(file)
-                     let content = NormalizeLegacyStaticAssetPaths(File.ReadAllText(file))
-                     let title = ParseTitle(content, id)
-                     let summary = ParseSummary(content)
-                     let coverImageUrl = ParseCoverImageUrl(content)
-                     let published = ParsePublishedDate(content)
-                     let tags = ParseTags(content, title)
-                     let readingTimeMinutes = ParseReadingTimeMinutes(content)
+                     let sourceContent = NormalizeLegacyStaticAssetPaths(File.ReadAllText(file))
+                     let title = ParseTitle(sourceContent, id)
+                     let summary = ParseSummary(sourceContent)
+                     let coverImageUrl = ParseCoverImageUrl(sourceContent)
+                     let published = ParsePublishedDate(sourceContent)
+                     let tags = ParseTags(sourceContent, title)
+                     let readingTimeMinutes = ParseReadingTimeMinutes(sourceContent)
+                     let content = ExtractArticleContent(sourceContent)
                      select CreatePost(
                          fileName,
                          File.GetLastWriteTimeUtc(file),
@@ -366,7 +370,20 @@ public class BlogService
             return metadataTitle.Trim();
         }
 
-        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(fallbackId.Replace("_", " "));
+        var generatedTitle = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(fallbackId.Replace("_", " "));
+        return Regex.Replace(
+            generatedTitle,
+            @"\b(Aspnetcore|Xunit|Ai|Gcp|Oop)\b",
+            static match => match.Value.ToLowerInvariant() switch
+            {
+                "aspnetcore" => "ASP.NET Core",
+                "xunit" => "xUnit",
+                "ai" => "AI",
+                "gcp" => "GCP",
+                "oop" => "OOP",
+                _ => match.Value
+            },
+            RegexOptions.IgnoreCase);
     }
 
     private static string ParseSummary(string content)
@@ -390,14 +407,29 @@ public class BlogService
             return NormalizeCoverImageUrl(metadataCoverImage);
         }
 
-        var imageMatch = FirstImageSrcRegex.Match(content);
-        if (!imageMatch.Success)
+        return string.Empty;
+    }
+
+    private static string ExtractArticleContent(string html)
+    {
+        var headAssets = string.Empty;
+        var headMatch = HtmlHeadRegex.Match(html);
+        if (headMatch.Success)
         {
-            return string.Empty;
+            headAssets = string.Concat(
+                StyleOrScriptRegex.Matches(headMatch.Groups["head"].Value)
+                    .Select(match => match.Value));
         }
 
-        var candidate = imageMatch.Groups["src"].Value;
-        return NormalizeCoverImageUrl(candidate);
+        var content = html;
+        var bodyMatch = HtmlBodyRegex.Match(content);
+        if (bodyMatch.Success)
+        {
+            content = bodyMatch.Groups["body"].Value;
+        }
+
+        content = LeadingHeadingRegex.Replace(content, string.Empty, 1);
+        return $"{headAssets}\n{content.Trim()}".Trim();
     }
 
     private static string NormalizeCoverImageUrl(string rawValue)
@@ -587,6 +619,16 @@ public class BlogService
         if (string.Equals(tag, "gcp", StringComparison.OrdinalIgnoreCase))
         {
             return "GCP";
+        }
+
+        if (string.Equals(tag, "ux", StringComparison.OrdinalIgnoreCase))
+        {
+            return "UX";
+        }
+
+        if (string.Equals(tag, "agentic ai", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Agentic AI";
         }
 
         return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(tag.Trim().ToLowerInvariant());

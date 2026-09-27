@@ -2,7 +2,7 @@
 
 <article class="case-template" data-reveal>
     <header class="case-template-header">
-        <h3 class="case-template-title">@Model.Title</h3>
+        <h2 class="case-template-title">@Model.Title</h2>
         <span class="case-status-pill">@Model.Status</span>
     </header>
 
@@ -12,14 +12,14 @@
         <summary>View details</summary>
         <div class="case-details-body">
             <div class="case-block">
-                <h4>Why this matters</h4>
+                <h3>Why this matters</h3>
                 <p>@Model.WhyItMatters</p>
             </div>
 
             @if (Model.Screenshots.Count > 0)
             {
                 <div class="case-block">
-                    <h4>Snapshots</h4>
+                    <h3>Snapshots</h3>
                     <div class="case-screenshot-grid">
                         @foreach (var screenshot in Model.Screenshots)
                         {
@@ -38,7 +38,7 @@
             @if (Model.TechnicalScope.Count > 0)
             {
                 <div class="case-block">
-                    <h4>Technical scope</h4>
+                    <h3>Technical scope</h3>
                     <ul class="case-list">
                         @foreach (var item in Model.TechnicalScope)
                         {
@@ -51,7 +51,7 @@
             @if (Model.ProofChecklist.Count > 0)
             {
                 <div class="case-block">
-                    <h4>Proof checklist</h4>
+                    <h3>Proof checklist</h3>
                     <ul class="case-list">
                         @foreach (var item in Model.ProofChecklist)
                         {
@@ -64,7 +64,7 @@
             @if (Model.BuildNotes.Count > 0)
             {
                 <div class="case-block">
-                    <h4>Build notes</h4>
+                    <h3>Build notes</h3>
                     <ul class="case-list">
                         @foreach (var item in Model.BuildNotes)
                         {
@@ -75,7 +75,7 @@
             }
 
             <div class="case-block">
-                <h4>What this shows</h4>
+                <h3>What this shows</h3>
                 <p>@Model.WhatItShows</p>
             </div>
         </div>

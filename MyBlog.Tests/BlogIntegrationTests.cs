@@ -12,7 +12,7 @@ using MyBlog.Services;
 
 namespace MyBlog.Tests;
 
-public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
+public partial class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 {
     private static readonly Regex AntiForgeryTokenRegexPrimary =
         new(@"name=""__RequestVerificationToken""[^>]*value=""([^""]+)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -52,9 +52,11 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         var html = await client.GetStringAsync("/blog");
 
-        Assert.Contains("class=\"route-blog route-blog-index\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("class=\"main-site route-blog route-blog-index\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"blog-post-content-shell\"", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"blog-post-summary\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<h2 class=\"blog-subtitle\">Featured articles</h2>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<h2 class=\"blog-subtitle\" data-reveal>More articles</h2>", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -111,7 +113,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
         Assert.Contains("Agent Guardrails in Practice: From Permission Popups to Policy Verification", blogIndexHtml, StringComparison.OrdinalIgnoreCase);
 
         var postHtml = await client.GetStringAsync("/blog/Why_AI_Permission_Popups_Matter");
-        Assert.Contains("<h2 id=\"post-title\">Agent Guardrails in Practice: From Permission Popups to Policy Verification</h2>", postHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<h1 id=\"post-title\">Agent Guardrails in Practice: From Permission Popups to Policy Verification</h1>", postHtml, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -121,8 +123,8 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         var html = await client.GetStringAsync("/blog/How_AI_Agents_Actually_Work");
 
-        Assert.Contains("<h2 id=\"post-title\">How AI Agents Actually Work, and How to Use Them Well</h2>", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("<h1>How AI Agents Actually Work, and How to Use Them Well</h1>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<h1 id=\"post-title\">How AI Agents Actually Work, and How to Use Them Well</h1>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(Regex.Matches(html, "<h1\\b", RegexOptions.IgnoreCase));
     }
 
     [Fact]
@@ -181,7 +183,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
-    public async Task PostRendering_NormalizesLegacyWwwrootStylesheetPath()
+    public async Task PostRendering_DoesNotInjectLegacyDocumentHeadAssets()
     {
         using var client = _factory.CreateClient();
 
@@ -189,7 +191,7 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
 
         Assert.DoesNotContain("../wwwroot/css/blogs.css", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/wwwroot/css/blogs.css", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("href=\"/css/blogs.css\"", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("href=\"/css/blogs.css\"", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1265,18 +1267,23 @@ public class BlogIntegrationTests : IClassFixture<TestWebApplicationFactory>
             };
         }
 
+        public int RequestCount { get; private set; }
+
         public Task<DailyCodingCapsuleViewModel> GetCapsuleForCurrentDayAsync(CancellationToken cancellationToken = default)
         {
+            RequestCount++;
             return Task.FromResult(_today);
         }
 
         public Task<DailyCodingCapsuleViewModel> GetCapsuleForOffsetDaysAsync(int offsetDays, CancellationToken cancellationToken = default)
         {
+            RequestCount++;
             return Task.FromResult(offsetDays < 0 ? _yesterday : _today);
         }
 
         public Task<DailyCodingCapsuleViewModel?> TryGetStoredCapsuleForOffsetDaysAsync(int offsetDays, CancellationToken cancellationToken = default)
         {
+            RequestCount++;
             DailyCodingCapsuleViewModel? result =
                 offsetDays == -1 && _includeStoredYesterday
                     ? _yesterday

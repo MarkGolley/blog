@@ -11,10 +11,17 @@ public sealed class LighthouseConfigurationTests
     {
         using var config = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot, fileName)));
         var ci = config.RootElement.GetProperty("ci");
-        var settings = ci.GetProperty("collect").GetProperty("settings");
+        var collect = ci.GetProperty("collect");
+        var settings = collect.GetProperty("settings");
         var assertions = ci.GetProperty("assert").GetProperty("assertions");
 
         Assert.Equal(formFactor, settings.GetProperty("formFactor").GetString());
+        Assert.True(collect.GetProperty("numberOfRuns").GetInt32() >= 3);
+        var urls = collect.GetProperty("url").EnumerateArray().Select(value => value.GetString()).ToArray();
+        Assert.Contains("http://127.0.0.1:5087/", urls);
+        Assert.Contains("http://127.0.0.1:5087/blog", urls);
+        Assert.Contains(urls, url => url?.StartsWith("http://127.0.0.1:5087/blog/", StringComparison.Ordinal) == true);
+        Assert.Contains("http://127.0.0.1:5087/projects/aisle-pilot", urls);
         Assert.Equal(lcpBudget, assertions.GetProperty("largest-contentful-paint")[1].GetProperty("maxNumericValue").GetInt32());
         Assert.Equal(0.1, assertions.GetProperty("cumulative-layout-shift")[1].GetProperty("maxNumericValue").GetDouble());
         Assert.True(assertions.TryGetProperty("total-blocking-time", out _));

@@ -18,13 +18,16 @@
     }
 
     ViewData["Title"] = Model.Post.Title;
-    ViewData["MetaDescription"] = $"Read \"{Model.Post.Title}\" by Mark Golley.";
+    ViewData["MetaDescription"] = string.IsNullOrWhiteSpace(Model.Post.Summary)
+        ? $"Read \"{Model.Post.Title}\" by Mark Golley."
+        : Model.Post.Summary;
     ViewData["CanonicalPath"] = $"/blog/{Uri.EscapeDataString(Model.Post.Id)}";
     ViewData["OgType"] = "article";
 }
 
-<section aria-labelledby="post-title" data-reveal>
-    <h2 id="post-title">@Model.Post.Title</h2>
+<article class="post-article" aria-labelledby="post-title" data-reveal>
+    <header class="post-header">
+    <h1 id="post-title">@Model.Post.Title</h1>
     <div class="post-meta">
         @Model.Post.DatePosted.ToString("dd MMMM yyyy")
         <span class="meta-dot">•</span>
@@ -45,6 +48,7 @@
             <img src="@Model.Post.CoverImageUrl" alt="" loading="eager" decoding="async" />
         </figure>
     }
+    </header>
     <div class="post-content">
         @Html.Raw(Model.Post.Content)
     </div>
@@ -55,14 +59,15 @@
         <button
             type="submit"
             class="like-btn icon-like-btn @(Model.IsPostLikedByCurrentVisitor ? "liked" : string.Empty)"
-            aria-label="@(Model.IsPostLikedByCurrentVisitor ? "Unlike this post" : "Like this post")">
-            <span class="like-symbol">@Html.Raw(Model.IsPostLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
+            aria-label="@(Model.IsPostLikedByCurrentVisitor ? $"Unlike this post. {Model.PostLikeCount} {(Model.PostLikeCount == 1 ? "like" : "likes")}" : $"Like this post. {Model.PostLikeCount} {(Model.PostLikeCount == 1 ? "like" : "likes")}")"
+            aria-pressed="@(Model.IsPostLikedByCurrentVisitor ? "true" : "false")">
+            <span class="like-symbol" aria-hidden="true">@Html.Raw(Model.IsPostLikedByCurrentVisitor ? "&#9829;" : "&#9825;")</span>
             <span class="like-count">@Model.PostLikeCount</span>
         </button>
     </form>
 
     <partial name="_SubscribeForm" model="(Context.Request.Path + Context.Request.QueryString).ToString()" />
-</section>
+</article>
 
 @if (Model.Quiz is { Questions.Count: > 0 })
 {
