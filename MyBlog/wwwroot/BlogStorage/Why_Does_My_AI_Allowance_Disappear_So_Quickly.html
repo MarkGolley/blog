@@ -1,0 +1,80 @@
+<!-- PublishedDate: 2026-09-27 -->
+<!-- Title: Why Does My AI Allowance Disappear So Quickly? -->
+<!-- Summary: Getting more useful work from ChatGPT Plus: choosing Astra or Sol, understanding usage, and deciding when to work in ChatGPT desktop or your IDE. -->
+<!-- Tags: AI, Developer Productivity, Software Engineering, Learning -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Why Does My AI Allowance Disappear So Quickly?</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/blogs.css">
+</head>
+<body>
+<p><em>Choosing between Astra and Sol—and when to use ChatGPT desktop or your IDE.</em></p>
+<p>The newer models are impressive. The speed at which I can get through my allowance is rather less impressive.</p>
+<p>That has made me think more carefully about how I use my Plus membership. It is tempting to select the most capable model, turn up the reasoning, and leave it there. If a better model is available, why wouldn't I use it?</p>
+<p>Because I want to finish the work. Being halfway through a useful session when I hit a limit changes how attractive that default feels.</p>
+<p>The question I want to answer is: <strong>which combination of model, settings and workflow gets me to a result I trust before my allowance runs out?</strong></p>
+<p><small>Product details checked on 27 September 2026. Availability and limits can change. This is a practical workflow guide, not a measured comparison of token consumption.</small></p>
+
+<h2>“Burning tokens” is not quite the same as using up an allowance</h2>
+<p>My experience is that the allowance can disappear quickly. That does not establish that newer models always generate more tokens.</p>
+<p>Tokens cover information read and written, including files, conversation history and tool results. Included usage also depends on the model, reasoning, context, tools and caching. The answer visible on screen is only part of the work. OpenAI cautions that credit rates alone do not determine subscription usage. <a href="https://learn.chatgpt.com/docs/pricing">Source: pricing and usage guidance</a>.</p>
+<p>Consider a hypothetical request: “Work out why this test is failing.” It is one message from me. The agent might inspect several files, run the test, read the failure, change an assumption and investigate again. Counting my messages would tell me very little about that investigation.</p>
+<p>Asking for shorter replies might make the chat easier to read, but it does not necessarily address an investigation that has gone in circles.</p>
+
+<h2>Does every task deserve Astra?</h2>
+<p>OpenAI positions Astra for difficult, ambiguous work and Sol for everyday writing and coding. Its guidance recommends experimenting with reasoning settings and keeping the lightest option that meets your quality needs. That is a starting point, not proof that a particular model will win on my repository. <a href="https://developers.openai.com/api/docs/guides/model-selection">Source: model selection</a>.</p>
+<p>Here is the approach I would start with:</p>
+<ul>
+    <li><strong>A clear, bounded change:</strong> try Sol. Correcting a known bug, implementing an agreed small feature or editing a draft gives it a defined job.</li>
+    <li><strong>A difficult diagnosis or consequential decision:</strong> consider Astra. If the hard part is understanding conflicting evidence or reasoning through dependencies, greater capability may earn its place.</li>
+    <li><strong>A simple, repetitive task:</strong> consider a lighter option such as Luna if it is available. Every task does not need to become an Astra-versus-Sol contest.</li>
+</ul>
+<p>I would avoid treating maximum reasoning as a permanent quality switch. Start with a setting appropriate to the difficulty, inspect the result, and increase it when there is a reason.</p>
+<p>There is a trap in the other direction, though. Repeatedly asking a struggling model to try again is not automatically economical. One successful investigation with a stronger model could be better value than several unsuccessful attempts with a lighter one. That is something to measure, rather than assume.</p>
+<p>Before escalating, I would check whether the model lacks information. A missing error message or unclear requirement will not necessarily be fixed by choosing Astra.</p>
+
+<h2>Check which Sol you actually mean</h2>
+<p>The version matters. Published Standard-speed credit rates for GPT-6 Astra are five times those of GPT-6 Sol, but 2.5 times those of GPT-5.6 Sol for equivalent token categories. These are credit-rate comparisons, not guaranteed ratios of completed tasks or included Plus usage. <a href="https://learn.chatgpt.com/docs/pricing">Source: token rates</a>.</p>
+<p>That is why advice such as “Sol lasts twice as long” is too loose to be useful. Which Sol? Which task? Which settings? And did the result actually work?</p>
+<p>If I share a comparison, I want the full model name alongside the result. Otherwise a helpful recommendation can become misleading as the options change.</p>
+
+<h2>ChatGPT desktop or the IDE?</h2>
+<p>I see this as a decision about where the necessary context is easiest to work with.</p>
+<p>For exploring a feature, discussing tradeoffs or shaping a brief, I would often start in ChatGPT desktop. It is also useful when the work spans documents and other tools. Current desktop documentation includes files, projects, browser and app workflows; it is much more than a box for questions. <a href="https://learn.chatgpt.com/docs/app">Source: ChatGPT desktop app</a>.</p>
+<p>When the question becomes “what does this implementation actually do?”, I would usually move into the IDE. Open files and selected code provide a natural starting point, and I can inspect edits beside the source. The Codex IDE documentation explicitly supports that workflow. <a href="https://learn.chatgpt.com/docs/codex/ide">Source: Codex IDE integration</a>.</p>
+<p>For example, I could discuss the tradeoffs of caching a meal plan in ChatGPT. Once we are deciding where that cache belongs in AislePilot, the implementation needs to be inspected. A persuasive answer based on an imagined architecture is not much help.</p>
+<p>This is a preference, not a hard boundary. Desktop can work on projects too, and an IDE agent can explain a design. I would choose whichever makes it easiest to provide accurate context and review the result.</p>
+<p><strong>Changing windows is not an allowance reset.</strong> ChatGPT Work and Codex share usage. Ordinary Chat should not be casually conflated with Work; check the active mode and your account's limits. <a href="https://learn.chatgpt.com/docs/pricing">Source: shared usage</a>.</p>
+
+<h2>A handover should save work</h2>
+<p>Moving between tools can become its own source of waste if I make the next agent rediscover every decision. I would hand over the outcome, relevant files, constraints, verification and anything still uncertain.</p>
+<pre><code>Outcome: Fix the empty-email validation message.
+Behaviour: Empty input should show the required-field message.
+Boundary: Preserve the existing validation rules.
+Starting point: Inspect the form and its validation handler.
+Verify: A focused regression test and the relevant existing tests.
+Unknown: Confirm whether the message comes from client or server validation.</code></pre>
+<p>That is enough to start investigating without pasting an entire brainstorming conversation. It also leaves room to discover that an earlier assumption was wrong.</p>
+<p>I would keep a continuing task in its existing conversation when that history is useful. For unrelated work, I would start fresh. Starting over constantly and carrying every conversation forever can both create unnecessary work.</p>
+
+<h2>The easiest work to save is work I never needed</h2>
+<p>If I ask for a bug fix and the agent starts redesigning the surrounding component, I want to know why that is necessary. If it keeps encountering the same failure, I want the next attempt to test a new explanation. If the relevant checks pass, I want a clear result rather than another round of optional improvements.</p>
+<p>A prompt I would use is:</p>
+<blockquote><p>Complete this specific outcome. Use the relevant files and checks. Record unrelated improvements separately. If you get stuck, explain what you have established and what new evidence the next step will gather. Stop when the agreed outcome is verified.</p></blockquote>
+<p>That will not enforce a token budget. It does make the intended work easier to distinguish from activity that merely looks productive.</p>
+
+<h2>How I would test whether this actually helps</h2>
+<p>I have not run a controlled Astra-versus-Sol benchmark for this article. I would rather make that clear than turn an impression into a percentage saving.</p>
+<p>A useful small experiment would use three representative tasks: a focused bug fix, a difficult diagnosis and a planning task. For each, record the exact model, reasoning setting, interface and mode, elapsed time, allowance before and after, and how much correction the result needed.</p>
+<p>For coding comparisons, start from the same code and brief in separate branches. Avoid concurrent account activity while measuring, watch for usage resets or delayed updates, and treat dashboard percentages as rough observations rather than precise token counts. One run is an anecdote; repeating the comparison would make it more informative.</p>
+<p>The result I care about is a completed task I can trust. A small allowance change is not a victory if I then spend an hour repairing the output.</p>
+
+<h2>What I would change first</h2>
+<p>I would start with Sol for clearly defined everyday work, bring in Astra when the difficulty warrants it, and choose desktop or IDE according to the context I need. I would spend less time chasing a perfect universal setting and more time noticing which tasks benefit from a stronger model.</p>
+<p>In <a href="/blog/AI_Agents_Can_Do_The_Work_But_Dont_Skip_The_Learning">my earlier post about AI and learning</a>, I wrote about keeping understanding alongside output. The same principle applies here: a subscription is more useful when I can judge what the model has done.</p>
+<p>I do not need the most powerful model making every decision. I need enough capability, the right context, and a result worth keeping—with some allowance left for the next thing.</p>
+</body>
+</html>
