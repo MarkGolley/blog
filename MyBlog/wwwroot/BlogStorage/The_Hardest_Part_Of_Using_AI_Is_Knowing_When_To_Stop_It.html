@@ -1,0 +1,136 @@
+<!-- PublishedDate: 2026-09-27 -->
+<!-- Title: The Hardest Part of Using AI Is Knowing When to Stop It -->
+<!-- Summary: How to keep a coding agent on scope, recognise when useful initiative becomes unwanted work, and give every task a clear finish line. -->
+<!-- Tags: AI, Agentic AI, Developer Productivity, Software Engineering -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>The Hardest Part of Using AI Is Knowing When to Stop It</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/blogs.css">
+</head>
+<body>
+
+<p><em>How to keep a coding agent on scope—and recognise when to interrupt.</em></p>
+
+<p>One of the most useful things about coding agents is that they can keep working. They inspect the code, make a change, run a test, investigate a failure, and try again.</p>
+<p>That is also one of the most frustrating things about them.</p>
+<p>You ask for a small fix. The agent notices something nearby that could be improved. That improvement leads to a refactor. The refactor affects another component. Before long, the original problem is buried inside a much larger set of changes.</p>
+<p>Each step can sound reasonable on its own. Taken together, they can leave you wondering why a simple request has turned into an afternoon of reviewing code.</p>
+<p>I’m increasingly convinced that using agents well requires more than explaining what you want them to start doing. You also need to make it clear what finishing looks like—and recognise when the work has stopped moving towards it.</p>
+
+<h2>How a small task gets bigger</h2>
+
+<p>Take a hypothetical example: a form shows the wrong validation message.</p>
+<p>You ask the agent to fix it. While investigating, it notices duplicated validation logic. It extracts a shared helper. Then it updates another form to use that helper. Some tests need changing, and an inconsistency in error handling becomes visible.</p>
+<p>Now the agent is standardising error handling.</p>
+<p>The original request was a validation message.</p>
+<p>The other changes might have value, but they create extra decisions, extra review, and extra opportunities to break something. They also make it harder to answer a basic question: which part of this diff actually fixes the problem?</p>
+<p>This is how scope drift can happen without one obviously terrible decision. A series of plausible improvements gradually changes the task.</p>
+<p><strong>Finding more work does not automatically make it part of the current work.</strong></p>
+
+<h2>“Fix this” leaves a lot unsaid</h2>
+
+<p>When I give another developer a task, there is usually some shared context. They may know the release deadline, the conventions of the team, or that this particular component is being replaced next month.</p>
+<p>An agent may not have any of that context unless it is provided or discovers it.</p>
+<p>“Fix this form” leaves several questions open:</p>
+<ul>
+    <li>Is the problem the message, the validation rule, or the whole interaction?</li>
+    <li>Should similar forms change too?</li>
+    <li>Is a refactor acceptable?</li>
+    <li>What evidence would show that the fix is complete?</li>
+</ul>
+<p>A useful task description does not need to become a specification document. A few clear sentences can remove a surprising amount of ambiguity.</p>
+<p>For the form example:</p>
+<blockquote><p>Fix the incorrect validation message when the email field is empty. Preserve the existing validation rules and other form behaviour. Add or update a focused regression test, then run the relevant tests. Leave unrelated cleanup for a separate task.</p></blockquote>
+<p>That gives the agent an outcome, a boundary, and a finish line.</p>
+
+<h2>Give the agent room inside the boundary</h2>
+
+<p>There is a balance here. I do not want an agent asking permission to read a file, choose a variable name, or run a relevant test.</p>
+<p>Constant interruptions make delegation feel like operating the tool manually.</p>
+<p>The distinction I find useful is between <strong>implementation decisions</strong> and <strong>scope decisions</strong>.</p>
+<p>An implementation decision is choosing how to achieve the agreed outcome within the existing constraints. A scope decision changes what is being delivered, what behaviour is affected, or how much of the system needs to change.</p>
+<p>For example, finding the right place to correct a validation message is part of the task. Deciding to replace validation across the application expands it.</p>
+<p>Sometimes a broader change really is necessary. The apparent message bug might come from a shared rule used by several forms. In that case, the agent should explain the dependency and why a narrow fix would be insufficient.</p>
+<p>That is a worthwhile interruption because there is a meaningful decision to make.</p>
+
+<h2>Ask what the next step contributes</h2>
+
+<p>The question I want an agent to be able to answer throughout a task is:</p>
+<blockquote><p>How does your next action help complete the original request?</p></blockquote>
+<p>“Updating this test proves that the empty email case now shows the correct message” is a clear answer.</p>
+<p>“Improving consistency across the application” needs more scrutiny if consistency was never part of the request.</p>
+<p>This is also useful when a task gets stuck. An agent can remain busy while making very little progress. It can repeatedly adjust code, rerun checks, and produce explanations without resolving the assumption that caused the problem.</p>
+<p>Activity alone is weak evidence that the approach is working.</p>
+<p>After repeated failed attempts, I want a pause to reconsider:</p>
+<ul>
+    <li>What has actually been established?</li>
+    <li>Which assumption is still unverified?</li>
+    <li>What new information would the next attempt provide?</li>
+</ul>
+<p>A retry based on new evidence is different from another variation of the same guess.</p>
+
+<h2>When I would interrupt</h2>
+
+<p>I would not use a fixed number of tool calls or changed files as the stopping rule. Some small-looking problems genuinely need investigation across several layers.</p>
+<p>Instead, I would watch for changes in the direction of the work.</p>
+<p><strong>The agent starts solving adjacent problems.</strong><br>
+It notices a naming inconsistency or an unrelated bug and quietly adds it to the task. Those findings can be recorded without being implemented immediately.</p>
+<p><strong>The explanation no longer matches the request.</strong><br>
+The task was a specific bug fix, but progress updates now describe a wider redesign. That is a good point to re-establish the intended outcome.</p>
+<p><strong>The same failure keeps returning.</strong><br>
+Repeated attempts are producing more code without a clearer diagnosis. The next useful step may be inspection, a smaller reproduction, or input from someone who knows the system.</p>
+<p><strong>Tests are being weakened to make the change pass.</strong><br>
+A failing test can reveal an outdated expectation, but it can also reveal that the implementation is wrong. Changing the expectation needs a reason tied to the intended behaviour.</p>
+<p><strong>The task appears complete, but optional work continues.</strong><br>
+The requested behaviour works and the relevant checks pass. The agent then proposes another abstraction, more cleanup, or additional features. That is usually a good place to finish and separate any follow-up work.</p>
+
+<h2>What to do when it has already drifted</h2>
+
+<p>Once a task has expanded, it is tempting to let the agent finish because it has already invested effort.</p>
+<p>But every extra change still has to justify its place in the result.</p>
+<p>A useful recovery instruction is:</p>
+<blockquote><p>Pause editing. Summarise the original request, what you have changed, and what remains necessary to complete it. Identify changes that fall outside that scope. Do not revert anything yet.</p></blockquote>
+<p>That last sentence matters. A rushed cleanup can remove useful work or interfere with changes that were already present.</p>
+<p>First inspect the state. Then decide what to keep, what to separate, and what to undo.</p>
+<p>If the approach itself has become confused, continuing from the latest explanation may preserve the confusion. Restating the task from the actual code and observed behaviour can be more useful than adding another layer of instructions.</p>
+
+<h2>A scope prompt you can reuse</h2>
+
+<p>This is the kind of brief I would use as a starting point:</p>
+<pre><code>Outcome:
+[Describe the specific behaviour or deliverable I want.]
+
+Boundaries:
+Keep changes limited to what this outcome requires.
+Preserve unrelated behaviour.
+Record unrelated bugs and cleanup opportunities separately.
+
+Autonomy:
+Make routine implementation decisions within this scope.
+If a broader change is necessary, explain the dependency
+and proposed expansion before proceeding.
+
+Verification:
+Use [relevant tests or checks] to verify the outcome.
+If a check fails, investigate the cause before changing
+the expected behaviour.
+
+Stop condition:
+Once the outcome is achieved and the relevant checks pass,
+stop. Summarise what changed, how it was verified, and
+any remaining limitations.</code></pre>
+<p>I would shorten this for a trivial task. The useful part is the clarity about what success requires.</p>
+<p>It is also worth remembering that instructions are not enforcement. An agent can misunderstand a boundary or incorrectly decide that an extra change is necessary. Reviewing the diff and checking the evidence still matter.</p>
+
+<h2>Finishing is part of the task</h2>
+
+<p>In <a href="/blog/AI_Agents_Can_Do_The_Work_But_Dont_Skip_The_Learning">my earlier writing about AI and learning</a>, I discussed the risk of shipping code faster than your understanding develops. Scope drift adds another version of that problem: the amount of work to review grows beyond the decision you originally intended to make.</p>
+<p>A good result should be understandable. You should be able to explain what changed, why it was needed, and what proves it works.</p>
+<p>The agent’s ability to continue is valuable when the next step contributes to that result. Once it starts creating a different task, persistence becomes something you have to manage.</p>
+<p>Before starting, define the finish line. During the work, check that the next action still points towards it. And when the requested outcome is achieved, let the task be finished.</p>
+
+</body>
+</html>
