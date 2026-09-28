@@ -23,6 +23,8 @@ public sealed partial class PlaywrightE2ETests
         page.PageError += (_, error) => errors.Add(error);
         await page.GotoAsync(_appHost!.BaseUrl + UsagePostPath);
         await page.EvaluateAsync("theme => document.documentElement.dataset.theme = theme", theme);
+        Assert.False(await page.Locator(".model-replay").IsVisibleAsync());
+        await page.Locator(".model-experiment-disclosure > summary").ClickAsync();
         await page.Locator("[data-replay-controls]").WaitForAsync();
         Assert.Equal(9, await page.Locator(".model-replay tbody tr").CountAsync());
         await page.Locator("[data-finish]").ClickAsync();
@@ -55,6 +57,7 @@ public sealed partial class PlaywrightE2ETests
         await context.RouteAsync("**/experiments/model-usage/*.json", route => route.AbortAsync());
         var page = await context.NewPageAsync();
         await page.GotoAsync(_appHost!.BaseUrl + UsagePostPath);
+        await page.Locator(".model-experiment-disclosure > summary").ClickAsync();
         await Assertions.Expect(page.Locator("[data-replay-status]")).ToContainTextAsync("could not load");
         Assert.Equal(9, await page.Locator(".model-replay tbody tr").CountAsync());
         Assert.False(await page.Locator("[data-replay-controls]").IsVisibleAsync());
@@ -68,6 +71,9 @@ public sealed partial class PlaywrightE2ETests
         var page = await context.NewPageAsync();
         await page.GotoAsync(_appHost!.BaseUrl + UsagePostPath);
         Assert.Equal(9, await page.Locator(".model-replay tbody tr").CountAsync());
+        Assert.False(await page.Locator(".model-replay").IsVisibleAsync());
+        await page.Locator(".model-experiment-disclosure > summary").ClickAsync();
+        Assert.True(await page.Locator(".model-replay").IsVisibleAsync());
         Assert.False(await page.Locator("[data-replay-controls]").IsVisibleAsync());
     }
 }

@@ -94,20 +94,36 @@
         status.textContent = `Recording paused at ${position.toFixed(1)} recorded seconds.`;
     });
     [comparison, repeat].forEach(select => select.addEventListener('change', choose));
-    fetch(root.dataset.modelReplay).then(response => {
-        if (!response.ok) throw new Error('Recording could not be loaded');
-        return response.json();
-    }).then(recording => {
-        if (recording.status !== 'complete' || recording.trials?.length !== 9 ||
-            recording.trials.some(t => !t.attempts?.length || t.attempts.some(a => !a.usage || a.estimated_cost_usd == null))) {
-            throw new Error('Recording is incomplete');
-        }
-        data = recording;
-        choose();
-        controls.hidden = false;
-        root.querySelector('[data-replay-panels]').hidden = false;
-    }).catch(() => {
-        controls.hidden = true;
-        status.textContent = 'The replay could not load. The recorded results and downloadable data below are still available.';
-    });
+    let loadingStarted = false;
+    function loadRecording() {
+        if (loadingStarted) return;
+        loadingStarted = true;
+        status.textContent = 'Loading the recording. All results are also in the table below.';
+        fetch(root.dataset.modelReplay).then(response => {
+            if (!response.ok) throw new Error('Recording could not be loaded');
+            return response.json();
+        }).then(recording => {
+            if (recording.status !== 'complete' || recording.trials?.length !== 9 ||
+                recording.trials.some(t => !t.attempts?.length || t.attempts.some(a => !a.usage || a.estimated_cost_usd == null))) {
+                throw new Error('Recording is incomplete');
+            }
+            data = recording;
+            choose();
+            controls.hidden = false;
+            root.querySelector('[data-replay-panels]').hidden = false;
+        }).catch(() => {
+            controls.hidden = true;
+            status.textContent = 'The replay could not load. The recorded results and downloadable data below are still available.';
+        });
+    }
+
+    const disclosure = root.closest('.model-experiment-disclosure');
+    if (disclosure && !disclosure.open) {
+        status.textContent = 'Open this section to load the recorded replay.';
+        disclosure.addEventListener('toggle', () => {
+            if (disclosure.open) loadRecording();
+        });
+    } else {
+        loadRecording();
+    }
 })();

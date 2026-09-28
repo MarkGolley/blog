@@ -13,6 +13,9 @@ public sealed class ModelUsageExperimentIntegrationTests : IClassFixture<TestWeb
         using var client = _factory.CreateClient();
         var html = await client.GetStringAsync("/blog/Why_Does_My_AI_Allowance_Disappear_So_Quickly");
         Assert.Contains("data-model-replay=", html);
+        Assert.Contains("class=\"model-experiment-disclosure\"", html);
+        Assert.Contains("Open the recorded experiment", html);
+        Assert.DoesNotContain("<details class=\"model-experiment-disclosure\" open", html);
         Assert.Contains("Every trial, including all attempts", html);
         Assert.Contains("none of these valid trials needed a retry", html);
         Assert.Contains("/js/model-usage-replay.js", html);

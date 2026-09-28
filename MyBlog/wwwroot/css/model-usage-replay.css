@@ -1,5 +1,43 @@
+.model-experiment-disclosure {
+    margin: 1.5rem 0 2rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-md);
+    background: var(--panel-strong);
+    overflow: clip;
+}
+.model-experiment-disclosure > summary {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .25rem 1rem;
+    align-items: center;
+    min-height: 64px;
+    padding: 1rem 3.25rem 1rem 1.25rem;
+    cursor: pointer;
+    list-style: none;
+    position: relative;
+}
+.model-experiment-disclosure > summary::-webkit-details-marker { display: none; }
+.model-experiment-disclosure > summary::after {
+    content: "+";
+    position: absolute;
+    right: 1.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--brand);
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+.model-experiment-disclosure[open] > summary::after { content: "−"; }
+.model-experiment-disclosure > summary:hover { background: var(--paper); }
+.model-experiment-disclosure > summary:focus-visible {
+    outline: 3px solid var(--brand);
+    outline-offset: -3px;
+}
+.experiment-disclosure-title { font-weight: 700; }
+.experiment-disclosure-note { grid-column: 1; color: var(--ink-soft); font-size: .92rem; }
+.experiment-disclosure-body { padding: 0 1.25rem 1.25rem; }
 .model-replay {
-    margin: 2rem 0;
+    margin: .5rem 0 1.5rem;
     padding: clamp(1rem, 3vw, 1.75rem);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-md);
@@ -36,6 +74,8 @@
 .model-replay th, .model-replay td { text-align: left; padding: .6rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .model-replay .replay-note { color: var(--ink-soft); font-size: .9rem; }
 @media (max-width: 650px) {
+    .model-experiment-disclosure > summary { padding-left: 1rem; }
+    .experiment-disclosure-body { padding: 0 .75rem .75rem; }
     .model-replay .replay-panels { grid-template-columns: 1fr; }
     .model-replay .replay-controls label { width: 100%; }
 }

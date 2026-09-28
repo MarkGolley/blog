@@ -53,6 +53,12 @@ def main():
 <ul>{summary_rows}</ul>
 <p>Median means the middle result of the three trials, so one unusually large or small run does not set the headline number.</p>
 {conclusion}
+<details class="model-experiment-disclosure">
+<summary>
+<span class="experiment-disclosure-title">Open the recorded experiment</span>
+<span class="experiment-disclosure-note">Replay all nine trials, inspect the submitted code and see the full results.</span>
+</summary>
+<div class="experiment-disclosure-body">
 <section class="model-replay" data-model-replay="/experiments/model-usage/2026-09-27.json" aria-labelledby="replay-title">
 <p class="replay-label">RECORDED EXPERIMENT / 27 SEPTEMBER 2026</p>
 <h3 id="replay-title">Watch the comparison</h3>
@@ -77,6 +83,8 @@ def main():
 <p>Three trials on one small problem are a useful example, not a verdict on either model. Passing these checks does not prove the code is right for every possible input. A harder task could give a different result.</p>
 <p>I also caught a mistake in my own test runner during an initial pilot: it rejected valid Python list operations. I fixed it, added a regression check and restarted every condition. That invalid pilot is kept in the experiment folder and excluded from these results.</p>
 <p>The <a href="https://developers.openai.com/api/docs/guides/reasoning">API reports reasoning usage</a> separately within output tokens. Prices came from the <a href="https://developers.openai.com/api/docs/models/gpt-6-sol">Sol</a> and <a href="https://developers.openai.com/api/docs/models/gpt-6-astra">Astra</a> model pages. The downloadable record includes exact model IDs, settings, all submitted fixes and test feedback.</p>
+</div>
+</details>
 <!-- MODEL_USAGE_EXPERIMENT_END -->'''
     post = POST.read_text(encoding='utf-8-sig')
     if '<!-- MODEL_USAGE_EXPERIMENT_START -->' in post:
