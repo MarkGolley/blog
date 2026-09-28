@@ -1,0 +1,640 @@
+{
+  "schema_version": 1,
+  "status": "invalid_pilot",
+  "started_at": "2026-09-27T19:18:25.648292+00:00",
+  "task": "Fix the Python function combine(items). This is a small shopping-list exercise\ninspired by a meal planner, not production AislePilot code.\nInput: a list of dictionaries with name (string), quantity (non-negative finite\nnumber) and unit (string). All inputs satisfy this shape.\nRules:\n- Trim and lowercase names and units; collapse internal whitespace in names.\n- Merge by normalized name AND compatible unit family. Never merge weight,\n  volume, count or distinct unknown units, even when names match.\n- g/gram/grams and kg/kilogram/kilograms are weight; return grams as unit g.\n- ml/millilitre/millilitres and l/litre/litres are volume; return millilitres as ml.\n- each/item/items are count; return unit each. Empty unit also means each.\n- Unknown units only merge with the same normalized unknown unit.\n- Convert kilograms and litres by multiplying by 1000 BEFORE adding.\n- Skip zero quantities. Do not mutate the input or its dictionaries.\n- Return a list of dictionaries containing only name, quantity, unit. Sort by\n  normalized name then output unit. Round final quantities to six decimal places.\nReturn JSON with one field, code, containing the full corrected function.\nUse only one undecorated function named combine, without imports, annotations,\nhelper functions, classes, recursion, external tools or I/O. Allowed builtins:\nstr, float, int, dict, list, tuple, set, sorted, round, len, min, max, sum, abs,\nenumerate, range, zip, isinstance. Ordinary string/list/dict methods are allowed.\nYou cannot change the tests. On a failed attempt you receive the test feedback\nand can return a replacement function, up to three attempts total.\n",
+  "starter": "def combine(items):\n    totals = {}\n    for item in items:\n        name = item[\"name\"]\n        if name not in totals:\n            totals[name] = dict(item)\n        else:\n            totals[name][\"quantity\"] += item[\"quantity\"]\n    return list(totals.values())\n",
+  "cases": [
+    [
+      "empty",
+      [],
+      []
+    ],
+    [
+      "same unit",
+      [
+        {
+          "name": "rice",
+          "quantity": 200,
+          "unit": "g"
+        },
+        {
+          "name": "rice",
+          "quantity": 300,
+          "unit": "g"
+        }
+      ],
+      [
+        {
+          "name": "rice",
+          "quantity": 500,
+          "unit": "g"
+        }
+      ]
+    ],
+    [
+      "mixed weight",
+      [
+        {
+          "name": "rice",
+          "quantity": 500,
+          "unit": "g"
+        },
+        {
+          "name": "rice",
+          "quantity": 1,
+          "unit": "kg"
+        }
+      ],
+      [
+        {
+          "name": "rice",
+          "quantity": 1500,
+          "unit": "g"
+        }
+      ]
+    ],
+    [
+      "weight aliases",
+      [
+        {
+          "name": "flour",
+          "quantity": 0.25,
+          "unit": "kilograms"
+        },
+        {
+          "name": "flour",
+          "quantity": 50,
+          "unit": "grams"
+        },
+        {
+          "name": "flour",
+          "quantity": 1,
+          "unit": "gram"
+        }
+      ],
+      [
+        {
+          "name": "flour",
+          "quantity": 301,
+          "unit": "g"
+        }
+      ]
+    ],
+    [
+      "volume",
+      [
+        {
+          "name": "milk",
+          "quantity": 0.5,
+          "unit": "l"
+        },
+        {
+          "name": "milk",
+          "quantity": 250,
+          "unit": "ml"
+        }
+      ],
+      [
+        {
+          "name": "milk",
+          "quantity": 750,
+          "unit": "ml"
+        }
+      ]
+    ],
+    [
+      "volume aliases",
+      [
+        {
+          "name": "oil",
+          "quantity": 1,
+          "unit": "litre"
+        },
+        {
+          "name": "oil",
+          "quantity": 2,
+          "unit": "millilitres"
+        },
+        {
+          "name": "oil",
+          "quantity": 3,
+          "unit": "millilitre"
+        },
+        {
+          "name": "oil",
+          "quantity": 0.1,
+          "unit": "litres"
+        }
+      ],
+      [
+        {
+          "name": "oil",
+          "quantity": 1105,
+          "unit": "ml"
+        }
+      ]
+    ],
+    [
+      "names and units",
+      [
+        {
+          "name": "  RED   Onion ",
+          "quantity": 2,
+          "unit": " ITEMS "
+        },
+        {
+          "name": "red onion",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      [
+        {
+          "name": "red onion",
+          "quantity": 3,
+          "unit": "each"
+        }
+      ]
+    ],
+    [
+      "incompatible units",
+      [
+        {
+          "name": "tomato",
+          "quantity": 2,
+          "unit": "each"
+        },
+        {
+          "name": "tomato",
+          "quantity": 500,
+          "unit": "g"
+        },
+        {
+          "name": "tomato",
+          "quantity": 100,
+          "unit": "ml"
+        }
+      ],
+      [
+        {
+          "name": "tomato",
+          "quantity": 2,
+          "unit": "each"
+        },
+        {
+          "name": "tomato",
+          "quantity": 500,
+          "unit": "g"
+        },
+        {
+          "name": "tomato",
+          "quantity": 100,
+          "unit": "ml"
+        }
+      ]
+    ],
+    [
+      "unknown units",
+      [
+        {
+          "name": "stock",
+          "quantity": 1,
+          "unit": " CUBE "
+        },
+        {
+          "name": "stock",
+          "quantity": 2,
+          "unit": "cube"
+        },
+        {
+          "name": "stock",
+          "quantity": 1,
+          "unit": "tsp"
+        }
+      ],
+      [
+        {
+          "name": "stock",
+          "quantity": 3,
+          "unit": "cube"
+        },
+        {
+          "name": "stock",
+          "quantity": 1,
+          "unit": "tsp"
+        }
+      ]
+    ],
+    [
+      "zero and empty unit",
+      [
+        {
+          "name": "eggs",
+          "quantity": 0,
+          "unit": "g"
+        },
+        {
+          "name": "eggs",
+          "quantity": 2,
+          "unit": ""
+        },
+        {
+          "name": "eggs",
+          "quantity": 1,
+          "unit": "each"
+        }
+      ],
+      [
+        {
+          "name": "eggs",
+          "quantity": 3,
+          "unit": "each"
+        }
+      ]
+    ],
+    [
+      "sort order",
+      [
+        {
+          "name": "zest",
+          "quantity": 2,
+          "unit": "g"
+        },
+        {
+          "name": "apple",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "name": "apple",
+          "quantity": 1,
+          "unit": "each"
+        }
+      ],
+      [
+        {
+          "name": "apple",
+          "quantity": 1,
+          "unit": "each"
+        },
+        {
+          "name": "apple",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "name": "zest",
+          "quantity": 2,
+          "unit": "g"
+        }
+      ]
+    ],
+    [
+      "round after summing",
+      [
+        {
+          "name": "spice",
+          "quantity": 4e-07,
+          "unit": "g"
+        },
+        {
+          "name": "spice",
+          "quantity": 4e-07,
+          "unit": "g"
+        }
+      ],
+      [
+        {
+          "name": "spice",
+          "quantity": 1e-06,
+          "unit": "g"
+        }
+      ]
+    ],
+    [
+      "decimal addition",
+      [
+        {
+          "name": "salt",
+          "quantity": 0.1,
+          "unit": "g"
+        },
+        {
+          "name": "salt",
+          "quantity": 0.2,
+          "unit": "g"
+        }
+      ],
+      [
+        {
+          "name": "salt",
+          "quantity": 0.3,
+          "unit": "g"
+        }
+      ]
+    ],
+    [
+      "conversion order",
+      [
+        {
+          "name": "flour",
+          "quantity": 0.001,
+          "unit": "kilogram"
+        },
+        {
+          "name": "flour",
+          "quantity": 0.5,
+          "unit": "g"
+        }
+      ],
+      [
+        {
+          "name": "flour",
+          "quantity": 1.5,
+          "unit": "g"
+        }
+      ]
+    ]
+  ],
+  "rates_usd_per_million": {
+    "gpt-6-sol": {
+      "input": 2,
+      "cached": 0.2,
+      "write": 2.5,
+      "output": 10
+    },
+    "gpt-6-astra": {
+      "input": 10,
+      "cached": 1,
+      "write": 12.5,
+      "output": 50
+    }
+  },
+  "pricing_checked": "2026-09-27",
+  "max_output_tokens": 8192,
+  "max_attempts": 3,
+  "repetitions": 3,
+  "budget_usd": 5.0,
+  "task_sha256": "b9e0e9c329683901c6433478d9c456b82d9d2ea0f573dbb9cfe8d07b0bd635ea",
+  "harness_sha256": {
+    "run.py": "46ea7615c9d99d70dfbc235642adcf8309febe83b329959c8a272636f4ad6de8",
+    "judge.py": "a296334452f85c127992b05c85e9447184814cf513ecb3a7eca90396410fd920",
+    "task.py": "18a87dc3ec6250a4471a6524e6f97b07ebb5470272b243eb3649768b51b15d1f"
+  },
+  "trials": [
+    {
+      "id": "gpt-6-sol-low-1",
+      "model": "gpt-6-sol",
+      "effort": "low",
+      "repetition": 1,
+      "attempts": [
+        {
+          "attempt": 1,
+          "response_id": "resp_0d0c37518ad35f9c016ab96c022ac087d2ae53048cb6118f3f",
+          "returned_model": "gpt-6-sol",
+          "response_status": "completed",
+          "incomplete_details": null,
+          "elapsed_seconds": 6.061,
+          "usage": {
+            "input_tokens": 452,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 366,
+            "output_tokens_details": {
+              "reasoning_tokens": 63
+            },
+            "total_tokens": 818
+          },
+          "estimated_cost_usd": 0.004564,
+          "code": "def combine(items):\n    totals = {}\n    for item in items:\n        quantity = item['quantity']\n        if quantity == 0:\n            continue\n\n        name = ' '.join(item['name'].lower().split())\n        unit = item['unit'].strip().lower()\n\n        if unit in ('g', 'gram', 'grams'):\n            output_unit = 'g'\n        elif unit in ('kg', 'kilogram', 'kilograms'):\n            output_unit = 'g'\n            quantity *= 1000\n        elif unit in ('ml', 'millilitre', 'millilitres'):\n            output_unit = 'ml'\n        elif unit in ('l', 'litre', 'litres'):\n            output_unit = 'ml'\n            quantity *= 1000\n        elif unit in ('', 'each', 'item', 'items'):\n            output_unit = 'each'\n        else:\n            output_unit = unit\n\n        key = (name, output_unit)\n        totals[key] = totals.get(key, 0) + quantity\n\n    return [\n        {'name': name, 'quantity': round(totals[(name, unit)], 6), 'unit': unit}\n        for name, unit in sorted(totals)\n    ]",
+          "result": {
+            "passed": true,
+            "passed_count": 14,
+            "total": 14,
+            "failures": []
+          }
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "gpt-6-astra-low-1",
+      "model": "gpt-6-astra",
+      "effort": "low",
+      "repetition": 1,
+      "attempts": [
+        {
+          "attempt": 1,
+          "response_id": "resp_0f7d0440aad64be5016ab96c079f7487d294eb9435526dd4d2",
+          "returned_model": "gpt-6-astra",
+          "response_status": "completed",
+          "incomplete_details": null,
+          "elapsed_seconds": 7.462,
+          "usage": {
+            "input_tokens": 452,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 447,
+            "output_tokens_details": {
+              "reasoning_tokens": 48
+            },
+            "total_tokens": 899
+          },
+          "estimated_cost_usd": 0.02687,
+          "code": "def combine(items):\n    units = {\n        'g': ('g', 1),\n        'gram': ('g', 1),\n        'grams': ('g', 1),\n        'kg': ('g', 1000),\n        'kilogram': ('g', 1000),\n        'kilograms': ('g', 1000),\n        'ml': ('ml', 1),\n        'millilitre': ('ml', 1),\n        'millilitres': ('ml', 1),\n        'l': ('ml', 1000),\n        'litre': ('ml', 1000),\n        'litres': ('ml', 1000),\n        'each': ('each', 1),\n        'item': ('each', 1),\n        'items': ('each', 1),\n        '': ('each', 1)\n    }\n    totals = {}\n    for item in items:\n        quantity = item['quantity']\n        if quantity == 0:\n            continue\n        name = ' '.join(item['name'].lower().split())\n        unit = item['unit'].strip().lower()\n        output_unit, factor = units.get(unit, (unit, 1))\n        key = (name, output_unit)\n        totals[key] = totals.get(key, 0) + quantity * factor\n    result = []\n    for name, unit in sorted(totals):\n        result.append({\n            'name': name,\n            'quantity': round(totals[(name, unit)], 6),\n            'unit': unit\n        })\n    return result",
+          "result": {
+            "passed": false,
+            "passed_count": 0,
+            "total": 14,
+            "failures": [
+              {
+                "test": "code format",
+                "message": "Unsupported syntax: Expr"
+              }
+            ]
+          }
+        },
+        {
+          "attempt": 2,
+          "response_id": "resp_08cd6fa0bc29264c016ab96c0f207c87d29c107cf81c296c03",
+          "returned_model": "gpt-6-astra",
+          "response_status": "completed",
+          "incomplete_details": null,
+          "elapsed_seconds": 7.474,
+          "usage": {
+            "input_tokens": 902,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 390,
+            "output_tokens_details": {
+              "reasoning_tokens": 33
+            },
+            "total_tokens": 1292
+          },
+          "estimated_cost_usd": 0.02852,
+          "code": "def combine(items):\n    units = {\n        'g': ('g', 1), 'gram': ('g', 1), 'grams': ('g', 1),\n        'kg': ('g', 1000), 'kilogram': ('g', 1000), 'kilograms': ('g', 1000),\n        'ml': ('ml', 1), 'millilitre': ('ml', 1), 'millilitres': ('ml', 1),\n        'l': ('ml', 1000), 'litre': ('ml', 1000), 'litres': ('ml', 1000),\n        'each': ('each', 1), 'item': ('each', 1), 'items': ('each', 1),\n        '': ('each', 1)\n    }\n    totals = {}\n    for item in items:\n        quantity = item['quantity']\n        if quantity != 0:\n            name = ' '.join(item['name'].lower().split())\n            unit = item['unit'].strip().lower()\n            output_unit, factor = units.get(unit, (unit, 1))\n            key = (name, output_unit)\n            totals[key] = totals.get(key, 0) + quantity * factor\n    result = []\n    for name, unit in sorted(totals):\n        result = result + [{'name': name, 'quantity': round(totals[(name, unit)], 6), 'unit': unit}]\n    return result",
+          "result": {
+            "passed": true,
+            "passed_count": 14,
+            "total": 14,
+            "failures": []
+          }
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "gpt-6-sol-high-1",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "repetition": 1,
+      "attempts": [
+        {
+          "attempt": 1,
+          "response_id": "resp_0a9a3d1f0b209102016ab96c16aba487d28046203c9e64652d",
+          "returned_model": "gpt-6-sol",
+          "response_status": "completed",
+          "incomplete_details": null,
+          "elapsed_seconds": 9.008,
+          "usage": {
+            "input_tokens": 452,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 649,
+            "output_tokens_details": {
+              "reasoning_tokens": 342
+            },
+            "total_tokens": 1101
+          },
+          "estimated_cost_usd": 0.007394,
+          "code": "def combine(items):\n    totals = {}\n    for item in items:\n        quantity = item[\"quantity\"]\n        if quantity == 0:\n            continue\n\n        name = \" \".join(item[\"name\"].strip().lower().split())\n        unit = item[\"unit\"].strip().lower()\n\n        if unit in (\"g\", \"gram\", \"grams\"):\n            unit = \"g\"\n        elif unit in (\"kg\", \"kilogram\", \"kilograms\"):\n            unit = \"g\"\n            quantity *= 1000\n        elif unit in (\"ml\", \"millilitre\", \"millilitres\"):\n            unit = \"ml\"\n        elif unit in (\"l\", \"litre\", \"litres\"):\n            unit = \"ml\"\n            quantity *= 1000\n        elif unit in (\"\", \"each\", \"item\", \"items\"):\n            unit = \"each\"\n\n        key = (name, unit)\n        totals[key] = totals.get(key, 0) + quantity\n\n    result = []\n    for name, unit in sorted(totals):\n        result.append({\"name\": name, \"quantity\": round(totals[(name, unit)], 6), \"unit\": unit})\n    return result",
+          "result": {
+            "passed": false,
+            "passed_count": 0,
+            "total": 14,
+            "failures": [
+              {
+                "test": "code format",
+                "message": "Unsupported syntax: Expr"
+              }
+            ]
+          }
+        },
+        {
+          "attempt": 2,
+          "response_id": "resp_0641e4b78166f63e016ab96c1fc96087d29aac931fa5759a59",
+          "returned_model": "gpt-6-sol",
+          "response_status": "completed",
+          "incomplete_details": null,
+          "elapsed_seconds": 7.459,
+          "usage": {
+            "input_tokens": 810,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 542,
+            "output_tokens_details": {
+              "reasoning_tokens": 233
+            },
+            "total_tokens": 1352
+          },
+          "estimated_cost_usd": 0.00704,
+          "code": "def combine(items):\n    totals = {}\n    for item in items:\n        quantity = item[\"quantity\"]\n        if quantity == 0:\n            continue\n\n        name = \" \".join(item[\"name\"].strip().lower().split())\n        unit = item[\"unit\"].strip().lower()\n\n        if unit in (\"g\", \"gram\", \"grams\"):\n            unit = \"g\"\n        elif unit in (\"kg\", \"kilogram\", \"kilograms\"):\n            unit = \"g\"\n            quantity *= 1000\n        elif unit in (\"ml\", \"millilitre\", \"millilitres\"):\n            unit = \"ml\"\n        elif unit in (\"l\", \"litre\", \"litres\"):\n            unit = \"ml\"\n            quantity *= 1000\n        elif unit in (\"\", \"each\", \"item\", \"items\"):\n            unit = \"each\"\n\n        key = (name, unit)\n        totals[key] = totals.get(key, 0) + quantity\n\n    result = []\n    for name, unit in sorted(totals):\n        result = result + [{\"name\": name, \"quantity\": round(totals[(name, unit)], 6), \"unit\": unit}]\n    return result",
+          "result": {
+            "passed": true,
+            "passed_count": 14,
+            "total": 14,
+            "failures": []
+          }
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "gpt-6-astra-low-2",
+      "model": "gpt-6-astra",
+      "effort": "low",
+      "repetition": 2,
+      "attempts": [
+        {
+          "attempt": 1,
+          "response_id": "resp_0d3e2a7672f85041016ab96c273b8887d2beffc67a79654141",
+          "returned_model": "gpt-6-astra",
+          "response_status": "completed",
+          "incomplete_details": null,
+          "elapsed_seconds": 8.131,
+          "usage": {
+            "input_tokens": 452,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 451,
+            "output_tokens_details": {
+              "reasoning_tokens": 67
+            },
+            "total_tokens": 903
+          },
+          "estimated_cost_usd": 0.02707,
+          "code": "def combine(items):\n    units = {\n        'g': ('g', 1),\n        'gram': ('g', 1),\n        'grams': ('g', 1),\n        'kg': ('g', 1000),\n        'kilogram': ('g', 1000),\n        'kilograms': ('g', 1000),\n        'ml': ('ml', 1),\n        'millilitre': ('ml', 1),\n        'millilitres': ('ml', 1),\n        'l': ('ml', 1000),\n        'litre': ('ml', 1000),\n        'litres': ('ml', 1000),\n        'each': ('each', 1),\n        'item': ('each', 1),\n        'items': ('each', 1),\n        '': ('each', 1)\n    }\n    totals = {}\n    for item in items:\n        quantity = item['quantity']\n        if quantity == 0:\n            continue\n        name = ' '.join(item['name'].strip().lower().split())\n        unit = item['unit'].strip().lower()\n        output_unit, factor = units.get(unit, (unit, 1))\n        key = (name, output_unit)\n        totals[key] = totals.get(key, 0) + quantity * factor\n    return [\n        {'name': name, 'quantity': round(totals[(name, unit)], 6), 'unit': unit}\n        for name, unit in sorted(totals)\n    ]",
+          "result": {
+            "passed": true,
+            "passed_count": 14,
+            "total": 14,
+            "failures": []
+          }
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "gpt-6-sol-high-2",
+      "model": "gpt-6-sol",
+      "effort": "high",
+      "repetition": 2,
+      "attempts": [
+        {
+          "attempt": 1,
+          "response_id": "resp_0c9bdd6de62c8d29016ab96c2f75f887d2b9681c94ed585822",
+          "returned_model": "gpt-6-sol",
+          "response_status": "completed",
+          "incomplete_details": null,
+          "elapsed_seconds": 10.225,
+          "usage": {
+            "input_tokens": 452,
+            "input_tokens_details": {
+              "cache_write_tokens": 0,
+              "cached_tokens": 0
+            },
+            "output_tokens": 839,
+            "output_tokens_details": {
+              "reasoning_tokens": 516
+            },
+            "total_tokens": 1291
+          },
+          "estimated_cost_usd": 0.009294,
+          "code": "def combine(items):\n    totals = {}\n    for item in items:\n        quantity = item[\"quantity\"]\n        if quantity == 0:\n            continue\n\n        name = \" \".join(item[\"name\"].strip().lower().split())\n        unit = item[\"unit\"].strip().lower()\n\n        if unit in (\"g\", \"gram\", \"grams\", \"kg\", \"kilogram\", \"kilograms\"):\n            output_unit = \"g\"\n            if unit in (\"kg\", \"kilogram\", \"kilograms\"):\n                quantity *= 1000\n        elif unit in (\"ml\", \"millilitre\", \"millilitres\", \"l\", \"litre\", \"litres\"):\n            output_unit = \"ml\"\n            if unit in (\"l\", \"litre\", \"litres\"):\n                quantity *= 1000\n        elif unit in (\"\", \"each\", \"item\", \"items\"):\n            output_unit = \"each\"\n        else:\n            output_unit = unit\n\n        key = (name, output_unit)\n        totals[key] = totals.get(key, 0) + quantity\n\n    return [\n        {\"name\": name, \"quantity\": round(totals[(name, unit)], 6), \"unit\": unit}\n        for name, unit in sorted(totals)\n    ]",
+          "result": {
+            "passed": true,
+            "passed_count": 14,
+            "total": 14,
+            "failures": []
+          }
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "estimated_cost_usd": 0.110752,
+  "exclusion_reason": "Evaluator mistakenly rejected ast.Expr (valid list.append statements). Stopped and restarted all conditions after regression test. One interrupted request may not have usage recorded."
+}

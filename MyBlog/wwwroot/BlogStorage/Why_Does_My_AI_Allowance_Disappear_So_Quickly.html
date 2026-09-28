@@ -1,0 +1,138 @@
+<!-- PublishedDate: 2026-09-27 -->
+<!-- Title: Why Does My AI Allowance Disappear So Quickly? -->
+<!-- Summary: Getting more useful work from ChatGPT Plus: choosing Astra or Sol, understanding usage, and deciding when to work in ChatGPT desktop or your IDE. -->
+<!-- Tags: AI, Developer Productivity, Software Engineering, Learning -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Why Does My AI Allowance Disappear So Quickly?</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/blogs.css">
+</head>
+<body>
+<p><em>Choosing between Astra and Sol - and when to use ChatGPT desktop or your IDE.</em></p>
+<p>The newer models are impressive. The speed at which I can get through my allowance is rather less impressive. That has made me think more carefully about how I use my GPT Plus membership. It is tempting to select the most capable model, turn up the reasoning, and leave it there. If a better model is available, why wouldn't I use it?</p>
+<p>Then I hit a limit halfway through something useful. Suddenly, choosing the strongest model for every little job does not seem quite so sensible.</p>
+<p>So this is what I wanted to work out: <strong>how do I get more useful work from the membership I already pay for?</strong></p>
+<p><small>Product details checked on 27 September 2026. Models and limits change, so check what is available in your account.</small></p>
+
+<h2>What am I actually using up?</h2>
+<p>I keep thinking of it as “burning tokens”, but that needs a bit of explanation.</p>
+<p>Tokens are small chunks of information the model reads and writes. Your question counts, but so do files, earlier messages and results from tools. The reply you see is only part of it. Your allowance also depends on the model and how it does the work. <a href="https://learn.chatgpt.com/docs/pricing">OpenAI explains the usage rules here</a>.</p>
+<p>Imagine asking: “Why is this test failing?” That is one short message. But the agent might read five files, run the test, inspect the error and try a different approach. There is quite a lot going on behind that one question.</p>
+<p>So hitting a limit sooner does not, by itself, prove that a newer model writes more tokens. And asking for a shorter answer will not fix an agent spending ages investigating the wrong thing.</p>
+
+<h2>Does every task deserve Astra?</h2>
+<p>OpenAI describes Astra as the choice for harder problems, and Sol as a good everyday model for writing and coding. That seems a useful place to start, rather than automatically picking the biggest option. <a href="https://developers.openai.com/api/docs/guides/model-selection">Here is its model guide</a>.</p>
+<p>Here is the approach I start with:</p>
+<ul>
+    <li><strong>I know what needs doing:</strong> start with Sol. Fix a small bug, add a straightforward feature or tidy up a draft.</li>
+    <li><strong>I cannot work out what is going wrong:</strong> consider Astra. A bug that crosses several parts of the application is a better reason to use it than changing a button label.</li>
+    <li><strong>It is a simple, repetitive job:</strong> consider Luna. There are smaller options too.</li>
+</ul>
+<p>The reasoning setting matters as well. Think of it as how much effort you ask the model to spend working through the problem. I would not turn it up to maximum for every task. OpenAI's guide recommends trying settings and keeping the lighter option when it does the job well.</p>
+<p>Of course, repeatedly telling Sol to “try again” is not necessarily saving anything. If Astra solves the problem with fewer attempts, it could be the better choice overall. I put together a small <a href="#model-usage-experiment">shopping-list experiment below</a> to start testing this. As it turned out, none of the models needed a second attempt on that task.</p>
+<p>Before switching, though, check what you have given it. Did you include the actual error? Does it know what the code is supposed to do? A stronger model still needs the right information.</p>
+
+<h2>Check which Sol you actually mean</h2>
+<p>There is another small catch: GPT-5.6 Sol and GPT-6 Sol are different versions with different published rates. Just saying “I used Sol” leaves out something useful.</p>
+<p>For the same amount and type of tokens at Standard speed, the published credit rate for GPT-6 Astra is five times GPT-6 Sol's rate. That does <strong>not</strong> mean your Plus allowance will last exactly five times longer with Sol. Credit pricing and included subscription limits are different things. <a href="https://learn.chatgpt.com/docs/pricing">The current rates are listed here</a>.</p>
+<p>Check the full model name in the picker, especially when following advice written a few months ago.</p>
+
+<h2>ChatGPT desktop or the IDE?</h2>
+<p>By IDE, I mean the editor where I write and run my code, such as Rider or VS Code.</p>
+<p>I would start in ChatGPT desktop when I want to talk an idea through, compare options or work with documents. The app can also work with files, projects and other tools, so it is useful for more than chatting. <a href="https://learn.chatgpt.com/docs/app">More about the desktop app</a>.</p>
+<p>Once I need help with the actual code, the IDE often makes more sense. I can point the agent at an open file or selected code and review its changes alongside it. That is what the <a href="https://learn.chatgpt.com/docs/codex/ide">Codex IDE integration</a> is designed to support.</p>
+<p>For example, I could use ChatGPT to discuss whether AislePilot should reuse a saved meal plan instead of generating one again. When it comes to changing that behaviour, I want the agent looking at how my app actually works. Otherwise we could spend a lot of time discussing a solution that does not fit.</p>
+<p>There is overlap. Desktop can change code too, and the IDE can help explain an idea. I would use whichever makes the job easier to follow.</p>
+<p>One thing to be clear about: <strong>switching apps does not give you a fresh allowance.</strong> ChatGPT Work and Codex share usage. Regular Chat is a separate mode, so check which one you are using and the limits shown in your account. <a href="https://learn.chatgpt.com/docs/pricing">More about shared usage</a>.</p>
+
+<h2>Do not make it start from scratch</h2>
+<p>If I move from discussing an idea in ChatGPT to building it in the IDE, I want to take the useful decisions with me. A short note is usually easier to follow than a whole conversation:</p>
+<pre><code>Fix the message shown when the email field is empty.
+It should tell the user to enter an email address.
+Keep the other validation rules as they are.
+Check whether the message comes from the browser or server.
+Add a test for this case and run the relevant existing tests.</code></pre>
+<p>That says what I want, what should stay the same and how to check it worked.</p>
+<p>For a task already in progress, I would keep the conversation going while its history is useful. For something unrelated, I would start a new one. There is little benefit in carrying a long discussion about meal planning into a completely different bug fix.</p>
+
+<h2>The easiest work to save is work I never needed</h2>
+<p>If I ask for a bug fix and the agent starts rebuilding half the feature, I want to know why. It might have a good reason. It might also have found extra work that can wait.</p>
+<p>The same applies when it gets stuck. Before another attempt, ask what it has learned and what it will try differently. Watching it make the same mistake again is frustrating enough without using more of the allowance.</p>
+<p>A prompt I would use is:</p>
+<blockquote><p>Keep this focused on the change I asked for. Make a note of unrelated improvements for later. If you get stuck, explain what you have learned and what you will try next. Once it works and the relevant checks pass, stop and tell me what changed.</p></blockquote>
+<p>This is not a magic token-saving prompt. It is a way to avoid paying for work I did not need in the first place.</p>
+
+<!-- MODEL_USAGE_EXPERIMENT_START -->
+<h2 id="model-usage-experiment">I gave both models the same broken shopping list</h2>
+<p>I used a small Python function inspired by AislePilot. Its job was to combine ingredients: 500 g of rice plus 1 kg should become 1,500 g. Two tomatoes and 500 g of tomatoes should stay separate. The starting code got those cases wrong.</p>
+<p>I compared Sol Low, Astra Low and Sol High, with three fresh trials each. Every trial received the same instructions and starting function. A fixed set of 14 checks covered units, names, sorting, rounding and leaving the input unchanged. Each model could submit up to three fixes, receiving the same kind of test feedback after a failure.</p>
+<p>This was a small API code-fixing exercise, not an IDE session or a measurement of Plus limits. The models had no browsing or file tools. Requests ran one at a time, with the order rotated between rounds. All nine results are below.</p>
+<ul><li><strong>gpt-6-sol / low:</strong> 3/3 passed; median 840 tokens and $0.00478 per trial.</li>
+<li><strong>gpt-6-astra / low:</strong> 3/3 passed; median 827 tokens and $0.02327 per trial.</li>
+<li><strong>gpt-6-sol / high:</strong> 3/3 passed; median 1,264 tokens and $0.00902 per trial.</li>
+</ul>
+<p>Median means the middle result of the three trials, so one unusually large or small run does not set the headline number.</p>
+<p><strong>Every model passed on its first attempt.</strong> Sol Low was enough for this problem. Astra Low used a similar number of tokens, but cost more at its higher rate. Sol High used more tokens without improving the test result.</p>
+<p>That supports starting with a lower setting for a small, clearly explained job. It does not show whether Astra saves retries on harder work, because none of these valid trials needed a retry.</p>
+<details class="model-experiment-disclosure">
+<summary>
+<span class="experiment-disclosure-title">Open the recorded experiment</span>
+<span class="experiment-disclosure-note">Replay all nine trials, inspect the submitted code and see the full results.</span>
+</summary>
+<div class="experiment-disclosure-body">
+<section class="model-replay" data-model-replay="/experiments/model-usage/2026-09-27.json" aria-labelledby="replay-title">
+<p class="replay-label">RECORDED EXPERIMENT / 27 SEPTEMBER 2026</p>
+<h3 id="replay-title">Watch the comparison</h3>
+<p>Replay real responses at 4x speed, or skip straight to the results. This does not call an AI model or use your allowance. Counts appear when each response finished; there is no live token stream.</p>
+<p class="replay-note">The two timelines start together for comparison. The actual API requests ran sequentially. Times cover the API request, not the local test run.</p>
+<p role="status" data-replay-status>Loading the recording. All results are also in the table below.</p>
+<div data-replay-controls hidden>
+<div class="replay-controls">
+<label>Compare<select data-comparison><option value="models">Sol Low vs Astra Low</option><option value="effort">Sol Low vs Sol High</option></select></label>
+<label>Trial<select data-repetition><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+<button type="button" data-play>Play recording</button><button type="button" data-finish>Show results</button><button type="button" data-reset>Reset</button></div>
+<label class="replay-seek">Recording position<input type="range" data-seek min="0" max="1" step="0.001" value="0"></label>
+<p data-clock></p></div>
+<div class="replay-panels" data-replay-panels hidden><article class="replay-panel" data-replay-panel>
+<h4 data-model></h4><p data-state></p><p class="replay-total" data-tokens></p><p>Total tokens so far</p>
+<dl><dt>Input</dt><dd data-input></dd><dt>Output</dt><dd data-output></dd><dt>Reasoning (inside output)</dt><dd data-reasoning></dd><dt>Estimated API cost</dt><dd data-cost></dd></dl>
+<details><summary>Inspect the submitted fix</summary><pre><code data-code></code></pre></details>
+<details><summary>Inspect test feedback</summary><pre data-feedback></pre></details></article><article class="replay-panel" data-replay-panel>
+<h4 data-model></h4><p data-state></p><p class="replay-total" data-tokens></p><p>Total tokens so far</p>
+<dl><dt>Input</dt><dd data-input></dd><dt>Output</dt><dd data-output></dd><dt>Reasoning (inside output)</dt><dd data-reasoning></dd><dt>Estimated API cost</dt><dd data-cost></dd></dl>
+<details><summary>Inspect the submitted fix</summary><pre><code data-code></code></pre></details>
+<details><summary>Inspect test feedback</summary><pre data-feedback></pre></details></article></div>
+<noscript><p>The interactive replay needs JavaScript. The complete results remain available below.</p></noscript>
+<div class="replay-table-wrap" tabindex="0" role="region" aria-label="All nine experiment results">
+<table><caption>Every trial, including all attempts</caption><thead><tr><th scope="col">Model / effort</th><th scope="col">Trial</th><th scope="col">Result</th><th scope="col">Attempts</th><th scope="col">Tokens</th><th scope="col">API time</th><th scope="col">Est. USD</th></tr></thead><tbody><tr><th scope="row">gpt-6-astra / low</th><td>1</td><td>Pass</td><td>1</td><td>808</td><td>5.63s</td><td>$0.02232</td></tr>
+<tr><th scope="row">gpt-6-sol / high</th><td>1</td><td>Pass</td><td>1</td><td>1,109</td><td>8.37s</td><td>$0.00747</td></tr>
+<tr><th scope="row">gpt-6-sol / low</th><td>1</td><td>Pass</td><td>1</td><td>803</td><td>4.46s</td><td>$0.00441</td></tr>
+<tr><th scope="row">gpt-6-astra / low</th><td>2</td><td>Pass</td><td>1</td><td>890</td><td>7.38s</td><td>$0.02642</td></tr>
+<tr><th scope="row">gpt-6-sol / high</th><td>2</td><td>Pass</td><td>1</td><td>1,264</td><td>10.03s</td><td>$0.00902</td></tr>
+<tr><th scope="row">gpt-6-sol / low</th><td>2</td><td>Pass</td><td>1</td><td>862</td><td>5.47s</td><td>$0.00500</td></tr>
+<tr><th scope="row">gpt-6-astra / low</th><td>3</td><td>Pass</td><td>1</td><td>827</td><td>7.42s</td><td>$0.02327</td></tr>
+<tr><th scope="row">gpt-6-sol / high</th><td>3</td><td>Pass</td><td>1</td><td>1,275</td><td>8.94s</td><td>$0.00913</td></tr>
+<tr><th scope="row">gpt-6-sol / low</th><td>3</td><td>Pass</td><td>1</td><td>840</td><td>4.57s</td><td>$0.00478</td></tr>
+</tbody></table></div>
+<p class="replay-note">Reasoning is already included in output tokens. Costs use recorded input, cached input, cache writes and output at the dated Standard API rates. They are estimates, not an invoice or a conversion to Plus allowance.</p>
+<p><a href="/experiments/model-usage/2026-09-27.json" download>Download the full recording, task and test cases (JSON)</a></p>
+</section>
+<h3>How much can this tell us?</h3>
+<p>Three trials on one small problem are a useful example, not a verdict on either model. Passing these checks does not prove the code is right for every possible input. A harder task could give a different result.</p>
+<p>I also caught a mistake in my own test runner during an initial pilot: it rejected valid Python list operations. I fixed it, added a regression check and restarted every condition. That invalid pilot is kept in the experiment folder and excluded from these results.</p>
+<p>The <a href="https://developers.openai.com/api/docs/guides/reasoning">API reports reasoning usage</a> separately within output tokens. Prices came from the <a href="https://developers.openai.com/api/docs/models/gpt-6-sol">Sol</a> and <a href="https://developers.openai.com/api/docs/models/gpt-6-astra">Astra</a> model pages. The downloadable record includes exact model IDs, settings, all submitted fixes and test feedback.</p>
+</div>
+</details>
+<!-- MODEL_USAGE_EXPERIMENT_END -->
+
+<h2>What I would change first</h2>
+<p>Start with Sol for everyday jobs. Give Astra the harder problems. Use ChatGPT desktop to talk things through, and bring the work into the IDE when having the code in front of you helps.</p>
+<p>As I wrote in <a href="/blog/AI_Agents_Can_Do_The_Work_But_Dont_Skip_The_Learning">my post about AI and learning</a>, I still need to understand what has been done. A confident answer is not enough.</p>
+<p>I want to finish something useful, understand it, and still have some allowance left to carry on. That feels like a better use of Plus than leaving everything on the strongest setting and hoping for the best.</p>
+<link rel="stylesheet" href="/css/model-usage-replay.css">
+<script src="/js/model-usage-replay.js" defer></script>
+</body>
+</html>
